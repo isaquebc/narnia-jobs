@@ -45,6 +45,10 @@ A extração do currículo e o recrutador usam a **sua** assinatura do Claude, p
 
 `./start.sh doctor` mostra qual mecanismo está ativo (volume, token ou nenhum), além de Redis, pasta de dados e worker.
 
+### Perfis
+
+Depois do primeiro uso, **Perfis** (menu lateral ou "Gerenciar perfis" no seletor do topo) permite ter vários perfis sobre os mesmos fatos, um por cargo-alvo: criar do zero ou clonar, trocar o ativo pelo seletor (todas as abas acompanham), renomear, arquivar e desarquivar. Em cada perfil: **Ênfases** (destacar, ocultar e ordenar experiências, projetos, skills, formação e idiomas, com prévia do cartão), **Narrativa** (seu pitch), **Recrutador** (persona: tom, honestidade, rigor e senioridade do recrutador, com restaurar padrão) e **Cartão** (o resumo de ~300 tokens que o recrutador recebe; mostra se está desatualizado e tem o botão "Atualizar cartão"). O dashboard sugere perfis por heurística, sem custo; o botão **Analisar possíveis perfis** usa o modelo sobre todo o seu histórico e, por isso, mostra a estimativa de tokens e pede confirmação antes.
+
 ### Onde ficam os dados e como fazer backup
 
 Tudo que é seu fica em `./data` (ou na pasta apontada por `NARNIA_DATA_DIR` no `.env`): banco SQLite, currículos enviados, textos extraídos, documentos gerados e logs de uso. Essa pasta nunca entra no repositório (`.gitignore`). **Backup = copiar `./data`** com os serviços parados (`./start.sh down`). O login da assinatura fica no volume Docker `claude-auth`, e a fila no volume `redis-data`.
@@ -113,4 +117,4 @@ Os corpos de exemplo de `user.json` e `profile.json` estão em `apps/api/test/he
 
 Com `./start.sh dev` no ar, abra `http://127.0.0.1:5173/?token=dev-token`. O `?token=` vira cookie (`/api/auth/enter`) e a página volta para `/`, que redireciona ao passo salvo do onboarding ou ao dashboard. O Vite faz proxy de `/api` e `/ws` para a api. Fluxo do primeiro uso em 5 passos: provider → currículo (arquivo ou texto livre, com opções de OCR e leitura pelo modelo e estimativa por chamada) → extração (etapas da cadeia, também na bandeja de atividades do topo) → revisão (identidade com telefone obrigatório, propostas com origem por trecho) → perfil (dados de carreira obrigatórios, "não sei" marca para pesquisa, alerta informativo do piso DIEESE) → dashboard. Tema claro/escuro no ícone do topo; textos vêm todos de `apps/web/src/i18n/pt-BR.ts`.
 
-Estrutura: `apps/web` (React + Vite), `apps/api` (Hono: REST, WS, enfileira jobs, CLI `narnia-jobs`), `apps/e2e` (Playwright, um arquivo por cenário E2E-xx do F01), `apps/worker` (BullMQ: cadeia de ingestão), `packages/shared` (schemas zod, contratos, tempo, i18n), `packages/core` (domínio, storage, leituras de PDF, consolidação), `packages/providers` (Claude Code via Agent SDK e mock). Metodologia: TDD, conforme `plans/plan-v0/09-metodologia-tdd.md`.
+Estrutura: `apps/web` (React + Vite), `apps/api` (Hono: REST, WS, enfileira jobs, CLI `narnia-jobs`), `apps/e2e` (Playwright, um arquivo por cenário: `e2e-NN-*` do F01 e `f02-NN-*` do F02), `apps/worker` (BullMQ: cadeia de ingestão), `packages/shared` (schemas zod, contratos, tempo, i18n), `packages/core` (domínio, storage, leituras de PDF, consolidação), `packages/providers` (Claude Code via Agent SDK e mock). Metodologia: TDD, conforme `plans/plan-v0/09-metodologia-tdd.md`.

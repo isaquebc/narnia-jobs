@@ -105,11 +105,11 @@ Regra: o modelo recebe no máximo o **cartão do perfil** sem pedir. Todo o rest
 
 | Grupo | Tools | Notas |
 |-------|-------|-------|
-| profile | `profile.list`, `profile.get_card`, `profile.switch`, `profile.update_emphasis`, `profile.create` | o cartão é cacheado e invalidado em qualquer escrita |
+| profile | `profile.list`, `profile.get_card`, `profile.switch`, `profile.update_emphasis`, `profile.update_pitch`, `profile.create` | **definidas em F02**: schemas zod em `packages/shared/src/mcp/profile.ts` e handlers puros em `packages/core/src/profile/tools.ts` (recebem `Repos`, validam entrada e saída); a exposição pelo servidor MCP é F04. O cartão é cacheado em `profile.card_json` e vale enquanto `card_facts_version = settings.facts_version` (fatos) e `card_updated_at` não for anulado por hooks em usuário, perfil e ênfases (F02-1); a relevância por fato (`profile_fact_relevance`, F02-2) é calculada junto com o cartão e ordena o top-3/top-8 e, em F04, a busca |
 | evidence | `experience.list/get/upsert`, `project.list/get/upsert`, `skill.list/upsert`, `education.list/upsert`, `achievement.add` | `list` devolve resumos de 1 linha; `get` o detalhe |
 | facts | `fact.search(q)`, `fact.verify(id)`, `fact.unverified(limit)` | busca FTS5 no SQLite |
 | research | `research.save(url, title, excerpt, used_for)` + tool nativa **WebSearch** liberada para o agente recrutador | só para preencher dados obrigatórios que o usuário não sabe; fontes confiáveis, sempre citadas |
-| jobs | `job.status(id)`, `job.list(profile)` | o agente informa o andamento de ingestões em segundo plano |
+| jobs | `job.status(id)`, `job.list(profile)` | o agente informa o andamento de ingestões em segundo plano. Desde F02 há dois tipos de job: **etapas** de ingestão (`runId` + `stage`, cadeia de F01) e **tarefas** genéricas (`enqueueTask` no `core`, id `task__<tipo>__<chave>`, despacho `processTask` no worker por registro de handlers); `profile.analyze` é a primeira tarefa |
 | session | `session.set_category(cat)` | categoria alimenta o medidor e o "limpar cache" |
 | ingest | `ingest.prepare(source, depth)`, `ingest.next_chunk(run)`, `ingest.propose(run, facts[])`, `ingest.set_digest(run, file, digest)`, `ingest.finish(run)` | ver §6 |
 | files | `file.list`, `file.get_digest(id)`, `file.get_text(id, from, to)` | o digest (~200–400 tokens) substitui reabrir o arquivo; texto só por trecho |

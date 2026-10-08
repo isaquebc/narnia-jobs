@@ -38,7 +38,15 @@ Regras:
   → features mostram dados/saídas apenas deste perfil
 ```
 
-Criar perfil novo: a partir de um existente (clona ênfases) ou do zero. O usuário base **não** é duplicado: o perfil apenas marca o que enfatizar, ocultar e como narrar.
+Criar perfil novo: a partir de um existente (clona ênfases, narrativa e persona; a carreira é pedida de novo, F02-8) ou do zero. O usuário base **não** é duplicado: o perfil apenas marca o que enfatizar, ocultar e como narrar.
+
+Implementado em F02 (2026-10-08):
+- **Seletor no topo do shell** com o perfil ativo; a troca avisa todas as abas abertas (`profile.switched`) e nunca perde um formulário não salvo (confirmação). Dashboard mostra o cartão resumido, contadores de ênfase e pendências do perfil ativo.
+- **Perfis** (`/perfis`): ativar, renomear, clonar, **arquivar** (nunca o ativo) e desarquivar com "mostrar arquivados"; apagar só perfil arquivado, em F10 (F02-6).
+- **Ênfases** por experiência, projeto, skill, formação e idioma: destacar, normal, ocultar; ordem por arraste ou botões; prévia do cartão. Por conquista entra em F05 (F02-3).
+- **Narrativa** (pitch) e **Recrutador**: persona derivada do perfil com padrões tom direto, honestidade máxima, rigor alto e recrutador sempre sênior, todos ajustáveis por seletor com restaurar padrão (F02-7).
+- **Cartão do perfil** (~300 tokens, com resumo objetivo heurístico): estado válido/desatualizado, "atualizado em" no fuso do usuário e botão **Atualizar cartão**; invalidação automática em qualquer escrita (F02-1).
+- **Sugestões de perfil**: heurísticas automáticas (banner no dashboard, zero tokens) e o botão **Analisar possíveis perfis**, que leva todo o histórico ao modelo depois de um alerta com estimativa de tokens e confirmação (F02-5); aceitar abre o formulário pré-preenchido e dispensar persiste.
 
 ## F3 · Ingestão de dados
 

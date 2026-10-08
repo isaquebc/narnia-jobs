@@ -95,11 +95,15 @@ Finalidade: o agente e as features leem o registro em vez de abrir o arquivo; o 
 | área / indústria | software, fintech, saúde... |
 | objetivo | novo emprego, mudança de área, freela, promoção interna |
 | mercado-alvo e idioma dos documentos | Brasil/pt-BR, EUA/en-US, Europa/en... |
-| ênfases | experiências/projetos/skills a destacar, ocultar ou reordenar |
+| ênfases | experiências/projetos/skills/formação/idiomas a destacar, ocultar ou reordenar (`profile_emphasis`: `fact_kind`, `fact_id`, `mode` highlight/normal/hidden, `position`; por conquista em F05) |
 | narrativa ("pitch") | 3–5 linhas que o recrutador refina com o usuário |
-| configuração do recrutador | persona (área de especialidade, nível), tom, rigor |
+| configuração do recrutador | persona derivada (especialidade, nível-alvo, mercado, idioma) + enums com padrão: tom direto/cordial, honestidade máxima/diplomática, rigor alto/médio, senioridade do recrutador sênior/pleno; overrides em `profile.persona_overrides_json` (F02-7) |
 | metas para este perfil | salário, empresas-alvo, prazo |
-| **cartão do perfil** (derivado, cacheado) | resumo de ~300 tokens injetado em todo prompt; recalculado quando dados mudam |
+| **cartão do perfil** (derivado, cacheado) | resumo de ~300 tokens (teto 1.600 chars) com resumo objetivo heurístico; `profile.card_json = {text, tokensEst, hash, factsVersion, builtAt}`, `card_facts_version`, `card_updated_at`; inválido quando a versão dos fatos avança ou um hook anula a data; reconstruído na leitura ou pelo botão (F02-1/F02-2) |
+| relevância por fato (derivada) | `profile_fact_relevance` (`profile_id`, `fact_kind`, `fact_id`, `score` 0–1, `reasons_json`, `computed_at`), gravada junto com o cartão; ordena o cartão e a busca de F04 |
+| sugestões de perfil | `profile_suggestion` (`source` heuristic/model, `model`, `payload_json` com título, senioridade, área, mercado, justificativa e fatos de apoio, `status` new/accepted/dismissed) |
+| arquivamento e clonagem | `profile.archived_at`, `profile.cloned_from`; perfil ativo em `profile.is_active` |
+| projetos (F02-9) | tabela `project` criada vazia em `0002` (`name`, `description`, `url`, `role`, datas, `tech_json`, origem/confiança/verificação como os demais fatos); preenchida por F03 |
 
 ---
 
