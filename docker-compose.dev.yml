@@ -1,0 +1,67 @@
+# Desenvolvimento, lint, testes e build: tudo dentro de containers. O host só precisa de Docker.
+# Uso via ./start.sh:  dev | test | lint | typecheck | build | shell | test:sh
+#   ./start.sh dev  -> sobe web (Vite :5173), api (tsx watch :3100), worker e redis com hot reload
+#   demais          -> docker compose -f docker-compose.dev.yml run --rm dev pnpm <cmd>
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    target: dev
+  user: node
+  working_dir: /app
+  volumes:
+    - .:/app
+    - node_modules:/app/node_modules
+    - pnpm-store:/pnpm/store
+  environment:
+    - REDIS_URL=redis://redis:6379
+    - NARNIA_DATA_DIR=/app/data
+    - NARNIA_PROVIDER=${NARNIA_PROVIDER:-mock}
+
+services:
+  dev:
+    <<: *dev
+    depends_on: [redis]
+    command: ["pnpm", "--version"]
+
+  api:
+    <<: *dev
+    profiles: ["app"]
+    command: ["pnpm", "--filter", "@narnia-jobs/api", "exec", "tsx", "watch", "src/server.ts"]
+    ports:
+      - "127.0.0.1:${NARNIA_DEV_API_PORT:-3100}:3100"   # só em dev: a API fica acessível no host para curl/Vite
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - NARNIA_DATA_DIR=/app/data
+      - NARNIA_PROVIDER=${NARNIA_PROVIDER:-mock}
+      - NARNIA_TOKEN=${NARNIA_TOKEN:-dev-token}         # token de boot previsível em dev; em produção é aleatório
+      - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_DEV_API_PORT:-3100}
+      - PORT=3100
+    depends_on: [redis]
+
+  worker:
+    <<: *dev
+    profiles: ["app"]
+    command: ["pnpm", "--filter", "@narnia-jobs/worker", "exec", "tsx", "watch", "src/main.ts"]
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - NARNIA_DATA_DIR=/app/data
+      - NARNIA_PROVIDER=${NARNIA_PROVIDER:-mock}
+      - TESSDATA_PATH=/usr/share/tessdata
+    depends_on: [redis]
+
+  web:
+    <<: *dev
+    profiles: ["app"]
+    command: ["pnpm", "--filter", "@narnia-jobs/web", "dev"]
+    ports:
+      - "127.0.0.1:${NARNIA_DEV_PORT:-5173}:5173"
+    depends_on: [api]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+volumes:
+  node_modules:
+  pnpm-store:

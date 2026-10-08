@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Tudo roda dentro de containers (docker compose); o runner só precisa de Docker.
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: |
+            packages/*/coverage/lcov.info
+            apps/*/coverage/lcov.info
+          if-no-files-found: ignore
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
+      - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm build
+
+  shell-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.dev.yml run --rm dev bats scripts/test
+      - run: >
+          docker run --rm -v "$PWD:/code:ro" -w /code -e NARNIA_PS_NO_MAIN=1 mcr.microsoft.com/powershell:7.4-ubuntu-22.04
+          pwsh -NoProfile -Command "Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck | Out-Null; Invoke-Pester -Path scripts/test -Output Detailed -ErrorAction Stop"
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build das imagens de produção (api/worker e web)
+        run: docker compose -f docker-compose.yml build
+      - name: Smoke do lançador (porta dinâmica, health, token, persistência)
+        run: |
+          printf 'NARNIA_PROVIDER=mock\n' > .env
+          ./start.sh up
+          PORT=$(sed -n 's/^NARNIA_PORT=//p' .env)
+          curl -fsS "http://127.0.0.1:${PORT}/api/health"
+          ./start.sh down
+      - run: ./start.sh down --purge <<< s
+        if: always()
+
+  launcher-smoke:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Funções puras do lançador (sem Docker)
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            pwsh -NoProfile -Command "\$env:NARNIA_PS_NO_MAIN='1'; . ./start.ps1; if ((Find-FreePort 3100 3199) -lt 3100) { exit 1 }; Get-AppUrl 3100 x"
+          else
+            source ./start.sh; find_free_port 3100 3199 >/dev/null; app_url 3100 x
+          fi
+
+  no-personal-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nenhum dado local ou segredo versionado
+        run: |
+          if git ls-files | grep -E '^(data/|\.env$|.*\.sqlite)'; then
+            echo "Arquivos de dados ou .env versionados"; exit 1
+          fi

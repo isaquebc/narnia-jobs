@@ -1,0 +1,18 @@
+
+config.json
+coverage/
+# dados do usuário nunca entram no repositório
+data/
+.e2e-data/
+dist/
+.env
+exports/
+*.log
+node_modules/
+snapshots/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.tsbuildinfo
+.turbo/
+uploads/

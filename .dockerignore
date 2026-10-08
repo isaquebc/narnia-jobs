@@ -1,0 +1,14 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/coverage
+data
+.env
+plans
+*.md
+!README.md
+!packages/providers/src/**/*.md
+.e2e-data
+apps/e2e
+scripts/test
