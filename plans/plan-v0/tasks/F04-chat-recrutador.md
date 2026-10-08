@@ -51,6 +51,7 @@ ambos: plugin/ (persona, skills, hooks) é lido pelo CLI; nada de prompt fora de
 - Autenticação: header `Authorization: Bearer <token de boot>`; no modo B o token vai no `.mcp.json` gerado (`headers`), no modo A o SDK recebe o mesmo via `.mcp.json` do plugin.
 - Registro de tools a partir de `packages/core/src/*/tools.ts` + schemas de `packages/shared/src/mcp/*`: uma tabela `TOOL_REGISTRY` com `{name, schema, handler, scopes}`; `scopes` permite restringir o conjunto por sessão (`session.set_category` ↔ skill) para manter o lazy load.
 - Respostas: resumo de uma linha por item em `*.list`; detalhe em `*.get`; paginação `limit/cursor`; erro tipado `{code, message}`.
+- **Busca sem ler tudo (decisão F02-2, 2026-10-08)**: índice FTS5 sobre experiências, conquistas, projetos, skills, formação e digests, mantido pelos hooks de escrita do `core`; `fact.search {q, kinds?, from?, to?, limit=10}` devolve linhas de 30–40 tokens (id, tipo, título, período, uma linha, nota de relevância de `profile/relevance.ts`), `fact.get {ids}` o detalhe, `fact.timeline {from, to}` por período; o prompt do recrutador manda buscar antes de listar e nunca pedir a lista completa. Resumo objetivo do perfil escrito pelo modelo (opcional, cache em `profile`, custo mostrado antes) entra aqui.
 - `usage.log` aceita o `usage` que o próprio agente informa (modo B) e é ignorado quando o `result` do SDK já registrou (modo A, dedupe por `provider_session_id`).
 
 ### 2.3 Plugin (`plugin/`)
