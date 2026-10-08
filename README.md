@@ -72,7 +72,7 @@ Só a porta escolhida (`NARNIA_PORT`) é publicada, e apenas em `127.0.0.1`: nad
 Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS, Docker Engine + Compose v2 no Linux). Node, pnpm e todas as ferramentas rodam dentro de containers; nada é instalado no host.
 
 ```bash
-./start.sh dev        # sobe web (http://127.0.0.1:5173), api (http://127.0.0.1:3100), worker e redis com hot reload
+./start.sh dev        # sobe web (http://127.0.0.1:5173/?token=dev-token), api (http://127.0.0.1:3100), worker e redis com hot reload
 ./start.sh test       # testes unitários (Vitest) de todos os pacotes
 ./start.sh lint       # Biome
 ./start.sh typecheck  # tsc
@@ -85,12 +85,12 @@ Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS, Docker Engin
 
 No Windows, use `.\start.ps1` com os mesmos subcomandos. Em Linux/macOS há também um `Makefile` fino sobre o `start.sh`: `make help` lista tudo; os principais são `make dev` (modo desenvolvimento, hot reload e provider mock), `make up` / `make down` / `make login` / `make doctor` (modo produção local), `make check` (lint + typecheck + testes), `make e2e` e `make tunnel` (URL pública temporária via `cloudflared`, já com o token; exige o `cloudflared` no host). Os modos dev e produção publicam ambos a porta 3100 no host, então suba um de cada vez. Imagens de produção: `docker/Dockerfile` (api e worker; a fonte TypeScript roda com `tsx`) e `docker/web.Dockerfile` (nginx + SPA). `docker-compose.e2e.yml` sobrepõe o compose de produção com provider mock, token fixo e pasta de dados descartável (`./.e2e-data`) para os testes de ponta a ponta.
 
-Em desenvolvimento o provider padrão é o **mock** (`NARNIA_PROVIDER=mock`): nenhuma chamada ao modelo nem à assinatura. Para usar o Claude Code de verdade, exporte `NARNIA_PROVIDER=claude-code` e faça o login com `./start.sh cli login`. O token de boot em dev é `dev-token` (`NARNIA_TOKEN`); em produção é aleatório e impresso no log da api.
+O modo dev funciona como a produção: provider **Claude Code** com a sua assinatura (o login de `./start.sh login` fica no mesmo volume `claude-auth` e vale para os dois modos; `CLAUDE_CODE_OAUTH_TOKEN` no `.env` também é respeitado). A diferença é o hot reload. Para desenvolver a interface sem gastar a assinatura, suba com `NARNIA_PROVIDER=mock ./start.sh dev`: o mock devolve sempre o mesmo currículo fictício, não lê o arquivo enviado. O token de boot em dev é `dev-token` (`NARNIA_TOKEN`); em produção é aleatório, persistido em `data/.token` e impresso pelo lançador.
 
 ### Fluxo completo da API com `curl` (provider mock)
 
 ```bash
-./start.sh dev -d api worker            # api em 127.0.0.1:3100
+NARNIA_PROVIDER=mock ./start.sh dev -d api worker   # api em 127.0.0.1:3100
 H='Authorization: Bearer dev-token'; B=http://127.0.0.1:3100
 curl -s $B/api/health
 curl -s -H "$H" $B/api/provider/status                                   # logado (mock)

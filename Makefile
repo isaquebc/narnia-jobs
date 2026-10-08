@@ -11,8 +11,8 @@ DATA_DIR ?= ./data
 help: ## lista os comandos
 	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z0-9_-]+:.*## / { printf "  \033[1m%-12s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-## --- desenvolvimento (hot reload, provider mock por padrão) ---------------------------------------
-dev: ## sobe web (:5173), api (:3100), worker e redis com hot reload; NARNIA_PROVIDER=claude-code para usar a assinatura
+## --- desenvolvimento (hot reload; provider claude-code como na produção) ---------------------------------------
+dev: ## sobe web (:5173), api (:3100), worker e redis com hot reload; mesma assinatura da produção (NARNIA_PROVIDER=mock para não gastar)
 	./start.sh dev
 
 dev-down: ## derruba os containers de desenvolvimento

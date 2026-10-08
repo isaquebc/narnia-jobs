@@ -293,7 +293,7 @@ Uso (produção, só Docker no host):
   status        estado dos serviços
 
 Desenvolvimento (tudo em containers):
-  dev           sobe web (http://127.0.0.1:\${NARNIA_DEV_PORT:-5173}), api, worker e redis com hot reload
+  dev           sobe web (http://127.0.0.1:\${NARNIA_DEV_PORT:-5173}), api, worker e redis com hot reload; provider claude-code, token dev-token
   test [args]   roda os testes unitários (Vitest) de todos os pacotes
   lint          Biome (formatação + lint)
   typecheck     tsc em todos os pacotes
@@ -318,6 +318,10 @@ main() {
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;
     dev)
       require_docker; ensure_installed
+      mkdir -p "${NARNIA_DATA_DIR:-./data}"
+      printf '\n  modo dev (hot reload):  %s\n' "$(app_url "${NARNIA_DEV_PORT:-5173}" "${NARNIA_TOKEN:-dev-token}")"
+      if env_has_value "$ENV_FILE" CLAUDE_CODE_OAUTH_TOKEN; then info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $ENV_FILE."
+      else info "login da assinatura (uma vez, vale para dev e produção): ./start.sh login   · mock: NARNIA_PROVIDER=mock ./start.sh dev"; fi
       "${DEV_COMPOSE[@]}" --profile app up "$@" ;;
     test)
       require_docker; ensure_installed

@@ -29,8 +29,8 @@ RUN apt-get update \
  && curl -fsSL -o ${TESSDATA_PATH}/eng.traineddata.gz ${TESSDATA_BASE}/eng.traineddata.gz \
  && corepack enable \
  && corepack prepare pnpm@${PNPM_VERSION} --activate \
- && mkdir -p /app/node_modules /pnpm/store /pnpm/corepack \
- && chown -R node:node /app /pnpm
+ && mkdir -p /app/node_modules /pnpm/store /pnpm/corepack /home/node/.claude \
+ && chown -R node:node /app /pnpm /home/node/.claude
 USER node
 WORKDIR /app
 CMD ["pnpm", "--version"]

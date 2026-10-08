@@ -203,7 +203,15 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "doctor"    { Assert-Docker; Invoke-Prod @("run", "--rm", "api", "narnia-jobs", "doctor") }
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }
-    "dev"       { Assert-Docker; Ensure-Installed; & docker @script:DevCompose --profile app up @Rest }
+    "dev"       {
+      Assert-Docker; Ensure-Installed
+      $devPort = if ($env:NARNIA_DEV_PORT) { $env:NARNIA_DEV_PORT } else { "5173" }
+      $devToken = if ($env:NARNIA_TOKEN) { $env:NARNIA_TOKEN } else { "dev-token" }
+      Write-Host ""; Write-Host "  modo dev (hot reload):  $(Get-AppUrl $devPort $devToken)"
+      if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $($script:EnvFile)." }
+      else { Info "login da assinatura (uma vez, vale para dev e produção): .\start.ps1 login   · mock: `$env:NARNIA_PROVIDER='mock'" }
+      & docker @script:DevCompose --profile app up @Rest
+    }
     "test"      { Assert-Docker; Ensure-Installed; Invoke-Dev (@("pnpm", "test") + $Rest) }
     "lint"      { Assert-Docker; Ensure-Installed; Invoke-Dev (@("pnpm", "lint") + $Rest) }
     "typecheck" { Assert-Docker; Ensure-Installed; Invoke-Dev (@("pnpm", "typecheck") + $Rest) }
