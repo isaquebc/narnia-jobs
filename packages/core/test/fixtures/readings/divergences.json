@@ -1,0 +1,20 @@
+{
+  "comment": "Três leituras do mesmo CV fictício com divergências plantadas: o OCR errou o nome da empresa (Acrne) e a camada de texto trouxe a data errada (2027). O voto 2 de 3 deve escolher Acme e 2021.",
+  "readings": [
+    {
+      "kind": "text_layer",
+      "quality": 0.9,
+      "text": "ANA MARIA EXEMPLO\nEngenheira de Software | Campinas, SP\n\nEXPERIÊNCIA\nAcme Ltda — Engenheira de Software Sênior — mar/2027 a nov/2023 — Campinas, SP\n- Reduziu a latência p95 da API de pagamentos em 40% com cache distribuído.\n\nFORMAÇÃO\nUnicamp — Bacharelado em Ciência da Computação — 2014 a 2018\n\nSKILLS\nGo, Python, Kubernetes, Docker, PostgreSQL"
+    },
+    {
+      "kind": "ocr",
+      "quality": 0.7,
+      "text": "ANA MARIA EXEMPLO\nEngenheira de Software | Campinas, SP\n\nEXPERIÊNCIA\nAcrne Ltda — Engenheira de Software Sênior — mar/2021 a nov/2023 — Campinas, SP\n- Reduziu a latência p95 da API de pagamentos em 40% com cache distribuído.\n\nFORMAÇÃO\nUnicamp — Bacharelado em Ciência da Computação — 2014 a 2018\n\nSKILLS\nGo, Python, Kubernetes, Docker, PostgreSQL"
+    },
+    {
+      "kind": "model_read",
+      "quality": 0.85,
+      "text": "ANA MARIA EXEMPLO\nEngenheira de Software | Campinas, SP\n\nEXPERIÊNCIA\nAcme Ltda — Engenheira de Software Sênior — mar/2021 a nov/2023 — Campinas, SP\n- Reduziu a latência p95 da API de pagamentos em 40% com cache distribuído.\n\nFORMAÇÃO\nUnicamp — Bacharelado em Ciência da Computação — 2014 a 2018\n\nSKILLS\nGo, Python, Kubernetes, Docker, PostgreSQL"
+    }
+  ]
+}
