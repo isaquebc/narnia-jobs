@@ -8,6 +8,8 @@ import { Card, CardTitle } from "../../components/ui/card";
 import { Tooltip } from "../../components/ui/tooltip";
 import { t } from "../../i18n";
 import { formatDate, formatTokens } from "../../lib/format";
+import { CardText } from "../profiles/CardText";
+import { SuggestionBanner } from "../profiles/SuggestionBanner";
 
 const NEXT: Array<{ key: "chat" | "ingest" | "cv" | "jobs"; task: string }> = [
   { key: "chat", task: "F04" },
@@ -26,9 +28,13 @@ export function Dashboard() {
   if (!dashboard.data) return <p className="text-sm text-muted-fg">{t("app.loading")}</p>;
   const d = dashboard.data;
   const name = user.data?.user?.displayName;
-  // Sem cartão do perfil (chega em F02), a data mostrada é a última atualização do registro.
+  // Data do cartão quando existe (F02); senão a última atualização do registro.
   const updatedAt =
-    d.profile?.cardUpdatedAt ?? d.profile?.updatedAt ?? d.profile?.createdAt ?? null;
+    d.card?.builtAt ??
+    d.profile?.cardUpdatedAt ??
+    d.profile?.updatedAt ??
+    d.profile?.createdAt ??
+    null;
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -52,6 +58,33 @@ export function Dashboard() {
             <Badge>{d.profile.area}</Badge>
             <Badge>{d.profile.market}</Badge>
           </div>
+          {d.card ? (
+            <div className="flex flex-col gap-1 rounded-md border border-border p-2">
+              <CardText text={d.card.text} lines={3} />
+              <div className="flex items-center gap-3 text-xs">
+                {!d.card.valid ? <Badge tone="warn">{t("profiles.cardStale")}</Badge> : null}
+                <NavLink
+                  to="/perfis/$id/cartao"
+                  params={{ id: d.profile.id }}
+                  className="underline"
+                >
+                  {t("card.viewAll")}
+                </NavLink>
+              </div>
+            </div>
+          ) : null}
+          <p className="text-xs text-muted-fg">
+            <span>
+              {t("dashboard.emphasis", {
+                highlighted: d.emphasis.highlighted,
+                hidden: d.emphasis.hidden,
+              })}
+            </span>
+            {" · "}
+            <NavLink to="/perfis" className="underline">
+              {t("dashboard.manageProfiles")}
+            </NavLink>
+          </p>
           {d.pendingResearch > 0 ? (
             <Alert tone="warn">{t("dashboard.research", { count: d.pendingResearch })}</Alert>
           ) : null}
@@ -62,8 +95,9 @@ export function Dashboard() {
           ) : null}
         </Card>
       )}
-      <div className="grid grid-cols-4 gap-4">
-        {(["experiences", "skills", "education", "files"] as const).map((k) => (
+      <SuggestionBanner count={d.suggestions} />
+      <div className="grid grid-cols-5 gap-4">
+        {(["experiences", "projects", "skills", "education", "files"] as const).map((k) => (
           <Card key={k} data-testid={`stat-${k}`} className="flex flex-col gap-1">
             <span className="text-xs uppercase text-muted-fg">{t(`dashboard.stats.${k}`)}</span>
             <span className="text-2xl font-semibold">{d.counts[k]}</span>

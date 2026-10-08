@@ -1,5 +1,5 @@
 import type { ProfileCreateRequest, SalaryRange, SalaryReference } from "@narnia-jobs/shared";
-import { useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Field } from "../../../components/ui/field";
@@ -18,32 +18,63 @@ type Seniority = (typeof SENIORITIES)[number];
 type Goal = (typeof GOALS)[number];
 type Researchable = "salary" | "contractTypes" | "locations" | "availableFrom";
 
+/** Valores iniciais (F02: clonar ou aceitar sugestão). Carreira nunca vem pré-preenchida (F02-8). */
+export interface ProfileFormInitial {
+  name?: string;
+  targetTitle?: string;
+  altTitles?: string[];
+  seniority?: Seniority;
+  area?: string;
+  goal?: Goal;
+  market?: string;
+  docLocale?: string;
+}
+
 export function ProfileForm({
   suggestion,
+  initial,
   userCountry,
   reference,
   onSubmit,
   submitting,
   externalError,
+  submitLabel,
+  banner,
+  onDirty,
 }: {
   suggestion: ProfileSuggestion | null;
+  initial?: ProfileFormInitial;
   userCountry: string;
   reference: SalaryReference | null;
   onSubmit: (body: ProfileCreateRequest) => void | Promise<void>;
   submitting?: boolean;
   externalError?: string | null;
+  submitLabel?: string;
+  /** Substitui o aviso de sugestão do F01 (ex.: "pré-preenchido a partir da sugestão"). */
+  banner?: ReactNode;
+  onDirty?: () => void;
 }) {
   const info = countryByCode(userCountry);
-  const [name, setName] = useState(suggestion?.targetTitle ?? "");
-  const [targetTitle, setTargetTitle] = useState(suggestion?.targetTitle ?? "");
-  const [altTitles, setAltTitles] = useState((suggestion?.altTitles ?? []).join(", "));
-  const [seniority, setSeniority] = useState<Seniority>(
-    (suggestion?.seniority as Seniority | null) ?? "pleno",
+  const [name, setName] = useState(initial?.name ?? suggestion?.targetTitle ?? "");
+  const [targetTitle, setTargetTitle] = useState(
+    initial?.targetTitle ?? suggestion?.targetTitle ?? "",
   );
-  const [area, setArea] = useState(suggestion?.area ?? "");
-  const [goal, setGoal] = useState<Goal>("new_job");
-  const [market, setMarket] = useState(userCountry);
-  const [docLocale, setDocLocale] = useState(userCountry === "BR" ? "pt-BR" : "en-US");
+  const [altTitles, setAltTitles] = useState(
+    (initial?.altTitles ?? suggestion?.altTitles ?? []).join(", "),
+  );
+  const [seniority, setSeniority] = useState<Seniority>(
+    initial?.seniority ?? (suggestion?.seniority as Seniority | null) ?? "pleno",
+  );
+  const [area, setArea] = useState(initial?.area ?? suggestion?.area ?? "");
+  const [goal, setGoal] = useState<Goal>(initial?.goal ?? "new_job");
+  const [market, setMarket] = useState(initial?.market ?? userCountry);
+  const [docLocale, setDocLocale] = useState(
+    initial?.docLocale ?? (userCountry === "BR" ? "pt-BR" : "en-US"),
+  );
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (touched) onDirty?.();
+  }, [touched, onDirty]);
   const [salary, setSalary] = useState<SalaryRange | undefined>(undefined);
   const [contractTypes, setContractTypes] = useState<ContractType[]>([]);
   const [locations, setLocations] = useState<LocationPref[]>([
@@ -102,8 +133,15 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
-      {suggestion?.reasons?.length ? (
+    <form
+      onSubmit={submit}
+      onChange={() => setTouched(true)}
+      className="flex flex-col gap-5"
+      noValidate
+    >
+      {banner !== undefined ? (
+        banner
+      ) : suggestion?.reasons?.length ? (
         <Alert>{t("profile.suggested", { reason: suggestion.reasons.join("; ") })}</Alert>
       ) : (
         <Alert>{t("profile.noSuggestion")}</Alert>
@@ -230,7 +268,7 @@ export function ProfileForm({
       {externalError ? <Alert tone="danger">{externalError}</Alert> : null}
       <div className="flex justify-end">
         <Button type="submit" disabled={submitting}>
-          {t("profile.create")}
+          {submitLabel ?? t("profile.create")}
         </Button>
       </div>
     </form>

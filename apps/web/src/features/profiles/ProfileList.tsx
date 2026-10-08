@@ -64,7 +64,7 @@ function ProfileListItem({ p, actions }: { p: ProfileRecord; actions: ProfileAct
         <div className="flex flex-wrap gap-2">
           <NavLink
             to="/perfis/$id/enfases"
-            search={{ id: p.id }}
+            params={{ id: p.id }}
             className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm"
           >
             {t("profiles.open")}

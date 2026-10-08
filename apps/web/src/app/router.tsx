@@ -3,6 +3,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
   type RouterHistory,
   redirect,
@@ -13,6 +14,10 @@ import { TooltipProvider } from "../components/ui/tooltip";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { Wizard } from "../features/onboarding/Wizard";
 import { NewProfilePage, type NewProfileSearch } from "../features/profiles/NewProfilePage";
+import { PersonaOverrides } from "../features/profiles/PersonaOverrides";
+import { PitchEditor } from "../features/profiles/PitchEditor";
+import { ProfileCardView } from "../features/profiles/ProfileCardView";
+import { ProfilePage, useProfile } from "../features/profiles/ProfilePage";
 import { ProfilesPage } from "../features/profiles/ProfilesPage";
 import { t } from "../i18n";
 import type { AppServices } from "./context";
@@ -105,12 +110,65 @@ const newProfileRoute = createRoute({
   },
 });
 
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/perfis/$id",
+  component: function ProfileLayout() {
+    const { id } = profileRoute.useParams();
+    return <ProfilePage id={id}>{(profile) => <Outlet key={profile.id} />}</ProfilePage>;
+  },
+});
+// O quadro de ênfases carrega sob demanda: o `@dnd-kit` fica fora do bundle inicial (F02-4, F01-56).
+const LazyEmphasisBoard = lazyRouteComponent(
+  () => import("../features/profiles/EmphasisBoard"),
+  "EmphasisBoard",
+);
+const profileEmphasisRoute = createRoute({
+  getParentRoute: () => profileRoute,
+  path: "/enfases",
+  component: function EmphasisTab() {
+    const { id } = profileRoute.useParams();
+    return <LazyEmphasisBoard profileId={id} />;
+  },
+});
+const profilePitchRoute = createRoute({
+  getParentRoute: () => profileRoute,
+  path: "/narrativa",
+  component: function PitchTab() {
+    const { id } = profileRoute.useParams();
+    const profile = useProfile(id);
+    return profile.data ? <PitchEditor key={profile.data.id} profile={profile.data} /> : null;
+  },
+});
+const profilePersonaRoute = createRoute({
+  getParentRoute: () => profileRoute,
+  path: "/recrutador",
+  component: function PersonaTab() {
+    const { id } = profileRoute.useParams();
+    return <PersonaOverrides profileId={id} />;
+  },
+});
+const profileCardRoute = createRoute({
+  getParentRoute: () => profileRoute,
+  path: "/cartao",
+  component: function CardTab() {
+    const { id } = profileRoute.useParams();
+    return <ProfileCardView profileId={id} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   onboardingRoute,
   dashboardRoute,
   profilesRoute,
   newProfileRoute,
+  profileRoute.addChildren([
+    profileEmphasisRoute,
+    profilePitchRoute,
+    profilePersonaRoute,
+    profileCardRoute,
+  ]),
 ]);
 
 export function createAppRouter(opts: {

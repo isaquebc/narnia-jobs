@@ -109,3 +109,65 @@ describe("Dashboard · cartão, contadores, uso e pendências", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("Dashboard · F02: resumo do cartão, ênfases e banner de sugestão", () => {
+  it("mostra as 3 linhas do cartão com link, contadores de ênfase e o banner com aceitar/dispensar", async () => {
+    const { api } = renderWithProviders(<Dashboard />, {
+      api: {
+        getDashboard: async () => ({
+          profile,
+          counts: { experiences: 2, skills: 6, education: 1, files: 1, projects: 0 },
+          usage: { totalTokens: 0, byCategory: {} },
+          pendingResearch: 0,
+          card: {
+            text: "Ana · Campinas\nResumo objetivo: 13 anos\nAlvo: Senior Backend Engineer",
+            builtAt: "2026-10-07T15:00:00.000Z",
+            valid: false,
+          },
+          emphasis: { highlighted: 3, hidden: 1 },
+          suggestions: 1,
+        }),
+        getUser: async () => ({ user: null }),
+        listSuggestions: async () => ({
+          suggestions: [
+            {
+              id: "sg1",
+              userId: "u1",
+              source: "heuristic" as const,
+              model: null,
+              payload: {
+                title: "Engineering Manager",
+                seniority: "manager" as const,
+                area: "engineering management",
+                market: "BR",
+                rationale: "3 anos liderando squads",
+                supportingFactIds: ["e1"],
+              },
+              status: "new" as const,
+              createdAt: "2026-10-08T12:00:00.000Z",
+              decidedAt: null,
+            },
+          ],
+        }),
+        dismissSuggestion: async () => ({ ok: true as const }),
+      },
+      timezone: "America/Sao_Paulo",
+    });
+    expect(await screen.findByText("Resumo objetivo: 13 anos")).toBeInTheDocument();
+    expect(screen.getByText("3 em destaque · 1 ocultos")).toBeInTheDocument();
+    expect(screen.getByText("Cartão desatualizado")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver cartão completo" })).toHaveAttribute(
+      "href",
+      "/perfis/p1/cartao",
+    );
+    expect(
+      await screen.findByText("Detectamos um possível perfil de Engineering Manager."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Aceitar" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/perfis/novo?suggestionId=sg1"),
+    );
+    expect(screen.getByRole("button", { name: "Dispensar" })).toBeInTheDocument();
+    expect(api).toBeTruthy();
+  });
+});
