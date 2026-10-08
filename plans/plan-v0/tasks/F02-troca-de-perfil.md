@@ -2,7 +2,7 @@
 
 Entregável 2 do plan-v0. Cobre o fluxo **F2** de `../02-fluxos-do-usuario.md`: o usuário base ganha vários perfis (lentes), troca entre eles no shell, e cada perfil carrega ênfases, narrativa, dados de carreira obrigatórios e a configuração do recrutador. É pré-requisito direto de F04 (o cartão do perfil é o único contexto implícito do agente) e de F05 (o CV é gerado a partir das ênfases). Depende de F01 (tabela `profile`, dashboard, shell).
 
-Status: **em escopo** (2026-10-07). Nada implementado.
+Status: **em escopo** (2026-10-07). Nada implementado. Decisões em fechamento com o dono desde 2026-10-08 (§5, §8).
 
 ---
 
@@ -135,7 +135,7 @@ Regras de UI: trocar perfil nunca perde formulário não salvo (confirmação); 
 
 | # | Decisão | Opções | Padrão proposto |
 |---|---------|--------|-----------------|
-| F02-1 | Invalidação do cartão | hooks nos repos (aplicação) · triggers SQLite · recalcular sempre | **hooks nos repos** (explícito, testável; triggers ficam para quando houver escrita fora do `core`) |
+| F02-1 | Invalidação do cartão | hooks nos repos (aplicação) · triggers SQLite · recalcular sempre · fila com merge | **Decidida 2026-10-08 (dono): hooks nos repos** + reconstrução preguiçosa na leitura, aproveitando `facts_version` para fatos (só usuário, perfil e ênfases precisam de hook explícito). A página do perfil atual mostra o estado do cartão ("atualizado em …" ou "desatualizado") com botão **Atualizar cartão** (`POST /api/profiles/:id/card/rebuild`). Fila com merge descartada para o cartão (função pura de milissegundos, sem conflito possível); a ideia foi guardada em F05 §2.5 e F10 §2.5. |
 | F02-2 | Limite do cartão | ~300 tokens com corte por prioridade · sem limite | **~300 tokens**, cortando primeiro lacunas, depois skills, depois experiências |
 | F02-3 | Ênfase em conquistas | granularidade por conquista · só por experiência | **por experiência em F02**; por conquista entra em F05 se o CV precisar |
 | F02-4 | Reordenação | drag-and-drop (`@dnd-kit`) · botões subir/descer | **`@dnd-kit`** com fallback de botões (acessibilidade) |
@@ -210,4 +210,7 @@ Não há chamada ao modelo em F02. Teste manual: ler o cartão de 3 perfis reais
 | Drag-and-drop frágil em e2e | testes de reordenação por teclado; drag só em um cenário |
 
 ## 8 · Registro de execução
+| Data | Marco | O que aconteceu |
+|------|-------|-----------------|
+| 2026-10-08 | — | **F02-1 decidida pelo dono**: hooks nos repositórios (uma chamada `cards.invalidate` ao final de cada escrita em usuário, perfil e ênfases; fatos cobertos por `facts_version`), reconstrução na leitura, e a página do perfil atual mostra o estado do cartão com botão de atualizar. A alternativa de fila com merge de atualizações, página de processos e escala de workers foi considerada arquitetura demais para um dado derivado barato e foi registrada como infraestrutura para F05 (jobs caros) e F10 (configuração). |
 (Preencher durante a implementação: datas, decisões tomadas, diferença `tokens_est` × real.)

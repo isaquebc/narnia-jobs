@@ -91,6 +91,12 @@ A skill instrui: usar só fatos existentes, priorizar conquistas com métrica, a
 | `template.validate` | não | `unzip` → `sanitize` → `render_sample` → `done` |
 Todos aparecem na bandeja de atividades (F01). Edição inline cria nova `document_version` e enfileira só `cv.render`.
 
+**Infraestrutura de jobs caros (sugestão do dono em 2026-10-08, ao decidir F02-1; entra aqui porque F05 é a primeira task com jobs longos e repetíveis):**
+- **Coalescência por chave**: jobs com id determinístico por alvo (`cv.render:<document_id>`, `cv.generate:<profile_id>`); uma atualização nova para o mesmo alvo substitui a pendente em vez de enfileirar outra (BullMQ: job id fixo + `removeOnComplete`; se o job já está ativo, enfileira um único "próximo" e descarta os intermediários).
+- **Conflito**: quando duas atualizações do mesmo alvo não podem ser fundidas (por exemplo, edição inline de uma versão que já foi substituída), o job falha com erro tipado e a UI mostra ao usuário, com a opção de refazer sobre a versão atual.
+- **Página de processos em segundo plano** (`/processos`): lista de jobs ativos, pendentes e recentes, com cancelar e repetir; o indicador do cabeçalho (bandeja do F01) passa a mostrar também o tamanho da fila.
+- **Escala de workers**: concorrência por fila configurável em Configurações (F10), aplicada em tempo de execução (`worker.concurrency`), porque roda na máquina do usuário e o custo é da própria máquina.
+
 ### 2.6 API
 | Método e rota | Função |
 |---------------|--------|
