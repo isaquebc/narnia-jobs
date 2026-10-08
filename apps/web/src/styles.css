@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-muted-fg: var(--muted-fg);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+}
+
+:root {
+  --bg: #f7f7f5;
+  --fg: #1b1d22;
+  --muted: #eceae4;
+  --muted-fg: #5b6068;
+  --card: #ffffff;
+  --border: #d9d6ce;
+  --primary: #0f5c5a;
+  --primary-fg: #ffffff;
+  --accent: #b5542f;
+  --danger: #b4232c;
+  --warn: #9a6700;
+  --ok: #1a7f37;
+}
+
+.dark {
+  --bg: #14161a;
+  --fg: #e8e6e1;
+  --muted: #1f2329;
+  --muted-fg: #a2a7b0;
+  --card: #1a1d22;
+  --border: #2d323a;
+  --primary: #4fb3af;
+  --primary-fg: #0d1a1a;
+  --accent: #e08a62;
+  --danger: #ff6b6b;
+  --warn: #e3b341;
+  --ok: #56d364;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-fg antialiased;
+  min-width: 1024px;
+}

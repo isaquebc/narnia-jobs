@@ -1,0 +1,154 @@
+import type {
+  DashboardResponseSchema,
+  EstimateResponse,
+  FileResponse,
+  IngestionCreateRequest,
+  IngestionResponse,
+  Job,
+  OnboardingState,
+  Profile,
+  ProfileCreateRequest,
+  ProfileSuggestionResponseSchema,
+  ProviderStatusResponse,
+  ReviewRequest,
+  SalaryReference,
+  User,
+  UserUpsertRequest,
+} from "@narnia-jobs/shared";
+import type { z } from "zod";
+
+/** A API devolve também `createdAt`/`updatedAt` do registro do perfil (campos fora do schema do shared). */
+export type Dashboard = Omit<z.infer<typeof DashboardResponseSchema>, "profile"> & {
+  profile: (Profile & { createdAt?: string; updatedAt?: string }) | null;
+};
+export type ProfileSuggestion = z.infer<typeof ProfileSuggestionResponseSchema> & {
+  altTitles?: string[];
+  yearsOfExperience?: number;
+};
+export type IngestionDetail = IngestionResponse & {
+  options?: { ocr: boolean; modelRead: boolean };
+  proposals: Array<IngestionResponse["proposals"][number] & { editedData?: unknown }>;
+  readings?: Array<{ id: string; kind: string; quality: number | null }>;
+};
+export type EstimateDetail = EstimateResponse & { labels?: Record<string, string> };
+
+export class ApiError extends Error {
+  override readonly name = "ApiError";
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+  }
+}
+
+export interface ApiClientOptions {
+  fetch?: typeof fetch;
+  getToken?: () => string | null;
+  baseUrl?: string;
+}
+
+async function parseError(res: Response): Promise<ApiError> {
+  let code = `http_${res.status}`;
+  let message = res.statusText || `HTTP ${res.status}`;
+  let details: unknown;
+  try {
+    const body = (await res.json()) as {
+      error?: { code?: string; message?: string; details?: unknown };
+    };
+    if (body?.error) {
+      code = body.error.code ?? code;
+      message = body.error.message ?? message;
+      details = body.error.details;
+    }
+  } catch {
+    // corpo não-JSON: mantém o status
+  }
+  if (res.status === 401) code = "unauthorized";
+  return new ApiError(res.status, code, message, details);
+}
+
+export function createApiClient(opts: ApiClientOptions = {}) {
+  const doFetch = opts.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const base = opts.baseUrl ?? "";
+
+  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const headers = new Headers(init.headers);
+    const token = opts.getToken?.();
+    if (token) headers.set("authorization", `Bearer ${token}`);
+    if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) {
+      headers.set("content-type", "application/json");
+    }
+    let res: Response;
+    try {
+      res = await doFetch(`${base}${path}`, { ...init, headers, credentials: "same-origin" });
+    } catch (e) {
+      throw new ApiError(0, "network", e instanceof Error ? e.message : "Falha de rede");
+    }
+    if (!res.ok) throw await parseError(res);
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  }
+
+  const json = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
+
+  return {
+    getHealth: () => request<{ ok: true; version: string }>("/api/health"),
+    getProviderStatus: () => request<ProviderStatusResponse>("/api/provider/status"),
+    setMockMode: (mode: Record<string, unknown>) =>
+      request<{ status: ProviderStatusResponse }>("/api/_test/mock", json(mode)),
+    getOnboardingState: () => request<OnboardingState>("/api/onboarding/state"),
+    putOnboardingState: (state: OnboardingState) =>
+      request<OnboardingState>("/api/onboarding/state", {
+        method: "PUT",
+        body: JSON.stringify(state),
+      }),
+    uploadFile: (file: File) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      return request<FileResponse>("/api/files", { method: "POST", body: form });
+    },
+    createText: (text: string) => request<FileResponse>("/api/texts", json({ text })),
+    getFile: (id: string) => request<FileResponse>(`/api/files/${encodeURIComponent(id)}`),
+    getEstimate: (id: string, options: { ocr: boolean; modelRead: boolean }) =>
+      request<EstimateDetail>(
+        `/api/files/${encodeURIComponent(id)}/estimate?ocr=${options.ocr}&modelRead=${options.modelRead}`,
+      ),
+    createIngestion: (body: IngestionCreateRequest) =>
+      request<IngestionDetail>("/api/ingestions", json(body)),
+    getIngestion: (id: string) =>
+      request<IngestionDetail>(`/api/ingestions/${encodeURIComponent(id)}`),
+    reviewIngestion: (id: string, body: ReviewRequest) =>
+      request<{ pending: number; runStatus: string }>(
+        `/api/ingestions/${encodeURIComponent(id)}/review`,
+        json(body),
+      ),
+    listJobs: () => request<{ jobs: Job[] }>("/api/jobs"),
+    cancelJob: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}/cancel`, json({})),
+    retryJob: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}/retry`, json({})),
+    getUsageSummary: () =>
+      request<{
+        totalTokens: number;
+        byCategory: Record<string, number>;
+        byModel: Record<string, number>;
+      }>("/api/usage/summary"),
+    getUser: () => request<{ user: User | null }>("/api/user"),
+    putUser: (body: UserUpsertRequest) =>
+      request<{ user: User }>("/api/user", { method: "PUT", body: JSON.stringify(body) }),
+    listProfiles: () => request<{ profiles: Profile[] }>("/api/profiles"),
+    createProfile: (body: ProfileCreateRequest) => request<Profile>("/api/profiles", json(body)),
+    getProfileSuggestion: (runId?: string) =>
+      request<ProfileSuggestion>(
+        `/api/profiles/suggestion${runId ? `?runId=${encodeURIComponent(runId)}` : ""}`,
+      ),
+    getSalaryReference: (country: string) =>
+      request<{ reference: SalaryReference | null }>(
+        `/api/salary-reference?country=${encodeURIComponent(country)}`,
+      ),
+    getDashboard: () => request<Dashboard>("/api/dashboard"),
+  };
+}
+
+export type ApiClient = ReturnType<typeof createApiClient>;
