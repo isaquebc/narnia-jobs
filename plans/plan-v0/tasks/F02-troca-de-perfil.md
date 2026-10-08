@@ -81,7 +81,9 @@ Nenhuma sessão de chat é encerrada ao trocar (F04 decide o que fazer com sess�
 | `GET /api/profiles/:id/card` · `POST /api/profiles/:id/card/rebuild` | cartão (cache) e reconstrução forçada |
 | `GET /api/profiles/:id/emphasis` · `PUT /api/profiles/:id/emphasis` | lista e substituição em lote (modo + posição) |
 | `GET /api/profiles/:id/persona` · `PUT /api/profiles/:id/persona` | derivada + overrides |
-| `GET /api/profiles/suggestions` | sugestões heurísticas a partir dos fatos existentes |
+| `GET /api/profiles/suggestions` | sugestões (heurísticas e do modelo) com `source` |
+| `GET /api/profiles/analyze/estimate` · `POST /api/profiles/analyze` | estimativa de tokens da análise; enfileira o job `profile.analyze` (modelo), resultado via WS `job.done` e nas sugestões |
+| `POST /api/profiles/suggestions/:id/dismiss` | dispensar |
 | `WS` | `profile.switched`, `profile.card_invalidated` |
 
 ### 2.6 Tools MCP `profile.*` (definição; exposição em F04)
@@ -104,7 +106,7 @@ Schemas zod em `packages/shared/src/mcp/profile.ts`; handlers puros em `packages
 | `profile` (completar) | `persona_overrides_json?`, `archived_at?` (UTC), `cloned_from?`, `card_json?` passa a ter `{text, tokens_est, hash, built_at}`; `card_updated_at` NULL = inválido |
 | `profile_emphasis` (nova) | `id`, `profile_id`, `fact_kind` (experience/project/skill/education/achievement), `fact_id`, `mode` (highlight/normal/hidden), `position?`, `updated_at`; único `(profile_id, fact_kind, fact_id)` |
 | `settings` | chave `active_profile` → id |
-| `profile_suggestion` (nova) | `id`, `user_id`, `payload_json` (cargo, senioridade, área, justificativa, fatos de apoio), `status` (new/accepted/dismissed), `created_at` |
+| `profile_suggestion` (nova) | `id`, `user_id`, `source` (heuristic/model), `model?`, `payload_json` (cargo, senioridade, área, mercado, justificativa, fatos de apoio), `status` (new/accepted/dismissed), `created_at` |
 
 Regras:
 - Arquivar perfil ativo é bloqueado (409); o usuário troca antes.
@@ -119,7 +121,7 @@ Regras:
 | Tela | Componentes | Estados a cobrir |
 |------|-------------|------------------|
 | Shell: `ProfileSwitcher` (topo) | lista de perfis com cargo-alvo, check no ativo, "+ novo perfil", "gerenciar perfis" | 1 perfil · N perfis · trocando (spinner) · perfil arquivado oculto |
-| Perfis (lista) | `ProfileList` com cartões (nome, alvo, nº de ênfases, última atualização do cartão), ações renomear/clonar/arquivar/ativar | vazio (impossível após F01) · com arquivados (filtro) |
+| Perfis (lista) | `ProfileList` com cartões (nome, alvo, nº de ênfases, última atualização do cartão), ações renomear/clonar/arquivar/ativar; botão **Analisar possíveis perfis** → `AnalyzeProfilesDialog` (alerta de custo com estimativa, modelo, confirmar) → lista de sugestões do modelo com aceitar/dispensar | vazio (impossível após F01) · com arquivados (filtro) · analisando (job na bandeja) · sem sugestões novas · erro do provider |
 | Novo perfil (modal/página) | `ProfileForm` (igual F01 passo 5) + `CloneFromSelect` + bloco Carreira obrigatório com "não sei" | do zero · clonando · validação |
 | Perfil › Ênfases | `EmphasisBoard`: três colunas ou abas (Experiências, Projetos, Skills), cada item com toggle destacar/normal/ocultar e drag para reordenar; prévia lateral do cartão atualizando | sem ênfases · com ocultos · reordenando · salvando |
 | Perfil › Narrativa | `PitchEditor` (textarea 3–5 linhas, contador) + sugestões do cartão | vazio · editado |
@@ -139,7 +141,7 @@ Regras de UI: trocar perfil nunca perde formulário não salvo (confirmação); 
 | F02-2 | Limite do cartão | ~300 tokens com corte por prioridade · sem limite | **Decidida 2026-10-08 (dono): ~300 tokens** (teto 1.600 chars), cortando lacunas → skills além das 8 → experiências além das 3. Acréscimos: (a) seção **Resumo objetivo** (2–3 linhas, heurística: anos totais, empresas, áreas, arco de cargos, nível, domínios) logo após a identidade e **nunca cortada**; versão escrita pelo modelo fica para F04 (cache no perfil, refeita pelo botão de atualizar, custo mostrado antes); (b) `profile/relevance.ts`: nota por fato e por perfil (recência, ênfase, métrica, verificação, aderência ao cargo-alvo), gravada em tabela auxiliar pelos mesmos hooks de F02-1; escolhe top-3/top-8 do cartão e ordena a busca; (c) busca que não lê tudo: FTS5 + `fact.search`/`fact.get`/`fact.timeline` com linhas de 30–40 tokens entram em **F04**; sem embeddings nesta escala. |
 | F02-3 | Ênfase em conquistas | granularidade por conquista · só por experiência | **Decidida 2026-10-08 (dono): por experiência em F02**; a ênfase por conquista é **obrigatória em F05** (registrada lá). Preparação aqui: `profile_emphasis.fact_kind` já aceita `achievement` no schema e na validação do repo, e `buildProfileCard` escolhe a conquista exibida pela relevância; só a UI do quadro de ênfases fica por experiência. |
 | F02-4 | Reordenação | drag-and-drop (`@dnd-kit`) · botões subir/descer | **Decidida 2026-10-08 (dono): `@dnd-kit`** com botões subir/descer como apoio (teclado e testes), carregado por importação dinâmica só na página de ênfases (bundle, F01-56). Reordenação assistida pelo modelo ("Reordenar com <modelo>": Haiku/Sonnet/Opus/Fable, estimativa antes, prévia, aceitar/desfazer) registrada na issue [#1](https://github.com/isaquebc/narnia-jobs-helpper/issues/1). |
-| F02-5 | Sugestões de perfil | só heurística local · heurística + modelo | **só heurística** (zero tokens); o recrutador pode sugerir no chat em F04 |
+| F02-5 | Sugestões de perfil | só heurística local · heurística + modelo | **Decidida 2026-10-08 (dono): as duas, separadas.** Heurística local automática (zero tokens, banner no dashboard, determinística) **e** um botão **"Analisar possíveis perfis"** na página de perfis que chama o modelo de propósito: entrada = todo o histórico (fatos verificados, conquistas, projetos, skills, formação, digests dos arquivos, perfis existentes); é operação cara, então **alerta com estimativa de tokens e confirmação** antes (mesmo padrão da extração), modelo configurável (Sonnet por padrão). Saída no schema `{ suggestions: [{ title, seniority, area, market, rationale, supportingFactIds[] }] }`, gravada em `profile_suggestion` com `source = model`; cada sugestão tem aceitar (formulário pré-preenchido) ou dispensar; uso registrado em `usage_event` (`profile.analyze`). Nova operação `analyzeProfiles` no `Provider`, prompt em `prompts/analyze-profiles.md`, mock com fixture. |
 | F02-6 | Arquivar vs apagar | arquivar apenas · apagar com cascata de documentos/candidaturas | **arquivar**; apagar vai para F10 com a gestão de dados |
 | F02-7 | Persona: tom e rigor | enum fixo (direto/cordial × alto/médio) · texto livre | **enum fixo** (previsível para o prompt em F04) |
 
@@ -164,6 +166,7 @@ Regras de UI: trocar perfil nunca perde formulário não salvo (confirmação); 
 - `clone`: copia ênfases, pitch e overrides; não copia carreira; `cloned_from` preenchido.
 - `buildPersona`: derivação padrão para 3 perfis fixture; overrides sobrepõem só os campos informados.
 - `profile.suggest` (estendido): com fatos de liderança sugere EM/PM; não repete sugestão já dispensada; retorna justificativa com ids de fatos.
+- `analyzeProfiles` (provider mock + core): monta a entrada compacta com todo o histórico (sem itens ocultos de nenhum perfil, sem duplicar fatos), valida a saída pelo schema, descarta sugestão igual a perfil existente ou já dispensada, grava `source = model`; estimativa de tokens cresce com o volume de fatos.
 - Tools `profile.*`: cada handler valida entrada pelo schema zod e devolve saída no schema; `profile.switch` em perfil arquivado → erro tipado.
 
 **`packages/shared`**
@@ -187,11 +190,12 @@ Rodam sobre o compose com `NARNIA_PROVIDER=mock` e um banco semeado por F01 (fix
 - **E2E-04 invalidação**: editar uma conquista (via tela de revisão de F01 ou API) → ambos os cartões mostram "atualizado" com nova data após abrir.
 - **E2E-05 arquivar**: tentar arquivar o ativo → bloqueado com mensagem; trocar e arquivar → some do seletor; "mostrar arquivados" lista.
 - **E2E-06 sugestão**: banco semeado com fatos de liderança → banner aparece → aceitar → formulário pré-preenchido → criar → banner some.
+- **E2E-06b análise pelo modelo (mock)**: botão "Analisar possíveis perfis" → alerta com estimativa → confirmar → job na bandeja → sugestões do modelo listadas com justificativa → dispensar uma, aceitar outra → formulário pré-preenchido.
 - **E2E-07 duas abas**: trocar perfil na aba A → aba B recebe `profile.switched` e atualiza o seletor.
 - **E2E-08 fuso**: "atualizado há" e `built_at` coerentes com `America/Sao_Paulo`.
 
 ### 6.4 Teste manual com provider real (antes de fechar F02)
-Não há chamada ao modelo em F02. Teste manual: ler o cartão de 3 perfis reais e avaliar se um recrutador entenderia o alvo em 20 segundos; medir `tokens_est` contra contagem real do SDK em F04 (registrar aqui a diferença).
+Única chamada ao modelo em F02: "Analisar possíveis perfis". Teste manual: rodar com o histórico real do dono, registrar tokens reais × estimativa, e avaliar se as sugestões fazem sentido e se a justificativa cita os fatos certos. Também: ler o cartão de 3 perfis reais e avaliar se um recrutador entenderia o alvo em 20 segundos; medir `tokens_est` contra contagem real do SDK em F04 (registrar aqui a diferença).
 
 ### 6.5 Definição de pronto
 - Testes de 6.2 e 6.3 verdes na CI; cobertura ≥ 80% em `core/profile`.
@@ -216,4 +220,5 @@ Não há chamada ao modelo em F02. Teste manual: ler o cartão de 3 perfis reais
 | 2026-10-08 | — | **F02-2 decidida pelo dono**: 300 tokens; preocupação registrada: busca e gasto de tokens são a maior fraqueza potencial do projeto. Respostas: resumo objetivo fixo no cartão, relevância pré-calculada em F02, FTS5 e tools de busca compactas em F04, regra no prompt do recrutador de buscar antes de listar, uso por tool no medidor (F10). |
 | 2026-10-08 | — | **F02-3 decidida pelo dono**: por experiência em F02; por conquista entra obrigatoriamente em F05 (dados preparados aqui, interface lá). |
 | 2026-10-08 | — | **F02-4 decidida pelo dono**: `@dnd-kit` + botões, importação dinâmica; botão "Reordenar com <modelo>" vira a issue #1 do repositório. |
+| 2026-10-08 | — | **F02-5 decidida pelo dono**: heurística automática + botão "Analisar possíveis perfis" com alerta de custo e confirmação, que leva todo o histórico ao modelo. F02 passa a ter uma chamada ao modelo (§6.4 atualizado). |
 (Preencher durante a implementação: datas, decisões tomadas, diferença `tokens_est` × real.)
