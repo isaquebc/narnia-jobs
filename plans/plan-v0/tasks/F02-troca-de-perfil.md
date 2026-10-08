@@ -1,8 +1,8 @@
 # F02 · Troca de perfil
 
-Entregável 2 do plan-v0. Cobre o fluxo **F2** de `../02-fluxos-do-usuario.md`: o usuário base ganha vários perfis (lentes), troca entre eles no shell, e cada perfil carrega ênfases, narrativa, dados de carreira obrigatórios e a configuração do recrutador. É pré-requisito direto de F04 (o cartão do perfil é o único contexto implícito do agente) e de F05 (o CV é gerado a partir das ênfases). Depende de F01 (tabela `profile`, dashboard, shell).
+Entregável 2 do plan-v0. Cobre o fluxo **F2** de `../02-fluxos-do-usuario.md`: o usuário base ganha vários perfis (lentes), troca entre eles no shell, e cada perfil carrega ênfases, narrativa, dados de carreira obrigatórios e a persona do recrutador. É pré-requisito direto de F04 (o cartão do perfil é o único contexto implícito do agente) e de F05 (o CV é gerado a partir das ênfases). Depende de F01 (tabela `profile`, fatos, dashboard, shell, jobs, provider).
 
-Status: **decisões fechadas** (2026-10-08, §5 e §8). Implementação ainda não iniciada; próximo passo é detalhar os marcos em §6.1 como no F01.
+Status: **refinada em 2026-10-08** sobre o F01 entregue (decisões de §5 fechadas pelo dono; gaps do cruzamento com o código em §8). Implementação ainda não iniciada; marcos em §6.1.
 
 ---
 
@@ -10,30 +10,33 @@ Status: **decisões fechadas** (2026-10-08, §5 e §8). Implementação ainda n�
 
 Uma pessoa que concluiu o onboarding (F01) consegue:
 
-1. criar um segundo perfil (ex.: "Project Manager") do zero ou clonando as ênfases de um perfil existente, com os dados de carreira obrigatórios preenchidos (faixa salarial, contratos, localidades, disponibilidade);
-2. trocar o perfil ativo pelo seletor no topo do shell e ver dashboard, contadores e sessões mudarem imediatamente;
-3. editar as ênfases do perfil: destacar, ocultar e reordenar experiências, projetos e skills, sem alterar os fatos do usuário base;
+1. criar um segundo perfil (ex.: "Project Manager") do zero ou clonando ênfases, narrativa e persona de um perfil existente, com os dados de carreira obrigatórios preenchidos (faixa salarial, contratos, localidades, disponibilidade) ou marcados "não sei";
+2. trocar o perfil ativo pelo seletor no topo do shell e ver dashboard e contadores de ênfase mudarem imediatamente, em todas as abas abertas;
+3. editar as ênfases do perfil: destacar, ocultar e reordenar experiências, skills, formação e idiomas, sem alterar os fatos do usuário base;
 4. escrever e refinar a narrativa ("pitch") do perfil;
-5. ver e ajustar a persona do recrutador derivada do perfil (área, nível, mercado, tom, rigor);
-6. ver o cartão do perfil (~300 tokens) renderizado, com data de atualização, e confirmar que ele muda ao editar qualquer dado relevante;
-7. aceitar ou recusar uma sugestão automática de perfil gerada a partir dos fatos já existentes (ex.: "seus 3 anos liderando squads sugerem um perfil de Engineering Manager").
+5. ver e ajustar a persona do recrutador derivada do perfil (especialidade, nível-alvo, mercado, idioma, tom, honestidade, rigor, senioridade do recrutador), com restaurar padrão por campo;
+6. ver o cartão do perfil (~300 tokens) renderizado na página do perfil, com "atualizado em" no seu fuso, estado válido/desatualizado e botão **Atualizar cartão**;
+7. aceitar ou dispensar sugestões de perfil: as heurísticas, automáticas no dashboard, e as do modelo, pedidas de propósito pelo botão **Analisar possíveis perfis**, que avisa o custo antes;
+8. arquivar um perfil que não usa mais (nunca o ativo) e voltar a vê-lo com "mostrar arquivados".
 
 ### Dentro do escopo
-- CRUD de perfis (criar, clonar, renomear, arquivar; sem apagar perfil ativo).
-- `settings.active_profile` + seletor no shell + evento WS `profile.switched` para todas as abas abertas.
-- Ênfases por perfil (`profile_emphasis`) sobre experiências, projetos, skills, formação; ordem manual.
-- Narrativa/pitch editável; persona do recrutador derivada e sobrescrevível.
-- Cartão do perfil: função pura de geração (`buildProfileCard`), cache em `profile.card_json`, invalidação em qualquer escrita em `user`, fatos, ênfases ou perfil.
-- Sugestão heurística de perfil (`profile.suggest`, já existe em F01 para o primeiro perfil; aqui ganha "a partir de fatos existentes" e múltiplas sugestões).
-- Escopo por perfil: dashboard, sessões (apenas a estrutura `chat_session.profile_id`, o chat é F04), documentos (F05), candidaturas (F07).
-- **Definição** das tools MCP `profile.*` em `packages/shared` (schemas de entrada/saída) e implementação como funções puras em `packages/core`. A exposição via servidor MCP HTTP é **F04**.
+- CRUD de perfis: criar, editar (incluindo carreira), clonar, arquivar, desarquivar, ativar. Sem apagar (F10, só para arquivados).
+- Perfil ativo em `profile.is_active` (já existe no F01) + seletor no shell + evento WS `profile.switched`.
+- Ênfases por perfil (`profile_emphasis`) sobre experiências, skills, formação e idiomas; ordem manual por tipo. **Projetos entram quando a tabela nascer (F03)**; conquistas, quando a UI nascer (F05, decisão F02-3). O schema já aceita os dois tipos.
+- Narrativa/pitch editável; persona derivada com padrões fixos e overrides por enum (F02-7).
+- Cartão do perfil: `buildProfileCard` puro, com **Resumo objetivo** heurístico, cache em `profile.card_json`, invalidação por `facts_version` + hooks (F02-1), reconstrução preguiçosa na leitura e forçada pelo botão.
+- Relevância por fato e perfil (`profile/relevance.ts`), calculada junto com o cartão e gravada em `profile_fact_relevance` para o cartão e para a busca do F04 (F02-2).
+- Sugestões: heurística estendida (múltiplas, a partir dos fatos existentes, sem repetir dispensadas) e análise pelo modelo como job com estimativa e confirmação (F02-5).
+- **Definição** das tools MCP `profile.*` (schemas em `packages/shared/src/mcp/profile.ts`, handlers puros em `packages/core/src/profile/tools.ts`). Exposição via servidor MCP é **F04**.
+- Dashboard por perfil: cartão resumido do ativo, contadores de ênfase, pendências de pesquisa do perfil, banner de sugestões. Contadores de fatos continuam do usuário (a lente não muda fatos).
 
 ### Fora do escopo (e para onde vai)
-- Chat com o recrutador e hook `SessionStart` que injeta o cartão → F04.
-- Geração de CV a partir das ênfases → F05.
-- Edição livre dos fatos do usuário base (fora de ênfases) → F10.
-- Pesquisa na internet para preencher "não sei" nos dados de carreira → F04. Aqui o campo continua aceitando `needs_research`.
-- Exportar/importar perfis entre instalações → F10.
+- Chat com o recrutador, hook que injeta o cartão, busca FTS5 e tools `fact.search/get/timeline`, resumo do perfil escrito pelo modelo → F04.
+- Geração de CV, ênfase por conquista na UI, fila com coalescência e página de processos → F05.
+- Projetos (tabela `project`, ênfase sobre projetos) → F03.
+- Edição livre dos fatos do usuário base, apagar perfil arquivado, configuração de concorrência dos workers → F10.
+- Pesquisa na internet para "não sei" → F04. Aqui o campo continua aceitando `needsResearch`.
+- Reordenação assistida pelo modelo → issue [#1](https://github.com/isaquebc/narnia-jobs-helpper/issues/1).
 
 ---
 
@@ -41,186 +44,247 @@ Uma pessoa que concluiu o onboarding (F01) consegue:
 
 ### 2.1 Modelo de "lente"
 ```
-user (fatos verificados) ──┬── profile A: emphasis(A) + pitch(A) + persona(A) + carreira(A) ──► card(A)
-                           └── profile B: emphasis(B) + pitch(B) + persona(B) + carreira(B) ──► card(B)
+user (fatos verificados) ──┬── profile A: emphasis(A) + pitch(A) + persona(A) + carreira(A) ──► relevance(A) ──► card(A)
+                           └── profile B: emphasis(B) + pitch(B) + persona(B) + carreira(B) ──► relevance(B) ──► card(B)
 ```
 - Fatos nunca são duplicados por perfil. `profile_emphasis` é uma tabela de ligação `(profile_id, fact_kind, fact_id)` com `mode` (highlight/normal/hidden) e `position`.
-- Fato sem linha em `profile_emphasis` = `normal`, posição por data decrescente.
-- Clonar perfil copia `profile_emphasis`, pitch e persona; dados de carreira são pedidos de novo (podem diferir: salário de PM ≠ salário de engenheiro).
+- Fato sem linha em `profile_emphasis` = `normal`, depois dos posicionados, por data decrescente (experiência e formação) ou por nome (skill, idioma).
+- `fact_kind` é o enum `EmphasisFactKindSchema = experience | skill | education | language | achievement | project`; a UI do F02 só oferece os quatro primeiros; o repo valida que o `fact_id` pertence ao usuário e que a tabela do tipo existe (achievement sim, project não até F03 → erro tipado `unsupported_kind`).
+- Clonar copia `profile_emphasis`, pitch e `persona_overrides_json`; dados de carreira são pedidos de novo (salário de PM ≠ salário de engenheiro).
 
 ### 2.2 Cartão do perfil (`buildProfileCard`)
-Função pura em `packages/core/src/profile/card.ts`: `(user, profile, facts, emphasis) → { text: string; tokens_est: number; hash: string }`.
+Função pura em `packages/core/src/profile/card.ts`: `(user, profile, facts, emphasis, relevance) → { text, tokensEst, hash }`.
 
 Conteúdo, nesta ordem e com limite de ~300 tokens (estimado por `chars/4`, teto rígido de 1.600 chars):
-1. Identidade curta: nome, cidade/país, remoto, idiomas com nível.
-2. Alvo: cargo, senioridade, área, mercado, idioma dos documentos.
-3. Carreira: faixa salarial, contratos, localidades, disponibilidade (ou "a pesquisar" quando `needs_research`).
-4. Pitch (até 3 linhas).
-5. Top 3 experiências destacadas (empresa · cargo · período · 1 conquista com métrica).
-6. Top 8 skills destacadas.
-7. Lacunas conhecidas: fatos não verificados, campos `needs_research`.
+1. Identidade curta: nome, cidade/país, preferência de remoto, idiomas com nível.
+2. **Resumo objetivo** (2–3 linhas, `profile/summary.ts`, heurístico, **nunca cortado**): anos totais de carreira (experiências com data; as sem data viram "N experiências sem data"), nº de empresas, áreas percorridas, arco de cargos em ordem cronológica (ex.: "dev → tech lead → engineering manager"), nível atual, domínios recorrentes (tecnologias/skills mais frequentes nas experiências).
+3. Alvo: cargo, senioridade, área, objetivo (`goal`), mercado, idioma dos documentos.
+4. Carreira: faixa salarial, contratos, localidades, disponibilidade (ou "a pesquisar" para cada campo em `needsResearch`).
+5. Pitch (até 3 linhas).
+6. Top 3 experiências por relevância (empresa · cargo · período · 1 conquista com métrica, a de maior relevância).
+7. Top 8 skills por relevância.
+8. Lacunas conhecidas: fatos não verificados, campos `needsResearch`.
 
-Cache: `profile.card_json = { text, tokens_est, hash, built_at }`. Invalidação por trigger de aplicação: todo repo que escreve em `user`, `experience`, `achievement`, `project`, `skill`, `education`, `language`, `profile`, `profile_emphasis` chama `cards.invalidate(user_id)` (marca `card_updated_at = NULL` em todos os perfis do usuário). Reconstrução preguiçosa no próximo `profile.get_card`.
+Corte quando não cabe (F02-2): primeiro 8 (lacunas), depois 7 (skills além das 3 primeiras), depois 6 (experiências além da 1ª). Seções 1–5 nunca são cortadas; se mesmo assim passar de 1.600 chars, o pitch é truncado em 3 linhas e o resumo objetivo em 2.
 
-### 2.3 Persona do recrutador (derivada)
-`buildPersona(profile) → { specialty, targetLevel, market, language, tone, honesty, rigor, recruiterSeniority }` em `packages/core/src/profile/persona.ts`. Derivação: `specialty = area + target_title`, `targetLevel = seniority`, `market`, `language = doc_locale`. Padrões por decisão F02-7: `tone = "direto"`, `honesty = "maxima"`, `rigor = "alto"`, `recruiterSeniority = "senior"` (sênior seja qual for o nível do perfil). Todos os campos são enums e o usuário pode sobrescrever qualquer um pela interface em `profile.persona_overrides_json`, com "restaurar padrão" por campo. O texto final do system prompt do agente é montado em F04 a partir deste objeto; aqui só existe o objeto e sua prévia na UI.
+**Cache e validade.** `profile.card_json = { text, tokensEst, hash, factsVersion, builtAt }` + colunas `card_updated_at` e `card_facts_version`. O cartão é **inválido** quando `card_updated_at IS NULL` ou `card_facts_version < settings.facts_version`. Invalidação (F02-1):
+- fatos: coberta por `facts_version` (toda escrita em `experience`, `achievement`, `education`, `skill`, `language` já incrementa; nenhum hook novo);
+- usuário, perfil, ênfases: hook explícito `cards.invalidate(userId)` ao final de `users.update/complete`, `profiles.create/update/clone/archive/unarchive`, `emphasis.replace` (marca `card_updated_at = NULL` em todos os perfis do usuário; `profiles.update` de pitch/alvo/carreira/persona invalida só o próprio).
+- Reconstrução preguiçosa em `profile.get_card`/`GET …/card` (grava o cache; leitura com efeito colateral documentado) e forçada em `POST …/card/rebuild`.
+- WS `profile.card_invalidated {profileIds}` é emitido **só quando o estado muda de válido para inválido** (uma revisão que aceita 16 propostas gera um evento, não 16).
 
-### 2.4 Troca de perfil
+### 2.3 Relevância (`profile/relevance.ts`)
+`scoreFacts(profile, facts, emphasis) → ProfileFactRelevance[]` em `packages/core/src/profile/relevance.ts`: nota 0–1 por fato e perfil, com `reasons` (lista de rótulos) para a UI explicar. Componentes, ponderados: recência (fim da experiência; skills herdam a experiência mais recente em que aparecem), modo de ênfase (highlight +, hidden = excluído com nota 0 e `hidden: true`), métrica presente na conquista, verificado, aderência ao alvo (termos de `targetTitle`/`altTitles`/`area` no título, resumo, tech ou nome da skill). Determinística: mesmo input → mesma saída.
+
+Calculada **junto com a reconstrução do cartão** (não a cada escrita) e gravada em `profile_fact_relevance` com a mesma validade do cartão; F04 lê a tabela para ordenar `fact.search`. Sem tabela de relevância por escrita evita O(fatos × perfis) em cada aceite de proposta.
+
+### 2.4 Persona do recrutador (derivada, F02-7)
+`buildPersona(profile, overrides) → Persona` em `packages/core/src/profile/persona.ts`:
 ```
-PUT /api/profiles/:id/activate ─► settings.active_profile = id ─► WS broadcast profile.switched {id}
-web: TanStack Query invalida tudo com chave ["profile", *]; rotas de features recarregam
+Persona = { specialty, targetLevel, market, language, tone, honesty, rigor, recruiterSeniority }
+derivados: specialty = `${area} · ${targetTitle}`, targetLevel = seniority, market, language = docLocale
+padrões:  tone = "direto" | "cordial"            → direto
+          honesty = "maxima" | "diplomatica"     → maxima
+          rigor = "alto" | "medio"               → alto
+          recruiterSeniority = "senior" | "pleno" → senior (sempre sênior por padrão, seja qual for o nível do perfil)
 ```
-Nenhuma sessão de chat é encerrada ao trocar (F04 decide o que fazer com sessões do perfil anterior: continuam vivas, só saem da aba visível).
+`profile.persona_overrides_json` guarda só os campos sobrescritos (validados pelo `PersonaOverridesSchema`, todos opcionais, enums); `null` em um campo = restaurar padrão. Sem texto livre no prompt. O texto final do system prompt é montado em F04 a partir deste objeto; aqui existe o objeto e sua prévia.
 
-### 2.5 API
+### 2.5 Troca de perfil
+```
+PUT /api/profiles/:id/activate ─► profiles.setActive(id) (transação: zera os outros) ─► WS profile.switched {profileId}
+web: invalida ["profiles"], ["dashboard"], ["profile", id, *]; rotas de perfil recarregam; outras abas idem pelo WS
+```
+Perfil arquivado não pode ser ativado (409 `profile_archived`); o ativo não pode ser arquivado (409 `profile_active`). Formulário com alterações não salvas: o `AppProvider` guarda um estado `dirty` e o seletor pede confirmação antes de trocar (o `beforeunload` do navegador não cobre a troca interna).
+
+### 2.6 Sugestões de perfil (F02-5)
+- **Heurística** (`profile/suggest.ts`, estende a do F01): regras sobre os fatos (títulos com lead/manager/head/principal, anos por área, skills de gestão/arquitetura/dados), gera até 3 candidatas com justificativa e `supportingFactIds`; descarta candidata igual a perfil existente (mesmo `targetTitle` normalizado) ou já dispensada (`profile_suggestion.status = dismissed`, comparação por `targetTitle` normalizado). Roda em `GET /api/profiles/suggestions` (zero tokens) e grava as novas com `source = heuristic`.
+- **Modelo**: `POST /api/profiles/analyze` enfileira o job `profile.analyze` (fila `extract` do worker, espelho em `job`, bandeja do F01). Entrada compacta montada no `core` (`profile/analyze-input.ts`): identidade curta, todas as experiências com conquistas (uma linha cada), formação, skills agrupadas, idiomas, resumo de cada digest de arquivo, perfis existentes (nome, alvo) e sugestões já dispensadas; sem itens ocultos. `GET /api/profiles/analyze/estimate` devolve tokens estimados com o tamanho real da entrada (`estimate.ts`) e o modelo (`settings.models.analyze`, padrão Sonnet). O worker chama `provider.analyzeProfiles(input)` com `outputFormat` no schema `AnalyzeProfilesOutputSchema = { suggestions: [{ title, seniority, area, market, rationale, supportingFactIds }] }`, grava cada sugestão com `source = model` e `model`, registra `usage_event` (`profile.analyze`), e o `job.done` faz a UI recarregar. Mock: fixture com 2 sugestões.
+
+### 2.7 API
 | Método e rota | Função |
 |---------------|--------|
-| `GET /api/profiles` · `POST /api/profiles` · `PATCH /api/profiles/:id` · `POST /api/profiles/:id/archive` | CRUD |
-| `POST /api/profiles/:id/clone` | clona ênfases, pitch, persona |
-| `PUT /api/profiles/:id/activate` | define ativo |
-| `GET /api/profiles/:id/card` · `POST /api/profiles/:id/card/rebuild` | cartão (cache) e reconstrução forçada |
-| `GET /api/profiles/:id/emphasis` · `PUT /api/profiles/:id/emphasis` | lista e substituição em lote (modo + posição) |
-| `GET /api/profiles/:id/persona` · `PUT /api/profiles/:id/persona` | derivada + overrides |
-| `GET /api/profiles/suggestions` | sugestões (heurísticas e do modelo) com `source` |
-| `GET /api/profiles/analyze/estimate` · `POST /api/profiles/analyze` | estimativa de tokens da análise; enfileira o job `profile.analyze` (modelo), resultado via WS `job.done` e nas sugestões |
-| `POST /api/profiles/suggestions/:id/dismiss` | dispensar |
-| `WS` | `profile.switched`, `profile.card_invalidated` |
+| `GET /api/profiles?archived=1` · `POST /api/profiles` · `PATCH /api/profiles/:id` | lista (arquivados só com o parâmetro), cria, edita (todos os campos, carreira incluída; mudar alvo/pitch/persona invalida o cartão) |
+| `POST /api/profiles/:id/archive` · `POST /api/profiles/:id/unarchive` | 409 se ativo / já no estado |
+| `POST /api/profiles/:id/clone` | corpo = dados do novo perfil (nome, alvo, carreira…); copia ênfases, pitch e persona do origem; `clonedFrom` |
+| `PUT /api/profiles/:id/activate` | define ativo; 409 se arquivado |
+| `GET /api/profiles/:id/card` · `POST /api/profiles/:id/card/rebuild` | cartão (reconstrói se inválido) · reconstrução forçada |
+| `GET /api/profiles/:id/emphasis` · `PUT /api/profiles/:id/emphasis` | lista (com os fatos resolvidos, uma linha cada, e a relevância) · substituição em lote `{ items: [{kind, id, mode, position?}] }` |
+| `GET /api/profiles/:id/persona` · `PUT /api/profiles/:id/persona` | derivada + overrides · grava overrides (`null` restaura) |
+| `GET /api/profiles/suggestions` · `POST /api/profiles/suggestions/:id/dismiss` | sugestões (heurísticas recalculadas + do modelo), com `source` · dispensar |
+| `GET /api/profiles/analyze/estimate` · `POST /api/profiles/analyze` | estimativa · enfileira `profile.analyze` (409 se já há um na fila) |
+| `GET /api/profiles/suggestion` (F01) | mantida para o onboarding |
+| `GET /api/dashboard` (F01, estendida) | + `card: { text, builtAt, valid }`, `emphasis: { highlighted, hidden }`, `suggestions: n` |
+| WS | `profile.switched {profileId}`, `profile.card_invalidated {profileIds}` (entram em `WsEventSchema`) |
+| só com provider mock | `POST /api/_test/seed { fixture: "engineer" \| "leader" \| "long" }` semeia usuário + fatos + perfil ativo sem passar pelo wizard; `PATCH /api/_test/facts/:kind/:id` altera um fato (E2E-04) |
 
-### 2.6 Tools MCP `profile.*` (definição; exposição em F04)
+Ordem de registro no Hono: rotas literais (`/suggestions`, `/analyze…`, `/suggestion`) **antes** de `/:id`.
+
+### 2.8 Tools MCP `profile.*` (definição; exposição em F04)
 | Tool | Entrada → Saída | Notas |
 |------|-----------------|-------|
-| `profile.list` | — → `[{id, name, target_title, is_active}]` | |
-| `profile.get_card` | `{profile_id?}` → `{text, tokens_est, built_at}` | reconstrói se invalidado |
-| `profile.switch` | `{profile_id}` → `{ok}` | mesmo efeito de `activate` |
-| `profile.update_emphasis` | `{profile_id, items: [{kind, id, mode, position?}]}` → `{updated}` | invalida cartão |
-| `profile.update_pitch` | `{profile_id, pitch}` → `{ok}` | |
-| `profile.create` | `{name, target_title, seniority, area, market, doc_locale, clone_from?}` → `{id}` | carreira obrigatória fica pendente com `needs_research` até o usuário preencher |
-Schemas zod em `packages/shared/src/mcp/profile.ts`; handlers puros em `packages/core/src/profile/tools.ts` recebendo o `db`.
+| `profile.list` | `{ includeArchived? }` → `[{ id, name, targetTitle, isActive, archived }]` | |
+| `profile.get_card` | `{ profileId? }` → `{ text, tokensEst, hash, builtAt }` | reconstrói se inválido; padrão = ativo |
+| `profile.switch` | `{ profileId }` → `{ ok }` | erro tipado se arquivado |
+| `profile.update_emphasis` | `{ profileId, items: [{ kind, id, mode, position? }] }` → `{ updated }` | invalida cartão |
+| `profile.update_pitch` | `{ profileId, pitch }` → `{ ok }` | |
+| `profile.create` | `{ name, targetTitle, seniority, area, goal, market, docLocale, cloneFrom? }` → `{ id }` | sem UI: carreira fica toda em `needsResearch` até o usuário preencher |
+Schemas zod em `packages/shared/src/mcp/profile.ts` (entrada e saída, com `toJsonSchema` sem `$schema`, F01 fix `e06eeda`); handlers puros em `packages/core/src/profile/tools.ts` recebendo `Repos`.
 
 ---
 
 ## 3 · Dados deste entregável
 
+Migration `0002_profiles.sql` (só para frente, como `0001`):
+
 | Tabela | Colunas (novas ou completadas) |
 |--------|--------------------------------|
-| `profile` (completar) | `persona_overrides_json?`, `archived_at?` (UTC), `cloned_from?`, `card_json?` passa a ter `{text, tokens_est, hash, built_at}`; `card_updated_at` NULL = inválido |
-| `profile_emphasis` (nova) | `id`, `profile_id`, `fact_kind` (experience/project/skill/education/achievement), `fact_id`, `mode` (highlight/normal/hidden), `position?`, `updated_at`; único `(profile_id, fact_kind, fact_id)` |
-| `settings` | chave `active_profile` → id |
-| `profile_suggestion` (nova) | `id`, `user_id`, `source` (heuristic/model), `model?`, `payload_json` (cargo, senioridade, área, mercado, justificativa, fatos de apoio), `status` (new/accepted/dismissed), `created_at` |
+| `profile` (completar) | `persona_overrides_json text not null default '{}'`, `archived_at text`, `cloned_from text references profile(id)`, `card_facts_version integer`; `card_json` passa a guardar `{text, tokensEst, hash, factsVersion, builtAt}`; `is_active` continua a fonte do ativo (F01) |
+| `profile_emphasis` (nova) | `id`, `profile_id` (fk, cascade), `fact_kind`, `fact_id`, `mode` (highlight/normal/hidden), `position integer`, `updated_at`; único `(profile_id, fact_kind, fact_id)`; índice `(profile_id, fact_kind, position)` |
+| `profile_fact_relevance` (nova) | `profile_id` (fk, cascade), `fact_kind`, `fact_id`, `score real`, `reasons_json`, `computed_at`; pk `(profile_id, fact_kind, fact_id)` |
+| `profile_suggestion` (nova) | `id`, `user_id`, `source` (heuristic/model), `model text`, `payload_json` (title, seniority, area, market, rationale, supportingFactIds), `status` (new/accepted/dismissed), `created_at`, `decided_at` |
+| `settings` | chave `models.analyze` (padrão `sonnet`) |
 
 Regras:
-- Arquivar perfil ativo é bloqueado (409); o usuário troca antes.
-- `profile_emphasis` órfã (fato apagado) é removida por `ON DELETE CASCADE` lógico nos repos.
-- `fact_id` referenciado só pode pertencer ao `user_id` do perfil (validação no repo).
-- Dados de carreira (`salary_*`, `contract_types_json`, `locations_json`, `available_from`) obrigatórios por perfil, com `needs_research_json` para "não sei" (mesma regra de F01).
+- `fact_id` referenciado só pode pertencer ao `user_id` do perfil (validação no repo; usuário único em F01, mas a regra fica).
+- Fato apagado remove ênfase e relevância (`facts.remove` chama `emphasis.removeFact(kind, id)`; sem FK física porque os fatos vivem em tabelas distintas).
+- `position` é renumerada sem buracos dentro de `(profile_id, fact_kind)` a cada `replace`.
+- Perfis existentes antes da migration: `card_updated_at` já é NULL → reconstrução na primeira leitura; o perfil do F01 já é `is_active`.
+- Dados de carreira obrigatórios por perfil com `needsResearch` para "não sei" (regra de F01-15, `requireCareerFields`).
 
 ---
 
 ## 4 · Layouts deste entregável
 
+Rotas web novas: `/perfis` (lista), `/perfis/novo` (criar/clonar), `/perfis/$id` com abas `enfases | narrativa | recrutador | cartao`. `SideNav` ganha "Perfis".
+
 | Tela | Componentes | Estados a cobrir |
 |------|-------------|------------------|
-| Shell: `ProfileSwitcher` (topo) | lista de perfis com cargo-alvo, check no ativo, "+ novo perfil", "gerenciar perfis" | 1 perfil · N perfis · trocando (spinner) · perfil arquivado oculto |
-| Perfis (lista) | `ProfileList` com cartões (nome, alvo, nº de ênfases, última atualização do cartão), ações renomear/clonar/arquivar/ativar; botão **Analisar possíveis perfis** → `AnalyzeProfilesDialog` (alerta de custo com estimativa, modelo, confirmar) → lista de sugestões do modelo com aceitar/dispensar | vazio (impossível após F01) · com arquivados (filtro) · analisando (job na bandeja) · sem sugestões novas · erro do provider |
-| Novo perfil (modal/página) | `ProfileForm` (igual F01 passo 5) + `CloneFromSelect` + bloco Carreira obrigatório com "não sei" | do zero · clonando · validação |
-| Perfil › Ênfases | `EmphasisBoard`: três colunas ou abas (Experiências, Projetos, Skills), cada item com toggle destacar/normal/ocultar e drag para reordenar; prévia lateral do cartão atualizando | sem ênfases · com ocultos · reordenando · salvando |
-| Perfil › Narrativa | `PitchEditor` (textarea 3–5 linhas, contador) + sugestões do cartão | vazio · editado |
-| Perfil › Recrutador | `PersonaPreview` (derivada) + `PersonaOverrides` com seletores: especialidade, mercado, idioma, tom (direto/cordial), honestidade (máxima/diplomática), rigor (alto/médio), senioridade do recrutador (sênior/pleno); "restaurar padrão" por campo | padrão · com overrides · restaurado |
-| Perfil › Cartão | `ProfileCardView` (texto, tokens estimados, "atualizado há X", botão reconstruir) | válido · invalidado (aviso) · reconstruindo |
-| Sugestões | `SuggestionBanner` no dashboard ("Detectamos um possível perfil de ...") com aceitar (abre Novo perfil pré-preenchido) ou dispensar | nenhuma · 1+ |
+| Shell: `ProfileSwitcher` (topo) | lista de perfis não arquivados com cargo-alvo, check no ativo, "+ novo perfil", "gerenciar perfis"; confirmação se há formulário sujo | 1 perfil · N perfis · trocando (spinner) · confirmação de descarte |
+| `/perfis` · `ProfileList` | cartões (nome, alvo, destacadas/ocultas, cartão atualizado em…), ações ativar/renomear/clonar/arquivar/desarquivar; filtro "mostrar arquivados"; botão **Analisar possíveis perfis** → `AnalyzeProfilesDialog` (alerta de custo com estimativa e modelo, confirmar) ; `SuggestionList` (heurísticas e do modelo, com justificativa e fatos de apoio, aceitar/dispensar) | com arquivados · analisando (job na bandeja) · sem sugestões · erro do provider · 409 ao arquivar o ativo |
+| `/perfis/novo` · `ProfileForm` | reaproveita o formulário do passo 5 do F01 (`ProfileForm` + carreira + "não sei" + alerta DIEESE) com `CloneFromSelect`; ao clonar, pré-preenche tudo menos carreira; vindo de sugestão, pré-preenche alvo/senioridade/área | do zero · clonando · a partir de sugestão · validação |
+| `/perfis/$id/enfases` · `EmphasisBoard` | abas Experiências / Skills / Formação / Idiomas; cada item com destacar/normal/ocultar, arrastar (`@dnd-kit`, `React.lazy` só aqui) e botões subir/descer; chip de relevância com motivos; salvar em lote; prévia lateral do cartão (reconstruída após salvar) | sem ênfases · com ocultos · reordenando · salvando · erro |
+| `/perfis/$id/narrativa` · `PitchEditor` | textarea 3–5 linhas com contador; mostra como o pitch aparece no cartão | vazio · editado · salvo |
+| `/perfis/$id/recrutador` · `PersonaPreview` + `PersonaOverrides` | seletores: especialidade, mercado, idioma, tom, honestidade, rigor, senioridade do recrutador; "restaurar padrão" por campo | padrão · com overrides · restaurado |
+| `/perfis/$id/cartao` · `ProfileCardView` | texto, tokens estimados, "atualizado em" (fuso do usuário), estado válido/desatualizado, botão **Atualizar cartão**, resumo objetivo destacado | válido · desatualizado (aviso) · reconstruindo |
+| Dashboard (F01, estendido) | `ProfileCardSummary` (3 primeiras linhas do cartão + link), contadores de ênfase, `SuggestionBanner` ("Detectamos um possível perfil de …", aceitar abre `/perfis/novo` pré-preenchido, dispensar persiste) | sem sugestão · 1+ · cartão desatualizado |
 
-Regras de UI: trocar perfil nunca perde formulário não salvo (confirmação); cartão mostra o fuso do usuário em "atualizado há"; todos os textos via `t()`.
+Regras de UI: trocar perfil nunca perde formulário não salvo (confirmação); datas via `formatInUserTz`; todos os textos via `t()` (o teste de literais do F01 cobre os componentes novos).
 
 ---
 
-## 5 · Decisões em aberto deste entregável
+## 5 · Decisões deste entregável (fechadas em 2026-10-08 pelo dono)
 
-| # | Decisão | Opções | Padrão proposto |
-|---|---------|--------|-----------------|
-| F02-1 | Invalidação do cartão | hooks nos repos (aplicação) · triggers SQLite · recalcular sempre · fila com merge | **Decidida 2026-10-08 (dono): hooks nos repos** + reconstrução preguiçosa na leitura, aproveitando `facts_version` para fatos (só usuário, perfil e ênfases precisam de hook explícito). A página do perfil atual mostra o estado do cartão ("atualizado em …" ou "desatualizado") com botão **Atualizar cartão** (`POST /api/profiles/:id/card/rebuild`). Fila com merge descartada para o cartão (função pura de milissegundos, sem conflito possível); a ideia foi guardada em F05 §2.5 e F10 §2.5. |
-| F02-2 | Limite do cartão | ~300 tokens com corte por prioridade · sem limite | **Decidida 2026-10-08 (dono): ~300 tokens** (teto 1.600 chars), cortando lacunas → skills além das 8 → experiências além das 3. Acréscimos: (a) seção **Resumo objetivo** (2–3 linhas, heurística: anos totais, empresas, áreas, arco de cargos, nível, domínios) logo após a identidade e **nunca cortada**; versão escrita pelo modelo fica para F04 (cache no perfil, refeita pelo botão de atualizar, custo mostrado antes); (b) `profile/relevance.ts`: nota por fato e por perfil (recência, ênfase, métrica, verificação, aderência ao cargo-alvo), gravada em tabela auxiliar pelos mesmos hooks de F02-1; escolhe top-3/top-8 do cartão e ordena a busca; (c) busca que não lê tudo: FTS5 + `fact.search`/`fact.get`/`fact.timeline` com linhas de 30–40 tokens entram em **F04**; sem embeddings nesta escala. |
-| F02-3 | Ênfase em conquistas | granularidade por conquista · só por experiência | **Decidida 2026-10-08 (dono): por experiência em F02**; a ênfase por conquista é **obrigatória em F05** (registrada lá). Preparação aqui: `profile_emphasis.fact_kind` já aceita `achievement` no schema e na validação do repo, e `buildProfileCard` escolhe a conquista exibida pela relevância; só a UI do quadro de ênfases fica por experiência. |
-| F02-4 | Reordenação | drag-and-drop (`@dnd-kit`) · botões subir/descer | **Decidida 2026-10-08 (dono): `@dnd-kit`** com botões subir/descer como apoio (teclado e testes), carregado por importação dinâmica só na página de ênfases (bundle, F01-56). Reordenação assistida pelo modelo ("Reordenar com <modelo>": Haiku/Sonnet/Opus/Fable, estimativa antes, prévia, aceitar/desfazer) registrada na issue [#1](https://github.com/isaquebc/narnia-jobs-helpper/issues/1). |
-| F02-5 | Sugestões de perfil | só heurística local · heurística + modelo | **Decidida 2026-10-08 (dono): as duas, separadas.** Heurística local automática (zero tokens, banner no dashboard, determinística) **e** um botão **"Analisar possíveis perfis"** na página de perfis que chama o modelo de propósito: entrada = todo o histórico (fatos verificados, conquistas, projetos, skills, formação, digests dos arquivos, perfis existentes); é operação cara, então **alerta com estimativa de tokens e confirmação** antes (mesmo padrão da extração), modelo configurável (Sonnet por padrão). Saída no schema `{ suggestions: [{ title, seniority, area, market, rationale, supportingFactIds[] }] }`, gravada em `profile_suggestion` com `source = model`; cada sugestão tem aceitar (formulário pré-preenchido) ou dispensar; uso registrado em `usage_event` (`profile.analyze`). Nova operação `analyzeProfiles` no `Provider`, prompt em `prompts/analyze-profiles.md`, mock com fixture. |
-| F02-6 | Arquivar vs apagar | arquivar apenas · apagar com cascata de documentos/candidaturas | **Decidida 2026-10-08 (dono): arquivar em F02**; perfil ativo não pode ser arquivado (409). **Apagar só depois de arquivar**: a ação "apagar" (F10) existe apenas para perfis arquivados, com cascata explícita (documentos, candidaturas, ênfases, sugestões) e confirmação listando o que vai junto. |
-| F02-7 | Persona: tom e rigor | enum fixo (direto/cordial × alto/médio) · texto livre | **Decidida 2026-10-08 (dono, revisada no mesmo dia): enums com padrão e configuráveis pela interface.** Padrões: tom **direto**, honestidade **máxima**, rigor **alto**, recrutador **sênior**, independentemente do nível do perfil. Na tela Perfil › Recrutador o usuário altera cada um por seletor: `tone` direto/cordial, `honesty` máxima/diplomática, `rigor` alto/médio, `recruiterSeniority` sênior/pleno; mais especialidade, mercado e idioma. Tudo em `profile.persona_overrides_json`; "restaurar padrão" por campo. Sem texto livre no prompt (previsibilidade do system prompt em F04). |
+| # | Decisão | Opções | Decidido |
+|---|---------|--------|----------|
+| F02-1 | Invalidação do cartão | hooks nos repos · triggers SQLite · recalcular sempre · fila com merge | **hooks nos repos** + `facts_version` para fatos + reconstrução preguiçosa; cartão visível na página do perfil com **Atualizar cartão**. Fila com merge descartada para o cartão (dado derivado barato, sem conflito); a ideia foi guardada em F05 §2.5 e F10 §2.5. |
+| F02-2 | Limite do cartão | ~300 tokens · sem limite | **~300 tokens** (teto 1.600 chars) com corte por prioridade; **Resumo objetivo** heurístico nunca cortado; relevância pré-calculada com o cartão; busca FTS5 e tools compactas em F04; sem embeddings nesta escala. |
+| F02-3 | Ênfase em conquistas | por conquista · só por experiência | **por experiência em F02**; por conquista **obrigatória em F05** (schema e repo já aceitam `achievement`). |
+| F02-4 | Reordenação | `@dnd-kit` · botões | **`@dnd-kit`** com botões subir/descer, importação dinâmica só na página de ênfases. "Reordenar com <modelo>" → issue #1. |
+| F02-5 | Sugestões de perfil | só heurística · heurística + modelo | **as duas, separadas**: heurística automática (zero tokens) + botão **Analisar possíveis perfis** (job com alerta de custo, estimativa e confirmação; todo o histórico vai ao modelo; modelo configurável, Sonnet por padrão). |
+| F02-6 | Arquivar vs apagar | arquivar · apagar com cascata | **arquivar** (ativo bloqueado, 409); **apagar só perfil arquivado**, em F10, com cascata listada. |
+| F02-7 | Persona | enum fixo · texto livre | **enums com padrão e configuráveis pela interface**: tom direto, honestidade máxima, rigor alto, recrutador sênior; seletores com restaurar padrão; sem texto livre. |
+| F02-8 | Clonar sem carreira | gravar com `needsResearch` · formulário antes de gravar | **formulário antes de gravar** (nada meio-pronto no banco); a tool `profile.create` com `cloneFrom`, que não tem UI, grava com carreira toda em `needsResearch`. |
+| F02-9 | Projetos nas ênfases | agora (tabela nova) · quando F03 criar `project` | **quando F03 criar a tabela**; o enum já reserva `project`. *(confirmar com o dono, ver §8)* |
+| F02-10 | Semeadura dos e2e | passar pelo wizard do F01 · endpoint de teste só-mock | **`POST /api/_test/seed`** com fixtures nomeadas (rápido e determinístico); os cenários do F01 continuam passando pelo wizard. |
 
 ---
 
 ## 6 · O que precisa estar coberto para o F02 funcionar
 
-### 6.1 Pré-requisitos e dependências
-1. F01 concluído: `user`, `profile`, fatos, shell, dashboard, i18n, `time.ts`, WS.
-2. Migration `0002_profiles.sql`: completar `profile`, criar `profile_emphasis`, `profile_suggestion`.
-3. `packages/shared`: schemas de `ProfileEmphasis`, `Persona`, `ProfileCard`, `ProfileSuggestion`, tools `profile.*`.
-4. `packages/core`: `profile/card.ts`, `profile/persona.ts`, `profile/suggest.ts` (estender), `profile/tools.ts`, repos com `cards.invalidate`.
-5. `apps/api`: rotas de §2.5, broadcast WS.
-6. `apps/web`: `ProfileSwitcher`, páginas de perfil, `EmphasisBoard`, `SuggestionBanner`.
-7. Fixtures: usuário com 6 experiências, 4 projetos, 20 skills, 2 formações; dois perfis (engenheiro, PM).
+### 6.1 Marcos de implementação (ordem obrigatória; cada marco termina com seus testes verdes, TDD como em `../09-metodologia-tdd.md`)
+
+| Marco | Entrega | Verificação |
+|-------|---------|-------------|
+| **M1 Shared + banco** | `packages/shared`: `EmphasisFactKindSchema`, `EmphasisModeSchema`, `ProfileEmphasisSchema`, `ProfileFactRelevanceSchema`, `PersonaSchema` + `PersonaOverridesSchema` (enums de F02-7), `ProfileCardSchema` (`tokensEst` inteiro ≥ 0), `ProfileSuggestionSchema` (`source`, `model`), `AnalyzeProfilesInput/OutputSchema`, contratos das rotas de §2.7, `WsEventSchema` + `profile.switched`/`profile.card_invalidated`, `packages/shared/src/mcp/profile.ts` com snapshot do JSON Schema; `packages/core`: `0002_profiles.sql`, repos `emphasis` (replace em lote, validação de dono e de tipo, renumeração, `removeFact`), `relevance` (upsert em lote por perfil), `suggestions` (criar, listar, dispensar, aceitar, dedupe por título normalizado), `profiles` (+ `archive/unarchive/clone`, `list({ archived })`, `setActive` com 409 lógico, `invalidateCards`), `facts.remove` chamando `emphasis.removeFact`; fixtures `engineer` (6 experiências com conquistas e métricas, 20 skills, 2 formações, 2 idiomas), `leader` (fatos de liderança) e `long` (20 experiências, 60 skills) em `packages/core/test/fixtures/profiles/` | testes de §6.2 de `shared` e dos repos; `./start.sh test` verde |
+| **M2 Core: cartão, relevância, persona, sugestões, tools** | `profile/summary.ts` (resumo objetivo), `profile/relevance.ts`, `profile/card.ts` (seções, corte, hash, `tokensEst`), `profile/cards.ts` (validade por `card_updated_at`/`card_facts_version`, reconstrução que grava cartão + relevância, hooks de invalidação com evento só na transição), `profile/persona.ts`, `profile/suggest.ts` estendido, `profile/analyze-input.ts` (entrada compacta + estimativa), `profile/tools.ts` (handlers `profile.*`) | testes de §6.2 `packages/core`; cobertura ≥ 80% em `src/profile/**` (threshold por glob no `vitest.config.ts`); cartão ≤ 1.600 chars na fixture `long` |
+| **M3 Provider + worker + API** | `Provider.analyzeProfiles` (`ClaudeCodeProvider` com `prompts/analyze-profiles.md` e `outputFormat`; `MockProvider` com fixture e modos de erro); worker: job `profile.analyze` na fila `extract` com espelho, `usage_event` e gravação das sugestões; api: rotas de §2.7, broadcast WS, dashboard estendido, `_test/seed` e `_test/facts` só com mock; `settings.models.analyze` | testes de §6.2 `providers`, `worker`, `api`; fluxo `curl` completo com mock (criar, clonar, ênfases, cartão, ativar, arquivar, analisar) registrado em §8 |
+| **M4 Web** | `ProfileSwitcher` no shell (+ guarda de formulário sujo no `AppProvider`), rotas `/perfis`, `/perfis/novo`, `/perfis/$id/*`, `ProfileList` + `AnalyzeProfilesDialog` + `SuggestionList`, `ProfileForm` reaproveitado com `CloneFromSelect` e pré-preenchimento por sugestão, `EmphasisBoard` (`@dnd-kit` por `React.lazy`, botões, chips de relevância, prévia do cartão), `PitchEditor`, `PersonaPreview`/`PersonaOverrides`, `ProfileCardView`, dashboard com `ProfileCardSummary` e `SuggestionBanner`; hooks `useProfiles` (ativar, arquivar, clonar), `useProfileCard`, `useEmphasis`, `useSuggestions`; WS `profile.switched` → invalidação de queries; dicionário pt-BR | testes de §6.2 `apps/web`; smoke manual com mock em `./start.sh dev` |
+| **M5 E2E + fechamento** | cenários E2E-01…E2E-09 de §6.3 em `apps/e2e/tests/` (prefixo `f02-`); `_test/seed` usado por todos; CI verde; documentos `../02` (fluxo F2), `../03 §4–5` (tools `profile.*`, relevância), `../04 §B` (tabelas novas) atualizados; §6.4 executado com o histórico real do dono; §8 completo | `./start.sh e2e` verde; §6.5 completo |
+
+Regras durante a implementação: as mesmas do F01 (teste antes do código, nada no host, nenhum teste automatizado com a assinatura real, fixtures fictícias, commits por lote quando o dono pedir, §8 por marco).
 
 ### 6.2 Testes unitários (Vitest) · obrigatórios
-**`packages/core`**
-- `buildProfileCard`: respeita a ordem das seções; nunca passa de 1.600 chars (fixture com 20 experiências e 60 skills); corta na prioridade definida (F02-2); inclui "a pesquisar" para `needs_research`; mesmo input → mesmo `hash`; experiências `hidden` não aparecem; `highlight` vem antes de `normal`.
-- Invalidação: escrever em cada uma das 9 tabelas listadas em §2.2 zera `card_updated_at` de todos os perfis do usuário; `get_card` reconstrói e grava `built_at` em UTC.
-- `profile_emphasis`: upsert em lote substitui o conjunto; rejeita `fact_id` de outro usuário; posição é renumerada sem buracos; fato apagado remove ênfase.
-- `clone`: copia ênfases, pitch e overrides; não copia carreira; `cloned_from` preenchido.
-- `buildPersona`: derivação padrão para 3 perfis fixture (tom direto, honestidade máxima, rigor alto, recrutador sênior); overrides sobrepõem só os campos informados e só aceitam valores do enum; `null` em um campo restaura o padrão.
-- `profile.suggest` (estendido): com fatos de liderança sugere EM/PM; não repete sugestão já dispensada; retorna justificativa com ids de fatos.
-- `analyzeProfiles` (provider mock + core): monta a entrada compacta com todo o histórico (sem itens ocultos de nenhum perfil, sem duplicar fatos), valida a saída pelo schema, descarta sugestão igual a perfil existente ou já dispensada, grava `source = model`; estimativa de tokens cresce com o volume de fatos.
-- Tools `profile.*`: cada handler valida entrada pelo schema zod e devolve saída no schema; `profile.switch` em perfil arquivado → erro tipado.
-
 **`packages/shared`**
-- Schemas de tools: snapshot do JSON Schema; `ProfileCard.tokens_est` é inteiro ≥ 0.
+- Schemas novos: válidos/inválidos por fixture; `PersonaOverridesSchema` rejeita valor fora do enum e aceita `null` por campo; `ProfileCard.tokensEst` inteiro ≥ 0; `WsEventSchema` aceita os dois eventos novos; snapshot do JSON Schema das tools `profile.*` e de `AnalyzeProfilesOutputSchema` (sem `$schema`).
+
+**`packages/core`**
+- `summary`: anos totais com sobreposição descontada; experiências sem data contadas à parte; arco de cargos em ordem cronológica; nunca passa de 3 linhas; determinístico.
+- `relevance`: `hidden` → excluído; `highlight` > `normal` com o resto igual; recência e métrica aumentam a nota; termos do alvo aumentam; `reasons` explica cada componente; mesmo input → mesma saída.
+- `buildProfileCard`: ordem das seções; resumo objetivo sempre presente; nunca passa de 1.600 chars na fixture `long`; corte na prioridade de F02-2; "a pesquisar" para cada `needsResearch`; mesmo input → mesmo `hash`; `hidden` não aparece; top-3/top-8 seguem a relevância.
+- `cards` (validade e invalidação): escrever em cada tabela de fatos (via repos) torna o cartão inválido por `facts_version`; `users.update`, `profiles.update` (pitch/alvo/carreira/persona), `emphasis.replace`, `clone`, `archive` invalidam; `get` reconstrói e grava `builtAt` em UTC, `card_facts_version` e a relevância; evento de invalidação só na transição válido → inválido (16 aceites = 1 evento).
+- `emphasis`: `replace` substitui o conjunto; rejeita `fact_id` de outro usuário e `kind` sem tabela (`project` → `unsupported_kind`); `position` renumerada sem buracos; `facts.remove` apaga a ênfase e a relevância.
+- `profiles`: `clone` copia ênfases, pitch e overrides, não copia carreira, preenche `clonedFrom`; `archive` do ativo → erro tipado `profile_active`; `setActive` de arquivado → `profile_archived`; `unarchive`; `list` padrão exclui arquivados.
+- `persona`: derivação padrão para 3 fixtures (tom direto, honestidade máxima, rigor alto, sênior); overrides só nos campos informados e só valores do enum; `null` restaura.
+- `suggest` (heurística): fixture `leader` sugere EM/PM com `supportingFactIds`; não repete dispensada; não sugere perfil já existente; `engineer` sem liderança → nenhuma.
+- `analyze-input`: entrada compacta sem itens ocultos e sem fatos duplicados; inclui digests e perfis existentes; estimativa cresce com o volume.
+- Tools `profile.*`: cada handler valida entrada e saída pelo schema; `profile.switch` em arquivado → erro tipado; `profile.create` com `cloneFrom` grava carreira em `needsResearch`.
+
+**`packages/providers`**
+- `analyzeProfiles`: `ClaudeCodeProvider` monta `query` com o prompt e o `outputFormat` certo (query injetado) e valida a saída; `MockProvider` devolve a fixture e respeita `errors.analyzeProfiles`.
+
+**`apps/worker`**
+- Job `profile.analyze`: grava sugestões `source = model`, registra `usage_event`, espelha estado; erro do provider → `error` com mensagem para a UI.
 
 **`apps/api`**
-- Rotas: criar, clonar, ativar, arquivar (409 se ativo), ênfases em lote, persona, cartão (cache hit/miss por `card_updated_at`), sugestões.
-- WS: `activate` emite `profile.switched` uma vez por cliente; escrita em fato emite `profile.card_invalidated`.
+- Rotas: criar, editar, clonar (pré-requisitos de carreira), ativar (409 arquivado), arquivar (409 ativo), desarquivar, ênfases em lote (400 em dono errado), persona (`null` restaura), cartão (cache hit/miss por validade; `rebuild` força), sugestões (heurísticas + modelo, dispensar), `analyze` (estimate; 409 com job na fila), dashboard estendido, `_test/seed` e `_test/facts` ausentes sem mock; ordem das rotas literais antes de `/:id`.
+- WS: `activate` emite `profile.switched` uma vez; escrita em fato emite `profile.card_invalidated` uma vez por transição.
 
 **`apps/web`**
-- `ProfileSwitcher`: lista, ativa, mostra spinner, invalida queries `["profile", *]`.
-- `EmphasisBoard`: toggle de modo, reordenação por teclado e por drag, salvar em lote, prévia do cartão atualiza após salvar.
-- `ProfileForm` (novo perfil): obrigatórios de carreira, "não sei", clonar pré-preenche.
-- `SuggestionBanner`: aceitar abre formulário pré-preenchido; dispensar some e não volta.
+- `ProfileSwitcher`: lista sem arquivados, ativa, spinner, invalida queries, confirmação com formulário sujo.
+- `EmphasisBoard`: toggle de modo, reordenação por teclado e por botões, salvar em lote, prévia do cartão atualiza após salvar, chip de relevância.
+- `ProfileForm` (novo/clonar/sugestão): obrigatórios de carreira, "não sei", pré-preenchimentos.
+- `PersonaOverrides`: seletores, restaurar padrão por campo.
+- `ProfileCardView`: estados válido/desatualizado, botão reconstruir, "atualizado em" no fuso.
+- `AnalyzeProfilesDialog`: estimativa visível antes, confirmar enfileira, erro do provider.
+- `SuggestionBanner`/`SuggestionList`: aceitar abre formulário pré-preenchido; dispensar some e não volta após recarregar.
+- i18n: teste de literais cobre os componentes novos.
 
 ### 6.3 Testes e2e (Playwright, Chromium) · obrigatórios
-Rodam sobre o compose com `NARNIA_PROVIDER=mock` e um banco semeado por F01 (fixture "engenheiro com CV").
-- **E2E-01 criar e trocar**: criar perfil "Project Manager" do zero com carreira preenchida → seletor mostra 2 → ativar PM → dashboard muda (cartão e contadores) → recarregar página mantém PM ativo.
-- **E2E-02 clonar**: clonar "Eng. Software" para "Staff Engineer" → ênfases iguais → carreira vazia pede preenchimento → salvar.
-- **E2E-03 ênfases**: ocultar uma experiência e destacar outra no perfil PM → cartão do PM reflete; cartão do perfil engenheiro não muda.
-- **E2E-04 invalidação**: editar uma conquista (via tela de revisão de F01 ou API) → ambos os cartões mostram "atualizado" com nova data após abrir.
-- **E2E-05 arquivar**: tentar arquivar o ativo → bloqueado com mensagem; trocar e arquivar → some do seletor; "mostrar arquivados" lista.
-- **E2E-06 sugestão**: banco semeado com fatos de liderança → banner aparece → aceitar → formulário pré-preenchido → criar → banner some.
-- **E2E-06b análise pelo modelo (mock)**: botão "Analisar possíveis perfis" → alerta com estimativa → confirmar → job na bandeja → sugestões do modelo listadas com justificativa → dispensar uma, aceitar outra → formulário pré-preenchido.
-- **E2E-07 duas abas**: trocar perfil na aba A → aba B recebe `profile.switched` e atualiza o seletor.
-- **E2E-08 fuso**: "atualizado há" e `built_at` coerentes com `America/Sao_Paulo`.
+Rodam no compose e2e (mock) com `POST /api/_test/seed` (F02-10). Arquivos `apps/e2e/tests/f02-NN-*.spec.ts`, títulos `F02/E2E-NN`.
+- **E2E-01 criar e trocar**: seed `engineer` → criar "Project Manager" do zero com carreira → seletor mostra 2 → ativar PM → dashboard muda (cartão e contadores de ênfase) → recarregar mantém PM ativo.
+- **E2E-02 clonar**: clonar o perfil do engenheiro para "Staff Engineer" → formulário pré-preenchido sem carreira → não salva sem carreira → "não sei" em salário → salva; ênfases iguais às do origem.
+- **E2E-03 ênfases**: no perfil PM ocultar uma experiência e destacar outra, reordenar por botões → salvar → cartão do PM reflete; cartão do engenheiro não muda. Um único arraste (`@dnd-kit`) neste cenário.
+- **E2E-04 invalidação**: `PATCH /api/_test/facts/experience/:id` → ambos os cartões ficam "desatualizados" (WS) → abrir cada um reconstrói com nova data.
+- **E2E-05 arquivar**: arquivar o ativo → bloqueado com mensagem; trocar e arquivar → some do seletor; "mostrar arquivados" lista; desarquivar volta.
+- **E2E-06 sugestão heurística**: seed `leader` → banner no dashboard → aceitar → formulário pré-preenchido → criar → banner some; dispensar outra → não volta após recarregar.
+- **E2E-07 análise pelo modelo (mock)**: "Analisar possíveis perfis" → alerta com estimativa e modelo → confirmar → job na bandeja → sugestões do modelo com justificativa → dispensar uma, aceitar outra.
+- **E2E-08 duas abas**: trocar perfil na aba A → aba B recebe `profile.switched` e atualiza o seletor e o dashboard.
+- **E2E-09 fuso e persona**: "atualizado em" coerente com `America/Sao_Paulo` a partir do `builtAt` da API; persona mostra os padrões e um override de tom persiste após recarregar.
 
 ### 6.4 Teste manual com provider real (antes de fechar F02)
-Única chamada ao modelo em F02: "Analisar possíveis perfis". Teste manual: rodar com o histórico real do dono, registrar tokens reais × estimativa, e avaliar se as sugestões fazem sentido e se a justificativa cita os fatos certos. Também: ler o cartão de 3 perfis reais e avaliar se um recrutador entenderia o alvo em 20 segundos; medir `tokens_est` contra contagem real do SDK em F04 (registrar aqui a diferença).
+Única chamada ao modelo em F02: "Analisar possíveis perfis". Com o histórico real do dono: registrar tokens reais × estimativa, se as sugestões fazem sentido e se a justificativa cita os fatos certos. Também: ler o cartão de 3 perfis reais e avaliar se um recrutador entende o alvo em 20 segundos; anotar `tokensEst` (chars/4) para comparar com a contagem real do SDK em F04.
 
 ### 6.5 Definição de pronto
-- Testes de 6.2 e 6.3 verdes na CI; cobertura ≥ 80% em `core/profile`.
-- Cartão de qualquer perfil ≤ 1.600 chars em todas as fixtures.
-- Nenhuma escrita em fatos deixa cartão desatualizado (teste de invalidação por tabela).
+- Testes de 6.2 e 6.3 verdes na CI; cobertura ≥ 80% em `core/src/profile/**`.
+- Cartão de qualquer perfil ≤ 1.600 chars em todas as fixtures, com resumo objetivo sempre presente.
+- Nenhuma escrita em fatos, usuário, perfil ou ênfases deixa cartão válido desatualizado (testes de invalidação por tabela e por repo).
 - `../02`, `../03 §4–5`, `../04 §B` atualizados com o que mudou.
+- Critério de entregável publicável de `README.md` (tasks): README de uso com a seção de perfis, estados de erro, i18n completo.
 
 ---
 
 ## 7 · Riscos específicos
 | Risco | Mitigação |
 |-------|-----------|
-| Cartão ficar genérico demais com o corte de 300 tokens | prioridade de corte explícita (F02-2); teste manual 6.4; F04 pode pedir detalhes por tool |
-| Invalidação esquecida em um repo novo | lista de tabelas em §2.2 é a fonte dos testes; lint customizado que exige `cards.invalidate` em repos de fatos |
-| Muitos perfis tornam o seletor confuso | arquivamento; ordenação por último uso |
-| Drag-and-drop frágil em e2e | testes de reordenação por teclado; drag só em um cenário |
+| Cartão genérico demais com 300 tokens | resumo objetivo fixo + relevância; teste manual 6.4; F04 busca detalhes por tool |
+| Invalidação esquecida em repo novo | fatos cobertos por `facts_version` (sem hook); lista de hooks de §2.2 é a fonte dos testes; teste "escrever em cada repo invalida" |
+| Relevância cara em usuários com muitos fatos | calculada só na reconstrução do cartão; fixture `long` mede o tempo (< 50 ms) |
+| Heurística do resumo errar anos com datas ausentes | regra explícita de "sem data" e teste dedicado |
+| Análise pelo modelo cara ou ruim | estimativa + confirmação; entrada compacta; modelo configurável; medição em 6.4 |
+| Muitos perfis tornam o seletor confuso | arquivamento; ordenação por último uso (`updated_at`) |
+| Drag-and-drop frágil em e2e | reordenação por botões e teclado na maioria dos cenários; um único arraste |
+| Rotas `/suggestions` capturadas por `/:id` | registro das literais antes; teste de api dedicado |
 
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
 |------|-------|-----------------|
-| 2026-10-08 | — | **F02-1 decidida pelo dono**: hooks nos repositórios (uma chamada `cards.invalidate` ao final de cada escrita em usuário, perfil e ênfases; fatos cobertos por `facts_version`), reconstrução na leitura, e a página do perfil atual mostra o estado do cartão com botão de atualizar. A alternativa de fila com merge de atualizações, página de processos e escala de workers foi considerada arquitetura demais para um dado derivado barato e foi registrada como infraestrutura para F05 (jobs caros) e F10 (configuração). |
-| 2026-10-08 | — | **F02-2 decidida pelo dono**: 300 tokens; preocupação registrada: busca e gasto de tokens são a maior fraqueza potencial do projeto. Respostas: resumo objetivo fixo no cartão, relevância pré-calculada em F02, FTS5 e tools de busca compactas em F04, regra no prompt do recrutador de buscar antes de listar, uso por tool no medidor (F10). |
-| 2026-10-08 | — | **F02-3 decidida pelo dono**: por experiência em F02; por conquista entra obrigatoriamente em F05 (dados preparados aqui, interface lá). |
-| 2026-10-08 | — | **F02-4 decidida pelo dono**: `@dnd-kit` + botões, importação dinâmica; botão "Reordenar com <modelo>" vira a issue #1 do repositório. |
-| 2026-10-08 | — | **F02-5 decidida pelo dono**: heurística automática + botão "Analisar possíveis perfis" com alerta de custo e confirmação, que leva todo o histórico ao modelo. F02 passa a ter uma chamada ao modelo (§6.4 atualizado). |
+| 2026-10-08 | — | **F02-1 decidida pelo dono**: hooks nos repositórios, reconstrução na leitura, página do perfil com estado do cartão e botão de atualizar. Fila com merge, página de processos e escala de workers registradas em F05 e F10. |
+| 2026-10-08 | — | **F02-2 decidida pelo dono**: 300 tokens; preocupação registrada: busca e gasto de tokens são a maior fraqueza potencial do projeto. Respostas: resumo objetivo fixo, relevância pré-calculada, FTS5 e tools compactas em F04, regra de buscar antes de listar no prompt, uso por tool no medidor (F10). |
+| 2026-10-08 | — | **F02-3 decidida pelo dono**: por experiência em F02; por conquista obrigatória em F05. |
+| 2026-10-08 | — | **F02-4 decidida pelo dono**: `@dnd-kit` + botões, importação dinâmica; "Reordenar com <modelo>" vira a issue #1. |
+| 2026-10-08 | — | **F02-5 decidida pelo dono**: heurística automática + botão "Analisar possíveis perfis" com alerta de custo e confirmação. F02 passa a ter uma chamada ao modelo. |
 | 2026-10-08 | — | **F02-6 decidida pelo dono**: arquivar aqui; apagar só perfil arquivado, em F10. |
-| 2026-10-08 | — | **F02-7 decidida pelo dono**: padrões tom direto, honestidade máxima, rigor alto, recrutador sênior; revisada em seguida: **todos configuráveis pela interface** por seletores (enums), com restaurar padrão; sem texto livre. **Todas as decisões de §5 fechadas.** |
-(Preencher durante a implementação: datas, decisões tomadas, diferença `tokens_est` × real.)
+| 2026-10-08 | — | **F02-7 decidida pelo dono**: padrões tom direto, honestidade máxima, rigor alto, recrutador sênior; todos configuráveis pela interface por enums, com restaurar padrão; sem texto livre. |
+| 2026-10-08 | — | **Refinamento completo sobre o F01 entregue.** Gaps encontrados e como foram fechados: (1) o plano criava `settings.active_profile`, mas o F01 já tem `profile.is_active` + `profiles.setActive` → mantido o do F01; (2) não existe tabela nem kind `project` (os kinds do F01 são identity, experience, achievement, education, skill, language, link) → projetos saem das ênfases até F03 (F02-9); (3) clonar "sem carreira" violaria `requireCareerFields` → formulário antes de gravar (F02-8); (4) `profile.switched` e `profile.card_invalidated` precisam entrar em `WsEventSchema`, porque o cliente valida os quadros; evento de invalidação só na transição para não gerar 16 eventos numa revisão; (5) invalidação de fatos já é coberta por `facts_version` (bump em insert/update/remove de `facts.ts`) → hooks explícitos só em usuário, perfil e ênfases; (6) relevância por escrita seria O(fatos × perfis) a cada aceite → calculada com o cartão e gravada com a mesma validade; (7) F01 tem `GET /api/profiles/suggestion` (singular) para o onboarding → mantida; plural para a lista; rotas literais antes de `/:id` no Hono; (8) o dashboard do F01 conta fatos do usuário → em F02 ganha cartão, ênfases e sugestões do perfil ativo, sem trocar os contadores de fatos; (9) E2E-04 pedia "editar uma conquista via tela de revisão" que não existe (edição é F10) → endpoint só-mock `_test/facts` e `_test/seed` (F02-10); (10) fixture de §6.1 pedia projetos → trocada por conquistas com métrica, idiomas e uma fixture longa para o teto do cartão; (11) `tokensEst` = chars/4 é impreciso para pt-BR → mantido e calibrado em F04; (12) desarquivar não existia → adicionado; (13) experiências sem data quebrariam o resumo objetivo → regra "N sem data"; (14) formulário sujo na troca de perfil → estado `dirty` no `AppProvider`; (15) `honesty` e `recruiterSeniority` não existiam no objeto da persona → adicionados com enums. |
+(Preencher durante a implementação: datas por marco, decisões F02-11+, diferença `tokensEst` × real.)
