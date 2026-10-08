@@ -45,6 +45,7 @@ function countingProvider(inner: Provider, calls: Record<string, number>): Provi
     readDocument: wrap("readDocument") as Provider["readDocument"],
     extractFacts: wrap("extractFacts") as Provider["extractFacts"],
     buildDigest: wrap("buildDigest") as Provider["buildDigest"],
+    analyzeProfiles: (i) => inner.analyzeProfiles(i),
   };
 }
 
@@ -257,6 +258,7 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
       },
       extractFacts: (i) => new MockProvider().extractFacts(i),
       buildDigest: (i) => new MockProvider().buildDigest(i),
+      analyzeProfiles: (i) => new MockProvider().analyzeProfiles(i),
     };
     const h3 = harness(spy);
     try {

@@ -1,4 +1,5 @@
 import type {
+  AnalyzeProfilesOutput,
   BuildDigestOutput,
   ExtractFactsOutput,
   ReadDocumentOutput,
@@ -141,4 +142,31 @@ export const MOCK_DIGEST: BuildDigestOutput = {
   ],
   sections: MOCK_READ_DOCUMENT.sections,
   meta: { pages: 1, language: "pt" },
+};
+
+/**
+ * Sugestões do modelo no mock (F02 §2.6): coerentes com as fixtures `engineer`/`leader` do core.
+ * `supportingFactIds` é preenchido em runtime com ids da entrada (ver `MockProvider.analyzeProfiles`).
+ */
+export const MOCK_ANALYZE_PROFILES: AnalyzeProfilesOutput = {
+  suggestions: [
+    {
+      title: "Engineering Manager",
+      seniority: "senior",
+      area: "management",
+      market: "BR",
+      rationale:
+        "Liderança de squads e contratação recorrentes nas experiências mais recentes; métricas de entrega e de time.",
+      supportingFactIds: [],
+    },
+    {
+      title: "Staff Engineer",
+      seniority: "staff",
+      area: "software",
+      market: "BR",
+      rationale:
+        "Trajetória técnica longa em backend e plataforma, com conquistas de desempenho e arquitetura que cruzam times.",
+      supportingFactIds: [],
+    },
+  ],
 };

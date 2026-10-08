@@ -1,5 +1,6 @@
 export { type ResolveBinaryOptions, resolveClaudeBinary } from "./claude-code/binary";
 export {
+  ANALYZE_PROFILES_JSON_SCHEMA,
   ClaudeCodeProvider,
   type ClaudeCodeProviderOptions,
   defaultExec,
@@ -17,6 +18,7 @@ export {
   providerIdFromEnv,
 } from "./factory";
 export {
+  MOCK_ANALYZE_PROFILES,
   MOCK_CV_TEXT,
   MOCK_DIGEST,
   MOCK_EXTRACT_FACTS,
@@ -29,6 +31,7 @@ export {
   type MockProviderOptions,
 } from "./mock/mock-provider";
 export {
+  type AnalyzeProfilesProviderInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,

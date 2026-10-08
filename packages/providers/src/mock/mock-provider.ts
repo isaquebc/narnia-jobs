@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
+  AnalyzeProfilesOutput,
   BuildDigestOutput,
   ExtractFactsOutput,
   ReadDocumentOutput,
 } from "@narnia-jobs/shared";
 import {
+  type AnalyzeProfilesProviderInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,
@@ -17,9 +19,19 @@ import {
   type ProviderStatus,
   type ReadDocumentInput,
 } from "../provider";
-import { MOCK_DIGEST, MOCK_EXTRACT_FACTS, MOCK_READ_DOCUMENT } from "./fixtures";
+import {
+  MOCK_ANALYZE_PROFILES,
+  MOCK_DIGEST,
+  MOCK_EXTRACT_FACTS,
+  MOCK_READ_DOCUMENT,
+} from "./fixtures";
 
-export type MockOperation = "detect" | "readDocument" | "extractFacts" | "buildDigest";
+export type MockOperation =
+  | "detect"
+  | "readDocument"
+  | "extractFacts"
+  | "buildDigest"
+  | "analyzeProfiles";
 
 export interface MockProviderOptions {
   installed?: boolean;
@@ -161,6 +173,22 @@ export class MockProvider implements Provider {
   async extractFacts(input: ExtractFactsInput): Promise<ProviderResult<ExtractFactsOutput>> {
     await this.gate("extractFacts");
     return this.result(structuredClone(MOCK_EXTRACT_FACTS), input.text, input.model);
+  }
+
+  /** Sugestões fixas (EM e Staff) citando as duas primeiras experiências da entrada como fatos de apoio. */
+  async analyzeProfiles(
+    input: AnalyzeProfilesProviderInput,
+  ): Promise<ProviderResult<AnalyzeProfilesOutput>> {
+    await this.gate("analyzeProfiles");
+    const supporting = input.experiences.slice(0, 2).map((e) => e.id);
+    const output: AnalyzeProfilesOutput = {
+      suggestions: MOCK_ANALYZE_PROFILES.suggestions.map((s) => ({
+        ...s,
+        supportingFactIds: supporting,
+      })),
+    };
+    const { model, ...rest } = input;
+    return this.result(output, JSON.stringify(rest), model);
   }
 
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {

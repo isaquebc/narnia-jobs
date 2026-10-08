@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { promisify } from "node:util";
 import {
+  type AnalyzeProfilesOutput,
+  AnalyzeProfilesOutputSchema,
   type BuildDigestOutput,
   BuildDigestOutputSchema,
   EXTRACTION_JSON_SCHEMAS,
@@ -10,9 +12,11 @@ import {
   ExtractFactsOutputSchema,
   type ReadDocumentOutput,
   ReadDocumentOutputSchema,
+  toJsonSchema,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
 import {
+  type AnalyzeProfilesProviderInput,
   type AuthMethod,
   type BuildDigestInput,
   type ExtractFactsInput,
@@ -109,7 +113,11 @@ export const PROMPTS = {
   readDocument: () => loadPrompt("read-document"),
   extractFacts: () => loadPrompt("extract-facts"),
   buildDigest: () => loadPrompt("build-digest"),
+  analyzeProfiles: () => loadPrompt("analyze-profiles"),
 };
+
+/** JSON Schema da análise de perfis (F02), gerado uma vez por processo (sem `$schema`, fix e06eeda). */
+export const ANALYZE_PROFILES_JSON_SCHEMA = toJsonSchema(AnalyzeProfilesOutputSchema);
 
 async function defaultQuery(params: {
   prompt: string;
@@ -287,6 +295,24 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.extractFacts },
       },
       ExtractFactsOutputSchema,
+    );
+  }
+
+  async analyzeProfiles(
+    input: AnalyzeProfilesProviderInput,
+  ): Promise<ProviderResult<AnalyzeProfilesOutput>> {
+    const { model, ...history } = input;
+    const prompt = `<historico>\n${JSON.stringify(history, null, 1)}\n</historico>`;
+    return this.run(
+      prompt,
+      {
+        model,
+        tools: [],
+        maxTurns: 1,
+        systemPrompt: PROMPTS.analyzeProfiles(),
+        outputFormat: { type: "json_schema", schema: ANALYZE_PROFILES_JSON_SCHEMA },
+      },
+      AnalyzeProfilesOutputSchema,
     );
   }
 

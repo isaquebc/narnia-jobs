@@ -1,4 +1,6 @@
 import type {
+  AnalyzeProfilesInput,
+  AnalyzeProfilesOutput,
   BuildDigestOutput,
   ExtractFactsOutput,
   FactProposal,
@@ -69,6 +71,8 @@ export interface BuildDigestInput {
   locale: string;
   model: string;
 }
+/** "Analisar possíveis perfis" (F02 §2.6): entrada compacta de todo o histórico + modelo escolhido. */
+export type AnalyzeProfilesProviderInput = AnalyzeProfilesInput & { model: string };
 
 export interface Provider {
   readonly id: "claude-code" | "mock";
@@ -79,6 +83,10 @@ export interface Provider {
   extractFacts(input: ExtractFactsInput): Promise<ProviderResult<ExtractFactsOutput>>;
   /** Registro de contexto do arquivo (Sonnet por padrão, decisão F01-5). */
   buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>>;
+  /** Sugestões de perfil a partir de todo o histórico (F02-5; Sonnet por padrão, uma chamada). */
+  analyzeProfiles(
+    input: AnalyzeProfilesProviderInput,
+  ): Promise<ProviderResult<AnalyzeProfilesOutput>>;
 }
 
 export type ProviderErrorCode =
