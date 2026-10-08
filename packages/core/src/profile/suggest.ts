@@ -1,5 +1,12 @@
-import type { SenioritySchema } from "@narnia-jobs/shared";
+import type {
+  ProfileSuggestionPayload,
+  SenioritySchema,
+  ProfileSuggestion as StoredSuggestion,
+} from "@narnia-jobs/shared";
 import type { z } from "zod";
+import type { Repos } from "../db";
+import { normalizeTitle } from "../db/repos/suggestions";
+import { collectFactSets, type FactSets } from "./relevance";
 
 type Seniority = z.infer<typeof SenioritySchema>;
 
@@ -127,4 +134,114 @@ export function suggestProfile(input: SuggestInput, now = new Date()): ProfileSu
     yearsOfExperience: years,
     reason: `Sugerido porque o título mais recente é "${latest.title}" e há ${years} anos de experiência (${seniority}); área "${area}" pelos títulos e skills.`,
   };
+}
+
+// --- F02 §2.6: várias sugestões a partir dos fatos existentes (heurística, zero tokens) ------------------
+
+export interface SuggestProfilesOptions {
+  existingTitles: string[];
+  dismissedTitles: string[];
+  market: string;
+}
+
+const LEAD_TITLE =
+  /\b(tech lead|team lead|lead|l[ií]der|engineering manager|manager|gerente|head|coordenador(a)?|coordinator)\b/i;
+const MANAGER_TITLE =
+  /\b(engineering manager|manager|gerente|head|coordenador(a)?|coordinator|diretor(a)?|director)\b/i;
+const PM_TITLE =
+  /\b(project manager|product manager|scrum master|product owner|delivery manager)\b/i;
+const MAX_SUGGESTIONS = 3;
+
+function years(experiences: FactSets["experiences"], now: Date): number {
+  return yearsOfExperience(
+    experiences.map((e) => ({
+      title: e.title,
+      startDate: e.startDate,
+      ...(e.endDate ? { endDate: e.endDate } : {}),
+      isCurrent: e.isCurrent,
+      tech: e.tech,
+    })),
+    now,
+  );
+}
+
+/** Até 3 candidatas com justificativa e fatos de apoio; nunca repete perfil existente nem título dispensado. */
+export function suggestProfiles(
+  facts: FactSets,
+  opts: SuggestProfilesOptions,
+  now = new Date(),
+): ProfileSuggestionPayload[] {
+  const leadExps = facts.experiences.filter((e) => LEAD_TITLE.test(e.title));
+  const managerExps = facts.experiences.filter((e) => MANAGER_TITLE.test(e.title));
+  const pmExps = facts.experiences.filter((e) => PM_TITLE.test(e.title));
+  const mgmtSkills = facts.skills.filter((s) => s.category === "management");
+  const techArea = detectArea(
+    facts.experiences.filter((e) => !LEAD_TITLE.test(e.title)).map((e) => e.title),
+    facts.skills.map((s) => ({ name: s.name, category: s.category })),
+  );
+  const area = techArea === "other" || techArea === "management" ? "software" : techArea;
+  const out: ProfileSuggestionPayload[] = [];
+  const titles = (exps: FactSets["experiences"]) =>
+    [...new Set(exps.map((e) => e.title))].join(", ");
+
+  if (leadExps.length > 0) {
+    const y = years(leadExps, now);
+    out.push({
+      title: "Engineering Manager",
+      seniority: "manager",
+      area,
+      market: opts.market,
+      rationale: `${y} anos em cargos de liderança (${titles(leadExps)}) sugerem um perfil de gestão de engenharia.`,
+      supportingFactIds: leadExps.map((e) => e.id),
+    });
+  }
+  if (mgmtSkills.length >= 2 || pmExps.length > 0) {
+    const support = [...pmExps.map((e) => e.id), ...mgmtSkills.map((s) => s.id)];
+    out.push({
+      title: "Project Manager",
+      seniority: pmExps.length > 0 ? "manager" : "senior",
+      area: "management",
+      market: opts.market,
+      rationale:
+        pmExps.length > 0
+          ? `Cargos de gestão de projetos/produto (${titles(pmExps)}) e skills de gestão (${mgmtSkills.map((s) => s.name).join(", ") || "—"}).`
+          : `Skills de gestão (${mgmtSkills.map((s) => s.name).join(", ")}) sugerem um perfil de gestão de projetos.`,
+      supportingFactIds: support,
+    });
+  }
+  if (leadExps.length > 0 && managerExps.length === 0) {
+    out.push({
+      title: "Tech Lead",
+      seniority: "staff",
+      area,
+      market: opts.market,
+      rationale: `Liderança técnica sem cargo de gestão formal (${titles(leadExps)}).`,
+      supportingFactIds: leadExps.map((e) => e.id),
+    });
+  }
+
+  const skip = new Set([...opts.existingTitles, ...opts.dismissedTitles].map(normalizeTitle));
+  return out.filter((s) => !skip.has(normalizeTitle(s.title))).slice(0, MAX_SUGGESTIONS);
+}
+
+/** Roda a heurística sobre os repos e grava as sugestões novas com `source = heuristic`; devolve só as criadas. */
+export function refreshHeuristicSuggestions(repos: Repos, now = new Date()): StoredSuggestion[] {
+  const facts = collectFactSets(repos);
+  const profiles = repos.profiles.list({ includeArchived: true });
+  const market = repos.profiles.active()?.market ?? profiles[0]?.market ?? "BR";
+  const candidates = suggestProfiles(
+    facts,
+    {
+      existingTitles: profiles.map((p) => p.targetTitle),
+      dismissedTitles: repos.suggestions.dismissedTitles(),
+      market,
+    },
+    now,
+  );
+  const created: StoredSuggestion[] = [];
+  for (const payload of candidates) {
+    const s = repos.suggestions.create({ source: "heuristic", payload });
+    if (s) created.push(s);
+  }
+  return created;
 }

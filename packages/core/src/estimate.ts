@@ -6,6 +6,8 @@ export const PROMPT_OVERHEAD = {
   digest: 700,
   /** Fatos extraídos entram como entrada da chamada de digest. */
   factsAsInput: 1500,
+  /** "Analisar possíveis perfis" (F02 §2.6): prompt + schema de saída. */
+  analyzeProfiles: 800,
 } as const;
 
 /** Aproximação de custo para o modelo ler uma página de PDF pela tool Read. */
@@ -60,4 +62,15 @@ export function estimateExtraction(input: EstimateInput): ExtractionEstimate {
     Boolean(c),
   );
   return { calls, totalTokens: list.reduce((s, c) => s + c.tokens, 0), labels: list.map(label) };
+}
+
+export interface CallEstimateInput {
+  inputChars: number;
+  overhead: number;
+  model: string;
+}
+
+/** Estimativa genérica de uma chamada (F02 §2.9-7): entrada em chars + overhead fixo do prompt. */
+export function estimateCall(input: CallEstimateInput): CallEstimate {
+  return { model: input.model, tokens: charsToTokens(input.inputChars) + input.overhead };
 }

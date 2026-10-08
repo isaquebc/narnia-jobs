@@ -87,6 +87,11 @@ export function usersRepo(db: Db): UsersRepo {
        updated_at = @updated_at where id = @id`,
   );
 
+  // F02 §2.2: toda alteração da identidade invalida os cartões de todos os perfis do usuário (hook explícito)
+  const invalidateCards = db.prepare(
+    "update profile set card_updated_at = null where user_id = ? and card_updated_at is not null",
+  );
+
   function toParams(u: UserRecord) {
     return {
       id: u.id,
@@ -149,6 +154,7 @@ export function usersRepo(db: Db): UsersRepo {
       }
       const merged: UserRecord = { ...current, ...defined, updatedAt: now };
       update.run(omit(toParams(merged), ["created_at"]));
+      if (Object.keys(defined).length > 0) invalidateCards.run(current.id);
       return merged;
     },
     ensureId() {

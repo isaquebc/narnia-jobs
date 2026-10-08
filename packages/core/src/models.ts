@@ -16,6 +16,13 @@ export const DEFAULT_EXTRACTION_MODELS: ExtractionModels = {
 
 interface ModelsSetting {
   extraction?: Partial<ExtractionModels>;
+  [task: string]: unknown;
+}
+
+/** Lê `settings.models.<chave>` (ex.: `analyze`, F02 §2.9-8) e cai no padrão quando ausente ou vazio. */
+export function resolveModel(settings: SettingsRepo, key: string, fallback: string): string {
+  const stored = settings.get<ModelsSetting>("models")?.[key];
+  return typeof stored === "string" && stored.length > 0 ? stored : fallback;
 }
 
 /** Lê `settings.models.extraction` e completa com os padrões. */
