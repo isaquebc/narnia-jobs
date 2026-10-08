@@ -216,17 +216,17 @@ barge-in: fala detectada → cancela TTS
 ## 12 · Docker
 
 ```
-docker/Dockerfile          imagem única da aplicação (node:22-slim + git + @anthropic-ai/claude-code + build do monorepo), usada por api e worker com comandos diferentes
+docker/Dockerfile          imagem única da aplicação, multi-stage (dev → build → deps-prod → runtime node:22-bookworm-slim + git + poppler-utils + tessdata); api e worker rodam a fonte TS com `tsx` (F01-62) e usam o CLI do Claude embutido no Agent SDK, sem instalação global (F01-41)
 docker/web.Dockerfile      nginx servindo apps/web/dist
 docker-compose.yml         serviços: web, api, worker, redis; volumes ./data, claude-auth, redis-data; porta do host dinâmica (ver abaixo)
 docker-compose.dev.yml     fonte montada, hot reload (Vite e tsx watch), Redis local; `pnpm` roda dentro dos containers
-docker-compose.e2e.yml     provider mock, pasta de dados temporária, Playwright em container
+docker-compose.e2e.yml     override: provider mock, token fixo, pasta `./.e2e-data`, nenhuma porta publicada; roda em projeto compose separado (`narnia-e2e`) por `./start.sh e2e`; o serviço Playwright monta o repositório e o volume `node_modules` do compose de dev
 ```
 Regra: **tudo dockerizado**. Nenhum comando de desenvolvimento exige Node ou pnpm no host; o lançador é um script de shell (`start.sh`) e PowerShell (`start.ps1`) que só usa Docker.
-**Porta dinâmica.** O usuário sobe o sistema por `./start.sh` (Linux/macOS) ou `.\start.ps1` (Windows), scripts finos que só dependem de Docker: procuram a primeira porta livre no intervalo 3100–3199 no host, gravam `NARNIA_PORT` em `.env`, executam `docker compose up -d`, esperam o `/api/health` e imprimem a URL com o token de boot. O compose publica `127.0.0.1:${NARNIA_PORT}:80` no serviço `web`, que faz proxy de `/api`, `/ws` e `/mcp` para a `api`. Dentro da rede do compose as portas são fixas. A pasta de dados independe da porta, então o banco é sempre o mesmo entre execuções. Os demais comandos (`login`, `doctor`, `install-plugin`, `logs`, `down`) são subcomandos dos mesmos scripts, executados via `docker compose run --rm api narnia-jobs <cmd>`; no modo B, `install-plugin` lê a porta atual do `.env` para gerar o `.mcp.json`.
+**Porta dinâmica.** O usuário sobe o sistema por `./start.sh` (Linux/macOS) ou `.\start.ps1` (Windows), scripts finos que só dependem de Docker: procuram a primeira porta livre no intervalo 3100–3199 no host, gravam `NARNIA_PORT` em `.env` (a porta salva é reutilizada enquanto estiver livre, F01-64), executam `docker compose up -d`, esperam o `/api/health` e imprimem a URL com o token de boot (persistido em `/data/.token`, então a URL é estável entre reinícios, F01-63). O compose publica `127.0.0.1:${NARNIA_PORT}:80` no serviço `web`, que faz proxy de `/api`, `/ws` e `/mcp` para a `api`. Dentro da rede do compose as portas são fixas. A pasta de dados independe da porta, então o banco é sempre o mesmo entre execuções. Os demais comandos (`login`, `doctor`, `install-plugin`, `logs`, `down`) são subcomandos dos mesmos scripts, executados via `docker compose run --rm api narnia-jobs <cmd>`; no modo B, `install-plugin` lê a porta atual do `.env` para gerar o `.mcp.json`.
 Comandos da CLI `narnia-jobs` relevantes ao Docker:
 - `narnia-jobs doctor`: checa login do CLI no container, volume de dados gravável, versão do Node, acesso ao MCP pelo host.
-- `docker compose run --rm narnia-jobs claude auth login`: login único da assinatura (URL + código).
+- `./start.sh login` (= `docker compose run --rm --no-deps api narnia-jobs login`): login único da assinatura (URL + código) no volume `claude-auth`; alternativa: `CLAUDE_CODE_OAUTH_TOKEN` no `.env`.
 - `narnia-jobs google connect`: registra o MCP oficial do Google Calendar com client ID/secret e executa `claude mcp login`.
 - `narnia-jobs install-plugin claude`: copia/aponta `plugin/` no host e registra o MCP HTTP (modo B).
 

@@ -2,7 +2,7 @@
 
 Projeto **open source**: clone, rode localmente e use a assinatura da IA que preferir (Claude Code primeiro; Codex planejado). Coleção de ferramentas locais para apoiar a busca de emprego: um recrutador(a) sênior como agente, perfis múltiplos (um por cargo-alvo), ingestão de dados (CV, GitHub, LinkedIn) e features isoladas (gerar CV, analisar vaga, candidaturas, simular entrevista). Roda na máquina do usuário via Docker (Linux, Windows e Mac), com dados persistidos em pasta do host fora do versionamento.
 
-**Estado:** fase de descoberta. Nenhum código ainda; o que existe é o plano `plan-v0` em `plans/plan-v0/`.
+**Estado:** F01 (primeiro uso) implementado: instalação por Docker, extração do currículo com revisão e primeiro perfil, até o dashboard. O plano está em `plans/plan-v0/`; as próximas entregas (perfis múltiplos, chat com o recrutador, ingestão de GitHub/LinkedIn, features) seguem a ordem de `plans/plan-v0/tasks/README.md`.
 
 | Documento | Conteúdo |
 |-----------|----------|
@@ -80,6 +80,7 @@ Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS, Docker Engin
 ./start.sh shell      # shell no container de desenvolvimento
 ./start.sh cli doctor # CLI narnia-jobs dentro do container de dev: doctor | login | install-plugin
 ./start.sh test:sh    # testes dos lançadores: start.sh (bats) e start.ps1 (Pester), em containers
+./start.sh e2e        # ponta a ponta: Playwright em container contra a stack de produção com provider mock (--ui-only pula as fases de down/up, worker e porta)
 ```
 
 No Windows, use `.\start.ps1` com os mesmos subcomandos. Imagens de produção: `docker/Dockerfile` (api e worker; a fonte TypeScript roda com `tsx`) e `docker/web.Dockerfile` (nginx + SPA). `docker-compose.e2e.yml` sobrepõe o compose de produção com provider mock, token fixo e pasta de dados descartável (`./.e2e-data`) para os testes de ponta a ponta.
@@ -112,4 +113,4 @@ Os corpos de exemplo de `user.json` e `profile.json` estão em `apps/api/test/he
 
 Com `./start.sh dev` no ar, abra `http://127.0.0.1:5173/?token=dev-token`. O `?token=` vira cookie (`/api/auth/enter`) e a página volta para `/`, que redireciona ao passo salvo do onboarding ou ao dashboard. O Vite faz proxy de `/api` e `/ws` para a api. Fluxo do primeiro uso em 5 passos: provider → currículo (arquivo ou texto livre, com opções de OCR e leitura pelo modelo e estimativa por chamada) → extração (etapas da cadeia, também na bandeja de atividades do topo) → revisão (identidade com telefone obrigatório, propostas com origem por trecho) → perfil (dados de carreira obrigatórios, "não sei" marca para pesquisa, alerta informativo do piso DIEESE) → dashboard. Tema claro/escuro no ícone do topo; textos vêm todos de `apps/web/src/i18n/pt-BR.ts`.
 
-Estrutura: `apps/web` (React + Vite), `apps/api` (Hono: REST, WS, enfileira jobs, CLI `narnia-jobs`), `apps/worker` (BullMQ: cadeia de ingestão), `packages/shared` (schemas zod, contratos, tempo, i18n), `packages/core` (domínio, storage, leituras de PDF, consolidação), `packages/providers` (Claude Code via Agent SDK e mock). Metodologia: TDD, conforme `plans/plan-v0/09-metodologia-tdd.md`.
+Estrutura: `apps/web` (React + Vite), `apps/api` (Hono: REST, WS, enfileira jobs, CLI `narnia-jobs`), `apps/e2e` (Playwright, um arquivo por cenário E2E-xx do F01), `apps/worker` (BullMQ: cadeia de ingestão), `packages/shared` (schemas zod, contratos, tempo, i18n), `packages/core` (domínio, storage, leituras de PDF, consolidação), `packages/providers` (Claude Code via Agent SDK e mock). Metodologia: TDD, conforme `plans/plan-v0/09-metodologia-tdd.md`.

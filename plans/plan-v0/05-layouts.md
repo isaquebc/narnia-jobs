@@ -33,6 +33,8 @@ Wireframes em ASCII. Desktop primeiro (uso local), mas o shell deve degradar bem
 
 ## L1 · Onboarding (wizard, tela cheia; 5 passos no F01, o 6º e 7º entram com F03 e F04)
 
+Implementação (M5): Tailwind v4 com tema claro/escuro; componentes shadcn/ui só sobre Radix Dialog, Tooltip, Switch e Tabs; `<select>` nativo em vez de Radix Select (F01-55); todos os textos vêm de `apps/web/src/i18n/pt-BR.ts`, com teste que proíbe literais pt-BR fora do dicionário. O estado do wizard é gravado em `onboarding/state` a cada avanço, por isso ele é retomável (F01-61).
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │   ①──②──③──④──⑤              Passo 1 · Provider                 │

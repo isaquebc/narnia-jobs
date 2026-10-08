@@ -16,7 +16,7 @@ Princípios:
 | nome completo / nome de exibição | sim | |
 | pronomes | não | aparece em documentos se o usuário quiser |
 | e-mail de contato | sim | o que vai no CV |
-| telefone | **sim** | país (código, ex. +55), DDD e número, armazenado em E.164 e validado com `libphonenumber-js`; exibido no formato do mercado-alvo |
+| telefone | **sim** | país (código, ex. +55), DDD e número, armazenado em E.164 e validado com `libphonenumber-js`; exibido no formato do mercado-alvo. No banco as colunas de contato são nullable (a identidade do CV chega antes do telefone); a obrigatoriedade vale na fronteira, pelo `UserSchema` (F01-33) |
 | cidade, estado, país, fuso | sim (cidade/país) | |
 | disponibilidade para remoto / híbrido / presencial | sim | |
 | disponibilidade para relocação / países | **sim** | pode ser "não" |

@@ -127,6 +127,7 @@ cmd_up() {
     write_env "$ENV_FILE" NARNIA_PORT "$port"
     info "porta escolhida: $port (gravada em $ENV_FILE)"
   fi
+  export NARNIA_PORT="$port"   # o compose só lê o .env padrão; com NARNIA_ENV_FILE diferente, a porta vai pelo ambiente
   "${PROD_COMPOSE[@]}" up -d --build "$@"
   info "aguardando a api ficar saudável…"
   if ! wait_healthy api 120; then
@@ -207,11 +208,16 @@ e2e_launcher_port() {
   local base block expected port token data_dir=${E2E_DATA_DIR}/port env_file=.e2e-port.env blocker
   base=$(find_free_port) || die "E2E-13: nenhuma porta livre."
   info "E2E-13: ocupando a porta ${base} e subindo o lançador em projeto descartável…"
-  blocker=$(docker run -d --rm -p "127.0.0.1:${base}:80" narnia-jobs/web)
+  # redis:7-alpine já está na máquina (serviço redis); a imagem web não serve de bloqueador porque o nginx sai sem o upstream api
+  blocker=$(docker run -d --rm -p "127.0.0.1:${base}:6379" redis:7-alpine)
+  local i; for ((i = 0; i < 20; i++)); do port_in_use "$base" && break; sleep 0.5; done
+  port_in_use "$base" || die "E2E-13: não consegui ocupar a porta ${base}."
   expected=$(find_free_port "$((base + 1))")
   rm -f "$env_file"; mkdir -p "$data_dir"
   (
-    export COMPOSE_PROJECT_NAME="${E2E_PROJECT}-port" NARNIA_ENV_FILE="$env_file" NARNIA_DATA_DIR="$data_dir" NARNIA_PROVIDER=mock NARNIA_PORT_START="$base"
+    # ENV_FILE e NARNIA_PORT_START são variáveis do script (lidas do ambiente só no carregamento): sobrescrever direto
+    ENV_FILE="$env_file"; NARNIA_PORT_START="$base"
+    export COMPOSE_PROJECT_NAME="${E2E_PROJECT}-port" NARNIA_DATA_DIR="$data_dir" NARNIA_PROVIDER=mock
     cmd_up >/dev/null
     port=$(env_value "$env_file" NARNIA_PORT)
     [[ "$port" == "$expected" ]] || die "E2E-13: esperava a porta ${expected}, o lançador escolheu '${port}'."

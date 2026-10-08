@@ -11,7 +11,7 @@ abrir localhost (container já no ar)
   └─ 1. Provider ─────────── detecta `claude` logado no container? se não, mostra o comando de login (Codex "em breve")
        └─ 2. Currículo ─────── upload de um CV pronto (PDF/DOCX/MD) OU texto livre contando a história profissional; OPCIONAL
             └─ 3. Extração ───── texto extraído localmente → modelo extrai fatos + gera o registro de contexto do arquivo
-                 └─ 4. Revisão ────── usuário confere e corrige cada fato; identidade e contato pré-preenchidos
+                 └─ 4. Revisão ────── usuário confere e corrige cada fato; identidade e contato pré-preenchidos (propostas de identidade não entram na lista: viram o formulário, F01-59); só avança com todas as propostas decididas (F01-60)
                       │              (telefone com país + DDD é obrigatório, mesmo que o CV não tenha)
                       └─ 5. Primeiro perfil ─ sugerido a partir do CV: cargo-alvo, senioridade, mercado, idioma
                            └─ 6. Mais fontes (opcional; existe a partir do F03) ─ GitHub | export do LinkedIn | depois
