@@ -82,6 +82,7 @@ Para apagar a sessão do CLI, o job remove o arquivo de transcript da sessão no
 ### 2.5 Configurações e doctor
 - `GET/PUT /api/settings`: valida com schema; cada seção tem `owner_task` e `available: bool` (a UI mostra "em breve" quando falso).
 - Modelos padrão por tarefa: `chat`, `ingest`, `documents`, `interview`, `clarify`; limite de tokens por sessão com aviso em 80 %.
+- **Apagar perfil** (decisão F02-6, 2026-10-08): só para perfil **arquivado** (perfil ativo ou não arquivado → 409); cascata explícita de documentos, candidaturas, ênfases e sugestões, com confirmação que lista o que vai junto e exige digitar o nome do perfil.
 - **Jobs em segundo plano** (sugestão do dono, 2026-10-08): concorrência por fila (`jobs.concurrency.<fila>`), aplicada aos workers em tempo de execução sem reiniciar; a página de processos (definida em F05 §2.5) ganha aqui o link em Configurações e o histórico com limpeza.
 - `GET /api/doctor` e `narnia-jobs doctor` (lançador): versão do Node/CLI, `claude auth status`, pasta de dados gravável e espaço livre, porta em uso, volume `claude-auth` presente, coletor de uso rodando, última ingestão/sessão, `NARNIA_DATA_DIR` fora de um repositório git, templates e modelos de voz instalados. Saída humana e `--json`.
 
