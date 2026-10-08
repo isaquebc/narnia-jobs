@@ -181,7 +181,7 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
   });
 
   app.post("/api/profiles", validate("json", ProfileCreateRequestSchema), (c) => {
-    const { activate, ...body } = c.req.valid("json");
+    const { activate, suggestionId, ...body } = c.req.valid("json");
     const userId = repos.users.ensureId();
     const { salary, salaryBelowReference } = resolveSalary(repos, body);
     const others = repos.profiles.list({ includeArchived: true }).length;
@@ -192,6 +192,14 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
       salaryBelowReference,
       isActive: others === 0 || activate === true,
     });
+    // sugestão de origem vira "aceita" (some do banner); id desconhecido não impede a criação
+    if (suggestionId) {
+      try {
+        repos.suggestions.accept(suggestionId);
+      } catch {
+        /* sugestão já decidida ou inexistente */
+      }
+    }
     if (others > 0 && activate === true)
       bus.emit({ type: "profile.switched", profileId: profile.id });
     return c.json(profile, 201);
@@ -356,7 +364,13 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
     const sourceId = c.req.param("id");
     if (!requireProfile(sourceId))
       return apiError(c, 404, "profile_not_found", "Perfil não encontrado");
-    const { activate, pitch: _pitch, personaOverrides: _po, ...body } = c.req.valid("json");
+    const {
+      activate,
+      suggestionId: _sg,
+      pitch: _pitch,
+      personaOverrides: _po,
+      ...body
+    } = c.req.valid("json");
     const { salary, salaryBelowReference } = resolveSalary(repos, body);
     try {
       const profile = repos.profiles.clone(sourceId, {

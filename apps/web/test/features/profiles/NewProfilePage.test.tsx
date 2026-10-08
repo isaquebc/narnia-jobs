@@ -112,4 +112,22 @@ describe("NewProfilePage · do zero, clonando e a partir de sugestão (F02 §4, 
     expect(screen.getByLabelText(/Senioridade/)).toHaveValue("manager");
     expect(screen.getByLabelText(/Área/)).toHaveValue("engineering management");
   });
+
+  it("a partir de sugestão: o POST leva suggestionId para a sugestão virar aceita", async () => {
+    const { fakes, onDone } = setup({
+      suggestionId: "sg1",
+      title: "Engineering Manager",
+      seniority: "manager",
+      area: "engineering management",
+      market: "BR",
+    });
+    await screen.findByText("Pré-preenchido a partir da sugestão “Engineering Manager”.");
+    await userEvent.type(screen.getByLabelText(/Nome do perfil/), "EM");
+    await fillCareerAsDontKnow();
+    await userEvent.click(screen.getByRole("button", { name: "Criar perfil" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("new"));
+    expect(fakes.createProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ suggestionId: "sg1", targetTitle: "Engineering Manager" }),
+    );
+  });
 });

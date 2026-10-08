@@ -134,7 +134,13 @@ export function NewProfilePage({
           submitLabel={t("profiles.createShort")}
           banner={banner}
           onDirty={() => guard.setDirty(true)}
-          onSubmit={(body) => submit.mutate(body)}
+          onSubmit={(body) =>
+            submit.mutate(
+              fromSuggestion && !cloneFrom
+                ? { ...body, suggestionId: fromSuggestion.suggestionId }
+                : body,
+            )
+          }
         />
       </Card>
     </div>

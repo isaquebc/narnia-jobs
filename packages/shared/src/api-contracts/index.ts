@@ -153,9 +153,10 @@ const PROFILE_INTERNAL_FIELDS = {
 } as const;
 
 // POST /api/profiles — mesma regra de obrigatórios/needsResearch do ProfileSchema.
-// `activate: true` ativa o perfil criado (sugestão aceita); sem isso só o primeiro perfil nasce ativo (F02 §2.9-3).
+// `activate: true` ativa o perfil criado; sem isso só o primeiro perfil nasce ativo (F02 §2.9-3).
+// `suggestionId` marca a sugestão de origem como aceita (F02 §4: aceitar abre o formulário pré-preenchido).
 export const ProfileCreateRequestSchema = ProfileBaseSchema.omit(PROFILE_INTERNAL_FIELDS)
-  .extend({ activate: z.boolean().optional() })
+  .extend({ activate: z.boolean().optional(), suggestionId: IdSchema.optional() })
   .superRefine(requireCareerFields);
 export type ProfileCreateRequest = z.infer<typeof ProfileCreateRequestSchema>;
 

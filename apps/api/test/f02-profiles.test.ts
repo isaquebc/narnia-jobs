@@ -274,6 +274,34 @@ describe("F02/M3 api · sugestões, análise, dashboard, invalidação por escri
     expect((await t.api("/api/profiles/suggestion")).status).toBe(200);
   });
 
+  it("POST /api/profiles com suggestionId marca a sugestão como aceita (some da lista de novas); id desconhecido é ignorado", async () => {
+    t = makeTestApp();
+    seedFixture(t.repos, "leader");
+    const list = await body<{ suggestions: Array<{ id: string; payload: { title: string } }> }>(
+      await t.api("/api/profiles/suggestions"),
+    );
+    const first = list.suggestions[0] as { id: string; payload: { title: string } };
+    const created = await t.api(
+      "/api/profiles",
+      json("POST", {
+        ...PM,
+        name: first.payload.title,
+        targetTitle: first.payload.title,
+        suggestionId: first.id,
+      }),
+    );
+    expect(created.status).toBe(201);
+    expect(t.repos.suggestions.list().find((s) => s.id === first.id)?.status).toBe("accepted");
+    const again = await body<{ suggestions: Array<{ id: string }> }>(
+      await t.api("/api/profiles/suggestions"),
+    );
+    expect(again.suggestions.map((s) => s.id)).not.toContain(first.id);
+    expect(
+      (await t.api("/api/profiles", json("POST", { ...PM, name: "Outro", suggestionId: "nope" })))
+        .status,
+    ).toBe(201);
+  });
+
   it("analyze/estimate devolve modelo e tokens; POST analyze enfileira a tarefa (202) e repete → 409 analyze_pending", async () => {
     t = makeTestApp();
     seedFixture(t.repos, "engineer");
