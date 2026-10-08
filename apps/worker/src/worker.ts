@@ -9,6 +9,7 @@ import {
   renderPdfPages,
   type StageJobData,
   type StageName,
+  type TaskJobData,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
 import { nowUtc, type WsEvent } from "@narnia-jobs/shared";
@@ -17,6 +18,11 @@ import IORedis from "ioredis";
 import { handleQueueEvent } from "./events";
 import { type OcrDeps, onStageFailed, processStage, type WorkerDeps } from "./pipeline";
 import { createQueues, QUEUE_NAMES } from "./queues";
+import { isTaskJob, processTask } from "./tasks";
+
+type JobData = StageJobData | TaskJobData;
+/** Rótulo de etapa para os eventos: etapas usam `stage`, tarefas usam o `type` (F02 §2.9-1). */
+const stageOf = (data: JobData) => (isTaskJob(data) ? data.type : data.stage);
 
 export interface StartWorkersOptions {
   redisUrl: string;
@@ -31,7 +37,7 @@ export interface StartWorkersOptions {
 }
 
 export interface StartedWorkers {
-  queues: Record<(typeof QUEUE_NAMES)[number], Queue<StageJobData>>;
+  queues: Record<(typeof QUEUE_NAMES)[number], Queue<JobData>>;
   workers: Worker[];
   heartbeat: () => Promise<string | null>;
   close: () => Promise<void>;
@@ -63,7 +69,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
     QueueCtor: Queue as unknown as new (
       name: string,
       opts: { connection: unknown; prefix: string; defaultJobOptions?: Record<string, unknown> },
-    ) => Queue<StageJobData>,
+    ) => Queue<JobData>,
   });
 
   const publish = async (event: WsEvent) => {
@@ -80,20 +86,16 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   };
 
   const workers = QUEUE_NAMES.map((name) => {
-    const worker = new Worker<StageJobData>(
+    const worker = new Worker<JobData>(
       name,
-      async (job) =>
-        processStage(
-          job.data,
-          {
-            runId: job.data.runId,
-            jobId: String(job.id),
-            progress: async (pct, note) => {
-              await job.updateProgress({ pct, stage: job.data.stage, note: note ?? null });
-            },
-          },
-          deps,
-        ),
+      async (job) => {
+        const data = job.data;
+        const progress = async (pct: number, note?: string) => {
+          await job.updateProgress({ pct, stage: stageOf(data), note: note ?? null });
+        };
+        if (isTaskJob(data)) return processTask(data, { jobId: String(job.id), progress }, deps);
+        return processStage(data, { runId: data.runId, jobId: String(job.id), progress }, deps);
+      },
       {
         connection,
         prefix,
@@ -108,7 +110,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
           jobId: String(job.id),
           at: nowUtc(),
           attempts: job.attemptsMade + 1,
-          stage: job.data.stage,
+          stage: stageOf(job.data),
         },
         ev,
       );
@@ -121,18 +123,24 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
           jobId: String(job.id),
           at: nowUtc(),
           progress: p ?? 0,
-          stage: job.data.stage,
+          stage: stageOf(job.data),
         },
         ev,
       );
     });
     worker.on("completed", (job, result) => {
       void handleQueueEvent(
-        { type: "completed", jobId: String(job.id), at: nowUtc(), result, stage: job.data.stage },
+        {
+          type: "completed",
+          jobId: String(job.id),
+          at: nowUtc(),
+          result,
+          stage: stageOf(job.data),
+        },
         ev,
       );
     });
-    worker.on("failed", (job: Job<StageJobData> | undefined, err) => {
+    worker.on("failed", (job: Job<JobData> | undefined, err) => {
       if (!job) return;
       const attempts = job.opts.attempts ?? 1;
       if (job.attemptsMade < attempts) {
@@ -144,7 +152,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
         return;
       }
       log(`[worker] falha definitiva em ${job.id}: ${err.message}`);
-      void onStageFailed(job.data, err, deps);
+      if (!isTaskJob(job.data)) void onStageFailed(job.data, err, deps);
       void handleQueueEvent(
         {
           type: "failed",
