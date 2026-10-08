@@ -1,0 +1,38 @@
+# Override para testes de ponta a ponta (M7): provider mock, token fixo, pasta de dados descartável (./.e2e-data, gitignored),
+# sem restart. Uso: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e up --build
+# O serviço playwright roda os testes de apps/e2e contra http://web (rede do compose).
+services:
+  web:
+    restart: "no"
+  api:
+    restart: "no"
+    volumes:
+      - ./.e2e-data:/data
+    environment:
+      - NARNIA_PROVIDER=mock
+      - NARNIA_TOKEN=e2e-token
+  worker:
+    restart: "no"
+    volumes:
+      - ./.e2e-data:/data
+    environment:
+      - NARNIA_PROVIDER=mock
+  redis:
+    restart: "no"
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.58.0-noble
+    profiles: ["e2e"]
+    working_dir: /e2e
+    volumes:
+      - ./apps/e2e:/e2e
+      - ./.e2e-data:/data:ro
+    environment:
+      - BASE_URL=http://web
+      - NARNIA_TOKEN=e2e-token
+      - CI=true
+    depends_on:
+      web:
+        condition: service_started
+      api:
+        condition: service_healthy
+    command: ["sh", "-c", "echo 'suíte e2e chega em M7'; sleep 1"]

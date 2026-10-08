@@ -1,0 +1,12 @@
+Comecei a trabalhar com software em 2018 na Globex, em São Paulo, como desenvolvedora pleno. Lá eu cuidava
+principalmente de automação de deploy: montei um pipeline de CI/CD que derrubou o tempo de publicação de duas horas
+para uns quinze minutos, e acabei virando referência do time nesse assunto. Também orientei três estagiários em
+Python e testes automatizados.
+
+Em março de 2021 fui para a Acme, em Campinas, como engenheira de software sênior, contratada em regime CLT.
+O trabalho era quase todo em Go, com Kubernetes e PostgreSQL. O resultado de que mais me orgulho foi reduzir a
+latência p95 da API de pagamentos em cerca de 40% usando cache distribuído. Também liderei a migração de doze
+serviços para Kubernetes sem derrubar nada. Saí em novembro de 2023.
+
+Sou formada em Ciência da Computação pela Unicamp, turma de 2014 a 2018. Falo inglês fluente (C1) e um espanhol
+razoável. Tirei a certificação CKA em 2022. Hoje procuro uma vaga sênior de backend, de preferência remota.
