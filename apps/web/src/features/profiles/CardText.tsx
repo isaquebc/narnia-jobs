@@ -1,7 +1,8 @@
 import { t } from "../../i18n";
 import { cn } from "../../lib/cn";
 
-const SUMMARY_PREFIX = "Resumo objetivo";
+// o core rotula a seção como "Resumo:" (F02-2, resumo objetivo)
+const SUMMARY_PREFIX = "Resumo";
 
 /** Texto do cartão linha a linha; a linha do resumo objetivo (F02-2) vem destacada. */
 export function CardText({
