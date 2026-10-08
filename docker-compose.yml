@@ -1,0 +1,87 @@
+# narnia-jobs · produção local. Suba com ./start.sh up (Linux/macOS) ou .\start.ps1 up (Windows): o lançador escolhe
+# a porta do host (NARNIA_PORT em .env), constrói as imagens, espera a api ficar saudável e imprime a URL com o token.
+# Serviços: web (nginx + SPA, única porta publicada), api (Hono + SDK), worker (BullMQ), redis. Dados em ./data (bind mount);
+# login da assinatura no volume claude-auth (ou CLAUDE_CODE_OAUTH_TOKEN no .env). Ver plans/plan-v0/08 §1.2.
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    target: runtime
+  image: narnia-jobs/app
+  restart: unless-stopped
+  volumes:
+    - ${NARNIA_DATA_DIR:-./data}:/data
+    - claude-auth:/home/node/.claude
+  environment:
+    - NARNIA_DATA_DIR=/data
+    - REDIS_URL=redis://redis:6379
+    - NARNIA_QUEUE_PREFIX=narnia
+    - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
+    - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+    - TESSDATA_PATH=/usr/share/tessdata
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      target: web
+    image: narnia-jobs/web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NARNIA_PORT:-3100}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: ["/app/docker/entrypoint.sh"]
+    environment:
+      - NARNIA_DATA_DIR=/data
+      - REDIS_URL=redis://redis:6379
+      - NARNIA_QUEUE_PREFIX=narnia
+      - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - TESSDATA_PATH=/usr/share/tessdata
+      - NARNIA_TOKEN=${NARNIA_TOKEN:-}
+      - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_PORT:-3100}
+      - NARNIA_VERSION=${NARNIA_VERSION:-0.1.0-dev}
+      - PORT=3100
+    ports:
+      - "127.0.0.1:8089:8089"      # callback OAuth do Google Calendar (F07); porta fixa
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 15s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *app
+    command: ["sh", "-c", "cd /app/apps/worker && exec ./node_modules/.bin/tsx src/main.ts"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  claude-auth:
+  redis-data:
