@@ -30,7 +30,13 @@ describe("M4/api dashboard", () => {
       counts: Record<string, number>;
     };
     expect(empty.profile).toBeNull();
-    expect(empty.counts).toEqual({ experiences: 0, skills: 0, education: 0, files: 0 });
+    expect(empty.counts).toEqual({
+      experiences: 0,
+      skills: 0,
+      education: 0,
+      files: 0,
+      projects: 0,
+    });
 
     await t.api("/api/user", put(VALID_USER));
     const { body: file } = await uploadFixture(t);
@@ -66,7 +72,7 @@ describe("M4/api dashboard", () => {
       pendingResearch: number;
     };
     expect(body.profile?.name).toBe(VALID_PROFILE.name);
-    expect(body.counts).toEqual({ experiences: 2, skills: 6, education: 1, files: 1 });
+    expect(body.counts).toEqual({ experiences: 2, skills: 6, education: 1, files: 1, projects: 0 });
     expect(body.usage.totalTokens).toBe(110);
     expect(body.pendingResearch).toBe(1);
   });

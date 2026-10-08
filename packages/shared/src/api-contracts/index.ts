@@ -227,6 +227,8 @@ export const AnalyzeEstimateResponseSchema = z.object({
   inputChars: z.number().int().min(0),
 });
 export type AnalyzeEstimateResponse = z.infer<typeof AnalyzeEstimateResponseSchema>;
+export const AnalyzeRequestSchema = z.object({ model: z.string().min(1).optional() });
+export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 export const AnalyzeResponseSchema = z.object({ job: JobSchema });
 
 // GET /api/profiles/suggestion?runId=
@@ -253,7 +255,7 @@ export const DashboardResponseSchema = z.object({
   }),
   pendingResearch: z.number().int(),
   // F02 §2.7: cartão resumido do perfil ativo, contadores de ênfase e sugestões novas.
-  // Opcionais em M1 (a api ainda não os devolve); M3 os torna obrigatórios junto com a rota (registro em F02 §8).
+  // A api devolve sempre desde M3; opcionais no contrato até M4 adaptar os fixtures dos testes da web (F02 §8).
   card: z
     .object({ text: z.string(), builtAt: IsoDateTimeSchema, valid: z.boolean() })
     .nullable()
@@ -261,6 +263,7 @@ export const DashboardResponseSchema = z.object({
   emphasis: z.object({ highlighted: z.number().int(), hidden: z.number().int() }).optional(),
   suggestions: z.number().int().optional(),
 });
+export type DashboardResponse = z.infer<typeof DashboardResponseSchema>;
 
 // GET /api/jobs ; GET /api/usage/summary
 export const JobsListResponseSchema = z.object({ jobs: z.array(JobSchema) });
@@ -299,3 +302,6 @@ export const ProfileWsEventSchema = z.discriminatedUnion("type", [
   ProfileCardInvalidatedEventSchema,
 ]);
 export type ProfileWsEvent = z.infer<typeof ProfileWsEventSchema>;
+/** Tudo que o barramento da api retransmite ao WebSocket (jobs/provider do F01 + perfil do F02). */
+export const AnyWsEventSchema = z.union([WsEventSchema, ProfileWsEventSchema]);
+export type AnyWsEvent = z.infer<typeof AnyWsEventSchema>;

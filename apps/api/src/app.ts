@@ -69,12 +69,13 @@ export function createApp(deps: AppDeps) {
       dataDir: deps.dataDir,
       provider: deps.provider,
       queue: deps.queue,
+      bus: deps.bus,
     }),
   );
   app.route("/", jobsRoutes({ repos: deps.repos, queue: deps.queue }));
   app.route("/", usageRoutes({ repos: deps.repos }));
-  app.route("/", userRoutes({ repos: deps.repos }));
-  app.route("/", profilesRoutes({ repos: deps.repos }));
+  app.route("/", userRoutes({ repos: deps.repos, bus: deps.bus }));
+  app.route("/", profilesRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue }));
   app.route("/", salaryReferenceRoutes({ repos: deps.repos }));
   app.route("/", dashboardRoutes({ repos: deps.repos }));
 

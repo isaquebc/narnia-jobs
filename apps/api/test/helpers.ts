@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createRepos,
+  enqueueTask,
   migrate,
   openDatabase,
   type Repos,
@@ -10,10 +11,10 @@ import {
   stageJobId,
 } from "@narnia-jobs/core";
 import { MOCK_DIGEST, MOCK_EXTRACT_FACTS, MockProvider } from "@narnia-jobs/providers";
-import { extractFactsOutputToProposals, type WsEvent } from "@narnia-jobs/shared";
+import { type AnyWsEvent, extractFactsOutputToProposals } from "@narnia-jobs/shared";
 import { type App, createApp } from "../src/app";
 import { EventBus } from "../src/events";
-import type { QueueAdapter } from "../src/queue";
+import type { EnqueueTaskRequest, QueueAdapter } from "../src/queue";
 
 export const FIXTURES = new URL("../../../packages/core/test/fixtures/", import.meta.url).pathname;
 export const TOKEN = "test-token-123";
@@ -22,6 +23,7 @@ export class FakeQueueAdapter implements QueueAdapter {
   enqueued: Array<{ runId: string; stage: StageName }> = [];
   cancelled: string[] = [];
   retried: string[] = [];
+  tasks: EnqueueTaskRequest[] = [];
   /** Estado que a BullMQ reportaria para cancel(): por padrão "removed". */
   cancelResult: "removed" | "active" | "missing" = "removed";
   constructor(private readonly repos: Repos) {}
@@ -37,6 +39,15 @@ export class FakeQueueAdapter implements QueueAdapter {
       payload: { runId, stage },
       stage,
       at: new Date().toISOString(),
+    });
+  }
+  async enqueueTask(req: EnqueueTaskRequest) {
+    this.tasks.push(req);
+    const fake = { add: async () => {} };
+    return enqueueTask({
+      queues: { ingest: fake, ocr: fake, extract: fake },
+      repos: this.repos,
+      ...req,
     });
   }
   async cancel(jobId: string) {
@@ -56,7 +67,7 @@ export interface TestApp {
   provider: MockProvider;
   queue: FakeQueueAdapter;
   bus: EventBus;
-  events: WsEvent[];
+  events: AnyWsEvent[];
   cleanup: () => void;
   /** fetch autenticado */
   api: (path: string, init?: RequestInit) => Promise<Response>;
@@ -70,7 +81,7 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
   const provider = opts.provider ?? new MockProvider();
   const queue = new FakeQueueAdapter(repos);
   const bus = new EventBus();
-  const events: WsEvent[] = [];
+  const events: AnyWsEvent[] = [];
   bus.on((e) => events.push(e));
   const token = opts.token ?? TOKEN;
   const app = createApp({ version: "0.0.0-test", repos, dataDir, provider, queue, bus, token });

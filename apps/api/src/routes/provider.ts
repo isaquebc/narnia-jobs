@@ -1,11 +1,20 @@
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { type Repos, resetDatabase } from "@narnia-jobs/core";
+import {
+  FIXTURE_NAMES,
+  type Repos,
+  resetDatabase,
+  seedFixture,
+  trackInvalidation,
+} from "@narnia-jobs/core";
 import { MockProvider, type Provider } from "@narnia-jobs/providers";
+import { EmphasisFactKindSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
+import { patchOnboarding } from "./onboarding";
+import { emitInvalidated } from "./profiles";
 import { validate } from "./validate";
 
 const MockModeSchema = z.object({
@@ -22,9 +31,21 @@ const MockModeSchema = z.object({
       readDocument: z.string().optional(),
       extractFacts: z.string().optional(),
       buildDigest: z.string().optional(),
+      analyzeProfiles: z.string().optional(),
     })
     .optional(),
 });
+
+const SeedRequestSchema = z.object({ fixture: z.enum(FIXTURE_NAMES) });
+/** Tipos de fato editáveis pelo endpoint de teste (E2E-04 do F02); `achievement` fica para F10. */
+const TestFactKindSchema = EmphasisFactKindSchema.exclude(["achievement"]);
+const FACT_REPO: Record<z.infer<typeof TestFactKindSchema>, keyof Repos["facts"]> = {
+  experience: "experiences",
+  project: "projects",
+  skill: "skills",
+  education: "education",
+  language: "languages",
+};
 
 /** Pastas derivadas dos uploads que o reset apaga (os dados do usuário em si estão no SQLite). */
 const RESET_DIRS = ["uploads", "readings", "digests"];
@@ -50,6 +71,27 @@ export function providerRoutes(deps: {
       deps.bus.emit({ type: "provider.status", status: await mock.detect() });
       return c.json({ ok: true, tables });
     });
+    // Semeadura dos cenários e2e do F02 (decisão F02-10): usuário + fatos + perfil ativo pelos repos, sem o wizard.
+    app.post("/api/_test/seed", validate("json", SeedRequestSchema), (c) => {
+      const ids = seedFixture(deps.repos, c.req.valid("json").fixture);
+      patchOnboarding(deps.repos, { step: 5, completed: true });
+      return c.json({ ok: true, ids });
+    });
+    // Altera um fato direto (E2E-04: invalidação dos cartões); a edição pela interface chega em F10.
+    app.patch("/api/_test/facts/:kind/:id", async (c) => {
+      const kind = TestFactKindSchema.safeParse(c.req.param("kind"));
+      if (!kind.success) return apiError(c, 400, "unsupported_kind", "Tipo de fato inválido");
+      const repo = deps.repos.facts[FACT_REPO[kind.data]] as {
+        get(id: string): unknown;
+        update(id: string, patch: Record<string, unknown>): unknown;
+      };
+      const id = c.req.param("id");
+      if (!repo.get(id)) return apiError(c, 404, "fact_not_found", "Fato não encontrado");
+      const patch = (await c.req.json()) as Record<string, unknown>;
+      const { result, flipped } = trackInvalidation(deps.repos, () => repo.update(id, patch));
+      emitInvalidated(deps.bus, flipped);
+      return c.json(result);
+    });
     app.post("/api/_test/mock", validate("json", MockModeSchema), async (c) => {
       const body = c.req.valid("json");
       mock.setMode(
@@ -66,6 +108,12 @@ export function providerRoutes(deps: {
       apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
     );
     app.post("/api/_test/reset", (c) =>
+      apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
+    );
+    app.post("/api/_test/seed", (c) =>
+      apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
+    );
+    app.patch("/api/_test/facts/:kind/:id", (c) =>
       apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
     );
   }

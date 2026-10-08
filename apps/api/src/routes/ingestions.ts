@@ -4,14 +4,17 @@ import {
   type Repos,
   type ReviewDecision,
   resolveExtractionModels,
+  trackInvalidation,
 } from "@narnia-jobs/core";
 import { IngestionCreateRequestSchema, ReviewRequestSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
+import type { EventBus } from "../events";
 import type { QueueAdapter } from "../queue";
 import { readMeta } from "../services/files";
 import { toIngestionResponse } from "../services/ingestions";
 import { patchOnboarding } from "./onboarding";
+import { emitInvalidated } from "./profiles";
 import { validate } from "./validate";
 
 const DECISION: Record<"accepted" | "edited" | "rejected", ReviewDecision["decision"]> = {
@@ -25,6 +28,7 @@ export function ingestionsRoutes(deps: {
   dataDir: string;
   provider: { id: string };
   queue: QueueAdapter;
+  bus: EventBus;
 }) {
   const app = new Hono();
 
@@ -78,7 +82,10 @@ export function ingestionsRoutes(deps: {
       ...(d.editedData ? { editedData: d.editedData } : {}),
     }));
     try {
-      const result = deps.repos.proposals.review(run.id, decisions);
+      const { result, flipped } = trackInvalidation(deps.repos, () =>
+        deps.repos.proposals.review(run.id, decisions),
+      );
+      emitInvalidated(deps.bus, flipped);
       const pending = deps.repos.proposals
         .listByRun(run.id)
         .filter((p) => p.decision === "pending");
