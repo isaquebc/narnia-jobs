@@ -17,6 +17,8 @@ export function useProfiles(opts: { includeArchived?: boolean } = {}) {
     queryFn: async () =>
       (includeArchived ? await api.listProfiles({ archived: true }) : await api.listProfiles())
         .profiles,
+    // ao alternar "mostrar arquivados" a lista anterior fica na tela até a nova chegar
+    placeholderData: (prev) => prev,
   });
 
   useEffect(() => {

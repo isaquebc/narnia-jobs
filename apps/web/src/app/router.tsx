@@ -12,8 +12,11 @@ import { Shell } from "../components/shell/Shell";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { Wizard } from "../features/onboarding/Wizard";
+import { NewProfilePage, type NewProfileSearch } from "../features/profiles/NewProfilePage";
+import { ProfilesPage } from "../features/profiles/ProfilesPage";
 import { t } from "../i18n";
 import type { AppServices } from "./context";
+import { FormGuardProvider } from "./FormGuard";
 
 export interface RouterContext {
   services: AppServices;
@@ -23,9 +26,11 @@ export interface RouterContext {
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: () => (
     <TooltipProvider>
-      <Shell>
-        <Outlet />
-      </Shell>
+      <FormGuardProvider>
+        <Shell>
+          <Outlet />
+        </Shell>
+      </FormGuardProvider>
     </TooltipProvider>
   ),
   errorComponent: ({ error, reset }) => (
@@ -68,7 +73,45 @@ const dashboardRoute = createRoute({
   component: Dashboard,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, onboardingRoute, dashboardRoute]);
+const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+
+const profilesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/perfis",
+  component: ProfilesPage,
+});
+
+const newProfileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/perfis/novo",
+  validateSearch: (search: Record<string, unknown>): NewProfileSearch => {
+    const out: NewProfileSearch = {};
+    for (const k of [
+      "cloneFrom",
+      "suggestionId",
+      "title",
+      "seniority",
+      "area",
+      "market",
+    ] as const) {
+      const v = str(search[k]);
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  },
+  component: function NewProfileRoute() {
+    const search = newProfileRoute.useSearch();
+    return <NewProfilePage search={search} />;
+  },
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  onboardingRoute,
+  dashboardRoute,
+  profilesRoute,
+  newProfileRoute,
+]);
 
 export function createAppRouter(opts: {
   services: AppServices;

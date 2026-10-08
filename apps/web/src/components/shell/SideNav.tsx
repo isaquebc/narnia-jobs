@@ -1,4 +1,4 @@
-import { LayoutDashboard, Rocket } from "lucide-react";
+import { LayoutDashboard, Rocket, Users } from "lucide-react";
 import { t } from "../../i18n";
 import { cn } from "../../lib/cn";
 import { NavLink } from "./NavLink";
@@ -6,7 +6,7 @@ import { NavLink } from "./NavLink";
 const item =
   "flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted [&.active]:bg-muted [&.active]:font-medium";
 
-/** Menu lateral mínimo (F01): Dashboard e Primeiro uso. Features futuras entram com suas tasks. */
+/** Menu lateral: Dashboard, Perfis (F02) e Primeiro uso. Features futuras entram com suas tasks. */
 export function SideNav({ className }: { className?: string }) {
   return (
     <nav
@@ -17,6 +17,11 @@ export function SideNav({ className }: { className?: string }) {
         <li>
           <NavLink to="/dashboard" className={item}>
             <LayoutDashboard size={16} /> {t("nav.dashboard")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/perfis" className={item}>
+            <Users size={16} /> {t("nav.profiles")}
           </NavLink>
         </li>
         <li>

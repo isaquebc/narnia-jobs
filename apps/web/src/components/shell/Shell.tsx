@@ -1,15 +1,14 @@
 import type { ReactNode } from "react";
 import { useTimezone } from "../../app/context";
-import { useProfiles } from "../../hooks/useProfiles";
 import { useWsStatus } from "../../hooks/useWsStatus";
 import { type TKey, t } from "../../i18n";
 import { ActivityTray } from "./ActivityTray";
+import { ProfileSwitcher } from "./ProfileSwitcher";
 import { ProviderIndicator } from "./ProviderIndicator";
 import { SideNav } from "./SideNav";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { active } = useProfiles();
   const tz = useTimezone();
   const wsStatus = useWsStatus();
   return (
@@ -17,9 +16,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
         <div className="flex items-center gap-4">
           <span className="font-semibold">{t("app.name")}</span>
-          <span className="rounded-md bg-muted px-2 py-1 text-sm" title={t("shell.activeProfile")}>
-            {active ? active.name : t("shell.noProfile")}
-          </span>
+          <ProfileSwitcher />
         </div>
         <div className="flex items-center gap-3">
           <ProviderIndicator />
