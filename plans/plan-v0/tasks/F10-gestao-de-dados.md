@@ -177,6 +177,7 @@ Regras de UI: nunca exibir chaves/tokens em claro (`has_token`); horários via `
 - i18n: varredura de literais estendida às novas pastas.
 
 ### 6.3 Testes e2e (Playwright, Chromium) · obrigatórios
+- **E2E edição de fato invalida cartões (decisão F02-10, 2026-10-08)**: seed `engineer` com dois perfis → em Meus dados editar o título de uma experiência pela interface → WS `profile.card_invalidated` chega → os cartões dos dois perfis mostram "desatualizado" → abrir cada um reconstrói com nova data e o título novo aparece no cartão do perfil que destaca essa experiência; apagar a experiência remove ênfase e relevância e o cartão deixa de citá-la. Substitui a versão de F02 (que altera o fato por `_test/facts`).
 Com `NARNIA_PROVIDER=mock`, banco semeado (fixtures de fatos, sessões e eventos), e logs de CLI fixture copiados para o volume de teste.
 - **E2E-01 editar fato**: abrir Meus dados → editar título de uma experiência → selo passa a verificado → histórico mostra antes/depois → cartão do perfil no dashboard reflete.
 - **E2E-02 filtro não verificados**: filtrar → só fatos ◐ → verificar um → some do filtro.
