@@ -10,11 +10,16 @@ export function renderApp(opts: {
   api?: Partial<ApiClient>;
   initialUrl?: string;
   timezone?: string;
+  /** staleTime das queries (padrão 0 nos testes; a app usa 5 s, ver main.tsx). */
+  staleTime?: number;
 }) {
   const ws = createFakeWs();
   const api = createFakeApi(opts.api);
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: opts.staleTime ?? 0 },
+      mutations: { retry: false },
+    },
   });
   const services: AppServices = {
     api,

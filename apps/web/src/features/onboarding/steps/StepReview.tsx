@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useApi } from "../../../app/context";
 import { describeError, ErrorState } from "../../../components/ErrorState";
@@ -20,6 +20,7 @@ import type { StepProps } from "../Wizard";
 
 export function StepReview({ state, go }: StepProps) {
   const api = useApi();
+  const qc = useQueryClient();
   const ingestion = useIngestion(state.runId);
   const user = useQuery({ queryKey: ["user"], queryFn: () => api.getUser() });
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
@@ -70,6 +71,8 @@ export function StepReview({ state, go }: StepProps) {
         if (list.length > 0) await api.reviewIngestion(state.runId, { decisions: list });
       }
       await api.putUser(toUserUpsertRequest(value));
+      // TimezoneSync, o dashboard e o passo 5 compartilham a chave; sem invalidar, o cache de 5 s mostra o usuário antigo
+      await qc.invalidateQueries({ queryKey: ["user"] });
       await go({ step: 5 });
     },
   });

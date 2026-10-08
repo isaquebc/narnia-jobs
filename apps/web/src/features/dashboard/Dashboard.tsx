@@ -64,7 +64,7 @@ export function Dashboard() {
       )}
       <div className="grid grid-cols-4 gap-4">
         {(["experiences", "skills", "education", "files"] as const).map((k) => (
-          <Card key={k} className="flex flex-col gap-1">
+          <Card key={k} data-testid={`stat-${k}`} className="flex flex-col gap-1">
             <span className="text-xs uppercase text-muted-fg">{t(`dashboard.stats.${k}`)}</span>
             <span className="text-2xl font-semibold">{d.counts[k]}</span>
           </Card>

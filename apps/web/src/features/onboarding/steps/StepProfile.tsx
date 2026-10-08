@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../app/context";
 import { describeError, ErrorState } from "../../../components/ErrorState";
 import { Card } from "../../../components/ui/card";
@@ -8,6 +8,7 @@ import type { StepProps } from "../Wizard";
 
 export function StepProfile({ state, finish }: StepProps) {
   const api = useApi();
+  const qc = useQueryClient();
   const user = useQuery({ queryKey: ["user"], queryFn: () => api.getUser() });
   const suggestion = useQuery({
     queryKey: ["profile", "suggestion", state.runId ?? null],
@@ -22,6 +23,11 @@ export function StepProfile({ state, finish }: StepProps) {
   const create = useMutation({
     mutationFn: async (body: Parameters<typeof api.createProfile>[0]) => {
       await api.createProfile(body);
+      // o seletor do shell e o dashboard leem o perfil ativo de caches com 5 s de validade
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["profiles"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
       await finish();
     },
   });
