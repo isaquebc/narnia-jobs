@@ -83,6 +83,15 @@ export function detectArea(titles: string[], skills: SuggestSkill[]): string {
   return "other";
 }
 
+/** Senioridade pelos anos de carreira (faixas de F01 §6.2) ou "manager" quando o título mais recente é de gestão. */
+export function inferSeniority(years: number, latestTitle: string, area: string): Seniority {
+  if (area === "management" && MANAGEMENT.test(latestTitle)) return "manager";
+  if (years < 2) return "junior";
+  if (years < 5) return "pleno";
+  if (years < 9) return "senior";
+  return "staff";
+}
+
 /** Heurística do passo 5 (F01 §6.2): senioridade por anos, área por títulos/skills, cargo-alvo pelo título mais recente. */
 export function suggestProfile(input: SuggestInput, now = new Date()): ProfileSuggestion {
   const sorted = [...input.experiences].sort((a, b) => {
@@ -105,12 +114,7 @@ export function suggestProfile(input: SuggestInput, now = new Date()): ProfileSu
     };
   }
 
-  let seniority: Seniority;
-  if (area === "management" && MANAGEMENT.test(latest.title)) seniority = "manager";
-  else if (years < 2) seniority = "junior";
-  else if (years < 5) seniority = "pleno";
-  else if (years < 9) seniority = "senior";
-  else seniority = "staff";
+  const seniority = inferSeniority(years, latest.title, area);
 
   const altTitles = (ALT_BY_AREA[area] ?? []).filter(
     (t) => t.toLowerCase() !== latest.title.toLowerCase(),
