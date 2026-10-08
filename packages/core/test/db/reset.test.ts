@@ -25,7 +25,19 @@ describe("db/reset (M7: isolamento entre cenários e2e, só com provider mock)",
 
     const result = resetDatabase(db);
 
-    expect(result.tables).toEqual(expect.arrayContaining(["user", "skill", "usage_event", "job"]));
+    expect(result.tables).toEqual(
+      expect.arrayContaining([
+        "user",
+        "skill",
+        "usage_event",
+        "job",
+        // F02: tabelas novas também são zeradas
+        "profile_emphasis",
+        "profile_fact_relevance",
+        "profile_suggestion",
+        "project",
+      ]),
+    );
     expect(result.tables).not.toContain("schema_migrations");
     expect(result.tables).not.toContain("salary_reference");
     expect(count(db, "user")).toBe(0);

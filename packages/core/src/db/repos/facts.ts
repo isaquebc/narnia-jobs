@@ -1,9 +1,11 @@
 import {
   type AchievementDataSchema,
   type EducationDataSchema,
+  type EmphasisFactKind,
   type ExperienceDataSchema,
   type LanguageDataSchema,
   nowUtc,
+  type ProjectDataSchema,
   type SkillDataSchema,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
@@ -35,12 +37,19 @@ export type AchievementInput = Omit<z.infer<typeof AchievementDataSchema>, "expe
 export type EducationData = z.infer<typeof EducationDataSchema>;
 export type SkillData = z.infer<typeof SkillDataSchema>;
 export type LanguageData = z.infer<typeof LanguageDataSchema>;
+export type ProjectData = z.infer<typeof ProjectDataSchema>;
 
 export type ExperienceRecord = ExperienceData & FactRecordMeta;
 export type AchievementRecord = AchievementInput & FactRecordMeta;
 export type EducationRecord = EducationData & FactRecordMeta;
 export type SkillRecord = SkillData & FactRecordMeta & { nameNormalized: string };
 export type LanguageRecord = LanguageData & FactRecordMeta;
+export type ProjectRecord = ProjectData & FactRecordMeta;
+
+/** Hooks de escrita (F02 §2.9-5): `onRemove` limpa ênfase e relevância do fato apagado. */
+export interface FactsHooks {
+  onRemove?: (kind: EmphasisFactKind, id: string) => void;
+}
 
 interface BaseRepo<I, R> {
   insert(input: I & FactMeta): R;
@@ -59,12 +68,15 @@ export interface FactsRepo {
   education: BaseRepo<EducationData, EducationRecord>;
   skills: BaseRepo<SkillData, SkillRecord>;
   languages: BaseRepo<LanguageData, LanguageRecord>;
+  /** F02-9: tabela nasce vazia; F03 preenche pelo GitHub. */
+  projects: BaseRepo<ProjectData, ProjectRecord>;
   counts(): {
     experiences: number;
     achievements: number;
     education: number;
     skills: number;
     languages: number;
+    projects: number;
   };
 }
 
@@ -87,12 +99,13 @@ function meta(r: Row): FactRecordMeta {
 function makeRepo<I extends object, R extends FactRecordMeta>(
   db: Db,
   settings: SettingsRepo,
-  table: string,
+  table: EmphasisFactKind,
   columns: string[],
   toRow: (input: I & FactMeta, ctx: { userId: string }) => Record<string, unknown>,
   fromRow: (r: Row) => R,
   userId: () => string,
   extraOrder = "created_at, rowid",
+  hooks: FactsHooks = {},
 ): BaseRepo<I, R> {
   const allCols = [
     "id",
@@ -155,6 +168,7 @@ function makeRepo<I extends object, R extends FactRecordMeta>(
     },
     remove(id) {
       delStmt.run(id);
+      hooks.onRemove?.(table, id);
       settings.bumpFactsVersion();
     },
     count() {
@@ -164,7 +178,12 @@ function makeRepo<I extends object, R extends FactRecordMeta>(
   return repo;
 }
 
-export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): FactsRepo {
+export function factsRepo(
+  db: Db,
+  settings: SettingsRepo,
+  users: UsersRepo,
+  hooks: FactsHooks = {},
+): FactsRepo {
   const uid = () => users.ensureId();
 
   const experiences = makeRepo<ExperienceData, ExperienceRecord>(
@@ -211,6 +230,7 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
     }),
     uid,
     "start_date desc, rowid",
+    hooks,
   );
 
   const achievementsBase = makeRepo<AchievementInput, AchievementRecord>(
@@ -226,6 +246,8 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
       ...(str(r.metric) ? { metric: String(r.metric) } : {}),
     }),
     uid,
+    undefined,
+    hooks,
   );
   const byExp = db.prepare(
     "select * from achievement where experience_id = ? order by created_at, rowid",
@@ -255,6 +277,8 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
       status: String(r.status) as EducationData["status"],
     }),
     uid,
+    undefined,
+    hooks,
   );
 
   const skills = makeRepo<SkillData, SkillRecord>(
@@ -278,6 +302,7 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
     }),
     uid,
     "name_normalized, rowid",
+    hooks,
   );
 
   const languages = makeRepo<LanguageData, LanguageRecord>(
@@ -288,6 +313,38 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
     (i, ctx) => ({ user_id: ctx.userId, name: i.name, level: i.level }),
     (r) => ({ ...meta(r), name: String(r.name), level: String(r.level) as LanguageData["level"] }),
     uid,
+    undefined,
+    hooks,
+  );
+
+  const projects = makeRepo<ProjectData, ProjectRecord>(
+    db,
+    settings,
+    "project",
+    ["user_id", "name", "description", "url", "role", "start_date", "end_date", "tech_json"],
+    (i, ctx) => ({
+      user_id: ctx.userId,
+      name: i.name,
+      description: i.description ?? null,
+      url: i.url ?? null,
+      role: i.role ?? null,
+      start_date: i.startDate ?? null,
+      end_date: i.endDate ?? null,
+      tech_json: JSON.stringify(i.tech ?? []),
+    }),
+    (r) => ({
+      ...meta(r),
+      name: String(r.name),
+      ...(str(r.description) ? { description: String(r.description) } : {}),
+      ...(str(r.url) ? { url: String(r.url) } : {}),
+      ...(str(r.role) ? { role: String(r.role) } : {}),
+      ...(str(r.start_date) ? { startDate: String(r.start_date) } : {}),
+      ...(str(r.end_date) ? { endDate: String(r.end_date) } : {}),
+      tech: json<string[]>(r.tech_json, []),
+    }),
+    uid,
+    undefined,
+    hooks,
   );
 
   return {
@@ -303,6 +360,7 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
     education,
     skills,
     languages,
+    projects,
     counts() {
       return {
         experiences: experiences.count(),
@@ -310,6 +368,7 @@ export function factsRepo(db: Db, settings: SettingsRepo, users: UsersRepo): Fac
         education: education.count(),
         skills: skills.count(),
         languages: languages.count(),
+        projects: projects.count(),
       };
     },
   };

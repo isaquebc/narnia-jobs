@@ -1,5 +1,6 @@
 import type { Db } from "../open";
 import { type DigestsRepo, digestsRepo } from "./digests";
+import { type EmphasisRepo, emphasisRepo } from "./emphasis";
 import { type FactSourcesRepo, factSourcesRepo } from "./fact-sources";
 import { type FactsRepo, factsRepo } from "./facts";
 import { type IngestionRunsRepo, ingestionRunsRepo } from "./ingestion-runs";
@@ -7,9 +8,11 @@ import { type JobsRepo, jobsRepo } from "./jobs";
 import { type ProfilesRepo, profilesRepo } from "./profiles";
 import { type ProposalsRepo, proposalsRepo } from "./proposals";
 import { type ReadingsRepo, readingsRepo } from "./readings";
+import { type RelevanceRepo, relevanceRepo } from "./relevance";
 import { type SalaryReferencesRepo, salaryReferencesRepo } from "./salary-references";
 import { type SettingsRepo, settingsRepo } from "./settings";
 import { type SourceFilesRepo, sourceFilesRepo } from "./source-files";
+import { type SuggestionsRepo, suggestionsRepo } from "./suggestions";
 import { type UsageEventsRepo, usageEventsRepo } from "./usage-events";
 import { type UsersRepo, usersRepo } from "./users";
 
@@ -18,6 +21,9 @@ export interface Repos {
   settings: SettingsRepo;
   users: UsersRepo;
   profiles: ProfilesRepo;
+  emphasis: EmphasisRepo;
+  relevance: RelevanceRepo;
+  suggestions: SuggestionsRepo;
   facts: FactsRepo;
   factSources: FactSourcesRepo;
   sourceFiles: SourceFilesRepo;
@@ -34,7 +40,15 @@ export interface Repos {
 export function createRepos(db: Db): Repos {
   const settings = settingsRepo(db);
   const users = usersRepo(db);
-  const facts = factsRepo(db, settings, users);
+  const emphasis = emphasisRepo(db);
+  const relevance = relevanceRepo(db);
+  // F02 §2.9-5: apagar um fato limpa ênfase e relevância dele em todos os perfis
+  const facts = factsRepo(db, settings, users, {
+    onRemove: (kind, id) => {
+      emphasis.removeFact(kind, id);
+      relevance.removeFact(kind, id);
+    },
+  });
   const factSources = factSourcesRepo(db);
   const sourceFiles = sourceFilesRepo(db);
   const ingestionRuns = ingestionRunsRepo(db);
@@ -42,7 +56,10 @@ export function createRepos(db: Db): Repos {
     db,
     settings,
     users,
-    profiles: profilesRepo(db),
+    profiles: profilesRepo(db, { emphasis }),
+    emphasis,
+    relevance,
+    suggestions: suggestionsRepo(db, users),
     facts,
     factSources,
     sourceFiles,
@@ -63,6 +80,7 @@ export function createRepos(db: Db): Repos {
 }
 
 export * from "./digests";
+export * from "./emphasis";
 export * from "./fact-sources";
 export * from "./facts";
 export * from "./ingestion-runs";
@@ -70,8 +88,10 @@ export * from "./jobs";
 export * from "./profiles";
 export * from "./proposals";
 export * from "./readings";
+export * from "./relevance";
 export * from "./salary-references";
 export * from "./settings";
 export * from "./source-files";
+export * from "./suggestions";
 export * from "./usage-events";
 export * from "./users";

@@ -24,6 +24,11 @@ const EXPECTED_TABLES = [
   "fact_source",
   "job",
   "usage_event",
+  // F02 (0002_profiles)
+  "profile_emphasis",
+  "profile_fact_relevance",
+  "profile_suggestion",
+  "project",
 ];
 
 function tables(db: ReturnType<typeof openDatabase>): string[] {
@@ -45,6 +50,7 @@ describe("db/migrate (F01 §3, M3)", () => {
     const result = migrate(db);
     expect(result.applied).toEqual(listMigrations().map((m) => m.name));
     expect(result.applied[0]).toBe("0001_init");
+    expect(result.applied[1]).toBe("0002_profiles");
     for (const t of EXPECTED_TABLES) expect(tables(db)).toContain(t);
   });
 
@@ -89,5 +95,22 @@ describe("db/migrate (F01 §3, M3)", () => {
     expect(ref.period).toBe("monthly");
     expect(String(ref.reference_month)).toMatch(/^\d{4}-\d{2}$/);
     expect(String(ref.source_url)).toContain("dieese.org.br");
+  });
+
+  it("0002_profiles completa profile (persona_overrides_json, archived_at, cloned_from, card_facts_version) e cria os índices", () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const cols = (db.prepare("pragma table_info(profile)").all() as Array<{ name: string }>).map(
+      (c) => c.name,
+    );
+    for (const c of ["persona_overrides_json", "archived_at", "cloned_from", "card_facts_version"])
+      expect(cols).toContain(c);
+    const idx = (
+      db.prepare("select name from sqlite_master where type = 'index'").all() as Array<{
+        name: string;
+      }>
+    ).map((i) => i.name);
+    expect(idx).toContain("profile_emphasis_order");
+    expect(idx).toContain("profile_suggestion_user_status");
   });
 });

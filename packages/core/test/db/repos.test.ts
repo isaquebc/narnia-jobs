@@ -175,6 +175,7 @@ describe("repos/facts", () => {
       education: 1,
       skills: 1,
       languages: 1,
+      projects: 0, // F02-9
     });
   });
 });
