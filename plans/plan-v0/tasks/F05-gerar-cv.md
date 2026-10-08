@@ -83,6 +83,9 @@ A skill instrui: usar só fatos existentes, priorizar conquistas com métrica, a
 | Fontes | embutidas na imagem (`Inter`, `Source Serif 4`, `IBM Plex Mono`, licenças OFL) para render reproduzível nos 3 SOs |
 | Saídas | `/data/exports/<document_id>/<version>/cv.pdf`, `cv.docx`, `content.json`, `preview.png`, `render.html` |
 
+### 2.4b Ênfase por conquista (decisão F02-3, 2026-10-08: **obrigatória em F05**)
+F02 entrega ênfases por experiência e já aceita `fact_kind = achievement` em `profile_emphasis`. F05 completa: no quadro de ênfases do perfil, cada experiência expande suas conquistas com destacar/normal/ocultar e ordem própria; a skill `gerar-cv` recebe só as conquistas não ocultas, com as destacadas primeiro, e o `CvContent` guarda o id da conquista de origem de cada bullet para o diff entre versões. Testes: conquista oculta nunca aparece no `CvContent`; destacada aparece antes; cartão do perfil (F02) usa a mesma ordem.
+
 ### 2.5 Jobs
 | Job | Modelo? | Etapas persistidas |
 |-----|---------|--------------------|
