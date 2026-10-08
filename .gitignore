@@ -16,3 +16,7 @@ snapshots/
 *.tsbuildinfo
 .turbo/
 uploads/
+# saídas do Playwright (apps/e2e)
+test-results/
+report/
+.e2e-port.env

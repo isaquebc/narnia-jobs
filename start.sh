@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # narnia-jobs · lançador para Linux/macOS. Só depende de Docker (com Compose v2).
 # Produção:        up | down [--purge] | login | doctor | logs | status
-# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | install
+# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
 set -euo pipefail
 
 NARNIA_PORT_START=${NARNIA_PORT_START:-3100}
@@ -9,6 +9,9 @@ NARNIA_PORT_END=${NARNIA_PORT_END:-3199}
 ENV_FILE=${NARNIA_ENV_FILE:-.env}
 DEV_COMPOSE=(docker compose -f docker-compose.dev.yml)
 PROD_COMPOSE=(docker compose -f docker-compose.yml)
+E2E_PROJECT=${NARNIA_E2E_PROJECT:-narnia-e2e}
+E2E_COMPOSE=(docker compose -p "$E2E_PROJECT" -f docker-compose.yml -f docker-compose.e2e.yml)
+E2E_DATA_DIR=./.e2e-data
 
 die() { printf 'erro: %s\n' "$*" >&2; exit 1; }
 info() { printf '» %s\n' "$*"; }
@@ -167,6 +170,109 @@ MSG
   "${PROD_COMPOSE[@]}" run --rm --no-deps api narnia-jobs login
 }
 
+# --- e2e (M7): Playwright em container contra a stack de produção com provider mock -------------------
+
+# dev_project_name -> nome do projeto do compose de dev (dono do volume node_modules)
+dev_project_name() { "${DEV_COMPOSE[@]}" config 2>/dev/null | sed -n 's/^name: //p' | head -n 1; }
+
+e2e_env() {
+  NARNIA_DEV_PROJECT=$(dev_project_name)
+  [[ -n "$NARNIA_DEV_PROJECT" ]] || die "não consegui descobrir o projeto do compose de dev."
+  export NARNIA_DEV_PROJECT NARNIA_UID NARNIA_GID
+  NARNIA_UID=$(id -u); NARNIA_GID=$(id -g)
+}
+
+e2e_up() {
+  "${E2E_COMPOSE[@]}" up -d --wait web api worker redis
+}
+
+# e2e_play ARGS… -> roda o Playwright no container (código de saída preservado)
+e2e_play() {
+  "${E2E_COMPOSE[@]}" --profile e2e run --rm --no-deps playwright ./node_modules/.bin/playwright test "$@"
+}
+
+e2e_api() {
+  # e2e_api METHOD PATH [BODY] -> chama a API da stack e2e de dentro da rede do compose (sem publicar portas)
+  local method=$1 path=$2 body=${3:-}
+  "${E2E_COMPOSE[@]}" exec -T api node -e '
+    const [method, path, body] = process.argv.slice(1);
+    fetch("http://127.0.0.1:3100" + path, { method, headers: { authorization: "Bearer e2e-token", "content-type": "application/json" }, body: body || undefined })
+      .then(async (r) => { process.stdout.write(await r.text()); process.exit(r.ok ? 0 : 1); })
+      .catch((e) => { console.error(String(e)); process.exit(1); });' "$method" "$path" "$body"
+}
+
+# E2E-13: porta ocupada no host → ./start.sh up escolhe a próxima; dados criados nela reaparecem na execução seguinte.
+# Usa um projeto e um .env descartáveis, provider mock e a pasta de dados ./.e2e-data/port.
+e2e_launcher_port() {
+  local base block expected port token data_dir=${E2E_DATA_DIR}/port env_file=.e2e-port.env blocker
+  base=$(find_free_port) || die "E2E-13: nenhuma porta livre."
+  info "E2E-13: ocupando a porta ${base} e subindo o lançador em projeto descartável…"
+  blocker=$(docker run -d --rm -p "127.0.0.1:${base}:80" narnia-jobs/web)
+  expected=$(find_free_port "$((base + 1))")
+  rm -f "$env_file"; mkdir -p "$data_dir"
+  (
+    export COMPOSE_PROJECT_NAME="${E2E_PROJECT}-port" NARNIA_ENV_FILE="$env_file" NARNIA_DATA_DIR="$data_dir" NARNIA_PROVIDER=mock NARNIA_PORT_START="$base"
+    cmd_up >/dev/null
+    port=$(env_value "$env_file" NARNIA_PORT)
+    [[ "$port" == "$expected" ]] || die "E2E-13: esperava a porta ${expected}, o lançador escolheu '${port}'."
+    token=$(read_token)
+    curl -fsS "http://127.0.0.1:${port}/api/health" >/dev/null || die "E2E-13: health falhou em ${port}."
+    curl -fsS -X PUT -H "authorization: Bearer ${token}" -H 'content-type: application/json' \
+      -d '{"displayName":"Porta","fullName":"Teste Porta","email":"porta@example.com","phone":{"e164":"+5511999990000","country":"BR","national":"11999990000"},"city":"Campinas","region":"SP","country":"BR","timezone":"America/Sao_Paulo","remotePref":"remote","relocation":{"mode":"none","countries":[]},"workAuth":[{"country":"BR","status":"citizen"}],"links":[]}' \
+      "http://127.0.0.1:${port}/api/user" >/dev/null || die "E2E-13: PUT /api/user falhou em ${port}."
+    "${PROD_COMPOSE[@]}" down --remove-orphans >/dev/null
+    docker stop "$blocker" >/dev/null
+    cmd_up >/dev/null
+    port=$(env_value "$env_file" NARNIA_PORT)
+    curl -fsS -H "authorization: Bearer ${token}" "http://127.0.0.1:${port}/api/user" | grep -q '"Teste Porta"' \
+      || die "E2E-13: o usuário criado antes do down não reapareceu na porta ${port}."
+    "${PROD_COMPOSE[@]}" down -v --remove-orphans >/dev/null
+  )
+  local rc=$?
+  docker stop "$blocker" >/dev/null 2>&1 || true
+  rm -f "$env_file"
+  return $rc
+}
+
+cmd_e2e() {
+  require_docker; ensure_installed; e2e_env
+  local rc=0 ui_only=0 arg; local -a args=()
+  for arg in "$@"; do
+    case "$arg" in
+      --ui-only) ui_only=1 ;;
+      *) args+=("$arg") ;;
+    esac
+  done
+  mkdir -p "$E2E_DATA_DIR"
+  info "e2e: construindo imagens e subindo a stack (projeto ${E2E_PROJECT}, provider mock)…"
+  "${E2E_COMPOSE[@]}" build
+  e2e_up
+  # cenários de interface (tudo que não depende de reiniciar serviços)
+  e2e_play --grep-invert '@ops' "${args[@]}" || rc=$?
+  if (( rc == 0 && ui_only == 0 )); then
+    # E2E-06: concluir o onboarding → down → up → dashboard e upload preservados
+    e2e_play --grep 'E2E-06.*parte 1' || rc=$?
+    if (( rc == 0 )); then
+      "${E2E_COMPOSE[@]}" down >/dev/null && e2e_up
+      e2e_play --grep 'E2E-06.*parte 2' || rc=$?
+    fi
+  fi
+  if (( rc == 0 && ui_only == 0 )); then
+    # E2E-12: extração lenta → worker reiniciado no meio → conclui sem propostas duplicadas
+    e2e_play --grep 'E2E-12.*parte 1' || rc=$?
+    if (( rc == 0 )); then
+      "${E2E_COMPOSE[@]}" kill worker >/dev/null && "${E2E_COMPOSE[@]}" up -d --wait worker >/dev/null
+      e2e_play --grep 'E2E-12.*parte 2' || rc=$?
+    fi
+  fi
+  "${E2E_COMPOSE[@]}" down -v --remove-orphans >/dev/null
+  if (( rc == 0 && ui_only == 0 )); then
+    e2e_launcher_port || rc=$?
+  fi
+  if (( rc == 0 )); then info "e2e: tudo verde."; else info "e2e: falhou (código ${rc}); relatório em apps/e2e/report/index.html"; fi
+  return $rc
+}
+
 usage() {
   cat <<USAGE
 narnia-jobs · ./start.sh <comando>
@@ -189,6 +295,7 @@ Desenvolvimento (tudo em containers):
   shell         abre um shell no container de desenvolvimento
   cli <cmd>     roda a CLI narnia-jobs (doctor | login | install-plugin) no container de dev
   test:sh       testa start.sh (bats) e start.ps1 (Pester) em containers
+  e2e [args]    testes de ponta a ponta (Playwright em container, provider mock); --ui-only pula down/up, worker e porta
   install       instala dependências no volume node_modules
 USAGE
 }
@@ -227,6 +334,8 @@ main() {
     cli)
       require_docker; ensure_installed
       "${DEV_COMPOSE[@]}" run --rm dev pnpm --filter @narnia-jobs/api exec tsx src/cli.ts "$@" ;;
+    e2e)
+      cmd_e2e "$@" ;;
     test:sh)
       # bats dentro da imagem de dev (precisa de Node para ocupar portas nos testes) + Pester para o start.ps1
       require_docker; ensure_installed

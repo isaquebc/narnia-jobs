@@ -1,11 +1,16 @@
-# Override para testes de ponta a ponta (M7): provider mock, token fixo, pasta de dados descartável (./.e2e-data, gitignored),
-# sem restart. Uso: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile e2e up --build
-# O serviço playwright roda os testes de apps/e2e contra http://web (rede do compose).
+# Override para testes de ponta a ponta (M7). Uso: ./start.sh e2e (Windows: .\start.ps1 e2e), que roda
+#   docker compose -p narnia-e2e -f docker-compose.yml -f docker-compose.e2e.yml …
+# Projeto separado (narnia-e2e) para não tocar a stack de produção local; provider mock; token fixo; pasta de dados
+# descartável (./.e2e-data, gitignored); nenhuma porta publicada no host (o Playwright fala com http://web na rede do compose).
+# O serviço playwright monta o repositório e o volume node_modules do compose de dev (NARNIA_DEV_PROJECT, calculado pelo
+# lançador), porque a imagem oficial traz só os navegadores, não o pacote @playwright/test.
 services:
   web:
     restart: "no"
+    ports: !override []
   api:
     restart: "no"
+    ports: !override []
     volumes:
       - ./.e2e-data:/data
     environment:
@@ -22,17 +27,25 @@ services:
   playwright:
     image: mcr.microsoft.com/playwright:v1.58.0-noble
     profiles: ["e2e"]
-    working_dir: /e2e
+    user: "${NARNIA_UID:-1000}:${NARNIA_GID:-1000}"
+    working_dir: /app/apps/e2e
     volumes:
-      - ./apps/e2e:/e2e
+      - .:/app
+      - dev-node-modules:/app/node_modules
       - ./.e2e-data:/data:ro
     environment:
       - BASE_URL=http://web
       - NARNIA_TOKEN=e2e-token
       - CI=true
+      - HOME=/tmp
     depends_on:
       web:
         condition: service_started
       api:
         condition: service_healthy
-    command: ["sh", "-c", "echo 'suíte e2e chega em M7'; sleep 1"]
+    command: ["./node_modules/.bin/playwright", "test"]
+
+volumes:
+  dev-node-modules:
+    external: true
+    name: ${NARNIA_DEV_PROJECT:-narnia-jobs-helpper}_node_modules

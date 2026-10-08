@@ -71,7 +71,7 @@ describe("Dashboard · cartão, contadores, uso e pendências", () => {
             cardUpdatedAt: null,
             // a API devolve created/updatedAt do registro; o schema do shared não os declara (campos extras)
             updatedAt: "2026-10-07T03:30:00.000Z",
-          } as typeof profile,
+          } as unknown as typeof profile,
           counts: { experiences: 0, skills: 0, education: 0, files: 0 },
           usage: { totalTokens: 0, byCategory: {} },
           pendingResearch: 0,

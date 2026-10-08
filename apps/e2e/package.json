@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Testes de ponta a ponta (Playwright) do narnia-jobs, por fluxo do usuário. Rodam em container contra o compose e2e.",
+  "description": "Testes de ponta a ponta (Playwright) do narnia-jobs, por fluxo do usuário. Rodam em container contra o compose e2e (./start.sh e2e).",
   "scripts": {
-    "test": "playwright test",
+    "test:e2e": "playwright test",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {

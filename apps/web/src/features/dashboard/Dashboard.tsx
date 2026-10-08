@@ -27,7 +27,8 @@ export function Dashboard() {
   const d = dashboard.data;
   const name = user.data?.user?.displayName;
   // Sem cartão do perfil (chega em F02), a data mostrada é a última atualização do registro.
-  const updatedAt = d.profile?.cardUpdatedAt ?? d.profile?.updatedAt ?? d.profile?.createdAt ?? null;
+  const updatedAt =
+    d.profile?.cardUpdatedAt ?? d.profile?.updatedAt ?? d.profile?.createdAt ?? null;
   return (
     <div className="flex flex-col gap-6">
       <div>

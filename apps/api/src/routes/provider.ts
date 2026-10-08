@@ -44,7 +44,8 @@ export function providerRoutes(deps: {
     // Isolamento entre cenários e2e (M7): apaga dados e arquivos, zera o wizard e devolve o mock aos padrões.
     app.post("/api/_test/reset", async (c) => {
       const { tables } = resetDatabase(deps.repos.db);
-      for (const dir of RESET_DIRS) rmSync(join(deps.dataDir, dir), { recursive: true, force: true });
+      for (const dir of RESET_DIRS)
+        rmSync(join(deps.dataDir, dir), { recursive: true, force: true });
       mock.reset();
       deps.bus.emit({ type: "provider.status", status: await mock.detect() });
       return c.json({ ok: true, tables });

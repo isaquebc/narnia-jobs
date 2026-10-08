@@ -17,7 +17,8 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     headers.set("content-type", "application/json");
   }
   const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
-  if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path} → ${res.status} ${await res.text()}`);
+  if (!res.ok)
+    throw new Error(`${init.method ?? "GET"} ${path} → ${res.status} ${await res.text()}`);
   return (await res.json()) as T;
 }
 

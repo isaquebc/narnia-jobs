@@ -121,7 +121,12 @@ describe("M7/providers MockProvider: modo compartilhado por arquivo (api e worke
       ).rejects.toBeInstanceOf(ProviderError);
       expect(existsSync(file)).toBe(true);
       api.reset();
-      expect(worker.getMode()).toMatchObject({ loggedIn: true, authMethod: "claude.ai", delayMs: 0, errors: {} });
+      expect(worker.getMode()).toMatchObject({
+        loggedIn: true,
+        authMethod: "claude.ai",
+        delayMs: 0,
+        errors: {},
+      });
       await expect(
         worker.extractFacts({ text: "x".repeat(300), locale: "pt-BR", model: "haiku" }),
       ).resolves.toBeTruthy();

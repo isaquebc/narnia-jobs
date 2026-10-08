@@ -1,6 +1,6 @@
 # narnia-jobs · lançador para Windows (PowerShell 5.1+ / 7+). Só depende de Docker Desktop (Compose v2).
 # Produção:        up | down [--purge] | login | doctor | logs | status
-# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | install
+# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)] [string] $Command = "help",
@@ -68,6 +68,42 @@ function Assert-Docker {
 
 function Invoke-Dev([string[]] $Args) { & docker @script:DevCompose run --rm dev @Args; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
 function Invoke-Prod([string[]] $Args) { & docker @script:ProdCompose @Args; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+
+# --- e2e (M7): Playwright em container contra a stack de produção com provider mock -------------------
+$script:E2eProject = if ($env:NARNIA_E2E_PROJECT) { $env:NARNIA_E2E_PROJECT } else { "narnia-e2e" }
+$script:E2eCompose = @("compose", "-p", $script:E2eProject, "-f", "docker-compose.yml", "-f", "docker-compose.e2e.yml")
+
+function Invoke-E2e([string[]] $Args) { & docker @script:E2eCompose @Args; return $LASTEXITCODE }
+function Invoke-E2eUp { return (Invoke-E2e @("up", "-d", "--wait", "web", "api", "worker", "redis")) }
+function Invoke-Play([string[]] $Args) {
+  return (Invoke-E2e (@("--profile", "e2e", "run", "--rm", "--no-deps", "playwright", "./node_modules/.bin/playwright", "test") + $Args))
+}
+
+function Invoke-E2eSuite {
+  Assert-Docker; Ensure-Installed
+  $devProject = (& docker @script:DevCompose config 2>$null | Where-Object { $_ -match '^name: ' } | Select-Object -First 1) -replace '^name: ', ''
+  if (-not $devProject) { Fail "não consegui descobrir o projeto do compose de dev." }
+  $env:NARNIA_DEV_PROJECT = $devProject
+  # no Docker Desktop (Windows/macOS) os bind mounts já pertencem ao usuário do container
+  $uiOnly = $Rest -contains "--ui-only"
+  $args = @($Rest | Where-Object { $_ -ne "--ui-only" })
+  New-Item -ItemType Directory -Force -Path "./.e2e-data" *> $null
+  Info "e2e: construindo imagens e subindo a stack (projeto $($script:E2eProject), provider mock)…"
+  if ((Invoke-E2e @("build")) -ne 0) { Fail "build das imagens falhou." }
+  if ((Invoke-E2eUp) -ne 0) { Fail "a stack e2e não subiu." }
+  $rc = Invoke-Play (@("--grep-invert", "@ops") + $args)
+  if ($rc -eq 0 -and -not $uiOnly) {
+    $rc = Invoke-Play @("--grep", "E2E-06.*parte 1")
+    if ($rc -eq 0) { Invoke-E2e @("down") *> $null; Invoke-E2eUp *> $null; $rc = Invoke-Play @("--grep", "E2E-06.*parte 2") }
+  }
+  if ($rc -eq 0 -and -not $uiOnly) {
+    $rc = Invoke-Play @("--grep", "E2E-12.*parte 1")
+    if ($rc -eq 0) { Invoke-E2e @("kill", "worker") *> $null; Invoke-E2e @("up", "-d", "--wait", "worker") *> $null; $rc = Invoke-Play @("--grep", "E2E-12.*parte 2") }
+  }
+  Invoke-E2e @("down", "-v", "--remove-orphans") *> $null
+  # E2E-13 (porta ocupada no lançador) roda só pelo start.sh (CI Linux); as funções de porta do start.ps1 têm testes Pester.
+  if ($rc -eq 0) { Info "e2e: tudo verde." } else { Info "e2e: falhou (código $rc); relatório em apps/e2e/report/index.html"; exit $rc }
+}
 
 function Ensure-Installed {
   & docker @script:DevCompose run --rm dev sh -c 'test -f node_modules/.modules.yaml && pnpm install --frozen-lockfile --prefer-offline >/dev/null 2>&1 || pnpm install --frozen-lockfile' *> $null
@@ -154,6 +190,7 @@ Desenvolvimento (tudo em containers):
   shell         abre um shell no container de desenvolvimento
   cli <cmd>     roda a CLI narnia-jobs (doctor | login | install-plugin) no container de dev
   test:sh       testa start.sh (bats) e start.ps1 (Pester) em containers
+  e2e [args]    testes de ponta a ponta (Playwright em container, provider mock); --ui-only pula down/up e worker
   install       instala dependências no volume node_modules
 "@
 }
@@ -174,6 +211,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "install"   { Assert-Docker; Invoke-Dev (@("pnpm", "install") + $Rest) }
     "shell"     { Assert-Docker; Ensure-Installed; Invoke-Dev @("bash") }
     "cli"       { Assert-Docker; Ensure-Installed; Invoke-Dev (@("pnpm", "--filter", "@narnia-jobs/api", "exec", "tsx", "src/cli.ts") + $Rest) }
+    "e2e"       { Invoke-E2eSuite }
     "test:sh"   {
       Assert-Docker
       Invoke-Dev @("bats", "scripts/test")

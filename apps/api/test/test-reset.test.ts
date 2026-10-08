@@ -37,11 +37,17 @@ describe("M7/api POST /api/_test/reset (isolamento dos cenários e2e; só com pr
     expect(body.tables).toEqual(expect.arrayContaining(["user", "source_file", "job"]));
 
     expect(await (await t.api("/api/user")).json()).toEqual({ user: null });
-    expect(await (await t.api("/api/onboarding/state")).json()).toEqual({ step: 1, completed: false });
+    expect(await (await t.api("/api/onboarding/state")).json()).toEqual({
+      step: 1,
+      completed: false,
+    });
     expect(await (await t.api("/api/provider/status")).json()).toMatchObject({ loggedIn: true });
     expect(t.provider.getMode().delayMs).toBe(0);
     expect(existsSync(join(t.dataDir, "uploads"))).toBe(false);
-    expect((await (await t.api("/api/dashboard")).json()).counts.files).toBe(0);
+    expect(
+      ((await (await t.api("/api/dashboard")).json()) as { counts: { files: number } }).counts
+        .files,
+    ).toBe(0);
     expect(t.events.some((e) => e.type === "provider.status")).toBe(true);
   });
 
