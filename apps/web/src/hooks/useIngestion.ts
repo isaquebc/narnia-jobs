@@ -23,7 +23,7 @@ export function useIngestion(runId: string | undefined) {
     if (!runId) return;
     ws.connect();
     return ws.subscribe((event) => {
-      if (event.type !== "provider.status" && event.jobId.startsWith(`${runId}__`)) {
+      if ("jobId" in event && event.jobId.startsWith(`${runId}__`)) {
         void qc.invalidateQueries({ queryKey: ingestionKey(runId) });
       }
     });

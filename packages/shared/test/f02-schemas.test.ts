@@ -19,6 +19,7 @@ import {
   ProfileSuggestionSchema,
   ProfileWsEventSchema,
   ProjectDataSchema,
+  WsEventSchema,
 } from "../src/index";
 import analyzeOutput from "./fixtures/analyze-profiles-output.valid.json";
 import persona from "./fixtures/persona.valid.json";
@@ -180,41 +181,39 @@ describe("F02/M1 shared · projetos (F02-9) e perfil estendido", () => {
 });
 
 describe("F02/M1 shared · dashboard e WS", () => {
-  it("Dashboard estendido com card, emphasis e suggestions (opcionais até M3)", () => {
+  it("Dashboard estendido exige card, emphasis, suggestions e counts.projects (F02-19 fechada em M4)", () => {
     const base = {
       profile: null,
       counts: { experiences: 0, skills: 0, education: 0, files: 0 },
       usage: { totalTokens: 0, byCategory: {} },
       pendingResearch: 0,
     };
-    expect(DashboardResponseSchema.safeParse(base).success).toBe(true);
+    expect(DashboardResponseSchema.safeParse(base).success).toBe(false);
+    const full = {
+      ...base,
+      counts: { ...base.counts, projects: 2 },
+      card: { text: "x", builtAt: "2026-10-08T12:00:00.000Z", valid: true },
+      emphasis: { highlighted: 2, hidden: 1 },
+      suggestions: 1,
+    };
+    expect(DashboardResponseSchema.safeParse(full).success).toBe(true);
+    expect(DashboardResponseSchema.safeParse({ ...full, card: null }).success).toBe(true);
     expect(
-      DashboardResponseSchema.safeParse({
-        ...base,
-        counts: { ...base.counts, projects: 2 },
-        card: { text: "x", builtAt: "2026-10-08T12:00:00.000Z", valid: true },
-        emphasis: { highlighted: 2, hidden: 1 },
-        suggestions: 1,
-      }).success,
-    ).toBe(true);
-    expect(
-      DashboardResponseSchema.safeParse({ ...base, card: { text: "x", valid: true } }).success,
+      DashboardResponseSchema.safeParse({ ...full, card: { text: "x", valid: true } }).success,
     ).toBe(false);
-    expect(DashboardResponseSchema.safeParse({ ...base, suggestions: 1.5 }).success).toBe(false);
+    expect(DashboardResponseSchema.safeParse({ ...full, suggestions: 1.5 }).success).toBe(false);
   });
-  it("eventos WS do F02 definidos (entram na união em M4): profile.switched e profile.card_invalidated", () => {
-    expect(
-      ProfileWsEventSchema.safeParse({ type: "profile.switched", profileId: "p1" }).success,
-    ).toBe(true);
-    expect(
-      ProfileWsEventSchema.safeParse({ type: "profile.card_invalidated", profileIds: ["p1", "p2"] })
-        .success,
-    ).toBe(true);
-    expect(ProfileWsEventSchema.safeParse({ type: "profile.card_invalidated" }).success).toBe(
-      false,
-    );
-    expect(
-      ProfileWsEventSchema.safeParse({ type: "profile.card_invalidated", profileIds: [] }).success,
-    ).toBe(false);
+  it("eventos WS do F02 fazem parte da união WsEventSchema (F02-20 fechada em M4)", () => {
+    for (const schema of [WsEventSchema, ProfileWsEventSchema]) {
+      expect(schema.safeParse({ type: "profile.switched", profileId: "p1" }).success).toBe(true);
+      expect(
+        schema.safeParse({ type: "profile.card_invalidated", profileIds: ["p1", "p2"] }).success,
+      ).toBe(true);
+      expect(schema.safeParse({ type: "profile.card_invalidated" }).success).toBe(false);
+      expect(schema.safeParse({ type: "profile.card_invalidated", profileIds: [] }).success).toBe(
+        false,
+      );
+    }
+    expect(WsEventSchema.safeParse({ type: "job.done", jobId: "j1" }).success).toBe(true);
   });
 });

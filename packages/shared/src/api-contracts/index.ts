@@ -247,21 +247,17 @@ export const DashboardResponseSchema = z.object({
     skills: z.number().int(),
     education: z.number().int(),
     files: z.number().int(),
-    projects: z.number().int().optional(),
+    projects: z.number().int(),
   }),
   usage: z.object({
     totalTokens: z.number().int(),
     byCategory: z.record(z.string(), z.number().int()),
   }),
   pendingResearch: z.number().int(),
-  // F02 §2.7: cartão resumido do perfil ativo, contadores de ênfase e sugestões novas.
-  // A api devolve sempre desde M3; opcionais no contrato até M4 adaptar os fixtures dos testes da web (F02 §8).
-  card: z
-    .object({ text: z.string(), builtAt: IsoDateTimeSchema, valid: z.boolean() })
-    .nullable()
-    .optional(),
-  emphasis: z.object({ highlighted: z.number().int(), hidden: z.number().int() }).optional(),
-  suggestions: z.number().int().optional(),
+  // F02 §2.7: cartão resumido do perfil ativo, contadores de ênfase e sugestões novas (obrigatórios desde M4, F02-19).
+  card: z.object({ text: z.string(), builtAt: IsoDateTimeSchema, valid: z.boolean() }).nullable(),
+  emphasis: z.object({ highlighted: z.number().int(), hidden: z.number().int() }),
+  suggestions: z.number().int(),
 });
 export type DashboardResponse = z.infer<typeof DashboardResponseSchema>;
 
@@ -273,22 +269,7 @@ export const UsageSummaryResponseSchema = z.object({
   byModel: z.record(z.string(), z.number().int()),
 });
 
-// WS /ws
-export const WsEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("provider.status"), status: ProviderStatusResponseSchema }),
-  z.object({
-    type: z.literal("job.progress"),
-    jobId: IdSchema,
-    stage: z.string(),
-    progress: z.number().min(0).max(100),
-  }),
-  z.object({ type: z.literal("job.done"), jobId: IdSchema }),
-  z.object({ type: z.literal("job.error"), jobId: IdSchema, error: z.string() }),
-]);
-export type WsEvent = z.infer<typeof WsEventSchema>;
-
-// Eventos do F02 (§2.5 troca de perfil, §2.2 cartão). Definidos em M1; entram na união `WsEventSchema` em M4,
-// quando os hooks da web (`useJobs`, `useIngestion`) passarem a discriminar por `type` antes de ler `jobId`.
+// Eventos do F02 (§2.5 troca de perfil, §2.2 cartão). Fazem parte da união `WsEventSchema` desde M4 (F02-20).
 export const ProfileSwitchedEventSchema = z.object({
   type: z.literal("profile.switched"),
   profileId: IdSchema,
@@ -302,6 +283,22 @@ export const ProfileWsEventSchema = z.discriminatedUnion("type", [
   ProfileCardInvalidatedEventSchema,
 ]);
 export type ProfileWsEvent = z.infer<typeof ProfileWsEventSchema>;
-/** Tudo que o barramento da api retransmite ao WebSocket (jobs/provider do F01 + perfil do F02). */
-export const AnyWsEventSchema = z.union([WsEventSchema, ProfileWsEventSchema]);
-export type AnyWsEvent = z.infer<typeof AnyWsEventSchema>;
+
+// WS /ws — jobs/provider (F01) + perfil (F02). Quem lê `jobId` discrimina por `type` antes.
+export const WsEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("provider.status"), status: ProviderStatusResponseSchema }),
+  z.object({
+    type: z.literal("job.progress"),
+    jobId: IdSchema,
+    stage: z.string(),
+    progress: z.number().min(0).max(100),
+  }),
+  z.object({ type: z.literal("job.done"), jobId: IdSchema }),
+  z.object({ type: z.literal("job.error"), jobId: IdSchema, error: z.string() }),
+  ProfileSwitchedEventSchema,
+  ProfileCardInvalidatedEventSchema,
+]);
+export type WsEvent = z.infer<typeof WsEventSchema>;
+/** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */
+export const AnyWsEventSchema = WsEventSchema;
+export type AnyWsEvent = WsEvent;

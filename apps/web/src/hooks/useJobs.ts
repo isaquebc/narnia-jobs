@@ -6,8 +6,10 @@ import { useApi, useWs } from "../app/context";
 export const jobsKey = ["jobs"] as const;
 const ACTIVE = new Set<Job["status"]>(["queued", "active", "stalled"]);
 
+const isJobEvent = (e: WsEvent): e is Extract<WsEvent, { jobId: string }> => "jobId" in e;
+
 function applyWsEvent(jobs: Job[], event: WsEvent): Job[] {
-  if (event.type === "provider.status") return jobs;
+  if (!isJobEvent(event)) return jobs;
   const idx = jobs.findIndex((j) => j.id === event.jobId);
   if (idx < 0) return jobs;
   const current = jobs[idx] as Job;
@@ -38,7 +40,7 @@ export function useJobs() {
   useEffect(() => {
     ws.connect();
     return ws.subscribe((event) => {
-      if (event.type === "provider.status") return;
+      if (!isJobEvent(event)) return;
       const known = (qc.getQueryData<Job[]>(jobsKey) ?? []).some((j) => j.id === event.jobId);
       if (!known) {
         void qc.invalidateQueries({ queryKey: jobsKey });

@@ -83,3 +83,26 @@ describe("lib/ws · cliente com reconexão e fila", () => {
     expect(states.at(-1)).toBe("closed");
   });
 });
+
+describe("lib/ws · eventos de perfil (F02)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeSocket.instances = [];
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("entrega profile.switched e profile.card_invalidated aos ouvintes", () => {
+    const client = createWsClient({ url: "ws://x/ws", factory: (u) => new FakeSocket(u) });
+    const seen: unknown[] = [];
+    client.subscribe((e) => seen.push(e));
+    client.connect();
+    const s = FakeSocket.instances[0] as FakeSocket;
+    s.open();
+    s.message({ type: "profile.switched", profileId: "p2" });
+    s.message({ type: "profile.card_invalidated", profileIds: ["p1", "p2"] });
+    expect(seen).toEqual([
+      { type: "profile.switched", profileId: "p2" },
+      { type: "profile.card_invalidated", profileIds: ["p1", "p2"] },
+    ]);
+  });
+});

@@ -1,25 +1,35 @@
 import type {
+  AnalyzeEstimateResponse,
+  AnalyzeRequest,
   DashboardResponseSchema,
+  EmphasisListResponse,
+  EmphasisPutRequest,
   EstimateResponse,
   FileResponse,
   IngestionCreateRequest,
   IngestionResponse,
   Job,
   OnboardingState,
+  PersonaOverrides,
+  PersonaResponse,
   Profile,
+  ProfileCardResponse,
   ProfileCreateRequest,
+  ProfilePatchRequest,
   ProfileSuggestionResponseSchema,
   ProviderStatusResponse,
   ReviewRequest,
   SalaryReference,
+  SuggestionsListResponse,
   User,
   UserUpsertRequest,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
 
 /** A API devolve também `createdAt`/`updatedAt` do registro do perfil (campos fora do schema do shared). */
+export type ProfileRecord = Profile & { createdAt?: string; updatedAt?: string };
 export type Dashboard = Omit<z.infer<typeof DashboardResponseSchema>, "profile"> & {
-  profile: (Profile & { createdAt?: string; updatedAt?: string }) | null;
+  profile: ProfileRecord | null;
 };
 export type ProfileSuggestion = z.infer<typeof ProfileSuggestionResponseSchema> & {
   altTitles?: string[];
@@ -137,8 +147,58 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     getUser: () => request<{ user: User | null }>("/api/user"),
     putUser: (body: UserUpsertRequest) =>
       request<{ user: User }>("/api/user", { method: "PUT", body: JSON.stringify(body) }),
-    listProfiles: () => request<{ profiles: Profile[] }>("/api/profiles"),
-    createProfile: (body: ProfileCreateRequest) => request<Profile>("/api/profiles", json(body)),
+    listProfiles: (opts?: { archived?: boolean }) =>
+      request<{ profiles: ProfileRecord[] }>(`/api/profiles${opts?.archived ? "?archived=1" : ""}`),
+    createProfile: (body: ProfileCreateRequest) =>
+      request<ProfileRecord>("/api/profiles", json(body)),
+    // F02 §2.7 — perfis, cartão, ênfases, persona, sugestões e análise
+    getProfile: (id: string) => request<ProfileRecord>(`/api/profiles/${encodeURIComponent(id)}`),
+    patchProfile: (id: string, body: ProfilePatchRequest) =>
+      request<ProfileRecord>(`/api/profiles/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    activateProfile: (id: string) =>
+      request<ProfileRecord>(`/api/profiles/${encodeURIComponent(id)}/activate`, {
+        method: "PUT",
+        body: JSON.stringify({}),
+      }),
+    archiveProfile: (id: string) =>
+      request<ProfileRecord>(`/api/profiles/${encodeURIComponent(id)}/archive`, json({})),
+    unarchiveProfile: (id: string) =>
+      request<ProfileRecord>(`/api/profiles/${encodeURIComponent(id)}/unarchive`, json({})),
+    cloneProfile: (sourceId: string, body: ProfileCreateRequest) =>
+      request<ProfileRecord>(`/api/profiles/${encodeURIComponent(sourceId)}/clone`, json(body)),
+    getProfileCard: (id: string) =>
+      request<ProfileCardResponse>(`/api/profiles/${encodeURIComponent(id)}/card`),
+    rebuildProfileCard: (id: string) =>
+      request<ProfileCardResponse>(
+        `/api/profiles/${encodeURIComponent(id)}/card/rebuild`,
+        json({}),
+      ),
+    getEmphasis: (id: string) =>
+      request<EmphasisListResponse>(`/api/profiles/${encodeURIComponent(id)}/emphasis`),
+    putEmphasis: (id: string, body: EmphasisPutRequest) =>
+      request<{ updated: number }>(`/api/profiles/${encodeURIComponent(id)}/emphasis`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    getPersona: (id: string) =>
+      request<PersonaResponse>(`/api/profiles/${encodeURIComponent(id)}/persona`),
+    putPersona: (id: string, overrides: PersonaOverrides) =>
+      request<PersonaResponse>(`/api/profiles/${encodeURIComponent(id)}/persona`, {
+        method: "PUT",
+        body: JSON.stringify(overrides),
+      }),
+    listSuggestions: () => request<SuggestionsListResponse>("/api/profiles/suggestions"),
+    dismissSuggestion: (id: string) =>
+      request<{ ok: true }>(
+        `/api/profiles/suggestions/${encodeURIComponent(id)}/dismiss`,
+        json({}),
+      ),
+    getAnalyzeEstimate: () => request<AnalyzeEstimateResponse>("/api/profiles/analyze/estimate"),
+    analyzeProfiles: (body: AnalyzeRequest) =>
+      request<{ job: Job }>("/api/profiles/analyze", json(body)),
     getProfileSuggestion: (runId?: string) =>
       request<ProfileSuggestion>(
         `/api/profiles/suggestion${runId ? `?runId=${encodeURIComponent(runId)}` : ""}`,

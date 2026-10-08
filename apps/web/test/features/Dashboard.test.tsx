@@ -29,9 +29,12 @@ describe("Dashboard · cartão, contadores, uso e pendências", () => {
       api: {
         getDashboard: async () => ({
           profile,
-          counts: { experiences: 2, skills: 6, education: 1, files: 1 },
+          counts: { experiences: 2, skills: 6, education: 1, files: 1, projects: 0 },
           usage: { totalTokens: 6710, byCategory: { ingest: 6710 } },
           pendingResearch: 1,
+          card: null,
+          emphasis: { highlighted: 0, hidden: 0 },
+          suggestions: 0,
         }),
         getUser: async () => ({
           user: {
@@ -72,9 +75,12 @@ describe("Dashboard · cartão, contadores, uso e pendências", () => {
             // a API devolve created/updatedAt do registro; o schema do shared não os declara (campos extras)
             updatedAt: "2026-10-07T03:30:00.000Z",
           } as unknown as typeof profile,
-          counts: { experiences: 0, skills: 0, education: 0, files: 0 },
+          counts: { experiences: 0, skills: 0, education: 0, files: 0, projects: 0 },
           usage: { totalTokens: 0, byCategory: {} },
           pendingResearch: 0,
+          card: null,
+          emphasis: { highlighted: 0, hidden: 0 },
+          suggestions: 0,
         }),
         getUser: async () => ({ user: null }),
       },
@@ -88,9 +94,12 @@ describe("Dashboard · cartão, contadores, uso e pendências", () => {
       api: {
         getDashboard: async () => ({
           profile: null,
-          counts: { experiences: 0, skills: 0, education: 0, files: 0 },
+          counts: { experiences: 0, skills: 0, education: 0, files: 0, projects: 0 },
           usage: { totalTokens: 0, byCategory: {} },
           pendingResearch: 0,
+          card: null,
+          emphasis: { highlighted: 0, hidden: 0 },
+          suggestions: 0,
         }),
         getUser: async () => ({ user: null }),
       },

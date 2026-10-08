@@ -37,9 +37,12 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
         listProfiles: async () => ({ profiles: [] }),
         getDashboard: async () => ({
           profile: null,
-          counts: { experiences: 0, skills: 0, education: 0, files: 0 },
+          counts: { experiences: 0, skills: 0, education: 0, files: 0, projects: 0 },
           usage: { totalTokens: 0, byCategory: {} },
           pendingResearch: 0,
+          card: null,
+          emphasis: { highlighted: 0, hidden: 0 },
+          suggestions: 0,
         }),
         getUser: async () => ({ user: null }),
       },
@@ -153,9 +156,12 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
         getDashboard: async () =>
           ({
             profile: profiles[0] ?? null,
-            counts: { experiences: 0, skills: 0, education: 0, files: 0 },
+            counts: { experiences: 0, skills: 0, education: 0, files: 0, projects: 0 },
             usage: { totalTokens: 0, byCategory: {} },
             pendingResearch: 0,
+            card: null,
+            emphasis: { highlighted: 0, hidden: 0 },
+            suggestions: 0,
           }) as never,
       },
       initialUrl: "/onboarding/5",

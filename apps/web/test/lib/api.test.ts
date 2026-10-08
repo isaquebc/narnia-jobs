@@ -108,3 +108,54 @@ describe("lib/api · cliente tipado", () => {
     expect(url).toBe("/api/files/f1/estimate?ocr=false&modelRead=true");
   });
 });
+
+describe("lib/api · rotas de perfil (F02)", () => {
+  it("monta método e caminho de cada rota nova", async () => {
+    const calls: Array<{ method: string; url: string; body: unknown }> = [];
+    const api = createApiClient({
+      fetch: fetchMock(200, { ok: true }, (init, url) => {
+        calls.push({
+          method: init.method ?? "GET",
+          url,
+          body: typeof init.body === "string" ? JSON.parse(init.body) : null,
+        });
+      }),
+      getToken: () => null,
+    });
+    await api.listProfiles({ archived: true });
+    await api.getProfile("p1");
+    await api.patchProfile("p1", { pitch: "x" });
+    await api.activateProfile("p1");
+    await api.archiveProfile("p1");
+    await api.unarchiveProfile("p1");
+    await api.getProfileCard("p1");
+    await api.rebuildProfileCard("p1");
+    await api.getEmphasis("p1");
+    await api.putEmphasis("p1", { items: [{ kind: "skill", id: "s1", mode: "highlight" }] });
+    await api.getPersona("p1");
+    await api.putPersona("p1", { tone: null });
+    await api.listSuggestions();
+    await api.dismissSuggestion("sg1");
+    await api.getAnalyzeEstimate();
+    await api.analyzeProfiles({});
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      "GET /api/profiles?archived=1",
+      "GET /api/profiles/p1",
+      "PATCH /api/profiles/p1",
+      "PUT /api/profiles/p1/activate",
+      "POST /api/profiles/p1/archive",
+      "POST /api/profiles/p1/unarchive",
+      "GET /api/profiles/p1/card",
+      "POST /api/profiles/p1/card/rebuild",
+      "GET /api/profiles/p1/emphasis",
+      "PUT /api/profiles/p1/emphasis",
+      "GET /api/profiles/p1/persona",
+      "PUT /api/profiles/p1/persona",
+      "GET /api/profiles/suggestions",
+      "POST /api/profiles/suggestions/sg1/dismiss",
+      "GET /api/profiles/analyze/estimate",
+      "POST /api/profiles/analyze",
+    ]);
+    expect(calls[11]?.body).toEqual({ tone: null });
+  });
+});
