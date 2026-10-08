@@ -1,0 +1,39 @@
+{
+  "name": "@narnia-jobs/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "build": "tsc -p tsconfig.json",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.3",
+    "@hono/zod-validator": "0.9.1",
+    "@narnia-jobs/core": "workspace:*",
+    "@narnia-jobs/providers": "workspace:*",
+    "@narnia-jobs/shared": "workspace:*",
+    "bullmq": "6.3.11",
+    "hono": "4.13.13",
+    "ioredis": "6.0.0",
+    "tsx": "4.23.15",
+    "ws": "8.22.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/ws": "8.18.2",
+    "@vitest/coverage-v8": "5.0.3",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  }
+}
