@@ -3,7 +3,6 @@
 exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapshot): mudar um schema exige atualizar o snapshot de propósito 1`] = `
 {
   "buildDigest": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
       "keyPoints": {
@@ -73,7 +72,6 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
     "type": "object",
   },
   "extractFacts": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
       "education": {
@@ -390,7 +388,6 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
     "type": "object",
   },
   "readDocument": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
       "sections": {
