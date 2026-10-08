@@ -1,0 +1,55 @@
+[
+  {
+    "kind": "identity",
+    "confidence": 0.9,
+    "data": {
+      "fullName": "Ana Maria Exemplo",
+      "email": "ana.exemplo@example.com",
+      "city": "Campinas",
+      "country": "BR"
+    }
+  },
+  {
+    "kind": "experience",
+    "confidence": 0.85,
+    "data": {
+      "company": "Acme Ltda",
+      "title": "Engenheira de Software Sênior",
+      "employmentType": "clt",
+      "startDate": "2021-03",
+      "endDate": "2023-11",
+      "isCurrent": false,
+      "location": "Campinas, SP",
+      "summary": "Backend em Go.",
+      "tech": ["Go", "Kubernetes"]
+    }
+  },
+  {
+    "kind": "achievement",
+    "confidence": 0.7,
+    "data": { "experienceIndex": 0, "text": "Reduziu a latência p95 em 40%", "metric": "40%" }
+  },
+  {
+    "kind": "education",
+    "confidence": 0.95,
+    "data": {
+      "institution": "Unicamp",
+      "course": "Ciência da Computação",
+      "degree": "Bacharelado",
+      "startDate": "2014",
+      "endDate": "2018",
+      "status": "completed"
+    }
+  },
+  {
+    "kind": "skill",
+    "confidence": 0.8,
+    "data": { "name": "Go", "category": "language", "level": 4 }
+  },
+  { "kind": "language", "confidence": 0.9, "data": { "name": "Inglês", "level": "C1" } },
+  {
+    "kind": "link",
+    "confidence": 1,
+    "data": { "label": "GitHub", "url": "https://github.com/exemplo" }
+  }
+]

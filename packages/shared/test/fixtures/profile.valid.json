@@ -1,0 +1,20 @@
+{
+  "id": "01926f3a-7b1c-7def-8a01-000000000002",
+  "userId": "01926f3a-7b1c-7def-8a01-000000000001",
+  "name": "Eng. de Software Sênior (backend)",
+  "targetTitle": "Senior Backend Engineer",
+  "altTitles": ["Staff Engineer"],
+  "seniority": "senior",
+  "area": "software",
+  "goal": "new_job",
+  "market": "BR",
+  "docLocale": "pt-BR",
+  "salary": { "min": 15000, "max": 22000, "currency": "BRL", "period": "monthly" },
+  "salaryBelowReference": false,
+  "contractTypes": ["clt", "pj"],
+  "locations": [{ "country": "BR", "city": "Campinas", "remote": "remote" }],
+  "availableFrom": "immediate",
+  "needsResearch": [],
+  "pitch": null,
+  "isActive": true
+}

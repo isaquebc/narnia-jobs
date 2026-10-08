@@ -1,0 +1,15 @@
+{
+  "fileId": "01926f3a-7b1c-7def-8a01-000000000010",
+  "summary": "Currículo de engenheira de software com 7 anos de experiência em backend, foco em Go e Kubernetes.",
+  "keyPoints": [
+    "Acme Ltda (2021–2023, Sênior)",
+    "Unicamp, Ciência da Computação (2014–2018)",
+    "Inglês C1"
+  ],
+  "sections": [
+    { "title": "Experiência", "start": 120, "end": 980 },
+    { "title": "Formação", "start": 981, "end": 1200 }
+  ],
+  "meta": { "pages": 2, "language": "pt", "docDate": "2026-01" },
+  "editedByUser": false
+}

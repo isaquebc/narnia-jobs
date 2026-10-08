@@ -1,0 +1,21 @@
+{
+  "id": "01926f3a-7b1c-7def-8a01-000000000001",
+  "displayName": "Ana Exemplo",
+  "fullName": "Ana Maria Exemplo",
+  "pronouns": "ela/dela",
+  "email": "ana.exemplo@example.com",
+  "phone": { "e164": "+5511987654321", "country": "BR", "national": "11987654321" },
+  "city": "Campinas",
+  "region": "SP",
+  "country": "BR",
+  "timezone": "America/Sao_Paulo",
+  "remotePref": "remote",
+  "relocation": { "mode": "country", "countries": ["PT", "ES"] },
+  "workAuth": [
+    { "country": "BR", "status": "citizen" },
+    { "country": "PT", "status": "needs_sponsorship" }
+  ],
+  "links": [{ "label": "GitHub", "url": "https://github.com/exemplo" }],
+  "createdAt": "2026-10-07T12:00:00.000Z",
+  "updatedAt": "2026-10-07T12:00:00.000Z"
+}

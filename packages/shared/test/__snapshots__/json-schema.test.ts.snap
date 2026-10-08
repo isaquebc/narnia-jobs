@@ -1,0 +1,436 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapshot): mudar um schema exige atualizar o snapshot de propósito 1`] = `
+{
+  "buildDigest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "keyPoints": {
+        "items": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "meta": {
+        "additionalProperties": false,
+        "properties": {
+          "docDate": {
+            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+            "type": "string",
+          },
+          "language": {
+            "type": "string",
+          },
+          "pages": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
+        },
+        "type": "object",
+      },
+      "sections": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "start": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "title": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "title",
+            "start",
+            "end",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "summary": {
+        "minLength": 1,
+        "type": "string",
+      },
+    },
+    "required": [
+      "summary",
+      "keyPoints",
+      "sections",
+      "meta",
+    ],
+    "type": "object",
+  },
+  "extractFacts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "education": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "course": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "degree": {
+              "type": "string",
+            },
+            "endDate": {
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+              "type": "string",
+            },
+            "institution": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "startDate": {
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "completed",
+                "in_progress",
+                "incomplete",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "institution",
+            "course",
+            "status",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "experiences": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "achievements": {
+              "default": [],
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  "metric": {
+                    "type": "string",
+                  },
+                  "text": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "confidence",
+                  "text",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+            "company": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "employmentType": {
+              "enum": [
+                "clt",
+                "pj",
+                "freelance",
+                "internship",
+                "temporary",
+              ],
+              "type": "string",
+            },
+            "endDate": {
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+              "type": "string",
+            },
+            "isCurrent": {
+              "type": "boolean",
+            },
+            "location": {
+              "type": "string",
+            },
+            "startDate": {
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+              "type": "string",
+            },
+            "summary": {
+              "type": "string",
+            },
+            "tech": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "title": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "company",
+            "title",
+            "startDate",
+            "isCurrent",
+            "tech",
+            "achievements",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "identity": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "type": "string",
+          },
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+          },
+          "country": {
+            "pattern": "^[A-Z]{2}$",
+            "type": "string",
+          },
+          "displayName": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "email": {
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "type": "string",
+          },
+          "fullName": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "url": {
+                  "format": "uri",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "label",
+                "url",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "phoneRaw": {
+            "type": "string",
+          },
+          "region": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "confidence",
+        ],
+        "type": "object",
+      },
+      "languages": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "level": {
+              "enum": [
+                "A1",
+                "A2",
+                "B1",
+                "B2",
+                "C1",
+                "C2",
+                "native",
+              ],
+              "type": "string",
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "name",
+            "level",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "links": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "label": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "url": {
+              "format": "uri",
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "label",
+            "url",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "skills": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "category": {
+              "enum": [
+                "language",
+                "framework",
+                "infra",
+                "data",
+                "tool",
+                "management",
+                "soft",
+                "domain",
+                "other",
+              ],
+              "type": "string",
+            },
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "level": {
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "name",
+            "category",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "experiences",
+      "education",
+      "skills",
+      "languages",
+      "links",
+    ],
+    "type": "object",
+  },
+  "readDocument": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "sections": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "start": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "title": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "title",
+            "start",
+            "end",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "text": {
+        "minLength": 1,
+        "type": "string",
+      },
+    },
+    "required": [
+      "text",
+      "sections",
+    ],
+    "type": "object",
+  },
+}
+`;

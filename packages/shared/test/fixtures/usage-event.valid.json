@@ -1,0 +1,14 @@
+{
+  "id": "01926f3a-7b1c-7def-8a01-000000000020",
+  "ts": "2026-10-07T12:00:05.000Z",
+  "origin": "narnia",
+  "category": "ingest",
+  "jobId": "run-0001:extract.facts",
+  "sessionId": null,
+  "model": "haiku",
+  "inputTokens": 5400,
+  "outputTokens": 900,
+  "cacheRead": 0,
+  "cacheWrite": 0,
+  "costUsdEst": 0.0081
+}

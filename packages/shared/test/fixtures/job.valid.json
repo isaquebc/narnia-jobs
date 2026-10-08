@@ -1,0 +1,17 @@
+{
+  "id": "run-0001:extract.facts",
+  "queue": "extract",
+  "type": "extract.facts",
+  "parentId": "run-0001",
+  "profileId": null,
+  "status": "active",
+  "progress": 40,
+  "stage": "extracting_facts",
+  "payload": { "runId": "run-0001" },
+  "result": null,
+  "error": null,
+  "attempts": 1,
+  "createdAt": "2026-10-07T12:00:00.000Z",
+  "startedAt": "2026-10-07T12:00:01.000Z",
+  "finishedAt": null
+}

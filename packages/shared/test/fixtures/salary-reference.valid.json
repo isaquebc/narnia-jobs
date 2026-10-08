@@ -1,0 +1,13 @@
+{
+  "id": "01926f3a-7b1c-7def-8a01-000000000030",
+  "country": "BR",
+  "source": "dieese",
+  "indicator": "salario_minimo_necessario",
+  "value": 7200.5,
+  "currency": "BRL",
+  "period": "monthly",
+  "referenceMonth": "2026-09",
+  "sourceUrl": "https://www.dieese.org.br/analisecestabasica/salarioMinimo.html",
+  "fetchedAt": "2026-10-07T12:00:00.000Z",
+  "isCurrent": true
+}
