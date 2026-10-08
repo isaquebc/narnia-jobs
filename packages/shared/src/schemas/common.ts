@@ -38,3 +38,14 @@ export type Link = z.infer<typeof LinkSchema>;
 
 export const RemotePrefSchema = z.enum(["remote", "hybrid", "onsite", "any"]);
 export type RemotePref = z.infer<typeof RemotePrefSchema>;
+
+/** Senioridade do alvo do perfil (vive aqui para persona e sugestões não importarem `profile.ts`, evitando ciclo). */
+export const SenioritySchema = z.enum([
+  "junior",
+  "pleno",
+  "senior",
+  "staff",
+  "manager",
+  "director",
+]);
+export type Seniority = z.infer<typeof SenioritySchema>;

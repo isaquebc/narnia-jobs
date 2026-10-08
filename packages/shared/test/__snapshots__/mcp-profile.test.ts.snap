@@ -1,0 +1,317 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`F02/M1 shared · tools MCP profile.* (definição; exposição em F04) > JSON Schema de cada tool sem $schema (regra do CLI) e estável (snapshot) 1`] = `
+{
+  "profile.create": {
+    "description": "Cria um perfil (lente) novo; com cloneFrom copia ênfases, pitch e persona. Dados de carreira ficam pendentes (needsResearch) até o usuário preencher.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "cloneFrom": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "docLocale": {
+          "pattern": "^[a-z]{2}-[A-Z]{2}$",
+          "type": "string",
+        },
+        "goal": {
+          "enum": [
+            "new_job",
+            "career_change",
+            "freelance",
+            "promotion",
+          ],
+          "type": "string",
+        },
+        "market": {
+          "minLength": 2,
+          "type": "string",
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "seniority": {
+          "enum": [
+            "junior",
+            "pleno",
+            "senior",
+            "staff",
+            "manager",
+            "director",
+          ],
+          "type": "string",
+        },
+        "targetTitle": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "name",
+        "targetTitle",
+        "seniority",
+        "area",
+        "goal",
+        "market",
+        "docLocale",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+  },
+  "profile.get_card": {
+    "description": "Devolve o cartão (~300 tokens) do perfil informado ou do ativo; reconstrói se estiver desatualizado.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "builtAt": {
+          "description": "Instante em ISO 8601 (UTC)",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+          "type": "string",
+        },
+        "hash": {
+          "type": "string",
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "text": {
+          "type": "string",
+        },
+        "tokensEst": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "profileId",
+        "text",
+        "tokensEst",
+        "hash",
+        "builtAt",
+      ],
+      "type": "object",
+    },
+  },
+  "profile.list": {
+    "description": "Lista os perfis do usuário (nome, cargo-alvo, ativo); arquivados só com includeArchived.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "includeArchived": {
+          "type": "boolean",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "profiles": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "archived": {
+                "type": "boolean",
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "isActive": {
+                "type": "boolean",
+              },
+              "name": {
+                "type": "string",
+              },
+              "targetTitle": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "id",
+              "name",
+              "targetTitle",
+              "isActive",
+              "archived",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "profiles",
+      ],
+      "type": "object",
+    },
+  },
+  "profile.switch": {
+    "description": "Torna o perfil informado o ativo (mesmo efeito do seletor do shell). Falha se o perfil está arquivado.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "profileId",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "ok",
+      ],
+      "type": "object",
+    },
+  },
+  "profile.update_emphasis": {
+    "description": "Substitui em lote as ênfases do perfil (destacar/normal/ocultar e ordem) e invalida o cartão.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "experience",
+                  "project",
+                  "skill",
+                  "education",
+                  "language",
+                  "achievement",
+                ],
+                "type": "string",
+              },
+              "mode": {
+                "enum": [
+                  "highlight",
+                  "normal",
+                  "hidden",
+                ],
+                "type": "string",
+              },
+              "position": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+              "mode",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "profileId",
+        "items",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "updated": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "updated",
+      ],
+      "type": "object",
+    },
+  },
+  "profile.update_pitch": {
+    "description": "Grava a narrativa (pitch) do perfil e invalida o cartão.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "pitch": {
+          "maxLength": 2000,
+          "type": "string",
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "profileId",
+        "pitch",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "ok",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;

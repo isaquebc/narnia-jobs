@@ -1,9 +1,24 @@
 import { z } from "zod";
 import { IdSchema, IsoDateTimeSchema } from "../schemas/common";
+import {
+  EmphasisFactKindSchema,
+  EmphasisItemSchema,
+  EmphasisModeSchema,
+} from "../schemas/emphasis";
 import { FactProposalSchema } from "../schemas/fact-proposal";
 import { FileDigestSchema } from "../schemas/file-digest";
 import { JobSchema } from "../schemas/job";
-import { ProfileBaseSchema, ProfileSchema, requireCareerFields } from "../schemas/profile";
+import { PersonaOverridesSchema, PersonaSchema } from "../schemas/persona";
+import {
+  ContractTypeSchema,
+  LocationPrefSchema,
+  ProfileBaseSchema,
+  ProfileSchema,
+  ResearchableFieldSchema,
+  requireCareerFields,
+} from "../schemas/profile";
+import { ProfileCardSchema } from "../schemas/profile-card";
+import { ProfileSuggestionSchema } from "../schemas/profile-suggestion";
 import { UserSchema } from "../schemas/user";
 
 /** Contratos das rotas de F01 §2.6. Fonte única para api (validação) e web (tipos). */
@@ -124,16 +139,95 @@ export const UserUpsertRequestSchema = UserSchema.omit({
 });
 export type UserUpsertRequest = z.infer<typeof UserUpsertRequestSchema>;
 
-// POST /api/profiles — mesma regra de obrigatórios/needsResearch do ProfileSchema
-export const ProfileCreateRequestSchema = ProfileBaseSchema.omit({
+// Campos internos do perfil que nenhum corpo de requisição escreve (F02 §2.9-3/4).
+const PROFILE_INTERNAL_FIELDS = {
   id: true,
   userId: true,
   isActive: true,
   salaryBelowReference: true,
   cardJson: true,
   cardUpdatedAt: true,
-}).superRefine(requireCareerFields);
+  cardFactsVersion: true,
+  archivedAt: true,
+  clonedFrom: true,
+} as const;
+
+// POST /api/profiles — mesma regra de obrigatórios/needsResearch do ProfileSchema.
+// `activate: true` ativa o perfil criado (sugestão aceita); sem isso só o primeiro perfil nasce ativo (F02 §2.9-3).
+export const ProfileCreateRequestSchema = ProfileBaseSchema.omit(PROFILE_INTERNAL_FIELDS)
+  .extend({ activate: z.boolean().optional() })
+  .superRefine(requireCareerFields);
 export type ProfileCreateRequest = z.infer<typeof ProfileCreateRequestSchema>;
+
+// PATCH /api/profiles/:id — parcial; a regra de carreira é reaplicada pelo repo sobre o resultado mesclado.
+// Os campos com `.default([])` perdem o padrão: num PATCH, ausente significa "não mexer", não "esvaziar".
+export const ProfilePatchRequestSchema = ProfileBaseSchema.omit(PROFILE_INTERNAL_FIELDS)
+  .partial()
+  .extend({
+    contractTypes: z.array(ContractTypeSchema).optional(),
+    locations: z.array(LocationPrefSchema).optional(),
+    needsResearch: z.array(ResearchableFieldSchema).optional(),
+  });
+export type ProfilePatchRequest = z.infer<typeof ProfilePatchRequestSchema>;
+
+// POST /api/profiles/:id/clone — corpo = dados do novo perfil; ênfases, pitch e persona vêm do perfil de origem.
+export const ProfileCloneRequestSchema = ProfileCreateRequestSchema;
+
+// GET /api/profiles?archived=1
+export const ProfilesListQuerySchema = z.object({
+  archived: z
+    .union([z.literal("1"), z.literal("true"), z.literal("0"), z.literal("false")])
+    .optional()
+    .transform((v) => v === "1" || v === "true"),
+});
+export const ProfilesListResponseSchema = z.object({ profiles: z.array(ProfileSchema) });
+
+// GET /api/profiles/:id/card · POST /api/profiles/:id/card/rebuild
+export const ProfileCardResponseSchema = ProfileCardSchema.extend({
+  profileId: IdSchema,
+  valid: z.boolean(),
+});
+export type ProfileCardResponse = z.infer<typeof ProfileCardResponseSchema>;
+
+// GET/PUT /api/profiles/:id/emphasis
+export const EmphasisPutRequestSchema = z.object({ items: z.array(EmphasisItemSchema) });
+export type EmphasisPutRequest = z.infer<typeof EmphasisPutRequestSchema>;
+export const EmphasisListItemSchema = z.object({
+  kind: EmphasisFactKindSchema,
+  id: IdSchema,
+  mode: EmphasisModeSchema,
+  position: z.number().int().min(0).nullable(),
+  label: z.string(),
+  sublabel: z.string().nullable(),
+  date: z.string().nullable(),
+  relevance: z.object({ score: z.number().min(0).max(1), reasons: z.array(z.string()) }).nullable(),
+});
+export const EmphasisListResponseSchema = z.object({ items: z.array(EmphasisListItemSchema) });
+export type EmphasisListResponse = z.infer<typeof EmphasisListResponseSchema>;
+
+// GET/PUT /api/profiles/:id/persona
+export const PersonaResponseSchema = z.object({
+  persona: PersonaSchema,
+  defaults: PersonaSchema,
+  overrides: PersonaOverridesSchema,
+});
+export type PersonaResponse = z.infer<typeof PersonaResponseSchema>;
+export const PersonaPutRequestSchema = PersonaOverridesSchema;
+
+// GET /api/profiles/suggestions · POST /api/profiles/suggestions/:id/dismiss
+export const SuggestionsListResponseSchema = z.object({
+  suggestions: z.array(ProfileSuggestionSchema),
+});
+export type SuggestionsListResponse = z.infer<typeof SuggestionsListResponseSchema>;
+
+// GET /api/profiles/analyze/estimate · POST /api/profiles/analyze
+export const AnalyzeEstimateResponseSchema = z.object({
+  model: z.string().min(1),
+  tokens: z.number().int().min(0),
+  inputChars: z.number().int().min(0),
+});
+export type AnalyzeEstimateResponse = z.infer<typeof AnalyzeEstimateResponseSchema>;
+export const AnalyzeResponseSchema = z.object({ job: JobSchema });
 
 // GET /api/profiles/suggestion?runId=
 export const ProfileSuggestionResponseSchema = z.object({
@@ -151,12 +245,21 @@ export const DashboardResponseSchema = z.object({
     skills: z.number().int(),
     education: z.number().int(),
     files: z.number().int(),
+    projects: z.number().int().optional(),
   }),
   usage: z.object({
     totalTokens: z.number().int(),
     byCategory: z.record(z.string(), z.number().int()),
   }),
   pendingResearch: z.number().int(),
+  // F02 §2.7: cartão resumido do perfil ativo, contadores de ênfase e sugestões novas.
+  // Opcionais em M1 (a api ainda não os devolve); M3 os torna obrigatórios junto com a rota (registro em F02 §8).
+  card: z
+    .object({ text: z.string(), builtAt: IsoDateTimeSchema, valid: z.boolean() })
+    .nullable()
+    .optional(),
+  emphasis: z.object({ highlighted: z.number().int(), hidden: z.number().int() }).optional(),
+  suggestions: z.number().int().optional(),
 });
 
 // GET /api/jobs ; GET /api/usage/summary
@@ -180,3 +283,19 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("job.error"), jobId: IdSchema, error: z.string() }),
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
+
+// Eventos do F02 (§2.5 troca de perfil, §2.2 cartão). Definidos em M1; entram na união `WsEventSchema` em M4,
+// quando os hooks da web (`useJobs`, `useIngestion`) passarem a discriminar por `type` antes de ler `jobId`.
+export const ProfileSwitchedEventSchema = z.object({
+  type: z.literal("profile.switched"),
+  profileId: IdSchema,
+});
+export const ProfileCardInvalidatedEventSchema = z.object({
+  type: z.literal("profile.card_invalidated"),
+  profileIds: z.array(IdSchema).min(1),
+});
+export const ProfileWsEventSchema = z.discriminatedUnion("type", [
+  ProfileSwitchedEventSchema,
+  ProfileCardInvalidatedEventSchema,
+]);
+export type ProfileWsEvent = z.infer<typeof ProfileWsEventSchema>;

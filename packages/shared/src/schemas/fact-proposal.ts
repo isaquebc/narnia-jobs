@@ -61,6 +61,17 @@ export const SkillDataSchema = z.object({
   level: z.number().int().min(1).max(5).optional(),
 });
 
+/** Projeto (F02-9): tabela nasce vazia em F02; F03 a preenche pelo GitHub. Sem extrator até lá. */
+export const ProjectDataSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  url: z.url().optional(),
+  role: z.string().optional(),
+  startDate: PartialDateSchema.optional(),
+  endDate: PartialDateSchema.optional(),
+  tech: z.array(z.string().min(1)).default([]),
+});
+
 export const LanguageLevelSchema = z.enum(["A1", "A2", "B1", "B2", "C1", "C2", "native"]);
 
 export const LanguageDataSchema = z.object({
@@ -79,6 +90,7 @@ export const FactProposalSchema = z.discriminatedUnion("kind", [
   proposal("skill", SkillDataSchema),
   proposal("language", LanguageDataSchema),
   proposal("link", LinkSchema),
+  proposal("project", ProjectDataSchema),
 ]);
 export type FactProposal = z.infer<typeof FactProposalSchema>;
 export type FactKind = FactProposal["kind"];
@@ -90,4 +102,5 @@ export const FACT_KINDS = [
   "skill",
   "language",
   "link",
+  "project",
 ] as const;

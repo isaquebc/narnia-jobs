@@ -1,0 +1,17 @@
+{
+  "id": "sug_01",
+  "userId": "usr_01",
+  "source": "model",
+  "model": "sonnet",
+  "payload": {
+    "title": "Engineering Manager",
+    "seniority": "manager",
+    "area": "software",
+    "market": "BR",
+    "rationale": "3 anos liderando squads com métricas de entrega.",
+    "supportingFactIds": ["exp_02", "ach_05"]
+  },
+  "status": "new",
+  "createdAt": "2026-10-08T12:00:00.000Z",
+  "decidedAt": null
+}

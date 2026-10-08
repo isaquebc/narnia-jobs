@@ -1,0 +1,20 @@
+{
+  "suggestions": [
+    {
+      "title": "Engineering Manager",
+      "seniority": "manager",
+      "area": "software",
+      "market": "BR",
+      "rationale": "Liderou duas squads por três anos.",
+      "supportingFactIds": ["exp_02"]
+    },
+    {
+      "title": "Staff Engineer",
+      "seniority": "staff",
+      "area": "software",
+      "market": "US",
+      "rationale": "Arquitetura de plataforma e mentoria.",
+      "supportingFactIds": ["exp_01", "ach_03"]
+    }
+  ]
+}

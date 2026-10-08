@@ -5,16 +5,11 @@ import {
   IsoCurrencySchema,
   IsoDateTimeSchema,
   RemotePrefSchema,
+  SenioritySchema,
 } from "./common";
+import { PersonaOverridesSchema } from "./persona";
 
-export const SenioritySchema = z.enum([
-  "junior",
-  "pleno",
-  "senior",
-  "staff",
-  "manager",
-  "director",
-]);
+export { SenioritySchema };
 export const GoalSchema = z.enum(["new_job", "career_change", "freelance", "promotion"]);
 export const SalaryPeriodSchema = z.enum(["monthly", "yearly", "hourly"]);
 export const ContractTypeSchema = z.enum(["clt", "pj", "freelance", "internship", "temporary"]);
@@ -71,6 +66,12 @@ export const ProfileBaseSchema = z.object({
   pitch: z.string().nullable().optional(),
   cardJson: z.string().nullable().optional(),
   cardUpdatedAt: IsoDateTimeSchema.nullable().optional(),
+  /** Versão de `facts_version` com que o cartão foi gerado (F02 §2.2); menor que a atual = inválido. */
+  cardFactsVersion: z.number().int().min(0).nullable().optional(),
+  /** Só os campos sobrescritos da persona (F02-7); validado por `PersonaOverridesSchema` na fronteira. */
+  personaOverrides: PersonaOverridesSchema.optional(),
+  archivedAt: IsoDateTimeSchema.nullable().optional(),
+  clonedFrom: IdSchema.nullable().optional(),
   isActive: z.boolean(),
 });
 
