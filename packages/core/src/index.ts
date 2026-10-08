@@ -17,6 +17,7 @@ export * from "./profile/persona";
 export * from "./profile/relevance";
 export * from "./profile/suggest";
 export * from "./profile/summary";
+export * from "./profile/tools";
 export * from "./salary";
 export * from "./testing/profile-fixtures";
 export * from "./usage";
