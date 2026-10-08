@@ -1,3 +1,4 @@
+import { seedFixture } from "@narnia-jobs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   makeTestApp,
@@ -75,5 +76,12 @@ describe("M4/api dashboard", () => {
     expect(body.counts).toEqual({ experiences: 2, skills: 6, education: 1, files: 1, projects: 0 });
     expect(body.usage.totalTokens).toBe(110);
     expect(body.pendingResearch).toBe(1);
+  });
+
+  it("F02: conta as sugestões heurísticas mesmo antes de alguém abrir a lista (o banner depende disso)", async () => {
+    t = makeTestApp();
+    seedFixture(t.repos, "leader");
+    const d = (await (await t.api("/api/dashboard")).json()) as { suggestions: number };
+    expect(d.suggestions).toBeGreaterThan(0);
   });
 });

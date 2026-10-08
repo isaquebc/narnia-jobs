@@ -1,4 +1,10 @@
-import { isCardValid, parseCard, type Repos, rebuildCard } from "@narnia-jobs/core";
+import {
+  isCardValid,
+  parseCard,
+  type Repos,
+  rebuildCard,
+  refreshHeuristicSuggestions,
+} from "@narnia-jobs/core";
 import type { DashboardResponse } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { usageSummary } from "./usage";
@@ -15,6 +21,12 @@ function cardSummary(repos: Repos, profileId: string): DashboardResponse["card"]
     builtAt: card.builtAt,
     valid: isCardValid(fresh, repos.settings.getFactsVersion()),
   };
+}
+
+/** A heurística roda aqui também (barata): o banner do dashboard depende desta contagem antes de alguém abrir a lista. */
+function countNewSuggestions(repos: Repos): number {
+  refreshHeuristicSuggestions(repos);
+  return repos.suggestions.list({ status: "new" }).length;
 }
 
 /** Dashboard (F01) estendido em F02 §2.7 com cartão, ênfases e sugestões do perfil ativo. */
@@ -38,7 +50,7 @@ export function dashboardRoutes(deps: { repos: Repos }) {
       pendingResearch: profile?.needsResearch.length ?? 0,
       card: profile ? cardSummary(repos, profile.id) : null,
       emphasis: profile ? repos.emphasis.countByMode(profile.id) : { highlighted: 0, hidden: 0 },
-      suggestions: repos.suggestions.list({ status: "new" }).length,
+      suggestions: countNewSuggestions(repos),
     };
     return c.json(body);
   });

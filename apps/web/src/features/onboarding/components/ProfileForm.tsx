@@ -1,5 +1,5 @@
 import type { ProfileCreateRequest, SalaryRange, SalaryReference } from "@narnia-jobs/shared";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Field } from "../../../components/ui/field";
@@ -72,9 +72,12 @@ export function ProfileForm({
     initial?.docLocale ?? (userCountry === "BR" ? "pt-BR" : "en-US"),
   );
   const [touched, setTouched] = useState(false);
+  // avisa só na transição para "tocado": a identidade de `onDirty` muda a cada render do pai e não pode re-disparar
+  const onDirtyRef = useRef(onDirty);
+  onDirtyRef.current = onDirty;
   useEffect(() => {
-    if (touched) onDirty?.();
-  }, [touched, onDirty]);
+    if (touched) onDirtyRef.current?.();
+  }, [touched]);
   const [salary, setSalary] = useState<SalaryRange | undefined>(undefined);
   const [contractTypes, setContractTypes] = useState<ContractType[]>([]);
   const [locations, setLocations] = useState<LocationPref[]>([
