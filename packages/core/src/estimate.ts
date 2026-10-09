@@ -8,6 +8,11 @@ export const PROMPT_OVERHEAD = {
   factsAsInput: 1500,
   /** "Analisar possíveis perfis" (F02 §2.6): prompt + schema de saída. */
   analyzeProfiles: 800,
+  /** F03 (GitHub): escolha de arquivos na profunda, análise por repositório, síntese e revisor; prompt + saída. */
+  pickFiles: 600,
+  analyzeRepo: 1_800,
+  synthesizeRun: 1_200,
+  checkProposals: 700,
 } as const;
 
 /** Aproximação de custo para o modelo ler uma página de PDF pela tool Read. */
