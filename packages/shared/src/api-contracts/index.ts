@@ -7,7 +7,30 @@ import {
 } from "../schemas/emphasis";
 import { FactProposalSchema } from "../schemas/fact-proposal";
 import { FileDigestSchema } from "../schemas/file-digest";
+import {
+  GithubMetricsSchema,
+  RepoAnalysisSchema,
+  RepoDigestSchema,
+  RepoGroupSchema,
+  RepoSchema,
+} from "../schemas/github";
+import {
+  BudgetRequestSchema,
+  BudgetSchema,
+  CheckStatusSchema,
+  ConflictSchema,
+  EvidenceSchema,
+  IngestionDepthSchema,
+  IngestionModeSchema,
+  IngestionSourceSchema,
+  PlanUsageSchema,
+  ProposalMatchSchema,
+  ResolutionSchema,
+  RunReportSchema,
+  RunStatusSchema,
+} from "../schemas/ingest";
 import { JobSchema } from "../schemas/job";
+import { NotificationSchema } from "../schemas/notification";
 import { PersonaOverridesSchema, PersonaSchema } from "../schemas/persona";
 import {
   ContractTypeSchema,
@@ -54,6 +77,12 @@ export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
 
 // POST /api/files (multipart) → FileResponse ; POST /api/texts {text} → FileResponse
 export const TextCreateRequestSchema = z.object({ text: z.string().min(200).max(50_000) });
+// F03 §2.9-5: o upload informa execuções anteriores do mesmo conteúdo (mesmo sha) para o aviso "já lido".
+export const PreviousRunSchema = z.object({
+  runId: IdSchema,
+  status: RunStatusSchema,
+  createdAt: IsoDateTimeSchema,
+});
 export const FileResponseSchema = z.object({
   id: IdSchema,
   kind: z.enum(["cv", "text"]),
@@ -62,6 +91,7 @@ export const FileResponseSchema = z.object({
   size: z.number().int().min(0),
   pages: z.number().int().min(0).nullable(),
   uploadedAt: IsoDateTimeSchema,
+  previousRuns: z.array(PreviousRunSchema).optional(),
 });
 export type FileResponse = z.infer<typeof FileResponseSchema>;
 
@@ -90,23 +120,26 @@ export const IngestionCreateRequestSchema = z.object({
 });
 export type IngestionCreateRequest = z.infer<typeof IngestionCreateRequestSchema>;
 
-export const IngestionStatusSchema = z.enum([
-  "estimating",
-  "queued",
-  "running",
-  "review",
-  "done",
-  "error",
-]);
+// F03: estados do F01 + confirmação, decisão no freio, pausa e cancelamento.
+export const IngestionStatusSchema = RunStatusSchema;
+// F03 §2.9-6: reconciliação, evidência e selo anti-alucinação; opcionais para o F01 continuar válido.
 export const ProposalWithIdSchema = z.object({
   id: IdSchema,
   proposal: FactProposalSchema,
   decision: z.enum(["pending", "accepted", "edited", "rejected"]),
   origin: z.enum(["text_layer", "ocr", "model_read", "consolidated"]).nullable(),
+  match: ProposalMatchSchema.optional(),
+  matchTargetId: IdSchema.nullable().optional(),
+  conflict: ConflictSchema.nullable().optional(),
+  evidence: EvidenceSchema.nullable().optional(),
+  checkStatus: CheckStatusSchema.optional(),
+  suggestedProfiles: z.array(IdSchema).optional(),
 });
 export const IngestionResponseSchema = z.object({
   id: IdSchema,
-  fileId: IdSchema,
+  /** Nulo para o GitHub, que não tem arquivo (F03 §2.9-2). */
+  fileId: IdSchema.nullable(),
+  source: IngestionSourceSchema.optional(),
   status: IngestionStatusSchema,
   jobs: z.array(JobSchema),
   proposals: z.array(ProposalWithIdSchema),
@@ -121,6 +154,8 @@ export const ReviewDecisionSchema = z
     proposalId: IdSchema,
     decision: z.enum(["accepted", "edited", "rejected"]),
     editedData: z.record(z.string(), z.unknown()).optional(),
+    /** Resolução campo a campo de um conflito (F03-6); sem ela, aceitar um conflito é recusado (422). */
+    resolution: ResolutionSchema.optional(),
   })
   .refine((d) => d.decision !== "edited" || d.editedData !== undefined, {
     message: "editedData é obrigatório quando a decisão é 'edited'",
@@ -278,6 +313,159 @@ export const UsageSummaryResponseSchema = z.object({
   byModel: z.record(z.string(), z.number().int()),
 });
 
+// ---------------------------------------------------------------------------------------------------------------
+// F03 · Ingestão (§2.10)
+
+// GET /api/github/auth · PUT {source} · POST /api/github/auth/device · DELETE — o token nunca sai da api.
+export const GithubAuthSourceSchema = z.enum(["host", "app"]);
+export const GithubAuthStatusResponseSchema = z.object({
+  source: GithubAuthSourceSchema,
+  connected: z.boolean(),
+  login: z.string().nullable(),
+  scopes: z.array(z.string()),
+  /** `gh` logado no computador do usuário e repassado pelo lançador. */
+  hostAvailable: z.boolean(),
+});
+export type GithubAuthStatusResponse = z.infer<typeof GithubAuthStatusResponseSchema>;
+export const GithubAuthPutRequestSchema = z.object({ source: GithubAuthSourceSchema });
+export const GithubDeviceResponseSchema = z.object({
+  code: z.string().min(4),
+  verificationUri: z.url(),
+  expiresAt: IsoDateTimeSchema,
+});
+export type GithubDeviceResponse = z.infer<typeof GithubDeviceResponseSchema>;
+
+// POST /api/sources/github/preview
+export const GithubPreviewRequestSchema = z.object({ mode: IngestionModeSchema });
+export const GithubPreviewResponseSchema = z.object({
+  mode: IngestionModeSchema,
+  authenticated: z.boolean(),
+  rateLimited: z.boolean(),
+  groups: z.array(RepoGroupSchema),
+});
+export type GithubPreviewResponse = z.infer<typeof GithubPreviewResponseSchema>;
+
+// GET /api/plan/usage
+export const PlanUsageResponseSchema = z.object({ usage: PlanUsageSchema.nullable() });
+
+// POST /api/ingestions (GitHub) — CV/texto continuam com `IngestionCreateRequestSchema` (F01).
+export const GithubIngestionCreateRequestSchema = z.object({
+  source: z.literal("github"),
+  mode: IngestionModeSchema,
+  repos: z.array(z.string().min(3)).min(1),
+  depth: IngestionDepthSchema,
+  model: z.string().min(1),
+  budget: BudgetRequestSchema.optional(),
+});
+export type GithubIngestionCreateRequest = z.infer<typeof GithubIngestionCreateRequestSchema>;
+
+// POST /api/ingestions/estimate
+export const FileEstimateRequestSchema = z.object({
+  source: z.enum(["cv", "text"]),
+  fileId: IdSchema,
+  model: z.string().min(1).optional(),
+});
+export const IngestionEstimateRequestSchema = z.union([
+  GithubIngestionCreateRequestSchema,
+  FileEstimateRequestSchema,
+]);
+export type IngestionEstimateRequest = z.infer<typeof IngestionEstimateRequestSchema>;
+export const IngestionEstimateResponseSchema = z.object({
+  calls: z.array(
+    z.object({
+      name: z.string().min(1),
+      model: z.string().min(1),
+      tokens: z.number().int().min(0),
+    }),
+  ),
+  totalTokens: z.number().int().min(0),
+  recommendedBudget: z.number().int().min(0),
+  perRepo: z.number().int().min(0).nullable(),
+  /** Conversão % → tokens ainda sem histórico (F03-3 §1). */
+  approximate: z.boolean(),
+  /** CV/texto abaixo de `ingest.auto_confirm_below` seguem sozinhos (F03-13). */
+  autoConfirm: z.boolean(),
+});
+export type IngestionEstimateResponse = z.infer<typeof IngestionEstimateResponseSchema>;
+
+// POST /api/ingestions/:id/decision — freio do orçamento (F03-3 §6)
+export const IngestionDecisionRequestSchema = z.object({
+  action: z.enum(["continue", "finish", "later"]),
+  extraBudget: z.number().int().min(0).optional(),
+});
+export type IngestionDecisionRequest = z.infer<typeof IngestionDecisionRequestSchema>;
+
+// GET /api/ingestions?status= — lista (bandeja, pendências)
+export const IngestionRunSummarySchema = z.object({
+  id: IdSchema,
+  source: IngestionSourceSchema,
+  mode: IngestionModeSchema.nullable(),
+  status: RunStatusSchema,
+  fileId: IdSchema.nullable(),
+  model: z.string().nullable(),
+  budget: BudgetSchema.nullable(),
+  report: RunReportSchema.nullable(),
+  createdAt: IsoDateTimeSchema,
+});
+export const IngestionsListResponseSchema = z.object({ runs: z.array(IngestionRunSummarySchema) });
+
+// POST /api/repos/:id/reanalyze · GET /api/repos · GET /api/repos/:id · GET|PUT /api/repos/:id/digest
+export const ReanalyzeRequestSchema = z.object({
+  kind: z.enum(["incremental", "deepen", "cover"]).optional(),
+});
+export const ReposListResponseSchema = z.object({ repos: z.array(RepoSchema) });
+export const RepoDetailResponseSchema = z.object({
+  repo: RepoSchema,
+  analyses: z.array(RepoAnalysisSchema),
+  digest: RepoDigestSchema.nullable(),
+  metrics: GithubMetricsSchema.nullable(),
+});
+export const RepoDigestPutRequestSchema = RepoDigestSchema.omit({
+  repoId: true,
+  editedByUser: true,
+});
+
+// GET /api/notifications?status= · POST /api/notifications/:id/read · /dismiss
+export const NotificationsListQuerySchema = z.object({
+  status: z.enum(["open", "resolved", "all"]).optional(),
+});
+export const NotificationsListResponseSchema = z.object({
+  notifications: z.array(NotificationSchema),
+  unresolved: z.number().int().min(0),
+});
+export type NotificationsListResponse = z.infer<typeof NotificationsListResponseSchema>;
+
+// GET /api/snapshots · DELETE /api/snapshots/:id
+export const SnapshotSchema = z.object({
+  id: IdSchema,
+  source: z.string().min(1),
+  ref: z.string().min(1),
+  headSha: z.string().nullable(),
+  size: z.number().int().min(0),
+  takenAt: IsoDateTimeSchema,
+  lastUsedAt: IsoDateTimeSchema.nullable(),
+});
+export const SnapshotsListResponseSchema = z.object({
+  snapshots: z.array(SnapshotSchema),
+  totalBytes: z.number().int().min(0),
+  maxBytes: z.number().int().min(0),
+});
+
+// Eventos do F03: estado da execução e notificações.
+export const IngestionUpdatedEventSchema = z.object({
+  type: z.literal("ingestion.updated"),
+  runId: IdSchema,
+  status: RunStatusSchema,
+});
+export const NotificationCreatedEventSchema = z.object({
+  type: z.literal("notification.created"),
+  notification: NotificationSchema,
+});
+export const NotificationUpdatedEventSchema = z.object({
+  type: z.literal("notification.updated"),
+  notification: NotificationSchema,
+});
+
 // Eventos do F02 (§2.5 troca de perfil, §2.2 cartão). Fazem parte da união `WsEventSchema` desde M4 (F02-20).
 export const ProfileSwitchedEventSchema = z.object({
   type: z.literal("profile.switched"),
@@ -306,6 +494,9 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("job.error"), jobId: IdSchema, error: z.string() }),
   ProfileSwitchedEventSchema,
   ProfileCardInvalidatedEventSchema,
+  IngestionUpdatedEventSchema,
+  NotificationCreatedEventSchema,
+  NotificationUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

@@ -4,6 +4,12 @@ import {
   ExtractFactsOutputSchema,
   ReadDocumentOutputSchema,
 } from "./schemas/extraction-output";
+import {
+  AnalyzeRepoOutputSchema,
+  CheckProposalsOutputSchema,
+  PickFilesOutputSchema,
+  SynthesizeRunOutputSchema,
+} from "./schemas/ingest-output";
 
 /**
  * JSON Schema para `outputFormat: { type: "json_schema", schema }` do Agent SDK.
@@ -24,4 +30,12 @@ export const EXTRACTION_JSON_SCHEMAS = {
   readDocument: toJsonSchema(ReadDocumentOutputSchema),
   extractFacts: toJsonSchema(ExtractFactsOutputSchema),
   buildDigest: toJsonSchema(BuildDigestOutputSchema),
+} as const;
+
+/** Saídas das chamadas da F03 (pickFiles, analyzeRepo, synthesizeRun, checkProposals). */
+export const INGEST_OUTPUT_JSON_SCHEMAS = {
+  pickFiles: toJsonSchema(PickFilesOutputSchema),
+  analyzeRepo: toJsonSchema(AnalyzeRepoOutputSchema),
+  synthesizeRun: toJsonSchema(SynthesizeRunOutputSchema),
+  checkProposals: toJsonSchema(CheckProposalsOutputSchema),
 } as const;

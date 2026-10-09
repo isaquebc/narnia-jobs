@@ -1,0 +1,815 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`F03/M1 shared · tools MCP file.* e ingest.* (definição; exposição em F04) > JSON Schema sem $schema e estável (snapshot) 1`] = `
+{
+  "file.get_digest": {
+    "description": "Devolve o digest (resumo, pontos principais, índice) de um arquivo ou repositório, em vez do original.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "fileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "repoId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "keyPoints": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "meta": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "docDate": {
+                      "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                      "type": "string",
+                    },
+                    "language": {
+                      "type": "string",
+                    },
+                    "pages": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "type": "object",
+                },
+                "sections": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "start": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "title": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "title",
+                      "start",
+                      "end",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "subjectId": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "subjectKind": {
+                  "enum": [
+                    "file",
+                    "repo",
+                  ],
+                  "type": "string",
+                },
+                "summary": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "subjectKind",
+                "subjectId",
+                "summary",
+                "keyPoints",
+                "sections",
+                "meta",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "digest",
+      ],
+      "type": "object",
+    },
+  },
+  "file.get_text": {
+    "description": "Devolve um trecho do texto extraído de um arquivo, por intervalo de caracteres (máx. 8k por chamada).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "fileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "from": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "to": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "fileId",
+        "from",
+        "to",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "text": {
+          "type": "string",
+        },
+        "to": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "total": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "text",
+        "from",
+        "to",
+        "total",
+      ],
+      "type": "object",
+    },
+  },
+  "file.list": {
+    "description": "Lista arquivos e repositórios ingeridos com uma linha cada (nome, tipo, data, se há digest).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "date": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "hasDigest": {
+                "type": "boolean",
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "subjectKind": {
+                "enum": [
+                  "file",
+                  "repo",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "subjectKind",
+              "id",
+              "name",
+              "kind",
+              "date",
+              "hasDigest",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+      ],
+      "type": "object",
+    },
+  },
+  "ingest.propose": {
+    "description": "Adiciona propostas a uma execução (vão para a revisão; nunca viram fato direto). Cada uma com trecho literal.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "proposals": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence": {
+                "additionalProperties": false,
+                "properties": {
+                  "quote": {
+                    "description": "Trecho copiado literalmente da fonte",
+                    "maxLength": 600,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "ref": {
+                    "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "ref",
+                  "quote",
+                ],
+                "type": "object",
+              },
+              "proposal": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "city": {
+                            "type": "string",
+                          },
+                          "country": {
+                            "pattern": "^[A-Z]{2}$",
+                            "type": "string",
+                          },
+                          "displayName": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "email": {
+                            "format": "email",
+                            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                            "type": "string",
+                          },
+                          "fullName": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "links": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "label": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "url": {
+                                  "format": "uri",
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "label",
+                                "url",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "phoneRaw": {
+                            "type": "string",
+                          },
+                          "region": {
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "identity",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "company": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "employmentType": {
+                            "enum": [
+                              "clt",
+                              "pj",
+                              "freelance",
+                              "internship",
+                              "temporary",
+                            ],
+                            "type": "string",
+                          },
+                          "endDate": {
+                            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                            "type": "string",
+                          },
+                          "isCurrent": {
+                            "type": "boolean",
+                          },
+                          "location": {
+                            "type": "string",
+                          },
+                          "startDate": {
+                            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                            "type": "string",
+                          },
+                          "summary": {
+                            "type": "string",
+                          },
+                          "tech": {
+                            "items": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "title": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "company",
+                          "title",
+                          "startDate",
+                          "isCurrent",
+                          "tech",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "experience",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "experienceIndex": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          "metric": {
+                            "type": "string",
+                          },
+                          "text": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "experienceIndex",
+                          "text",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "achievement",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "course": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "degree": {
+                            "type": "string",
+                          },
+                          "endDate": {
+                            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                            "type": "string",
+                          },
+                          "institution": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "startDate": {
+                            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                            "type": "string",
+                          },
+                          "status": {
+                            "enum": [
+                              "completed",
+                              "in_progress",
+                              "incomplete",
+                            ],
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "institution",
+                          "course",
+                          "status",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "education",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "category": {
+                            "enum": [
+                              "language",
+                              "framework",
+                              "infra",
+                              "data",
+                              "tool",
+                              "management",
+                              "soft",
+                              "domain",
+                              "other",
+                            ],
+                            "type": "string",
+                          },
+                          "level": {
+                            "maximum": 5,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "category",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "skill",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "level": {
+                            "enum": [
+                              "A1",
+                              "A2",
+                              "B1",
+                              "B2",
+                              "C1",
+                              "C2",
+                              "native",
+                            ],
+                            "type": "string",
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "level",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "language",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "label": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "url": {
+                            "format": "uri",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "label",
+                          "url",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "link",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "data": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                          },
+                          "endDate": {
+                            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                            "type": "string",
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "role": {
+                            "type": "string",
+                          },
+                          "startDate": {
+                            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+                            "type": "string",
+                          },
+                          "tech": {
+                            "default": [],
+                            "items": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "url": {
+                            "format": "uri",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "tech",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "const": "project",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "confidence",
+                      "data",
+                    ],
+                    "type": "object",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "proposal",
+              "evidence",
+            ],
+            "type": "object",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+        "proposals",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "added",
+      ],
+      "type": "object",
+    },
+  },
+  "ingest.status": {
+    "description": "Estado de uma execução de ingestão: status, repositórios analisados, uso e pendências de revisão.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingProposals": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "estimating",
+            "queued",
+            "running",
+            "awaiting_confirmation",
+            "awaiting_decision",
+            "paused",
+            "review",
+            "done",
+            "error",
+            "cancelled",
+          ],
+          "type": "string",
+        },
+        "usedTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "runId",
+        "status",
+        "pendingProposals",
+        "usedTokens",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;

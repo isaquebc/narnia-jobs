@@ -1,0 +1,416 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`F03/M1 shared · saídas estruturadas do modelo (JSON Schema) > JSON Schema das quatro saídas sem $schema e estável (snapshot) 1`] = `
+{
+  "analyzeRepo": {
+    "additionalProperties": false,
+    "properties": {
+      "coverage": {
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "topics": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "files",
+          "topics",
+        ],
+        "type": "object",
+      },
+      "projects": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "description": {
+              "type": "string",
+            },
+            "endDate": {
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+              "type": "string",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "role": {
+              "type": "string",
+            },
+            "startDate": {
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+              "type": "string",
+            },
+            "tech": {
+              "default": [],
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "url": {
+              "format": "uri",
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "name",
+            "tech",
+            "evidence",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "report": {
+        "additionalProperties": false,
+        "properties": {
+          "highlights": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "risks": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "stack": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "suggestedProjects": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "summary": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "summary",
+          "stack",
+          "highlights",
+          "risks",
+          "suggestedProjects",
+        ],
+        "type": "object",
+      },
+      "skills": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "category": {
+              "enum": [
+                "language",
+                "framework",
+                "infra",
+                "data",
+                "tool",
+                "management",
+                "soft",
+                "domain",
+                "other",
+              ],
+              "type": "string",
+            },
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
+            },
+            "level": {
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "name",
+            "category",
+            "evidence",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "projects",
+      "skills",
+      "report",
+      "coverage",
+    ],
+    "type": "object",
+  },
+  "checkProposals": {
+    "additionalProperties": false,
+    "properties": {
+      "results": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "note": {
+              "type": "string",
+            },
+            "proposalId": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "supported",
+                "partial",
+                "unsupported",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "proposalId",
+            "status",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "results",
+    ],
+    "type": "object",
+  },
+  "pickFiles": {
+    "additionalProperties": false,
+    "properties": {
+      "files": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "reason": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "path",
+            "reason",
+          ],
+          "type": "object",
+        },
+        "maxItems": 8,
+        "type": "array",
+      },
+    },
+    "required": [
+      "files",
+    ],
+    "type": "object",
+  },
+  "synthesizeRun": {
+    "additionalProperties": false,
+    "properties": {
+      "report": {
+        "additionalProperties": false,
+        "properties": {
+          "gaps": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "highlights": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "summary": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "summary",
+          "highlights",
+          "gaps",
+        ],
+        "type": "object",
+      },
+      "seniority": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "level": {
+                "enum": [
+                  "junior",
+                  "pleno",
+                  "senior",
+                  "staff",
+                  "manager",
+                  "director",
+                ],
+                "type": "string",
+              },
+              "rationale": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "level",
+              "rationale",
+            ],
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "skills": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "category": {
+              "enum": [
+                "language",
+                "framework",
+                "infra",
+                "data",
+                "tool",
+                "management",
+                "soft",
+                "domain",
+                "other",
+              ],
+              "type": "string",
+            },
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
+            },
+            "level": {
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer",
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "name",
+            "category",
+            "evidence",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "skills",
+      "seniority",
+      "report",
+    ],
+    "type": "object",
+  },
+}
+`;
