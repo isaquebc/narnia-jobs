@@ -1,0 +1,83 @@
+{
+  "ana-exemplo/api-pagamentos": {
+    "repository": {
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 87
+          }
+        }
+      }
+    },
+    "prsOpen": {
+      "issueCount": 2
+    },
+    "prsMerged": {
+      "issueCount": 31
+    },
+    "prsClosed": {
+      "issueCount": 4
+    },
+    "reviews": {
+      "issueCount": 12
+    },
+    "issuesOpened": {
+      "issueCount": 9
+    },
+    "issuesClosed": {
+      "issueCount": 7
+    }
+  },
+  "ana-exemplo/painel-web": {
+    "repository": {
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 40
+          }
+        }
+      }
+    },
+    "prsOpen": {
+      "issueCount": 0
+    },
+    "prsMerged": {
+      "issueCount": 10
+    },
+    "prsClosed": {
+      "issueCount": 1
+    },
+    "reviews": {
+      "issueCount": 3
+    },
+    "issuesOpened": {
+      "issueCount": 2
+    },
+    "issuesClosed": {
+      "issueCount": 2
+    }
+  },
+  "ana-exemplo/blog": {
+    "repository": {
+      "defaultBranchRef": null
+    },
+    "prsOpen": {
+      "issueCount": 0
+    },
+    "prsMerged": {
+      "issueCount": 0
+    },
+    "prsClosed": {
+      "issueCount": 0
+    },
+    "reviews": {
+      "issueCount": 0
+    },
+    "issuesOpened": {
+      "issueCount": 0
+    },
+    "issuesClosed": {
+      "issueCount": 0
+    }
+  }
+}

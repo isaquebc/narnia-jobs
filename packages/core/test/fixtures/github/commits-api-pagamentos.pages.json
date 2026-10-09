@@ -1,0 +1,110 @@
+[
+  [
+    {
+      "sha": "c000",
+      "commit": {
+        "message": "feat: estorno parcial",
+        "author": {
+          "name": "Ana",
+          "date": "2026-09-28T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    },
+    {
+      "sha": "c001",
+      "commit": {
+        "message": "fix: arredondamento em centavos",
+        "author": {
+          "name": "Ana",
+          "date": "2026-09-27T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    },
+    {
+      "sha": "c002",
+      "commit": {
+        "message": "feat: webhook de conciliação",
+        "author": {
+          "name": "Ana",
+          "date": "2026-09-26T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    },
+    {
+      "sha": "c003",
+      "commit": {
+        "message": "test: cobertura de reembolso",
+        "author": {
+          "name": "Ana",
+          "date": "2026-09-25T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    },
+    {
+      "sha": "c004",
+      "commit": {
+        "message": "chore: atualiza node 22",
+        "author": {
+          "name": "Ana",
+          "date": "2026-09-24T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    }
+  ],
+  [
+    {
+      "sha": "d000",
+      "commit": {
+        "message": "refactor: módulo 0",
+        "author": {
+          "name": "Ana",
+          "date": "2026-08-01T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    },
+    {
+      "sha": "d001",
+      "commit": {
+        "message": "refactor: módulo 1",
+        "author": {
+          "name": "Ana",
+          "date": "2026-08-01T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    },
+    {
+      "sha": "d002",
+      "commit": {
+        "message": "refactor: módulo 2",
+        "author": {
+          "name": "Ana",
+          "date": "2026-08-01T10:00:00Z"
+        }
+      },
+      "author": {
+        "login": "ana-exemplo"
+      }
+    }
+  ]
+]

@@ -1,0 +1,94 @@
+{
+  "sha": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+  "tree": [
+    {
+      "path": "README.md",
+      "type": "blob",
+      "size": 2400
+    },
+    {
+      "path": "package.json",
+      "type": "blob",
+      "size": 900
+    },
+    {
+      "path": "tsconfig.json",
+      "type": "blob",
+      "size": 400
+    },
+    {
+      "path": "Dockerfile",
+      "type": "blob",
+      "size": 500
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "type": "blob",
+      "size": 700
+    },
+    {
+      "path": "src/index.ts",
+      "type": "blob",
+      "size": 1200
+    },
+    {
+      "path": "src/server.ts",
+      "type": "blob",
+      "size": 3200
+    },
+    {
+      "path": "src/routes/payments.ts",
+      "type": "blob",
+      "size": 6400
+    },
+    {
+      "path": "src/routes/refunds.ts",
+      "type": "blob",
+      "size": 5100
+    },
+    {
+      "path": "src/db/migrations/001_init.sql",
+      "type": "blob",
+      "size": 2200
+    },
+    {
+      "path": "src/lib/money.ts",
+      "type": "blob",
+      "size": 1800
+    },
+    {
+      "path": "test/payments.test.ts",
+      "type": "blob",
+      "size": 4200
+    },
+    {
+      "path": "test/refunds.test.ts",
+      "type": "blob",
+      "size": 3900
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "type": "blob",
+      "size": 180000
+    },
+    {
+      "path": "docs/arquitetura.png",
+      "type": "blob",
+      "size": 90000
+    },
+    {
+      "path": "node_modules/x/index.js",
+      "type": "blob",
+      "size": 100
+    },
+    {
+      "path": "src",
+      "type": "tree"
+    },
+    {
+      "path": "test",
+      "type": "tree"
+    }
+  ],
+  "truncated": false
+}

@@ -1,0 +1,40 @@
+[
+  [
+    {
+      "name": "biblioteca-datas",
+      "full_name": "coletivo-oss/biblioteca-datas",
+      "owner": {
+        "login": "coletivo-oss"
+      },
+      "html_url": "https://github.com/coletivo-oss/biblioteca-datas",
+      "description": "Biblioteca de datas em português",
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "TypeScript",
+      "stargazers_count": 310,
+      "pushed_at": "2026-09-10T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "site",
+      "full_name": "coletivo-oss/site",
+      "owner": {
+        "login": "coletivo-oss"
+      },
+      "html_url": "https://github.com/coletivo-oss/site",
+      "description": null,
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "HTML",
+      "stargazers_count": 4,
+      "pushed_at": "2026-01-10T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    }
+  ]
+]

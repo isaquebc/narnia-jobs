@@ -1,0 +1,222 @@
+[
+  [
+    {
+      "name": "api-pagamentos",
+      "full_name": "ana-exemplo/api-pagamentos",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/api-pagamentos",
+      "description": "API de pagamentos com Node.js e PostgreSQL",
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "TypeScript",
+      "stargazers_count": 42,
+      "pushed_at": "2026-09-28T12:00:00Z",
+      "default_branch": "main",
+      "topics": ["api", "payments", "nodejs"],
+      "visibility": "public"
+    },
+    {
+      "name": "painel-web",
+      "full_name": "ana-exemplo/painel-web",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/painel-web",
+      "description": "Painel React para operações",
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "TypeScript",
+      "stargazers_count": 8,
+      "pushed_at": "2026-09-20T09:30:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "cli-relatorios",
+      "full_name": "ana-exemplo/cli-relatorios",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/cli-relatorios",
+      "description": "CLI em Go para relatórios",
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "Go",
+      "stargazers_count": 3,
+      "pushed_at": "2026-08-15T18:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "notas-privadas",
+      "full_name": "ana-exemplo/notas-privadas",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/notas-privadas",
+      "description": "Anotações pessoais",
+      "private": true,
+      "fork": false,
+      "archived": false,
+      "language": "Markdown",
+      "stargazers_count": 0,
+      "pushed_at": "2026-09-29T08:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "private"
+    },
+    {
+      "name": "etl-dados",
+      "full_name": "ana-exemplo/etl-dados",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/etl-dados",
+      "description": "Pipeline ETL com Airflow",
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "Python",
+      "stargazers_count": 5,
+      "pushed_at": "2026-07-02T14:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "blog",
+      "full_name": "ana-exemplo/blog",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/blog",
+      "description": null,
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "Astro",
+      "stargazers_count": 1,
+      "pushed_at": "2026-06-10T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "dotfiles",
+      "full_name": "ana-exemplo/dotfiles",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/dotfiles",
+      "description": null,
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "Shell",
+      "stargazers_count": 0,
+      "pushed_at": "2026-05-01T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    }
+  ],
+  [
+    {
+      "name": "estudos-rust",
+      "full_name": "ana-exemplo/estudos-rust",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/estudos-rust",
+      "description": null,
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "Rust",
+      "stargazers_count": 0,
+      "pushed_at": "2026-04-11T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "bot-telegram",
+      "full_name": "ana-exemplo/bot-telegram",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/bot-telegram",
+      "description": null,
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "Python",
+      "stargazers_count": 2,
+      "pushed_at": "2026-03-03T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "react",
+      "full_name": "ana-exemplo/react",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/react",
+      "description": "Fork do React",
+      "private": false,
+      "fork": true,
+      "archived": false,
+      "language": "JavaScript",
+      "stargazers_count": 0,
+      "pushed_at": "2026-09-27T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "awesome-go",
+      "full_name": "ana-exemplo/awesome-go",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/awesome-go",
+      "description": null,
+      "private": false,
+      "fork": true,
+      "archived": false,
+      "language": null,
+      "stargazers_count": 0,
+      "pushed_at": "2025-12-01T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "app-legado",
+      "full_name": "ana-exemplo/app-legado",
+      "owner": {
+        "login": "ana-exemplo"
+      },
+      "html_url": "https://github.com/ana-exemplo/app-legado",
+      "description": "Aplicação antiga",
+      "private": false,
+      "fork": false,
+      "archived": true,
+      "language": "PHP",
+      "stargazers_count": 0,
+      "pushed_at": "2023-02-01T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    }
+  ]
+]

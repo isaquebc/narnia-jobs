@@ -1,0 +1,62 @@
+{
+  "y2026": {
+    "contributionsCollection": {
+      "totalCommitContributions": 412,
+      "totalPullRequestContributions": 58,
+      "totalIssueContributions": 21,
+      "totalPullRequestReviewContributions": 44
+    }
+  },
+  "y2026_prsMerged": {
+    "issueCount": 49
+  },
+  "y2026_prsClosed": {
+    "issueCount": 5
+  },
+  "y2026_reviewsApproved": {
+    "issueCount": 38
+  },
+  "y2026_issuesClosed": {
+    "issueCount": 15
+  },
+  "y2025": {
+    "contributionsCollection": {
+      "totalCommitContributions": 300,
+      "totalPullRequestContributions": 40,
+      "totalIssueContributions": 10,
+      "totalPullRequestReviewContributions": 20
+    }
+  },
+  "y2025_prsMerged": {
+    "issueCount": 35
+  },
+  "y2025_prsClosed": {
+    "issueCount": 3
+  },
+  "y2025_reviewsApproved": {
+    "issueCount": 18
+  },
+  "y2025_issuesClosed": {
+    "issueCount": 8
+  },
+  "y2024": {
+    "contributionsCollection": {
+      "totalCommitContributions": 120,
+      "totalPullRequestContributions": 12,
+      "totalIssueContributions": 4,
+      "totalPullRequestReviewContributions": 5
+    }
+  },
+  "y2024_prsMerged": {
+    "issueCount": 10
+  },
+  "y2024_prsClosed": {
+    "issueCount": 1
+  },
+  "y2024_reviewsApproved": {
+    "issueCount": 4
+  },
+  "y2024_issuesClosed": {
+    "issueCount": 3
+  }
+}

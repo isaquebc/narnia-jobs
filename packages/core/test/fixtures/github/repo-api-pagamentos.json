@@ -1,0 +1,18 @@
+{
+  "name": "api-pagamentos",
+  "full_name": "ana-exemplo/api-pagamentos",
+  "owner": {
+    "login": "ana-exemplo"
+  },
+  "html_url": "https://github.com/ana-exemplo/api-pagamentos",
+  "description": "API de pagamentos com Node.js e PostgreSQL",
+  "private": false,
+  "fork": false,
+  "archived": false,
+  "language": "TypeScript",
+  "stargazers_count": 42,
+  "pushed_at": "2026-09-28T12:00:00Z",
+  "default_branch": "main",
+  "topics": ["api", "payments", "nodejs"],
+  "visibility": "public"
+}

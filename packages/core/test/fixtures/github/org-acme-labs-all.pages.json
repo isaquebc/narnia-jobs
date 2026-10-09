@@ -1,0 +1,58 @@
+[
+  [
+    {
+      "name": "plataforma-core",
+      "full_name": "acme-labs/plataforma-core",
+      "owner": {
+        "login": "acme-labs"
+      },
+      "html_url": "https://github.com/acme-labs/plataforma-core",
+      "description": "Núcleo da plataforma",
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "TypeScript",
+      "stargazers_count": 120,
+      "pushed_at": "2026-09-25T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    },
+    {
+      "name": "infra-terraform",
+      "full_name": "acme-labs/infra-terraform",
+      "owner": {
+        "login": "acme-labs"
+      },
+      "html_url": "https://github.com/acme-labs/infra-terraform",
+      "description": null,
+      "private": true,
+      "fork": false,
+      "archived": false,
+      "language": "HCL",
+      "stargazers_count": 0,
+      "pushed_at": "2026-09-22T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "private"
+    },
+    {
+      "name": "design-system",
+      "full_name": "acme-labs/design-system",
+      "owner": {
+        "login": "acme-labs"
+      },
+      "html_url": "https://github.com/acme-labs/design-system",
+      "description": null,
+      "private": false,
+      "fork": false,
+      "archived": false,
+      "language": "TypeScript",
+      "stargazers_count": 30,
+      "pushed_at": "2026-08-30T10:00:00Z",
+      "default_branch": "main",
+      "topics": [],
+      "visibility": "public"
+    }
+  ]
+]
