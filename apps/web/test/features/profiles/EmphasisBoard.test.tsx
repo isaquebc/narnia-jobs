@@ -19,6 +19,7 @@ const card = {
 function setup() {
   const fakes = {
     getEmphasis: vi.fn(async () => ({
+      cardValid: true,
       items: [
         {
           kind: "experience" as const,

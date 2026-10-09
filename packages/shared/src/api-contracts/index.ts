@@ -207,7 +207,11 @@ export const EmphasisListItemSchema = z.object({
   date: z.string().nullable(),
   relevance: z.object({ score: z.number().min(0).max(1), reasons: z.array(z.string()) }).nullable(),
 });
-export const EmphasisListResponseSchema = z.object({ items: z.array(EmphasisListItemSchema) });
+export const EmphasisListResponseSchema = z.object({
+  /** false quando o cartão está inválido: a relevância mostrada pode estar desatualizada (auditoria F02-9). */
+  cardValid: z.boolean(),
+  items: z.array(EmphasisListItemSchema),
+});
 export type EmphasisListResponse = z.infer<typeof EmphasisListResponseSchema>;
 
 // GET/PUT /api/profiles/:id/persona

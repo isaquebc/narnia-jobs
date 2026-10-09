@@ -42,8 +42,9 @@ export interface ProfilesRouteDeps {
 export const ANALYZE_TASK_TYPE = "profile.analyze";
 
 /** Emite `profile.card_invalidated` só com os perfis que estavam válidos e deixaram de estar (F02 §2.9-2). */
-export function emitInvalidated(bus: EventBus, flipped: string[]): void {
-  if (flipped.length > 0) bus.emit({ type: "profile.card_invalidated", profileIds: flipped });
+export function emitInvalidated(bus: EventBus, flipped: string[], extra: string[] = []): void {
+  const ids = [...new Set([...flipped, ...extra])];
+  if (ids.length > 0) bus.emit({ type: "profile.card_invalidated", profileIds: ids });
 }
 
 type SalaryInput = {
@@ -88,6 +89,9 @@ const KIND_ORDER: EmphasisFactKind[] = ["experience", "project", "skill", "educa
 
 /** Lista de ênfases com os fatos resolvidos (uma linha cada) e a relevância gravada na última reconstrução. */
 function emphasisList(repos: Repos, profileId: string): EmphasisListResponse {
+  // auditoria F02 (9): a relevância é gravada na reconstrução do cartão; com cartão inválido ela pode estar velha
+  const profile = repos.profiles.get(profileId);
+  const cardValid = profile ? isCardValid(profile, repos.settings.getFactsVersion()) : false;
   const rows = new Map(
     repos.emphasis.list(profileId).map((e) => [`${e.factKind}:${e.factId}`, e] as const),
   );
@@ -158,7 +162,7 @@ function emphasisList(repos: Repos, profileId: string): EmphasisListResponse {
     if (a.date !== b.date) return (b.date ?? "").localeCompare(a.date ?? "");
     return a.label.localeCompare(b.label);
   });
-  return { items };
+  return { cardValid, items };
 }
 
 /**
@@ -344,17 +348,24 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
     }
   });
 
+  // auditoria F02 (8): arquivar/desarquivar/clonar também avisam as outras abas (o repo zera o cartão)
   app.post("/api/profiles/:id/archive", (c) => {
+    const id = c.req.param("id");
     try {
-      return c.json(repos.profiles.archive(c.req.param("id")));
+      const { result, flipped } = trackInvalidation(repos, () => repos.profiles.archive(id));
+      emitInvalidated(bus, flipped, [id]);
+      return c.json(result);
     } catch (e) {
       return profileErrorResponse(c, e);
     }
   });
 
   app.post("/api/profiles/:id/unarchive", (c) => {
+    const id = c.req.param("id");
     try {
-      return c.json(repos.profiles.unarchive(c.req.param("id")));
+      const { result, flipped } = trackInvalidation(repos, () => repos.profiles.unarchive(id));
+      emitInvalidated(bus, flipped, result.cardUpdatedAt ? [] : [id]);
+      return c.json(result);
     } catch (e) {
       return profileErrorResponse(c, e);
     }
@@ -373,11 +384,14 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
     } = c.req.valid("json");
     const { salary, salaryBelowReference } = resolveSalary(repos, body);
     try {
-      const profile = repos.profiles.clone(sourceId, {
-        ...body,
-        ...(salary ? { salary } : {}),
-        salaryBelowReference,
-      });
+      const { result: profile, flipped } = trackInvalidation(repos, () =>
+        repos.profiles.clone(sourceId, {
+          ...body,
+          ...(salary ? { salary } : {}),
+          salaryBelowReference,
+        }),
+      );
+      emitInvalidated(bus, flipped, [profile.id]);
       if (activate === true) {
         repos.profiles.setActive(profile.id);
         bus.emit({ type: "profile.switched", profileId: profile.id });
@@ -420,10 +434,10 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
   app.put("/api/profiles/:id/emphasis", validate("json", EmphasisPutRequestSchema), (c) => {
     const profile = requireProfile(c.req.param("id"));
     if (!profile) return apiError(c, 404, "profile_not_found", "Perfil não encontrado");
-    const { items } = c.req.valid("json");
+    const { items, kinds } = c.req.valid("json");
     try {
       const { result, flipped } = trackInvalidation(repos, () =>
-        repos.emphasis.replace(profile.id, items),
+        repos.emphasis.replace(profile.id, items, kinds ? { kinds } : undefined),
       );
       emitInvalidated(bus, flipped);
       return c.json(result);
