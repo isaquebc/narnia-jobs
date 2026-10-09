@@ -6,8 +6,8 @@ Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo
 |------|-------|----------------------|------------|
 | [F01-onboarding](F01-onboarding.md) | F1 | fundação (monorepo, Docker, SQLite, jobs, provider mínimo, testes) + primeiro uso com CV/texto livre, revisão e primeiro perfil | — |
 | [F02-troca-de-perfil](F02-troca-de-perfil.md) | F2 | vários perfis, ênfases, cartão do perfil, persona derivada, seletor no shell | F01 |
+| [F03-ingestao](F03-ingestao.md) | F3 | GitHub público e privado pelo `gh`, métricas, orçamento ligado ao plano, análise incremental e relatórios, segundo CV/texto com "já lido", reconciliação com conflitos, revisão anti-alucinação, notificações (LinkedIn adiado) | F01, F02 (clarificação depende de F04) |
 | [F04-chat-recrutador](F04-chat-recrutador.md) | F4 | servidor MCP (`/mcp`), `plugin/`, chat web via Agent SDK (modo A), instalação no Claude Code (modo B), clarificação, pesquisa em fontes confiáveis | F01, F02 |
-| [F03-ingestao](F03-ingestao.md) | F3 | GitHub, LinkedIn, re-ingestão, três profundidades, snapshots, revisão com conflitos, clarificar | F01, F04 |
 | [F10-gestao-de-dados](F10-gestao-de-dados.md) | F6 | Meus dados completo, exportar/apagar, medidor de uso completo, limpar cache, Configurações, `doctor` | F01, F04 |
 | [F05-gerar-cv](F05-gerar-cv.md) | F5.1 | conteúdo pelo agente + layout no servidor com 3 templates e upload de template, PDF/DOCX, versões | F02, F04 |
 | [F06-analisar-vaga](F06-analisar-vaga.md) | F5.2 | fit, lacunas, riscos, palavras-chave ATS, perguntas prováveis; ponte para CV e entrevista | F02, F04 |
@@ -20,12 +20,17 @@ Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo
 
 ```
 Onda 1  F01
-Onda 2  F02 ──► F04
-Onda 3  F03   F10          (paralelizáveis; ambas usam jobs de F01 e sessões de F04)
+Onda 2  F02 ──► F03 ──► F04   (decisão do dono, 2026-10-09: F03 antes da F04; o botão "Clarificar" fica desabilitado até a F04)
+Onda 3  F10
 Onda 4  F05   F06 ──► F07  (features; F05 e F06 em paralelo)
 Onda 5  F09   F08
 Onda 6  F11
 ```
+
+## Itens adiados
+| Item | Origem | Desenho preservado em |
+|------|--------|-----------------------|
+| Ingestão do export do LinkedIn (ZIP de CSVs) | F03-7, adiado pelo dono em 2026-10-09 | `F03-ingestao.md` §9 |
 
 ## Critério de entregável publicável (decisão global 4, 2026-10-07)
 
