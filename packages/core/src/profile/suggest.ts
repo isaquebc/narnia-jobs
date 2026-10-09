@@ -225,7 +225,13 @@ export function suggestProfiles(
 }
 
 /** Roda a heurística sobre os repos e grava as sugestões novas com `source = heuristic`; devolve só as criadas. */
+export const HEURISTIC_VERSION_KEY = "suggestions.heuristic_facts_version";
+
 export function refreshHeuristicSuggestions(repos: Repos, now = new Date()): StoredSuggestion[] {
+  // auditoria F02 (7): a heurística só roda (e só escreve) quando os fatos mudaram desde a última execução
+  const version = repos.settings.getFactsVersion();
+  if (repos.settings.get<number>(HEURISTIC_VERSION_KEY) === version) return [];
+  repos.settings.set(HEURISTIC_VERSION_KEY, version);
   const facts = collectFactSets(repos);
   const profiles = repos.profiles.list({ includeArchived: true });
   const market = repos.profiles.active()?.market ?? profiles[0]?.market ?? "BR";

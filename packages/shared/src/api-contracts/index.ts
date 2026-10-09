@@ -191,7 +191,11 @@ export const ProfileCardResponseSchema = ProfileCardSchema.extend({
 export type ProfileCardResponse = z.infer<typeof ProfileCardResponseSchema>;
 
 // GET/PUT /api/profiles/:id/emphasis
-export const EmphasisPutRequestSchema = z.object({ items: z.array(EmphasisItemSchema) });
+export const EmphasisPutRequestSchema = z.object({
+  items: z.array(EmphasisItemSchema),
+  /** Tipos substituídos pelo lote; os demais são preservados (auditoria F02-3). Ausente = todos. */
+  kinds: z.array(EmphasisFactKindSchema).min(1).optional(),
+});
 export type EmphasisPutRequest = z.infer<typeof EmphasisPutRequestSchema>;
 export const EmphasisListItemSchema = z.object({
   kind: EmphasisFactKindSchema,

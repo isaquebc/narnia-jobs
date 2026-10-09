@@ -15,7 +15,11 @@ import { num, type Row } from "../sql";
 export interface EmphasisRepo {
   list(profileId: string): ProfileEmphasis[];
   /** Substitui o conjunto de ênfases do perfil; valida dono e existência de cada fato; renumera `position` por tipo. */
-  replace(profileId: string, items: EmphasisItem[]): { updated: number };
+  replace(
+    profileId: string,
+    items: EmphasisItem[],
+    opts?: { kinds?: EmphasisFactKind[] },
+  ): { updated: number };
   removeFact(kind: EmphasisFactKind, factId: string): void;
   countByMode(profileId: string): { highlighted: number; hidden: number };
   /** Copia as ênfases de um perfil para outro (clone, F02-8). */
@@ -54,6 +58,7 @@ export function emphasisRepo(db: Db): EmphasisRepo {
     EmphasisFactKindSchema.options.map((k) => [k, db.prepare(OWNER_SQL[k])]),
   ) as Record<EmphasisFactKind, ReturnType<Db["prepare"]>>;
   const delAll = db.prepare("delete from profile_emphasis where profile_id = ?");
+  const delKind = db.prepare("delete from profile_emphasis where profile_id = ? and fact_kind = ?");
   const delFact = db.prepare("delete from profile_emphasis where fact_kind = ? and fact_id = ?");
   const insert = db.prepare(
     `insert into profile_emphasis (id, profile_id, fact_kind, fact_id, mode, position, updated_at)
@@ -85,10 +90,18 @@ export function emphasisRepo(db: Db): EmphasisRepo {
     list(profileId) {
       return (listStmt.all(profileId) as Row[]).map(map);
     },
-    replace(profileId, rawItems) {
+    replace(profileId, rawItems, opts) {
       const items = rawItems.map((i) => EmphasisItemSchema.parse(i));
       const userId = requireProfileOwner(profileId);
-      for (const item of items) assertOwned(userId, item);
+      // auditoria F02 (3): com `kinds`, só os tipos listados são substituídos; os demais (ex.: conquistas via tool) ficam
+      const kinds = opts?.kinds
+        ? new Set(opts.kinds.map((k) => EmphasisFactKindSchema.parse(k)))
+        : null;
+      for (const item of items) {
+        assertOwned(userId, item);
+        if (kinds && !kinds.has(item.kind))
+          throw new ProfileError("unsupported_kind", `Tipo fora de kinds: ${item.kind}`);
+      }
       // ordem dentro de cada tipo: posição pedida (estável) e, sem posição, a ordem de chegada ao final
       const byKind = new Map<EmphasisFactKind, Array<{ item: EmphasisItem; idx: number }>>();
       items.forEach((item, idx) => {
@@ -98,7 +111,8 @@ export function emphasisRepo(db: Db): EmphasisRepo {
       });
       const now = nowUtc();
       return withTransaction(db, () => {
-        delAll.run(profileId);
+        if (kinds) for (const k of kinds) delKind.run(profileId, k);
+        else delAll.run(profileId);
         invalidateCard.run(profileId);
         let updated = 0;
         for (const list of byKind.values()) {

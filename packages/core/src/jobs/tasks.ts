@@ -26,8 +26,16 @@ export function taskJobId(type: string, key: string): string {
   return `task__${safe(type)}__${safe(key)}`;
 }
 
+/** Job já existente na fila (subconjunto do `Job` da BullMQ). */
+export interface TaskJobHandle {
+  getState(): Promise<string>;
+  remove(): Promise<unknown>;
+}
+
 export interface TaskQueueLike {
   add(name: string, data: TaskJobData, opts: { jobId: string }): Promise<unknown>;
+  /** Necessário para reenfileirar depois de uma falha: a BullMQ ignora `add` com id de job ainda presente. */
+  getJob?(id: string): Promise<TaskJobHandle | null | undefined>;
 }
 
 export interface EnqueueTaskInput {
@@ -55,6 +63,15 @@ export async function enqueueTask(input: EnqueueTaskInput): Promise<EnqueueTaskR
   if (existing && !TERMINAL_JOB_STATUSES.has(existing.status)) {
     return { job: existing, enqueued: false };
   }
+  const queue = input.queues[input.queue];
+  if (existing) {
+    // auditoria F02 (1): com `removeOnFail: false` o job falho continua na fila com o mesmo id e o `add` seria ignorado
+    const old = await queue.getJob?.(id);
+    if (old) {
+      if ((await old.getState()) === "active") return { job: existing, enqueued: false };
+      await old.remove();
+    }
+  }
   const data: TaskJobData = {
     kind: "task",
     type: input.type,
@@ -73,7 +90,7 @@ export async function enqueueTask(input: EnqueueTaskInput): Promise<EnqueueTaskR
         stage: input.type,
         at,
       });
-  await input.queues[input.queue].add(input.type, data, { jobId: id });
+  await queue.add(input.type, data, { jobId: id });
   return { job, enqueued: true };
 }
 

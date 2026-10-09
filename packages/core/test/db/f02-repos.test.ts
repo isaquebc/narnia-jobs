@@ -93,7 +93,7 @@ describe("F02/M1 repos/profiles estendido", () => {
     ).toThrow();
   });
 
-  it("cartão: setCard grava cache + cardFactsVersion; update/ênfases/persona invalidam só o próprio; invalidateCards devolve os que viraram", () => {
+  it("cartão: setCard grava cache + cardFactsVersion; update de pitch/ênfases invalidam só o próprio (persona não); invalidateCards devolve os que viraram", () => {
     const r = setup();
     const { profileId, skillIds } = seedFixture(r, "engineer");
     const pm = r.profiles.create({ ...PM, userId: r.users.ensureId(), isActive: false });
@@ -120,7 +120,8 @@ describe("F02/M1 repos/profiles estendido", () => {
 
     r.profiles.setCard(pm.id, { ...card, hash: "h4" });
     r.profiles.updatePersonaOverrides(pm.id, { tone: "cordial" });
-    expect(r.profiles.get(pm.id)?.cardUpdatedAt).toBeNull();
+    // a persona não entra no cartão: não invalida (auditoria F02-5, 2026-10-08)
+    expect(r.profiles.get(pm.id)?.cardUpdatedAt).not.toBeNull();
 
     r.profiles.setCard(pm.id, { ...card, hash: "h5" });
     const flipped = r.profiles.invalidateCards(r.users.ensureId());

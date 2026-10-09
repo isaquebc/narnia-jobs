@@ -78,11 +78,11 @@ export function getCard(repos: Repos, profileId: string, now = new Date()): Prof
   return rebuildCard(repos, profileId, now);
 }
 
-/** Ids dos perfis (inclusive arquivados) cujo cartão está válido agora. */
+/** Ids dos perfis não arquivados cujo cartão está válido agora (auditoria F02-6: arquivados ficam fora do evento). */
 export function validProfileIds(repos: Repos): string[] {
   const version = repos.settings.getFactsVersion();
   return repos.profiles
-    .list({ includeArchived: true })
+    .list()
     .filter((p) => isCardValid(p, version))
     .map((p) => p.id);
 }

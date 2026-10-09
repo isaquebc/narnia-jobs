@@ -128,7 +128,11 @@ export function buildObjectiveSummary(input: SummaryInput, now = new Date()): st
 
   const line2 = `Trajetória: ${arc(all).join(" → ")}.`;
 
-  const latest = chronological(all).at(-1) as SummaryExperience;
+  // auditoria F02 (2): "atual" é a experiência em curso (isCurrent ou sem fim), desempate pelo início mais recente;
+  // só sem nenhuma em curso vale a de início mais recente
+  const ordered = chronological(all);
+  const current = ordered.filter((e) => e.isCurrent || !e.endDate);
+  const latest = (current.at(-1) ?? ordered.at(-1)) as SummaryExperience;
   const seniority =
     seniorityFromTitle(latest.title) ??
     inferSeniority(

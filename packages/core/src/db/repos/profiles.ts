@@ -65,6 +65,23 @@ export interface ProfilesRepo {
   invalidateCards(userId: string): string[];
 }
 
+/** Campos do perfil que aparecem no cartão (F02 §2.2); mudar um deles invalida o cache. */
+const CARD_FIELDS = [
+  "targetTitle",
+  "altTitles",
+  "seniority",
+  "area",
+  "goal",
+  "market",
+  "docLocale",
+  "salary",
+  "contractTypes",
+  "locations",
+  "availableFrom",
+  "needsResearch",
+  "pitch",
+] as const;
+
 export interface ProfilesRepoDeps {
   emphasis?: EmphasisRepo;
 }
@@ -148,7 +165,7 @@ export function profilesRepo(db: Db, deps: ProfilesRepoDeps = {}): ProfilesRepo 
   );
   const setArchived = db.prepare("update profile set archived_at = ?, updated_at = ? where id = ?");
   const setOverrides = db.prepare(
-    "update profile set persona_overrides_json = ?, card_updated_at = null, updated_at = ? where id = ?",
+    "update profile set persona_overrides_json = ?, updated_at = ? where id = ?",
   );
 
   function toParams(p: Profile, createdAt: string, updatedAt: string) {
@@ -212,14 +229,12 @@ export function profilesRepo(db: Db, deps: ProfilesRepoDeps = {}): ProfilesRepo 
       const current = require(id);
       const { createdAt, ...base } = current;
       const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-      // qualquer edição invalida o cartão do próprio perfil (F02 §2.2)
-      const next = ProfileSchema.parse({
-        ...base,
-        ...defined,
-        id,
-        userId: current.userId,
-        cardUpdatedAt: null,
-      });
+      const merged = ProfileSchema.parse({ ...base, ...defined, id, userId: current.userId });
+      // auditoria F02 (5): só o que entra no cartão invalida; renomear não
+      const changed = CARD_FIELDS.some(
+        (k) => JSON.stringify(merged[k] ?? null) !== JSON.stringify(current[k] ?? null),
+      );
+      const next = changed ? { ...merged, cardUpdatedAt: null } : merged;
       const now = nowUtc();
       update.run(omit(toParams(next, createdAt, now), ["user_id", "created_at"]));
       return repo.get(id) as ProfileRecord;

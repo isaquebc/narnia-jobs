@@ -43,7 +43,19 @@ export interface CardOptions {
   maxChars?: number;
 }
 
-export const CARD_LIMITS = { experiences: 3, skills: 8, skillsReduced: 3, pitchLines: 3 } as const;
+export const CARD_LIMITS = {
+  experiences: 3,
+  skills: 8,
+  skillsReduced: 3,
+  pitchLines: 3,
+  /** Teto por linha de pitch e de resumo (auditoria F02-4): o corte final nunca fatia uma linha. */
+  pitchLineChars: 160,
+  summaryLineChars: 220,
+} as const;
+
+function clip(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+}
 
 const REMOTE_LABEL: Record<string, string> = {
   remote: "remoto",
@@ -137,7 +149,8 @@ function pitchLines(profile: CardProfile, maxLines: number): string[] {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean)
-    .slice(0, maxLines);
+    .slice(0, maxLines)
+    .map((l) => clip(l, CARD_LIMITS.pitchLineChars));
   return [`Pitch: ${lines[0] ?? ""}`, ...lines.slice(1).map((l) => `  ${l}`)];
 }
 
@@ -262,7 +275,10 @@ export function buildProfileCard(
   const render = (p: Plan): string => {
     const lines: string[] = [
       ...identityLines(user, facts, hiddenLang),
-      `Resumo: ${summary.slice(0, p.summaryLines).join(" ")}`,
+      `Resumo: ${summary
+        .slice(0, p.summaryLines)
+        .map((l) => clip(l, CARD_LIMITS.summaryLineChars))
+        .join(" ")}`,
       targetLine(profile),
       careerLine(profile),
       ...pitchLines(profile, p.pitchLines),
@@ -295,7 +311,12 @@ export function buildProfileCard(
     if (!plan) break;
     text = render(plan);
   }
-  if (text.length > maxChars) text = text.slice(0, maxChars);
+  // último recurso: remove linhas inteiras a partir do fim (nunca fatia uma linha; a identidade fica)
+  if (text.length > maxChars) {
+    const lines = text.split("\n");
+    while (lines.join("\n").length > maxChars && lines.length > 1) lines.pop();
+    text = lines.join("\n");
+  }
   return {
     text,
     tokensEst: charsToTokens(text.length),
