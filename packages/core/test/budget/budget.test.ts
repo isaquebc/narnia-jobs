@@ -1,10 +1,11 @@
 import type { PlanUsage } from "@narnia-jobs/shared";
 import { describe, expect, it } from "vitest";
 import { BRAKE_FACTOR, brakeSummary, costToFinish, shouldBrake } from "../../src/budget/brake";
-import { learnPctToTokens } from "../../src/budget/learn";
+import { learnPctToTokens, recordPctSample } from "../../src/budget/learn";
 import { RECOMMEND_WINDOW_SHARE, recommendBudget } from "../../src/budget/recommend";
 import { splitBudget } from "../../src/budget/split";
 import { formatBudget, fromDisplay, toDisplay } from "../../src/budget/units";
+import { createRepos, migrate, openDatabase } from "../../src/db";
 
 const defaults = { quick: 15_000, balanced: 50_000, deep: 150_000 };
 const plan = (fiveHour: number | null): PlanUsage => ({
@@ -217,5 +218,27 @@ describe("F03/M2 budget: recomendação, aprendizado, divisão, unidades e freio
         pctToTokens: null,
       }).window,
     ).toBeNull();
+  });
+
+  it("recordPctSample grava a conversão aprendida em settings e não grava amostra inválida", () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const { settings } = createRepos(db);
+    expect(
+      recordPctSample(settings, {
+        model: "haiku",
+        utilizationBefore: 5,
+        utilizationAfter: 7,
+        tokens: 10_000,
+      }),
+    ).toEqual({ haiku: 5_000 });
+    expect(settings.get("budget.pct_to_tokens")).toEqual({ haiku: 5_000 });
+    recordPctSample(settings, {
+      model: "haiku",
+      utilizationBefore: 7,
+      utilizationAfter: 7,
+      tokens: 10_000,
+    });
+    expect(settings.get("budget.pct_to_tokens")).toEqual({ haiku: 5_000 });
   });
 });

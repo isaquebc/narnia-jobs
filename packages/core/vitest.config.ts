@@ -16,6 +16,9 @@ export default defineConfig({
         statements: 80,
         // F02 §6.5: o domínio de perfis tem o mesmo piso, medido em separado
         "src/profile/**": { lines: 80, functions: 80, branches: 80, statements: 80 },
+        // F03 §6.1 M2: ingestão e orçamento com o mesmo piso, medidos em separado
+        "src/ingest/**": { lines: 80, functions: 80, branches: 80, statements: 80 },
+        "src/budget/**": { lines: 80, functions: 80, branches: 80, statements: 80 },
       },
     },
     testTimeout: 30_000,
