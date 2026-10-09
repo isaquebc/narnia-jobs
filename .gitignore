@@ -20,3 +20,4 @@ uploads/
 test-results/
 report/
 .e2e-port.env
+.claude-data/

@@ -7,11 +7,26 @@ param(
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)] [string[]] $Rest
 )
 $ErrorActionPreference = "Stop"
+# Instâncias: a do dono (padrão) e a do Claude (NARNIA_INSTANCE=claude, valores em .env.claude). Os valores do arquivo
+# sempre vencem o ambiente (isolamento dos dados do dono); a única exceção é NARNIA_PROVIDER.
+switch ($env:NARNIA_INSTANCE) {
+  { $_ -in $null, "", "owner" } { break }
+  "claude" {
+    foreach ($line in Get-Content (Join-Path $PSScriptRoot ".env.claude")) {
+      if ($line -match '^\s*#' -or $line -notmatch '^([A-Z_]+)=(.*)$') { continue }
+      if ($Matches[1] -eq "NARNIA_PROVIDER" -and $env:NARNIA_PROVIDER) { continue }
+      Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
+    }
+  }
+  default { Write-Error "erro: NARNIA_INSTANCE desconhecida: $($env:NARNIA_INSTANCE) (use vazio ou 'claude')"; exit 1 }
+}
 $script:PortStart  = if ($env:NARNIA_PORT_START) { [int]$env:NARNIA_PORT_START } else { 3100 }
 $script:PortEnd    = if ($env:NARNIA_PORT_END)   { [int]$env:NARNIA_PORT_END }   else { 3199 }
 $script:EnvFile    = if ($env:NARNIA_ENV_FILE)   { $env:NARNIA_ENV_FILE }        else { ".env" }
 $script:DevCompose  = @("compose", "-f", "docker-compose.dev.yml")
 $script:ProdCompose = @("compose", "-f", "docker-compose.yml")
+if ($env:NARNIA_DEV_PROJECT_NAME)  { $script:DevCompose  = @("compose", "-p", $env:NARNIA_DEV_PROJECT_NAME, "-f", "docker-compose.dev.yml") }
+if ($env:NARNIA_PROD_PROJECT_NAME) { $script:ProdCompose = @("compose", "-p", $env:NARNIA_PROD_PROJECT_NAME, "-f", "docker-compose.yml") }
 
 function Fail([string] $Message) { Write-Error "erro: $Message"; exit 1 }
 function Info([string] $Message) { Write-Host "» $Message" }
@@ -132,6 +147,7 @@ function Invoke-Up {
     $port = Get-EnvValue $script:EnvFile "NARNIA_PORT"
     Info "stack já no ar na porta $port; aplicando alterações"
   } else {
+    $envDir = Split-Path -Parent $script:EnvFile; if ($envDir) { New-Item -ItemType Directory -Force -Path $envDir *> $null }
     $port = Choose-Port $script:EnvFile
     if (-not $port) { Fail "nenhuma porta livre entre $($script:PortStart) e $($script:PortEnd)." }
     Write-Env $script:EnvFile "NARNIA_PORT" $port

@@ -78,3 +78,19 @@ Describe "Choose-Port" {
 Describe "Get-AppUrl" {
   It "monta a URL de abertura" { Get-AppUrl 3101 "abc123" | Should -Be "http://127.0.0.1:3101/?token=abc123" }
 }
+
+Describe "Instâncias (NARNIA_INSTANCE)" {
+  It "instância claude: projetos, portas e dados próprios; ignora NARNIA_DATA_DIR do ambiente" {
+    $script = Join-Path $PSScriptRoot "../../start.ps1"
+    $env:NARNIA_INSTANCE = "claude"; $env:NARNIA_DATA_DIR = "./data"
+    try {
+      $out = pwsh -NoProfile -Command ". '$script'; '{0}|{1}|{2}|{3}|{4}' -f (`$script:DevCompose -join ' '), (`$script:ProdCompose -join ' '), `$script:EnvFile, `$script:PortStart, `$env:NARNIA_DATA_DIR"
+    } finally {
+      Remove-Item env:NARNIA_INSTANCE, env:NARNIA_DATA_DIR, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue
+    }
+    $out | Should -Be "compose -p narnia-claude -f docker-compose.dev.yml|compose -p narnia-claude-prod -f docker-compose.yml|.claude-data/.env|3250|./.claude-data/prod"
+  }
+  It "instância padrão não usa -p" {
+    ($script:DevCompose -join " ") | Should -Be "compose -f docker-compose.dev.yml"
+  }
+}

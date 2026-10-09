@@ -113,3 +113,44 @@ occupy_port() { # ocupa a porta $1 com um servidor TCP em Node (aceita várias c
   run env_has_value "$TMP/.env" NADA
   [ "$status" -eq 1 ]
 }
+
+# --- instâncias (2026-10-09): a do dono (padrão) e a do Claude (NARNIA_INSTANCE=claude), mesmo código, dados separados
+
+@test "instância padrão: compose sem -p, dados em ./data, .env na raiz" {
+  [[ "${DEV_COMPOSE[*]}" == "docker compose -f docker-compose.dev.yml" ]]
+  [[ "${PROD_COMPOSE[*]}" == "docker compose -f docker-compose.yml" ]]
+  [[ "$ENV_FILE" == ".env" ]]
+  [[ "$NARNIA_PORT_START" == "3100" ]]
+}
+
+@test "instância claude: projetos, portas, dados e .env próprios" {
+  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; printf "%s|%s|%s|%s|%s|%s|%s|%s\n" "${DEV_COMPOSE[*]}" "${PROD_COMPOSE[*]}" "$ENV_FILE" "$NARNIA_PORT_START" "$NARNIA_DEV_PORT" "$NARNIA_DEV_API_PORT" "$NARNIA_DEV_DATA_DIR" "$NARNIA_DATA_DIR"'
+  [ "$status" -eq 0 ]
+  IFS='|' read -r dev prod envf start webp apip devdata proddata <<<"$output"
+  [[ "$dev" == "docker compose -p narnia-claude -f docker-compose.dev.yml" ]]
+  [[ "$prod" == "docker compose -p narnia-claude-prod -f docker-compose.yml" ]]
+  [[ "$envf" == ".claude-data/.env" ]]
+  [[ "$start" == "3250" ]]
+  [[ "$webp" == "5174" && "$apip" == "3200" ]]
+  [[ "$devdata" == "/app/.claude-data/dev" && "$proddata" == "./.claude-data/prod" ]]
+}
+
+@test "instância desconhecida falha com mensagem" {
+  run env NARNIA_INSTANCE=xyz bash -c 'source ./start.sh'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"NARNIA_INSTANCE"* ]]
+}
+
+@test "dev_data_host_dir converte o caminho do container para o host" {
+  NARNIA_DEV_DATA_DIR=/app/.claude-data/dev
+  [[ "$(dev_data_host_dir)" == "./.claude-data/dev" ]]
+  unset NARNIA_DEV_DATA_DIR
+  [[ "$(dev_data_host_dir)" == "./data" ]]
+}
+
+@test "instância claude ignora NARNIA_DATA_DIR do ambiente, mas aceita NARNIA_PROVIDER" {
+  run env NARNIA_INSTANCE=claude NARNIA_DATA_DIR=./data NARNIA_DEV_DATA_DIR=/app/data NARNIA_PROVIDER=claude-code \
+    bash -c 'source ./start.sh; printf "%s|%s|%s\n" "$NARNIA_DATA_DIR" "$NARNIA_DEV_DATA_DIR" "$NARNIA_PROVIDER"'
+  [ "$status" -eq 0 ]
+  [[ "$output" == "./.claude-data/prod|/app/.claude-data/dev|claude-code" ]]
+}

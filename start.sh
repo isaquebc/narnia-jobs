@@ -4,11 +4,31 @@
 # Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
 set -euo pipefail
 
+# --- instâncias: a do dono (padrão) e a do Claude (NARNIA_INSTANCE=claude, valores em .env.claude) -----------------
+# Mesmo código-fonte; projetos Docker, portas, banco, Redis e node_modules separados. Os valores do arquivo SEMPRE
+# vencem o ambiente (isolamento: um NARNIA_DATA_DIR exportado no shell nunca leva a instância do Claude aos dados do
+# dono); a única exceção é NARNIA_PROVIDER (ex.: NARNIA_PROVIDER=claude-code NARNIA_INSTANCE=claude ./start.sh dev).
+NARNIA_INSTANCE=${NARNIA_INSTANCE:-}
+INSTANCE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+case "$NARNIA_INSTANCE" in
+  "" | owner) ;;
+  claude)
+    while IFS='=' read -r key value; do
+      [[ -z "$key" || "$key" == \#* ]] && continue
+      [[ "$key" == NARNIA_PROVIDER && -n "${NARNIA_PROVIDER:-}" ]] && continue
+      export "$key=$value"
+    done < "$INSTANCE_DIR/.env.claude"
+    ;;
+  *) printf 'erro: NARNIA_INSTANCE desconhecida: %s (use vazio ou "claude")\n' "$NARNIA_INSTANCE" >&2; exit 1 ;;
+esac
+
 NARNIA_PORT_START=${NARNIA_PORT_START:-3100}
 NARNIA_PORT_END=${NARNIA_PORT_END:-3199}
 ENV_FILE=${NARNIA_ENV_FILE:-.env}
 DEV_COMPOSE=(docker compose -f docker-compose.dev.yml)
 PROD_COMPOSE=(docker compose -f docker-compose.yml)
+if [[ -n "${NARNIA_DEV_PROJECT_NAME:-}" ]]; then DEV_COMPOSE=(docker compose -p "$NARNIA_DEV_PROJECT_NAME" -f docker-compose.dev.yml); fi
+if [[ -n "${NARNIA_PROD_PROJECT_NAME:-}" ]]; then PROD_COMPOSE=(docker compose -p "$NARNIA_PROD_PROJECT_NAME" -f docker-compose.yml); fi
 E2E_PROJECT=${NARNIA_E2E_PROJECT:-narnia-e2e}
 E2E_COMPOSE=(docker compose -p "$E2E_PROJECT" -f docker-compose.yml -f docker-compose.e2e.yml)
 E2E_DATA_DIR=./.e2e-data
@@ -75,6 +95,12 @@ choose_port() {
   find_free_port "$start" "$end"
 }
 
+# dev_data_host_dir -> pasta de dados do modo dev no host (NARNIA_DEV_DATA_DIR é caminho do container, sob /app)
+dev_data_host_dir() {
+  local d=${NARNIA_DEV_DATA_DIR:-/app/data}
+  printf './%s\n' "${d#/app/}"
+}
+
 # app_url PORT TOKEN -> URL de abertura da interface
 app_url() { printf 'http://127.0.0.1:%s/?token=%s\n' "$1" "$2"; }
 
@@ -123,6 +149,7 @@ cmd_up() {
     info "stack já no ar na porta ${port:-?}; aplicando alterações"
   else
     mkdir -p "${NARNIA_DATA_DIR:-./data}"   # cria a pasta antes do Docker, para ela pertencer ao usuário e não ao root
+    mkdir -p "$(dirname "$ENV_FILE")"
     port=$(choose_port "$ENV_FILE") || die "nenhuma porta livre entre ${NARNIA_PORT_START} e ${NARNIA_PORT_END}."
     write_env "$ENV_FILE" NARNIA_PORT "$port"
     info "porta escolhida: $port (gravada em $ENV_FILE)"
@@ -217,6 +244,8 @@ e2e_launcher_port() {
   (
     # ENV_FILE e NARNIA_PORT_START são variáveis do script (lidas do ambiente só no carregamento): sobrescrever direto
     ENV_FILE="$env_file"; NARNIA_PORT_START="$base"
+    PROD_COMPOSE=(docker compose -p "${E2E_PROJECT}-port" -f docker-compose.yml)   # nunca o projeto de uma instância
+    export NARNIA_OAUTH_PORT=""                                                       # porta OAuth aleatória (não colide)
     export COMPOSE_PROJECT_NAME="${E2E_PROJECT}-port" NARNIA_DATA_DIR="$data_dir" NARNIA_PROVIDER=mock
     cmd_up >/dev/null
     port=$(env_value "$env_file" NARNIA_PORT)
@@ -318,7 +347,8 @@ main() {
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;
     dev)
       require_docker; ensure_installed
-      mkdir -p "${NARNIA_DATA_DIR:-./data}"
+      mkdir -p "$(dev_data_host_dir)"
+      [[ -z "$NARNIA_INSTANCE" ]] || info "instância: ${NARNIA_INSTANCE} (projeto ${NARNIA_DEV_PROJECT_NAME:-?}, dados $(dev_data_host_dir))"
       printf '\n  modo dev (hot reload):  %s\n' "$(app_url "${NARNIA_DEV_PORT:-5173}" "${NARNIA_TOKEN:-dev-token}")"
       if env_has_value "$ENV_FILE" CLAUDE_CODE_OAUTH_TOKEN; then info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $ENV_FILE."
       else info "login da assinatura (uma vez, vale para dev e produção): ./start.sh login   · mock: NARNIA_PROVIDER=mock ./start.sh dev"; fi

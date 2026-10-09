@@ -1,0 +1,5 @@
+{
+  "env": {
+    "NARNIA_INSTANCE": "claude"
+  }
+}

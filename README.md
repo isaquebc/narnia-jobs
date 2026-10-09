@@ -91,6 +91,10 @@ No Windows, use `.\start.ps1` com os mesmos subcomandos. Em Linux/macOS há tamb
 
 O modo dev funciona como a produção: provider **Claude Code** com a sua assinatura (o login de `./start.sh login` fica no mesmo volume `claude-auth` e vale para os dois modos; `CLAUDE_CODE_OAUTH_TOKEN` no `.env` também é respeitado). A diferença é o hot reload. Para desenvolver a interface sem gastar a assinatura, suba com `NARNIA_PROVIDER=mock ./start.sh dev`: o mock devolve sempre o mesmo currículo fictício, não lê o arquivo enviado. O token de boot em dev é `dev-token` (`NARNIA_TOKEN`); em produção é aleatório, persistido em `data/.token` e impresso pelo lançador.
 
+### Duas instâncias: a sua e a de testes do agente
+
+O mesmo código roda em duas instâncias independentes. A **sua** (`make dev`, dados em `./data`, :5173/:3100) é a de uso real e nunca é tocada pelos testes. A **do agente de desenvolvimento** (`NARNIA_INSTANCE=claude`, valores em `.env.claude`, dados em `./.claude-data`, :5174/:3200, provider mock) é operada por `scripts/claude-env.sh` (`make claude-up`, `make claude-seed ARGS=engineer`, `make claude-wipe`…). Regras completas em `CLAUDE.md`.
+
 ### Fluxo completo da API com `curl` (provider mock)
 
 ```bash

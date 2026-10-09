@@ -5,11 +5,12 @@ SHELL := /bin/bash
 ENV_FILE ?= .env
 DATA_DIR ?= ./data
 
+# Instância do Claude (testes, isolada da do dono): make claude-<cmd> = scripts/claude-env.sh <cmd>
 .PHONY: help dev dev-down up down purge restart login doctor logs status tunnel \
         test lint typecheck build e2e e2e-ui check install shell
 
 help: ## lista os comandos
-	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z0-9_-]+:.*## / { printf "  \033[1m%-12s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z0-9_%-]+:.*## / { printf "  \033[1m%-12s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 ## --- desenvolvimento (hot reload; provider claude-code como na produção) ---------------------------------------
 dev: ## sobe web (:5173), api (:3100), worker e redis com hot reload; mesma assinatura da produção (NARNIA_PROVIDER=mock para não gastar)
@@ -80,3 +81,7 @@ e2e-ui: ## só os cenários de interface (ARGS="--grep E2E-03" para filtrar)
 	./start.sh e2e --ui-only $(ARGS)
 
 check: lint typecheck test ## lint + typecheck + testes unitários
+
+## --- instância do Claude (ambiente de testes isolado; ver CLAUDE.md) --------------------------------
+claude-%: ## scripts/claude-env.sh <cmd> (up, status, seed, reset, api, sql, test, e2e, down, wipe)
+	scripts/claude-env.sh $* $(ARGS)
