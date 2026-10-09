@@ -2,7 +2,7 @@
 
 Entregável 3 do plan-v0. Cobre o fluxo **F3** de `../02-fluxos-do-usuario.md` além do que F01 já entregou (CV e texto livre em profundidade rápida): GitHub (usuário, organização ou repositórios), export do LinkedIn, CVs e textos adicionais com re-ingestão, três níveis de profundidade com estimativa real, pré-processamento determinístico, snapshots, digest por arquivo, revisão com conflitos e tags por perfil, tudo como jobs em segundo plano e com várias ingestões simultâneas. Depende de F01 (jobs, `ingestion_run`, revisão) e F02 (tags por perfil). A sessão de clarificação é F04; aqui só existe o botão que a abre.
 
-Status: **em escopo** (2026-10-07). Nada implementado.
+Status: **em escopo** (2026-10-07). Nada implementado. Decisões em fechamento com o dono desde 2026-10-09 (§5, §8).
 
 ---
 
@@ -135,7 +135,7 @@ Regras de UI: a revisão é retomável; o usuário pode sair e voltar pela bande
 
 | # | Decisão | Opções | Padrão proposto |
 |---|---------|--------|-----------------|
-| F03-1 | Cliente GitHub | `octokit` · `fetch` manual | **`octokit`** (paginação, rate limit, tipos) |
+| F03-1 | Cliente GitHub | `octokit` · `fetch` manual · `gh` | **Decidida 2026-10-09 (dono): `gh` dentro do container**, com duas origens de credencial escolhidas em Configurações › Integrações (`settings.github.auth = host | app`, padrão `host`): (a) **reusar o `gh` do computador**: o lançador (`start.sh`/`start.ps1` em `up`/`dev`) roda `gh auth token` no host quando o `gh` existe e está logado e entrega o token ao container (arquivo 0600 no volume `gh-auth`, nunca em `.env`, banco ou log), renovado a cada subida; (b) **login próprio do app** pelo fluxo de dispositivo, sem terminal visível: botão "Conectar GitHub" → a API roda `gh auth login --web` em segundo plano (verificado: funciona sem TTY), mostra o código com copiar e o botão "Abrir GitHub" (`github.com/login/device`, nova aba), detecta a autorização e avisa por WS ("Conectado como @usuario", escopos), contagem dos 15 min e "gerar outro código"; credencial no volume `gh-auth`. Se `host` estiver escolhido e o `gh` do computador não existir ou não estiver logado, a UI cai no fluxo (b). "Desconectar" apaga a credencial do app. Análise pública funciona sem login (limite anônimo); privada exige escopo `repo` (explicado antes de autorizar; o app só lê). Coletor usa `gh api` (paginação, rate limit) e `gh repo clone` quando precisar de código. |
 | F03-2 | Rate limit sem token (60 req/h) | bloquear sem token · permitir com aviso e limite de 10 repos | **permitir com aviso** e orientar a criar token |
 | F03-3 | Amostragem de código na profunda | heurística fixa (entrypoints, configs, testes, ≤ 8 arquivos, ≤ 12 KB cada) · deixar o modelo pedir arquivos por tool | **heurística fixa** (custo previsível) |
 | F03-4 | Clone raso | `git clone --depth 1` no container · baixar tarball da API | **tarball da API** (sem `git`, sem credencial SSH; `git` fica para repos privados com token) |
@@ -217,4 +217,8 @@ GitHub real do autor nas três profundidades: registrar tokens estimados × reai
 | Snapshots ocuparem disco | teto + tela de limpeza (F03-9) |
 
 ## 8 · Registro de execução
+| Data | Marco | O que aconteceu |
+|------|-------|-----------------|
+| 2026-10-09 | — | **Observações do dono ao ler o plano** (a incorporar no refinamento): (1) **área de notificações** transversal onde revisões, conflitos e pendências ficam até o usuário resolver, com sinalização no cabeçalho (o primeiro uso gera uma lista longa); (2) **LinkedIn fica para depois** (F03-7 sai do escopo); (3) GitHub em dois modos: **análise pública** (página pública, projetos visíveis, recomendação de projetos novos e de atualizações) e **análise privada** (repositórios privados para confirmar e sugerir skills, relevância, e sugerir versões open source para engajar o perfil); (4) **análise incremental**: salvar o commit analisado por repositório; nova análise olha o diff desde ele; análise mais profunda que a anterior parte do relatório já salvo, não do zero; toda análise gera um **relatório salvo**; (5) **segundo CV** e **texto livre** ("Conte a sua história de carreira/vida") com hash salvo e detecção de "já lido"; (6) **escolher o modelo antes da ingestão**; (7) conflito vira **notificação** que leva à revisão; (8) teto de snapshots **configurável**; (9) F03-2 seletor por organização com expansão e pré-seleção dos 10 mais recentes; F03-3 limitador de custo diluído por repositório (a detalhar); F03-8 aprovada. |
+| 2026-10-09 | — | **F03-1 decidida pelo dono**: `gh` no container; preferência por reusar o `gh` do computador (menos fricção), com login próprio do app pelo fluxo de dispositivo como alternativa automática e escolha em Configurações. |
 (Preencher durante a implementação: datas, medições de 6.4, decisões tomadas.)
