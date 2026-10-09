@@ -386,6 +386,8 @@ export const ptBR = {
     saved: "Ênfases salvas.",
     unsaved: "Alterações não salvas",
     preview: "Prévia do cartão",
+    staleRelevance:
+      "A relevância pode estar desatualizada: o cartão mudou desde a última geração. Atualize o cartão na aba Cartão.",
   },
   pitch: {
     title: "Narrativa",

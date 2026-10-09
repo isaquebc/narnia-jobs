@@ -4,9 +4,10 @@ import { useEffect } from "react";
 import { useApi, useWs } from "../app/context";
 import { jobsKey } from "./useJobs";
 
-export const suggestionsKey = ["profiles", "suggestions"] as const;
+/** Chave própria (auditoria F02-13): não pode ser prefixo de ["profiles"], senão toda ação de perfil refaz o GET. */
+export const suggestionsKey = ["suggestions"] as const;
 
-/** Sugestões de perfil (F02 §2.6): uma chamada por tela (a heurística roda no servidor a cada GET). */
+/** Sugestões de perfil (F02 §2.6): uma chamada por tela; recarrega em `profile.switched` e ao concluir a análise. */
 export function useSuggestions(opts: { enabled?: boolean } = {}) {
   const api = useApi();
   const ws = useWs();
@@ -21,6 +22,10 @@ export function useSuggestions(opts: { enabled?: boolean } = {}) {
   useEffect(() => {
     ws.connect();
     return ws.subscribe((event) => {
+      if (event.type === "profile.switched") {
+        void qc.invalidateQueries({ queryKey: suggestionsKey });
+        return;
+      }
       if (event.type === "job.done" && event.jobId.startsWith("task__profile.analyze__")) {
         void qc.invalidateQueries({ queryKey: suggestionsKey });
         void qc.invalidateQueries({ queryKey: ["dashboard"] });

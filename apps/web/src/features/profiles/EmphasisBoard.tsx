@@ -131,6 +131,8 @@ export function EmphasisBoard({ profileId }: { profileId: string }) {
   const emphasis = useEmphasis(profileId);
   const card = useProfileCard(profileId);
   const guard = useFormGuard();
+  const { setDirty: setGuardDirty } = guard;
+  useEffect(() => () => setGuardDirty(false), [setGuardDirty]);
   const [tab, setTab] = useState<Kind>("experience");
   const [groups, setGroups] = useState<Record<Kind, Item[]> | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -169,7 +171,8 @@ export function EmphasisBoard({ profileId }: { profileId: string }) {
       groups[k].map((it, position) => ({ kind: it.kind, id: it.id, mode: it.mode, position })),
     );
     emphasis.save.mutate(
-      { items },
+      // auditoria F02 (3): só os tipos com aba são substituídos; ênfases de outros tipos (conquistas) ficam
+      { items, kinds: [...KINDS] },
       {
         onSuccess: () => {
           setDirty(false);
@@ -192,6 +195,9 @@ export function EmphasisBoard({ profileId }: { profileId: string }) {
           {dirty ? <Badge tone="warn">{t("emphasis.unsaved")}</Badge> : null}
         </div>
         <p className="text-sm text-muted-fg">{t("emphasis.hint")}</p>
+        {emphasis.data && !emphasis.data.cardValid ? (
+          <Alert tone="warn">{t("emphasis.staleRelevance")}</Alert>
+        ) : null}
         <Tabs value={tab} onValueChange={(v) => setTab(v as Kind)} items={tabs}>
           {KINDS.map((kind) => (
             <TabPanel key={kind} value={kind}>

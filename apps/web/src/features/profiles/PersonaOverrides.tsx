@@ -1,5 +1,6 @@
 import type { PersonaOverrides as Overrides, Persona } from "@narnia-jobs/shared";
 import { useEffect, useState } from "react";
+import { useFormGuard } from "../../app/FormGuard";
 import { describeError, ErrorState } from "../../components/ErrorState";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
@@ -22,6 +23,10 @@ type TextField = "specialty" | "market";
 /** Aba Recrutador (F02 §4, F02-7): persona derivada, seletores com padrão e restaurar por campo. */
 export function PersonaOverrides({ profileId }: { profileId: string }) {
   const { data, isError, error, refetch, save } = usePersona(profileId);
+  // auditoria F02 (12): overrides não salvos contam como formulário sujo (trocar de perfil pede confirmação)
+  const guard = useFormGuard();
+  const { setDirty: setGuardDirty } = guard;
+  useEffect(() => () => setGuardDirty(false), [setGuardDirty]);
   const [local, setLocal] = useState<Overrides>({});
   const [saved, setSaved] = useState(false);
   useEffect(() => {
@@ -36,14 +41,19 @@ export function PersonaOverrides({ profileId }: { profileId: string }) {
   };
   const overridden = (field: keyof Overrides) =>
     local[field] !== undefined && local[field] !== null;
+  const onSaved = () => {
+    setSaved(true);
+    guard.setDirty(false);
+  };
   const setField = (field: keyof Overrides, value: string | null) => {
     setSaved(false);
+    guard.setDirty(true);
     setLocal((o) => ({ ...o, [field]: value }));
   };
   const restore = (field: keyof Overrides) => {
     const next = { ...local, [field]: null };
     setLocal(next);
-    save.mutate(next, { onSuccess: () => setSaved(true) });
+    save.mutate(next, { onSuccess: onSaved });
   };
   const restoreButton = (field: keyof Overrides, label: string) =>
     overridden(field) ? (
@@ -136,7 +146,7 @@ export function PersonaOverrides({ profileId }: { profileId: string }) {
       {saved ? <Alert tone="ok">{t("persona.saved")}</Alert> : null}
       <div>
         <Button
-          onClick={() => save.mutate(local, { onSuccess: () => setSaved(true) })}
+          onClick={() => save.mutate(local, { onSuccess: onSaved })}
           disabled={save.isPending}
         >
           {t("persona.save")}

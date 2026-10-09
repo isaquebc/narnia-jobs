@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../../app/context";
 import { useFormGuard } from "../../app/FormGuard";
 import { describeError } from "../../components/ErrorState";
@@ -18,6 +18,9 @@ export function PitchEditor({ profile }: { profile: ProfileRecord }) {
   const api = useApi();
   const qc = useQueryClient();
   const guard = useFormGuard();
+  // auditoria F02 (11): sair da página sem salvar não pode deixar o guard sujo
+  const { setDirty: setGuardDirty } = guard;
+  useEffect(() => () => setGuardDirty(false), [setGuardDirty]);
   const [pitch, setPitch] = useState(profile.pitch ?? "");
   const [saved, setSaved] = useState(false);
   const save = useMutation({

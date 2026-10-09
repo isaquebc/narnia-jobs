@@ -102,6 +102,7 @@ describe("EmphasisBoard · modos, ordem por botões, salvar em lote e prévia (F
         { kind: "experience", id: "e1", mode: "highlight", position: 1 },
         { kind: "skill", id: "s1", mode: "hidden", position: 0 },
       ],
+      kinds: ["experience", "project", "skill", "education", "language"],
     });
     expect(await screen.findByText("Ênfases salvas.")).toBeInTheDocument();
     await waitFor(() => expect(fakes.getProfileCard).toHaveBeenCalledTimes(2));

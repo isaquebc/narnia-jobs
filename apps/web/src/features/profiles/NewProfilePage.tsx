@@ -1,7 +1,7 @@
 import type { ProfileCreateRequest } from "@narnia-jobs/shared";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../../app/context";
 import { useFormGuard } from "../../app/FormGuard";
 import { describeError, ErrorState } from "../../components/ErrorState";
@@ -39,6 +39,8 @@ export function NewProfilePage({
   const api = useApi();
   const router = useRouter({ warn: false });
   const guard = useFormGuard();
+  const { setDirty: setGuardDirty } = guard;
+  useEffect(() => () => setGuardDirty(false), [setGuardDirty]);
   const { profiles, create, clone } = useProfiles();
   const [cloneFrom, setCloneFrom] = useState<string>(search.cloneFrom ?? "");
   const user = useQuery({ queryKey: ["user"], queryFn: () => api.getUser() });
