@@ -1,10 +1,16 @@
 import type {
   AnalyzeProfilesInput,
   AnalyzeProfilesOutput,
+  AnalyzeRepoOutput,
   BuildDigestOutput,
+  CheckProposalsOutput,
   ExtractFactsOutput,
   FactProposal,
+  PickFilesOutput,
+  PlanUsage,
   ReadDocumentOutput,
+  RepoReport,
+  SynthesizeRunOutput,
 } from "@narnia-jobs/shared";
 
 /**
@@ -74,6 +80,34 @@ export interface BuildDigestInput {
 /** "Analisar possíveis perfis" (F02 §2.6): entrada compacta de todo o histórico + modelo escolhido. */
 export type AnalyzeProfilesProviderInput = AnalyzeProfilesInput & { model: string };
 
+/* ---------- F03 · ingestão do GitHub e revisão anti-alucinação (§2.4, §2.5, §2.8) ---------- */
+
+/** Profunda: a chamada barata escolhe até `maxFiles` arquivos entre a árvore e os candidatos da heurística. */
+export interface PickFilesInput {
+  repo: string;
+  tree: string[];
+  candidates: string[];
+  maxFiles: number;
+  model: string;
+}
+/** Uma chamada por repositório, sem tools: o contexto já vem empacotado e limitado à fatia (`packContext`). */
+export interface AnalyzeRepoInput {
+  repo: string;
+  context: string;
+  model: string;
+}
+/** Síntese: só os relatórios dos repositórios e a tabela de métricas, nunca código. */
+export interface SynthesizeRunInput {
+  reports: Array<{ fullName: string; report: RepoReport }>;
+  metricsTable: string;
+  model: string;
+}
+/** Camada 2 do revisor (modelo mais barato): afirmação + trecho, julgamento só pelo trecho. */
+export interface CheckProposalsInput {
+  items: Array<{ proposalId: string; kind: string; claim: string; quote: string }>;
+  model: string;
+}
+
 export interface Provider {
   readonly id: "claude-code" | "mock";
   detect(): Promise<ProviderStatus>;
@@ -87,6 +121,17 @@ export interface Provider {
   analyzeProfiles(
     input: AnalyzeProfilesProviderInput,
   ): Promise<ProviderResult<AnalyzeProfilesOutput>>;
+  /** F03 §2.5: escolha de arquivos (profunda), análise por repositório e síntese da execução. */
+  pickFiles(input: PickFilesInput): Promise<ProviderResult<PickFilesOutput>>;
+  analyzeRepo(input: AnalyzeRepoInput): Promise<ProviderResult<AnalyzeRepoOutput>>;
+  synthesizeRun(input: SynthesizeRunInput): Promise<ProviderResult<SynthesizeRunOutput>>;
+  /** F03 §2.8: camada 2 da revisão anti-alucinação. */
+  checkProposals(input: CheckProposalsInput): Promise<ProviderResult<CheckProposalsOutput>>;
+  /**
+   * F03 §2.4: diagnóstico do plano (assinatura e uso das janelas). Nunca gasta tokens; `null` quando o plano não se
+   * aplica (API key, terceiros) ou não há dado.
+   */
+  getPlanUsage(): Promise<PlanUsage | null>;
 }
 
 export type ProviderErrorCode =

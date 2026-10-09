@@ -94,6 +94,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
               "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
               "type": "string",
             },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
+            },
             "institution": {
               "minLength": 1,
               "type": "string",
@@ -135,6 +156,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
                     "minimum": 0,
                     "type": "number",
                   },
+                  "evidence": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "quote": {
+                        "description": "Trecho copiado literalmente da fonte",
+                        "maxLength": 600,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "ref": {
+                        "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "ref",
+                      "quote",
+                    ],
+                    "type": "object",
+                  },
                   "metric": {
                     "type": "string",
                   },
@@ -173,6 +215,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
             "endDate": {
               "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
               "type": "string",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
             },
             "isCurrent": {
               "type": "boolean",
@@ -236,6 +299,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
             "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
             "type": "string",
           },
+          "evidence": {
+            "additionalProperties": false,
+            "properties": {
+              "quote": {
+                "description": "Trecho copiado literalmente da fonte",
+                "maxLength": 600,
+                "minLength": 1,
+                "type": "string",
+              },
+              "ref": {
+                "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                "minLength": 1,
+                "type": "string",
+              },
+            },
+            "required": [
+              "ref",
+              "quote",
+            ],
+            "type": "object",
+          },
           "fullName": {
             "minLength": 1,
             "type": "string",
@@ -282,6 +366,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
               "minimum": 0,
               "type": "number",
             },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
+            },
             "level": {
               "enum": [
                 "A1",
@@ -316,6 +421,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
               "maximum": 1,
               "minimum": 0,
               "type": "number",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
             },
             "label": {
               "minLength": 1,
@@ -357,6 +483,27 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
               "maximum": 1,
               "minimum": 0,
               "type": "number",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
             },
             "level": {
               "maximum": 5,

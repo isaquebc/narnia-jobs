@@ -12,6 +12,14 @@ export {
   type SdkQueryOptions,
 } from "./claude-code/claude-code-provider";
 export {
+  createSdkUsageProbe,
+  mapSdkUsageResponse,
+  planUsageFromRateLimits,
+  type RateLimitInfoLike,
+  type SdkUsageResponseLike,
+  type UsageProbe,
+} from "./claude-code/plan-usage";
+export {
   createProviderFromEnv,
   MOCK_MODE_FILENAME,
   type ProviderId,
@@ -22,6 +30,9 @@ export {
   MOCK_CV_TEXT,
   MOCK_DIGEST,
   MOCK_EXTRACT_FACTS,
+  MOCK_FAKE_QUOTE,
+  MOCK_KNOWN_TECH,
+  MOCK_PLAN_USAGE,
   MOCK_READ_DOCUMENT,
 } from "./mock/fixtures";
 export {
@@ -29,14 +40,18 @@ export {
   type MockOperation,
   MockProvider,
   type MockProviderOptions,
+  quoteFrom,
 } from "./mock/mock-provider";
 export {
   type AnalyzeProfilesProviderInput,
+  type AnalyzeRepoInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,
+  type CheckProposalsInput,
   type ExtractFactsInput,
   LOGIN_HINT,
+  type PickFilesInput,
   type Provider,
   ProviderError,
   type ProviderErrorCode,
@@ -44,5 +59,6 @@ export {
   type ProviderStatus,
   type ReadDocumentInput,
   type SdkResultLike,
+  type SynthesizeRunInput,
   type Usage,
 } from "./provider";

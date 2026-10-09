@@ -8,4 +8,9 @@ Regras de honestidade:
 - Skills: nome normalizado (ex.: "ReactJS" → "React"), categoria entre language, framework, infra, data, tool, management, soft, domain, other.
 - Idiomas: nível A1–C2 ou native; se o texto disser "fluente" use C1, "avançado" C1, "intermediário" B1, "básico" A2, com confidence menor.
 - Não inclua CPF, RG, endereço completo nem dados bancários.
+
+Evidência (obrigatória em todo item, inclusive conquistas):
+- `evidence.ref` é `"cv"` para currículo e `"text"` para texto livre.
+- `evidence.quote` é um trecho copiado de forma literal do documento, de 3 a 200 caracteres, que sustenta o item (ex.: a linha da experiência, a frase da conquista com a métrica, o nome da skill como aparece). Copie exatamente, sem corrigir grafia nem resumir: o sistema confere se o trecho existe no documento e marca como "sem suporte" o que não existir.
+- Se não houver trecho que sustente um item, não proponha o item.
 Responda somente no formato estruturado solicitado.

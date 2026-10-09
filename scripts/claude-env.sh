@@ -109,7 +109,8 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   api M PATH [B]   chama a API da instância (token já incluso)
   sql "consulta"   consulta somente leitura no SQLite da instância
   logs [svc]       logs da instância
-  test|lint|typecheck|build|e2e [args]   comandos do start.sh dentro da instância
+  test|lint|typecheck|build|e2e|test:sh [args]   comandos do start.sh dentro da instância
+  exec CMD [ARGS…] roda um comando no container de dev da instância (ex.: exec pnpm --filter @narnia-jobs/core exec vitest run x)
   wipe             remove containers, volumes e ./.claude-data da instância
 USAGE
 }
@@ -127,7 +128,8 @@ main() {
     api) api "$@" ;;
     sql) cmd_env_sql "$@" ;;
     logs) "${DEV_COMPOSE[@]}" --profile app logs -f --tail=100 "$@" ;;
-    test | lint | typecheck | build | e2e | shell | cli | install) "$ROOT/start.sh" "$cmd" "$@" ;;
+    test | lint | typecheck | build | e2e | shell | cli | install | test:sh) "$ROOT/start.sh" "$cmd" "$@" ;;
+    exec) require_docker; ensure_installed; dev_run "$@" ;;
     wipe) cmd_env_wipe ;;
     help | -h | --help) usage ;;
     *) usage; die "comando desconhecido: $cmd" ;;

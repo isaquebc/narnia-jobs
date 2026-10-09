@@ -5,31 +5,52 @@ import { promisify } from "node:util";
 import {
   type AnalyzeProfilesOutput,
   AnalyzeProfilesOutputSchema,
+  type AnalyzeRepoOutput,
+  AnalyzeRepoOutputSchema,
   type BuildDigestOutput,
   BuildDigestOutputSchema,
+  type CheckProposalsOutput,
+  CheckProposalsOutputSchema,
   EXTRACTION_JSON_SCHEMAS,
   type ExtractFactsOutput,
   ExtractFactsOutputSchema,
+  INGEST_OUTPUT_JSON_SCHEMAS,
+  type PickFilesOutput,
+  PickFilesOutputSchema,
+  type PlanUsage,
   type ReadDocumentOutput,
   ReadDocumentOutputSchema,
+  type SynthesizeRunOutput,
+  SynthesizeRunOutputSchema,
   toJsonSchema,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
 import {
   type AnalyzeProfilesProviderInput,
+  type AnalyzeRepoInput,
   type AuthMethod,
   type BuildDigestInput,
+  type CheckProposalsInput,
   type ExtractFactsInput,
   LOGIN_HINT,
+  type PickFilesInput,
   type Provider,
   ProviderError,
   type ProviderResult,
   type ProviderStatus,
   type ReadDocumentInput,
   type SdkResultLike,
+  type SynthesizeRunInput,
   type Usage,
 } from "../provider";
 import { resolveClaudeBinary } from "./binary";
+import {
+  createSdkUsageProbe,
+  mapSdkUsageResponse,
+  planUsageFromRateLimits,
+  type RateLimitInfoLike,
+  type UsageProbe,
+} from "./plan-usage";
 
 /* ---------- processos (detect) ---------- */
 
@@ -69,6 +90,8 @@ export interface SdkMessageLike {
   structured_output?: unknown;
   usage?: SdkResultLike["usage"];
   total_cost_usd?: number;
+  /** `rate_limit_event` (F03 §2.4): janela do plano com utilização e renovação. */
+  rate_limit_info?: RateLimitInfoLike;
 }
 
 export interface SdkQueryOptions {
@@ -93,6 +116,8 @@ export interface ClaudeCodeProviderOptions {
   query?: QueryFn;
   /** Caminho do CLI; por padrão resolvido por `resolveClaudeBinary`. */
   binaryPath?: string;
+  /** Sonda do `/usage` estruturado (F03 §2.4); padrão = sessão do SDK sem mensagem. */
+  usageProbe?: UsageProbe;
 }
 
 const AUTH_METHODS: ReadonlySet<string> = new Set([
@@ -114,6 +139,10 @@ export const PROMPTS = {
   extractFacts: () => loadPrompt("extract-facts"),
   buildDigest: () => loadPrompt("build-digest"),
   analyzeProfiles: () => loadPrompt("analyze-profiles"),
+  pickFiles: () => loadPrompt("pick-files"),
+  analyzeRepo: () => loadPrompt("analyze-repo"),
+  synthesizeRun: () => loadPrompt("synthesize-run"),
+  checkProposals: () => loadPrompt("check-proposals"),
 };
 
 /** JSON Schema da análise de perfis (F02), gerado uma vez por processo (sem `$schema`, fix e06eeda). */
@@ -165,6 +194,9 @@ export class ClaudeCodeProvider implements Provider {
   private readonly exec: Exec;
   private readonly query: QueryFn | null;
   private readonly binaryPath: string | null;
+  private readonly usageProbe: UsageProbe;
+  /** Último `rate_limit_event` por tipo de janela, visto em qualquer `query` deste processo. */
+  private readonly rateLimits = new Map<string, RateLimitInfoLike>();
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     this.exec = options.exec ?? defaultExec;
@@ -172,6 +204,18 @@ export class ClaudeCodeProvider implements Provider {
     this.binaryPath =
       options.binaryPath ??
       resolveClaudeBinary({ explicit: process.env.CLAUDE_CODE_BIN || undefined });
+    this.usageProbe = options.usageProbe ?? createSdkUsageProbe({ binaryPath: this.binaryPath });
+  }
+
+  /** Diagnóstico do plano: API experimental primeiro, depois o último evento de limite; `null` sem dado. */
+  async getPlanUsage(): Promise<PlanUsage | null> {
+    try {
+      const fromApi = mapSdkUsageResponse(await this.usageProbe());
+      if (fromApi) return fromApi;
+    } catch {
+      // API experimental indisponível: segue para o evento
+    }
+    return planUsageFromRateLimits(this.rateLimits);
   }
 
   async detect(): Promise<ProviderStatus> {
@@ -227,6 +271,10 @@ export class ClaudeCodeProvider implements Provider {
         : await defaultQuery({ prompt, options: fullOptions });
       for await (const message of stream) {
         if (message.type === "result") result = message;
+        if (message.type === "rate_limit_event" && message.rate_limit_info) {
+          const info = message.rate_limit_info;
+          this.rateLimits.set(info.rateLimitType ?? "five_hour", info);
+        }
       }
     } catch (e) {
       throw new ProviderError(
@@ -313,6 +361,78 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema: ANALYZE_PROFILES_JSON_SCHEMA },
       },
       AnalyzeProfilesOutputSchema,
+    );
+  }
+
+  /** Chamada sem tools e de um turno com saída estruturada (F03 §2.5). */
+  private single<T>(
+    prompt: string,
+    model: string,
+    systemPrompt: string,
+    schema: Record<string, unknown>,
+    zod: z.ZodType<T>,
+  ): Promise<ProviderResult<T>> {
+    return this.run(
+      prompt,
+      {
+        model,
+        tools: [],
+        maxTurns: 1,
+        systemPrompt,
+        outputFormat: { type: "json_schema", schema },
+      },
+      zod,
+    );
+  }
+
+  pickFiles(input: PickFilesInput): Promise<ProviderResult<PickFilesOutput>> {
+    const prompt = [
+      `Repositório: ${input.repo}. Escolha no máximo ${input.maxFiles} arquivos (maxFiles = ${input.maxFiles}).`,
+      `<candidatos>\n${input.candidates.join("\n")}\n</candidatos>`,
+      `<arvore>\n${input.tree.join("\n")}\n</arvore>`,
+    ].join("\n\n");
+    return this.single(
+      prompt,
+      input.model,
+      PROMPTS.pickFiles(),
+      INGEST_OUTPUT_JSON_SCHEMAS.pickFiles,
+      PickFilesOutputSchema,
+    );
+  }
+
+  analyzeRepo(input: AnalyzeRepoInput): Promise<ProviderResult<AnalyzeRepoOutput>> {
+    const prompt = `Repositório: ${input.repo}.\n\n<contexto>\n${input.context}\n</contexto>`;
+    return this.single(
+      prompt,
+      input.model,
+      PROMPTS.analyzeRepo(),
+      INGEST_OUTPUT_JSON_SCHEMAS.analyzeRepo,
+      AnalyzeRepoOutputSchema,
+    );
+  }
+
+  synthesizeRun(input: SynthesizeRunInput): Promise<ProviderResult<SynthesizeRunOutput>> {
+    const reports = input.reports
+      .map((r) => `## ${r.fullName}\n${JSON.stringify(r.report, null, 1)}`)
+      .join("\n\n");
+    const prompt = `<relatorios>\n${reports}\n</relatorios>\n\n<metricas>\n${input.metricsTable}\n</metricas>`;
+    return this.single(
+      prompt,
+      input.model,
+      PROMPTS.synthesizeRun(),
+      INGEST_OUTPUT_JSON_SCHEMAS.synthesizeRun,
+      SynthesizeRunOutputSchema,
+    );
+  }
+
+  checkProposals(input: CheckProposalsInput): Promise<ProviderResult<CheckProposalsOutput>> {
+    const prompt = `<itens>\n${JSON.stringify(input.items, null, 1)}\n</itens>`;
+    return this.single(
+      prompt,
+      input.model,
+      PROMPTS.checkProposals(),
+      INGEST_OUTPUT_JSON_SCHEMAS.checkProposals,
+      CheckProposalsOutputSchema,
     );
   }
 

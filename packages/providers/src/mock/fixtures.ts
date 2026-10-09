@@ -2,6 +2,7 @@ import type {
   AnalyzeProfilesOutput,
   BuildDigestOutput,
   ExtractFactsOutput,
+  PlanUsage,
   ReadDocumentOutput,
 } from "@narnia-jobs/shared";
 
@@ -170,3 +171,37 @@ export const MOCK_ANALYZE_PROFILES: AnalyzeProfilesOutput = {
     },
   ],
 };
+
+/** Diagnóstico do plano no mock (F03 §2.4): Max, 35% da janela de 5 h e 20% da semanal. Controlável pelo modo. */
+export const MOCK_PLAN_USAGE: PlanUsage = {
+  subscription: "max",
+  source: "usage_api",
+  windows: {
+    fiveHour: { utilization: 35, resetsAt: "2026-10-09T20:00:00.000Z" },
+    sevenDay: { utilization: 20, resetsAt: "2026-10-14T00:00:00.000Z" },
+    perModel: [],
+  },
+};
+
+/** Tecnologias que o mock reconhece no contexto de um repositório (nome exibido → categoria). */
+export const MOCK_KNOWN_TECH: Array<
+  [string, "language" | "framework" | "data" | "infra" | "tool"]
+> = [
+  ["TypeScript", "language"],
+  ["JavaScript", "language"],
+  ["Python", "language"],
+  ["Rust", "language"],
+  ["Go", "language"],
+  ["Node.js", "framework"],
+  ["Fastify", "framework"],
+  ["React", "framework"],
+  ["PostgreSQL", "data"],
+  ["Redis", "data"],
+  ["Docker", "infra"],
+  ["Kubernetes", "infra"],
+  ["Terraform", "infra"],
+  ["GitHub Actions", "tool"],
+];
+
+/** Trecho inventado usado pelo modo `unsupportedEvidence` (E2E-07): nunca existe na fonte. */
+export const MOCK_FAKE_QUOTE = "Trecho inventado pelo mock que não existe na fonte";

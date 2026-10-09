@@ -46,6 +46,11 @@ function countingProvider(inner: Provider, calls: Record<string, number>): Provi
     extractFacts: wrap("extractFacts") as Provider["extractFacts"],
     buildDigest: wrap("buildDigest") as Provider["buildDigest"],
     analyzeProfiles: (i) => inner.analyzeProfiles(i),
+    pickFiles: (i) => inner.pickFiles(i),
+    analyzeRepo: (i) => inner.analyzeRepo(i),
+    synthesizeRun: (i) => inner.synthesizeRun(i),
+    checkProposals: (i) => inner.checkProposals(i),
+    getPlanUsage: () => inner.getPlanUsage(),
   };
 }
 
@@ -259,6 +264,11 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
       extractFacts: (i) => new MockProvider().extractFacts(i),
       buildDigest: (i) => new MockProvider().buildDigest(i),
       analyzeProfiles: (i) => new MockProvider().analyzeProfiles(i),
+      pickFiles: (i) => new MockProvider().pickFiles(i),
+      analyzeRepo: (i) => new MockProvider().analyzeRepo(i),
+      synthesizeRun: (i) => new MockProvider().synthesizeRun(i),
+      checkProposals: (i) => new MockProvider().checkProposals(i),
+      getPlanUsage: () => new MockProvider().getPlanUsage(),
     };
     const h3 = harness(spy);
     try {
