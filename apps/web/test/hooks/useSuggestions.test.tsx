@@ -33,7 +33,13 @@ describe("Auditoria F02 (2026-10-08) · useSuggestions (13)", () => {
     }));
     const activateProfile = vi.fn(async (id: string) => profile(id, { isActive: true }));
     const listSuggestions = vi.fn(async () => ({ suggestions: [] }));
-    const { wrapper, ws } = setup({ listProfiles, activateProfile, listSuggestions });
+    const createProfile = vi.fn(async () => profile("p3", { isActive: false }));
+    const { wrapper, ws } = setup({
+      listProfiles,
+      activateProfile,
+      listSuggestions,
+      createProfile,
+    });
     const { result } = renderHook(() => ({ p: useProfiles(), s: useSuggestions() }), { wrapper });
     await waitFor(() => expect(listSuggestions).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.p.active?.id).toBe("p1"));
@@ -42,5 +48,22 @@ describe("Auditoria F02 (2026-10-08) · useSuggestions (13)", () => {
     expect(listSuggestions).toHaveBeenCalledTimes(1);
     act(() => ws.emit({ type: "profile.switched", profileId: "p2" }));
     await waitFor(() => expect(listSuggestions).toHaveBeenCalledTimes(2));
+    // criar um perfil (aceitar uma sugestão) refaz: a sugestão aceita sai da lista
+    await act(() =>
+      result.current.p.create.mutateAsync({
+        name: "PM",
+        targetTitle: "Project Manager",
+        altTitles: [],
+        seniority: "senior",
+        area: "management",
+        goal: "new_job",
+        market: "BR",
+        docLocale: "pt-BR",
+        contractTypes: [],
+        locations: [],
+        needsResearch: ["salary", "contractTypes", "locations", "availableFrom"],
+      }),
+    );
+    await waitFor(() => expect(listSuggestions).toHaveBeenCalledTimes(3));
   });
 });

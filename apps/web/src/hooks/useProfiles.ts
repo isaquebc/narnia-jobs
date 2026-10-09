@@ -2,6 +2,7 @@ import type { ProfileCreateRequest } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useApi, useWs } from "../app/context";
+import { suggestionsKey } from "./useSuggestions";
 
 export const profilesKey = ["profiles"] as const;
 export const profileKey = (id: string) => ["profile", id] as const;
@@ -50,14 +51,18 @@ export function useProfiles(opts: { includeArchived?: boolean } = {}) {
     mutationFn: (id: string) => api.unarchiveProfile(id),
     onSuccess: invalidateAll,
   });
+  // criar (inclusive a partir de uma sugestão aceita) muda o conjunto de sugestões; ativar/arquivar não (F02-13)
+  const invalidateWithSuggestions = async () => {
+    await Promise.all([invalidateAll(), qc.invalidateQueries({ queryKey: suggestionsKey })]);
+  };
   const create = useMutation({
     mutationFn: (body: ProfileCreateRequest) => api.createProfile(body),
-    onSuccess: invalidateAll,
+    onSuccess: invalidateWithSuggestions,
   });
   const clone = useMutation({
     mutationFn: (input: { sourceId: string; body: ProfileCreateRequest }) =>
       api.cloneProfile(input.sourceId, input.body),
-    onSuccess: invalidateAll,
+    onSuccess: invalidateWithSuggestions,
   });
   const rename = useMutation({
     mutationFn: (input: { id: string; name: string }) =>
