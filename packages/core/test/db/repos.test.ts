@@ -371,7 +371,7 @@ describe("repos/proposals.review", () => {
   it("recusa decisão para proposta de outro run e conquista cuja experiência foi rejeitada é ignorada", () => {
     const { r, run, ids } = runWithProposals();
     const other = r.ingestionRuns.create({
-      fileId: r.sourceFiles.get(run.fileId)?.id as string,
+      fileId: r.sourceFiles.get(run.fileId as string)?.id as string,
       provider: "mock",
       models: { document: "haiku", facts: "haiku", digest: "sonnet" },
       options: { ocr: false, modelRead: false },

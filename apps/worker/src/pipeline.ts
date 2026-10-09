@@ -98,8 +98,9 @@ export function consolidatedText(deps: WorkerDeps, runId: string): string {
 function stageEnv(data: StageJobData, deps: WorkerDeps): StageEnv {
   const run = deps.repos.ingestionRuns.get(data.runId);
   if (!run) throw new Error(`Run não encontrado: ${data.runId}`);
-  const file = deps.repos.sourceFiles.get(run.fileId);
-  if (!file) throw new Error(`Arquivo não encontrado: ${run.fileId}`);
+  // a cadeia de etapas é só para CV/texto (F03 §2.9-1); execuções do GitHub não têm arquivo
+  const file = run.fileId ? deps.repos.sourceFiles.get(run.fileId) : null;
+  if (!file) throw new Error(`Arquivo não encontrado: ${run.fileId ?? "(execução sem arquivo)"}`);
   return {
     run,
     file,

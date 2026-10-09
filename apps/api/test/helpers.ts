@@ -147,7 +147,7 @@ export function simulateWorker(t: TestApp, runId: string) {
   ]);
   const proposals = extractFactsOutputToProposals(MOCK_EXTRACT_FACTS);
   t.repos.proposals.insertMany(runId, proposals);
-  t.repos.digests.upsert({ fileId: run.fileId, ...MOCK_DIGEST, editedByUser: false });
+  t.repos.digests.upsert({ fileId: run.fileId as string, ...MOCK_DIGEST, editedByUser: false });
   for (const stage of [
     "ingest.read_text",
     "ingest.consolidate",

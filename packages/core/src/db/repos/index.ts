@@ -3,14 +3,26 @@ import { type DigestsRepo, digestsRepo } from "./digests";
 import { type EmphasisRepo, emphasisRepo } from "./emphasis";
 import { type FactSourcesRepo, factSourcesRepo } from "./fact-sources";
 import { type FactsRepo, factsRepo } from "./facts";
+import {
+  type GithubMetricsRepo,
+  githubMetricsRepo,
+  type RepoAnalysesRepo,
+  type RepoDigestsRepo,
+  type ReposRepo,
+  repoAnalysesRepo,
+  repoDigestsRepo,
+  reposRepo,
+} from "./github";
 import { type IngestionRunsRepo, ingestionRunsRepo } from "./ingestion-runs";
 import { type JobsRepo, jobsRepo } from "./jobs";
+import { type NotificationsRepo, notificationsRepo } from "./notifications";
 import { type ProfilesRepo, profilesRepo } from "./profiles";
 import { type ProposalsRepo, proposalsRepo } from "./proposals";
 import { type ReadingsRepo, readingsRepo } from "./readings";
 import { type RelevanceRepo, relevanceRepo } from "./relevance";
 import { type SalaryReferencesRepo, salaryReferencesRepo } from "./salary-references";
 import { type SettingsRepo, settingsRepo } from "./settings";
+import { type SnapshotsRepo, snapshotsRepo } from "./snapshots";
 import { type SourceFilesRepo, sourceFilesRepo } from "./source-files";
 import { type SuggestionsRepo, suggestionsRepo } from "./suggestions";
 import { type UsageEventsRepo, usageEventsRepo } from "./usage-events";
@@ -34,6 +46,13 @@ export interface Repos {
   jobs: JobsRepo;
   usageEvents: UsageEventsRepo;
   salaryReferences: SalaryReferencesRepo;
+  // F03
+  repos: ReposRepo;
+  repoAnalyses: RepoAnalysesRepo;
+  repoDigests: RepoDigestsRepo;
+  githubMetrics: GithubMetricsRepo;
+  snapshots: SnapshotsRepo;
+  notifications: NotificationsRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -76,6 +95,12 @@ export function createRepos(db: Db): Repos {
     jobs: jobsRepo(db),
     usageEvents: usageEventsRepo(db),
     salaryReferences: salaryReferencesRepo(db),
+    repos: reposRepo(db),
+    repoAnalyses: repoAnalysesRepo(db),
+    repoDigests: repoDigestsRepo(db),
+    githubMetrics: githubMetricsRepo(db),
+    snapshots: snapshotsRepo(db),
+    notifications: notificationsRepo(db),
   };
 }
 
@@ -83,14 +108,17 @@ export * from "./digests";
 export * from "./emphasis";
 export * from "./fact-sources";
 export * from "./facts";
+export * from "./github";
 export * from "./ingestion-runs";
 export * from "./jobs";
+export * from "./notifications";
 export * from "./profiles";
 export * from "./proposals";
 export * from "./readings";
 export * from "./relevance";
 export * from "./salary-references";
 export * from "./settings";
+export * from "./snapshots";
 export * from "./source-files";
 export * from "./suggestions";
 export * from "./usage-events";

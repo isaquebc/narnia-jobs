@@ -5,6 +5,7 @@ export * from "./estimate";
 export * from "./extract";
 export * from "./ids";
 export * from "./ingest/chain";
+export * from "./ingest/settings";
 export * from "./jobs/tasks";
 export * from "./models";
 export * from "./pdf";

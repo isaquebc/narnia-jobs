@@ -18,7 +18,20 @@ export function listMigrations(): Migration[] {
     .map((f) => ({ name: f.replace(/\.sql$/, ""), sql: readFileSync(MIGRATIONS_DIR + f, "utf8") }));
 }
 
-export function migrate(db: Db): { applied: string[] } {
+export interface MigrateOptions {
+  /** Para depois de aplicar esta migration (inclusive). Usado pelos testes de upgrade. */
+  until?: string;
+}
+
+/**
+ * Migrations que reconstroem tabelas referenciadas (SQLite não altera CHECK/NOT NULL) declaram na primeira linha
+ * `-- narnia: foreign-keys-off`: o executor desliga as chaves estrangeiras fora da transação (o pragma não muda dentro
+ * dela), roda `pragma foreign_key_check` antes do commit (qualquer referência quebrada desfaz tudo) e religa as FKs no
+ * estado anterior, com sucesso ou erro (F03 §2.9-2, F03-17).
+ */
+const FK_OFF = /^--\s*narnia:\s*foreign-keys-off/m;
+
+export function migrate(db: Db, opts: MigrateOptions = {}): { applied: string[] } {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null)",
   );
@@ -30,17 +43,37 @@ export function migrate(db: Db): { applied: string[] } {
   const applied: string[] = [];
   const insert = db.prepare("insert into schema_migrations (name, applied_at) values (?, ?)");
   for (const m of listMigrations()) {
-    if (done.has(m.name)) continue;
-    db.exec("begin");
+    if (done.has(m.name)) {
+      if (opts.until === m.name) break;
+      continue;
+    }
+    const fkOff = FK_OFF.test(m.sql);
+    const fkBefore = (db.prepare("pragma foreign_keys").get() as { foreign_keys: number })
+      .foreign_keys;
+    if (fkOff) db.exec("pragma foreign_keys = off");
     try {
-      db.exec(m.sql);
-      insert.run(m.name, nowUtc());
-      db.exec("commit");
-    } catch (e) {
-      db.exec("rollback");
-      throw e;
+      db.exec("begin");
+      try {
+        db.exec(m.sql);
+        if (fkOff) {
+          const broken = db.prepare("pragma foreign_key_check").all();
+          if (broken.length > 0) {
+            throw new Error(
+              `foreign_key_check falhou em ${m.name}: ${broken.length} referência(s) quebrada(s) ${JSON.stringify(broken.slice(0, 3))}`,
+            );
+          }
+        }
+        insert.run(m.name, nowUtc());
+        db.exec("commit");
+      } catch (e) {
+        db.exec("rollback");
+        throw e;
+      }
+    } finally {
+      if (fkOff) db.exec(`pragma foreign_keys = ${fkBefore ? "on" : "off"}`);
     }
     applied.push(m.name);
+    if (opts.until === m.name) break;
   }
   return { applied };
 }

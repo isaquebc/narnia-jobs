@@ -57,7 +57,7 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
     origin: inferOrigin(p.proposal, segments),
     editedData: p.editedData,
   }));
-  const digest = repos.digests.get(run.fileId);
+  const digest = run.fileId ? repos.digests.get(run.fileId) : null;
   return {
     id: run.id,
     fileId: run.fileId,

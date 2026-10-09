@@ -44,7 +44,9 @@ export type AchievementRecord = AchievementInput & FactRecordMeta;
 export type EducationRecord = EducationData & FactRecordMeta;
 export type SkillRecord = SkillData & FactRecordMeta & { nameNormalized: string };
 export type LanguageRecord = LanguageData & FactRecordMeta;
-export type ProjectRecord = ProjectData & FactRecordMeta;
+/** F03: projeto pode vir de um repositório do GitHub. */
+export type ProjectInput = ProjectData & { repoId?: string | null };
+export type ProjectRecord = ProjectInput & FactRecordMeta;
 
 /** Hooks de escrita (F02 §2.9-5): `onRemove` limpa ênfase e relevância do fato apagado. */
 export interface FactsHooks {
@@ -69,7 +71,7 @@ export interface FactsRepo {
   skills: BaseRepo<SkillData, SkillRecord>;
   languages: BaseRepo<LanguageData, LanguageRecord>;
   /** F02-9: tabela nasce vazia; F03 preenche pelo GitHub. */
-  projects: BaseRepo<ProjectData, ProjectRecord>;
+  projects: BaseRepo<ProjectInput, ProjectRecord>;
   counts(): {
     experiences: number;
     achievements: number;
@@ -317,11 +319,21 @@ export function factsRepo(
     hooks,
   );
 
-  const projects = makeRepo<ProjectData, ProjectRecord>(
+  const projects = makeRepo<ProjectInput, ProjectRecord>(
     db,
     settings,
     "project",
-    ["user_id", "name", "description", "url", "role", "start_date", "end_date", "tech_json"],
+    [
+      "user_id",
+      "name",
+      "description",
+      "url",
+      "role",
+      "start_date",
+      "end_date",
+      "tech_json",
+      "repo_id",
+    ],
     (i, ctx) => ({
       user_id: ctx.userId,
       name: i.name,
@@ -331,6 +343,7 @@ export function factsRepo(
       start_date: i.startDate ?? null,
       end_date: i.endDate ?? null,
       tech_json: JSON.stringify(i.tech ?? []),
+      repo_id: i.repoId ?? null,
     }),
     (r) => ({
       ...meta(r),
@@ -341,6 +354,7 @@ export function factsRepo(
       ...(str(r.start_date) ? { startDate: String(r.start_date) } : {}),
       ...(str(r.end_date) ? { endDate: String(r.end_date) } : {}),
       tech: json<string[]>(r.tech_json, []),
+      repoId: str(r.repo_id),
     }),
     uid,
     undefined,

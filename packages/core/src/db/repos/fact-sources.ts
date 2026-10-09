@@ -19,6 +19,9 @@ export interface FactSourceRecord {
   fileId: string | null;
   runId: string | null;
   url: string | null;
+  /** F03: repositório e análise de origem (GitHub). */
+  repoId: string | null;
+  analysisId: string | null;
   createdAt: string;
 }
 
@@ -28,13 +31,15 @@ export interface FactSourcesRepo {
     fileId?: string | null;
     runId?: string | null;
     url?: string | null;
+    repoId?: string | null;
+    analysisId?: string | null;
   }): FactSourceRecord;
   get(id: string): FactSourceRecord | null;
 }
 
 export function factSourcesRepo(db: Db): FactSourcesRepo {
   const insert = db.prepare(
-    "insert into fact_source (id, kind, file_id, run_id, url, created_at) values (?, ?, ?, ?, ?, ?)",
+    "insert into fact_source (id, kind, file_id, run_id, url, repo_id, analysis_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
   );
   const get = db.prepare("select * from fact_source where id = ?");
   const map = (r: Row): FactSourceRecord => ({
@@ -43,6 +48,8 @@ export function factSourcesRepo(db: Db): FactSourcesRepo {
     fileId: str(r.file_id),
     runId: str(r.run_id),
     url: str(r.url),
+    repoId: str(r.repo_id),
+    analysisId: str(r.analysis_id),
     createdAt: String(r.created_at),
   });
   return {
@@ -54,6 +61,8 @@ export function factSourcesRepo(db: Db): FactSourcesRepo {
         input.fileId ?? null,
         input.runId ?? null,
         input.url ?? null,
+        input.repoId ?? null,
+        input.analysisId ?? null,
         nowUtc(),
       );
       return map(get.get(id) as Row);

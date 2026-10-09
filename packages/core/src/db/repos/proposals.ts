@@ -1,9 +1,14 @@
 import {
+  type CheckStatus,
+  type Conflict,
+  type Evidence,
   type FactKind,
   type FactProposal,
   FactProposalSchema,
   type Link,
   nowUtc,
+  type ProposalMatch,
+  type Resolution,
 } from "@narnia-jobs/shared";
 import { newId } from "../../ids";
 import type { Db } from "../open";
@@ -27,6 +32,14 @@ export interface ProposalRecord {
   editedData: Record<string, unknown> | null;
   targetId: string | null;
   decidedAt: string | null;
+  /** F03 §2.8: reconciliação com os fatos existentes, resolução por campo, evidência e selo anti-alucinação. */
+  match: ProposalMatch;
+  matchTargetId: string | null;
+  conflict: Conflict | null;
+  resolution: Resolution | null;
+  evidence: Evidence | null;
+  checkStatus: CheckStatus;
+  suggestedProfiles: string[];
 }
 
 export interface ReviewDecision {
@@ -55,7 +68,19 @@ export class ProposalReviewError extends Error {
 }
 
 export interface ProposalsRepo {
-  insertMany(runId: string, proposals: FactProposal[]): string[];
+  /** `evidence[i]` é o trecho literal que sustenta `proposals[i]` (F03-12); ausente no F01 antigo. */
+  insertMany(
+    runId: string,
+    proposals: FactProposal[],
+    evidence?: Array<Evidence | null | undefined>,
+  ): string[];
+  setMatch(
+    id: string,
+    input: { match: ProposalMatch; targetId?: string | null; conflict?: Conflict | null },
+  ): void;
+  setResolution(id: string, resolution: Resolution | null): void;
+  setCheckStatus(id: string, status: CheckStatus): void;
+  setSuggestedProfiles(id: string, profileIds: string[]): void;
   listByRun(runId: string): ProposalRecord[];
   /**
    * Aplica as decisões da tela de revisão (F01 §2.5): aceitar/editar cria fatos `verified = 1` com `fact_source`;
@@ -77,6 +102,13 @@ function map(r: Row): ProposalRecord {
     editedData: json<Record<string, unknown> | null>(r.edited_payload_json, null),
     targetId: str(r.target_id),
     decidedAt: str(r.decided_at),
+    match: (str(r.match) ?? "new") as ProposalMatch,
+    matchTargetId: str(r.match_target_id),
+    conflict: json<Conflict | null>(r.conflict_json, null),
+    resolution: json<Resolution | null>(r.resolution_json, null),
+    evidence: json<Evidence | null>(r.evidence_json, null),
+    checkStatus: (str(r.check_status) ?? "unchecked") as CheckStatus,
+    suggestedProfiles: json<string[]>(r.suggested_profiles_json, []),
   };
 }
 
@@ -90,7 +122,17 @@ interface Deps {
 
 export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
   const insert = db.prepare(
-    "insert into ingestion_proposal (id, run_id, idx, kind, payload_json, confidence) values (?, ?, ?, ?, ?, ?)",
+    "insert into ingestion_proposal (id, run_id, idx, kind, payload_json, confidence, evidence_json) values (?, ?, ?, ?, ?, ?, ?)",
+  );
+  const setMatch = db.prepare(
+    "update ingestion_proposal set match = ?, match_target_id = ?, conflict_json = ? where id = ?",
+  );
+  const setResolution = db.prepare(
+    "update ingestion_proposal set resolution_json = ? where id = ?",
+  );
+  const setCheck = db.prepare("update ingestion_proposal set check_status = ? where id = ?");
+  const setProfiles = db.prepare(
+    "update ingestion_proposal set suggested_profiles_json = ? where id = ?",
   );
   const byRun = db.prepare("select * from ingestion_proposal where run_id = ? order by idx");
   const decide = db.prepare(
@@ -98,12 +140,47 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
   );
 
   return {
-    insertMany(runId, proposals) {
+    setMatch(id, input) {
+      setMatch.run(
+        input.match,
+        input.targetId ?? null,
+        input.conflict ? JSON.stringify(input.conflict) : null,
+        id,
+      );
+    },
+    setResolution(id, resolution) {
+      setResolution.run(resolution ? JSON.stringify(resolution) : null, id);
+    },
+    setCheckStatus(id, status) {
+      setCheck.run(status, id);
+    },
+    setSuggestedProfiles(id, profileIds) {
+      setProfiles.run(JSON.stringify(profileIds), id);
+    },
+    insertMany(runId, proposals, evidence) {
       return withTransaction(db, () => {
+        const start = (
+          db
+            .prepare(
+              "select coalesce(max(idx) + 1, 0) as n from ingestion_proposal where run_id = ?",
+            )
+            .get(runId) as {
+            n: number;
+          }
+        ).n;
         const ids: string[] = [];
-        proposals.forEach((p, idx) => {
+        proposals.forEach((p, i) => {
           const id = newId();
-          insert.run(id, runId, idx, p.kind, JSON.stringify(p), p.confidence);
+          const ev = evidence?.[i];
+          insert.run(
+            id,
+            runId,
+            start + i,
+            p.kind,
+            JSON.stringify(p),
+            p.confidence,
+            ev ? JSON.stringify(ev) : null,
+          );
           ids.push(id);
         });
         return ids;
@@ -138,7 +215,7 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
         }
 
         const run = deps.runs.get(runId);
-        const file = run ? deps.files.get(run.fileId) : null;
+        const file = run?.fileId ? deps.files.get(run.fileId) : null;
         const result: ReviewResult = {
           accepted: 0,
           edited: 0,
