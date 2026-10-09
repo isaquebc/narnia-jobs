@@ -16,6 +16,7 @@ import { withTransaction } from "../open";
 import { json, type Row, str } from "../sql";
 import type { FactSourceKind, FactSourcesRepo } from "./fact-sources";
 import type { FactsRepo } from "./facts";
+import type { ReposRepo } from "./github";
 import type { IngestionRunsRepo } from "./ingestion-runs";
 import type { SourceFilesRepo } from "./source-files";
 import type { UserPatch, UsersRepo } from "./users";
@@ -47,6 +48,8 @@ export interface ReviewDecision {
   decision: "accept" | "edit" | "reject";
   /** Campos editados pelo usuário (merge sobre `proposal.data`); obrigatório para `edit`. */
   editedData?: Record<string, unknown>;
+  /** F03-6: resolução campo a campo de um conflito; sem ela, aceitar um conflito é recusado. */
+  resolution?: Resolution;
 }
 
 export interface ReviewResult {
@@ -59,7 +62,7 @@ export interface ReviewResult {
 }
 
 export class ProposalReviewError extends Error {
-  readonly code: "unknown_proposal" | "foreign_proposal" | "missing_edit";
+  readonly code: "unknown_proposal" | "foreign_proposal" | "missing_edit" | "conflict_unresolved";
   constructor(code: ProposalReviewError["code"], message: string) {
     super(message);
     this.name = "ProposalReviewError";
@@ -118,6 +121,8 @@ interface Deps {
   factSources: FactSourcesRepo;
   runs: IngestionRunsRepo;
   files: SourceFilesRepo;
+  /** F03: projeto aceito liga ao repositório pelo `url`. */
+  repos?: ReposRepo;
 }
 
 export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
@@ -211,6 +216,18 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
           if (d.decision === "edit" && !d.editedData) {
             throw new ProposalReviewError("missing_edit", `Edição sem dados: ${d.proposalId}`);
           }
+          if (
+            d.decision !== "reject" &&
+            p.decision === "pending" &&
+            p.match === "conflict" &&
+            p.conflict?.fields.some((f) => !(d.resolution ?? p.resolution)?.[f.field])
+          ) {
+            const fields = (p.conflict?.fields ?? []).map((f) => f.field).join(", ");
+            throw new ProposalReviewError(
+              "conflict_unresolved",
+              `Conflito sem resolução para ${fields}: ${d.proposalId}`,
+            );
+          }
           wanted.set(d.proposalId, d);
         }
 
@@ -225,11 +242,23 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
         };
         const ensureSource = () => {
           if (!result.sourceId) {
-            const kind: FactSourceKind = file?.kind === "text" ? "text" : "cv";
+            const kind: FactSourceKind =
+              run?.source === "github" ? "github" : file?.kind === "text" ? "text" : "cv";
             result.sourceId = deps.factSources.create({ kind, fileId: file?.id ?? null, runId }).id;
           }
           return result.sourceId;
         };
+        const factRepo = (kind: string) =>
+          (
+            ({
+              experience: deps.facts.experiences,
+              achievement: deps.facts.achievements,
+              education: deps.facts.education,
+              skill: deps.facts.skills,
+              language: deps.facts.languages,
+              project: deps.facts.projects,
+            }) as Record<string, { update(id: string, patch: Record<string, unknown>): unknown }>
+          )[kind];
         const now = nowUtc();
 
         // experienceIndex → id da experiência aceita (deste review ou de um anterior)
@@ -249,6 +278,34 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
           if (d.decision === "reject") {
             decide.run("rejected", null, null, now, p.id);
             result.rejected++;
+            return;
+          }
+          // F03 §2.9-6: entidade que já existe não é duplicada; a fonte nova fica ligada pela proposta aceita
+          if ((p.match === "existing" || p.match === "conflict") && p.matchTargetId) {
+            ensureSource();
+            if (p.match === "conflict" && p.conflict) {
+              const resolution = (d.resolution ?? p.resolution ?? {}) as Resolution;
+              const patch: Record<string, unknown> = {};
+              for (const f of p.conflict.fields) {
+                const r = resolution[f.field];
+                if (r?.choice === "use_new") patch[f.field] = f.proposed;
+                if (r?.choice === "edit") patch[f.field] = r.value;
+              }
+              if (Object.keys(patch).length > 0) factRepo(p.kind)?.update(p.matchTargetId, patch);
+              setResolution.run(JSON.stringify(resolution), p.id);
+            }
+            const edited = d.decision === "edit";
+            decide.run(
+              edited ? "edited" : "accepted",
+              edited ? JSON.stringify(d.editedData) : null,
+              p.matchTargetId,
+              now,
+              p.id,
+            );
+            if (p.kind === "experience")
+              experienceIds.set(expOrdinal.get(p.id) as number, p.matchTargetId);
+            if (edited) result.edited++;
+            else result.accepted++;
             return;
           }
           const data =
@@ -303,6 +360,17 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
             case "language":
               targetId = deps.facts.languages.insert({ ...valid.data, ...meta }).id;
               break;
+            case "project": {
+              const url = valid.data.url?.replace(/\.git$/, "").replace(/\/$/, "");
+              const full = url?.match(/github\.com\/([^/]+\/[^/]+)/)?.[1] ?? null;
+              const repo = full ? (deps.repos?.getByFullName(full) ?? null) : null;
+              targetId = deps.facts.projects.insert({
+                ...valid.data,
+                ...meta,
+                ...(repo ? { repoId: repo.id } : {}),
+              }).id;
+              break;
+            }
             case "link": {
               const u = deps.users.appendLinks([valid.data as Link]);
               targetId = u.id;

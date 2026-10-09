@@ -1,10 +1,12 @@
 import {
   ExtractError,
   estimateExtraction,
+  previousRunsForFile,
   type Repos,
   resolveExtractionModels,
+  type SourceFileRecord,
 } from "@narnia-jobs/core";
-import { TextCreateRequestSchema } from "@narnia-jobs/shared";
+import { FileDigestPutRequestSchema, TextCreateRequestSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
 import { readMeta, storeText, storeUpload, toFileResponse } from "../services/files";
@@ -16,6 +18,11 @@ function extractErrorStatus(e: ExtractError): 400 | 413 {
 
 export function filesRoutes(deps: { repos: Repos; dataDir: string }) {
   const app = new Hono();
+  /** "Já lido" (F03 §2.9-5): a resposta do arquivo traz as execuções anteriores do mesmo conteúdo. */
+  const withRuns = (file: SourceFileRecord, meta: ReturnType<typeof readMeta>) => ({
+    ...toFileResponse(file, meta),
+    previousRuns: previousRunsForFile(deps.repos, file.id),
+  });
 
   app.post("/api/files", async (c) => {
     const body = await c.req.parseBody();
@@ -32,7 +39,7 @@ export function filesRoutes(deps: { repos: Repos; dataDir: string }) {
         file.name || null,
         "cv",
       );
-      return c.json(toFileResponse(stored.file, stored.meta), stored.created ? 201 : 200);
+      return c.json(withRuns(stored.file, stored.meta), stored.created ? 201 : 200);
     } catch (e) {
       if (e instanceof ExtractError) return apiError(c, extractErrorStatus(e), e.code, e.message);
       throw e;
@@ -42,7 +49,7 @@ export function filesRoutes(deps: { repos: Repos; dataDir: string }) {
   app.post("/api/texts", validate("json", TextCreateRequestSchema), async (c) => {
     try {
       const stored = await storeText(deps.repos, deps.dataDir, c.req.valid("json").text);
-      return c.json(toFileResponse(stored.file, stored.meta), stored.created ? 201 : 200);
+      return c.json(withRuns(stored.file, stored.meta), stored.created ? 201 : 200);
     } catch (e) {
       if (e instanceof ExtractError) return apiError(c, extractErrorStatus(e), e.code, e.message);
       throw e;
@@ -52,7 +59,26 @@ export function filesRoutes(deps: { repos: Repos; dataDir: string }) {
   app.get("/api/files/:id", (c) => {
     const file = deps.repos.sourceFiles.get(c.req.param("id"));
     if (!file) return apiError(c, 404, "not_found", "Arquivo não encontrado");
-    return c.json(toFileResponse(file, readMeta(deps.dataDir, file)));
+    return c.json(withRuns(file, readMeta(deps.dataDir, file)));
+  });
+
+  app.get("/api/files/:id/digest", (c) => {
+    const file = deps.repos.sourceFiles.get(c.req.param("id"));
+    if (!file) return apiError(c, 404, "not_found", "Arquivo não encontrado");
+    return c.json({ digest: deps.repos.digests.get(file.id) });
+  });
+
+  app.put("/api/files/:id/digest", validate("json", FileDigestPutRequestSchema), (c) => {
+    const file = deps.repos.sourceFiles.get(c.req.param("id"));
+    if (!file) return apiError(c, 404, "not_found", "Arquivo não encontrado");
+    const current = deps.repos.digests.get(file.id);
+    const digest = deps.repos.digests.upsert({
+      ...c.req.valid("json"),
+      fileId: file.id,
+      editedByUser: true,
+      textPath: current?.textPath ?? null,
+    });
+    return c.json({ digest });
   });
 
   // Estimativa das chamadas ao modelo (três para PDF com tudo ligado), por modelo (F01 §2.5).

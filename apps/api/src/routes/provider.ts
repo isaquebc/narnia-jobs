@@ -8,11 +8,18 @@ import {
   trackInvalidation,
 } from "@narnia-jobs/core";
 import { MockProvider, type Provider } from "@narnia-jobs/providers";
-import { EmphasisFactKindSchema } from "@narnia-jobs/shared";
+import { EmphasisFactKindSchema, PlanUsageSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
+import {
+  type FakeDeviceFlow,
+  fakeStateFile,
+  type GithubAuthDeps,
+  githubAuthStatus,
+  writeFakeState,
+} from "../github-auth";
 import { patchOnboarding } from "./onboarding";
 import { emitInvalidated } from "./profiles";
 import { validate } from "./validate";
@@ -32,8 +39,25 @@ const MockModeSchema = z.object({
       extractFacts: z.string().optional(),
       buildDigest: z.string().optional(),
       analyzeProfiles: z.string().optional(),
+      pickFiles: z.string().optional(),
+      analyzeRepo: z.string().optional(),
+      synthesizeRun: z.string().optional(),
+      checkProposals: z.string().optional(),
     })
     .optional(),
+  /** F03 E2E-07: a primeira proposta de cada extração cita um trecho inexistente. */
+  unsupportedEvidence: z.boolean().optional(),
+  /** F03 §2.4: diagnóstico do plano devolvido pelo mock (null = indisponível). */
+  planUsage: PlanUsageSchema.nullable().optional(),
+});
+
+/** Estado do `gh` falso (F03 e2e): login, rate limit, commit novo por repositório, token do host, fluxo de dispositivo. */
+const TestGithubSchema = z.object({
+  authenticated: z.boolean().optional(),
+  rateLimited: z.boolean().optional(),
+  heads: z.record(z.string(), z.string().regex(/^[0-9a-f]{40}$/)).optional(),
+  hostTokenAvailable: z.boolean().optional(),
+  deviceComplete: z.boolean().optional(),
 });
 
 const SeedRequestSchema = z.object({ fixture: z.enum(FIXTURE_NAMES) });
@@ -55,6 +79,9 @@ export function providerRoutes(deps: {
   bus: EventBus;
   repos: Repos;
   dataDir: string;
+  /** Fluxo de dispositivo falso e credenciais do GitHub (F03, só com o mock). */
+  deviceFlow?: FakeDeviceFlow | null;
+  githubAuth?: GithubAuthDeps;
 }) {
   const app = new Hono();
   app.get("/api/provider/status", async (c) => c.json(await deps.provider.detect()));
@@ -67,6 +94,7 @@ export function providerRoutes(deps: {
       const { tables } = resetDatabase(deps.repos.db);
       for (const dir of RESET_DIRS)
         rmSync(join(deps.dataDir, dir), { recursive: true, force: true });
+      rmSync(fakeStateFile(deps.dataDir), { force: true });
       mock.reset();
       deps.bus.emit({ type: "provider.status", status: await mock.detect() });
       return c.json({ ok: true, tables });
@@ -92,6 +120,18 @@ export function providerRoutes(deps: {
       emitInvalidated(deps.bus, flipped);
       return c.json(result);
     });
+    app.post("/api/_test/github", validate("json", TestGithubSchema), async (c) => {
+      const { deviceComplete, ...state } = c.req.valid("json");
+      writeFakeState(
+        deps.dataDir,
+        Object.fromEntries(Object.entries(state).filter(([, v]) => v !== undefined)),
+      );
+      if (deviceComplete !== undefined) deps.deviceFlow?.complete(deviceComplete);
+      return c.json({
+        ok: true,
+        ...(deps.githubAuth ? { status: await githubAuthStatus(deps.githubAuth) } : {}),
+      });
+    });
     app.post("/api/_test/mock", validate("json", MockModeSchema), async (c) => {
       const body = c.req.valid("json");
       mock.setMode(
@@ -114,6 +154,9 @@ export function providerRoutes(deps: {
       apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
     );
     app.patch("/api/_test/facts/:kind/:id", (c) =>
+      apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
+    );
+    app.post("/api/_test/github", (c) =>
       apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
     );
   }

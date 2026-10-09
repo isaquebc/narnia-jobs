@@ -35,7 +35,29 @@ export interface FactSourcesRepo {
     analysisId?: string | null;
   }): FactSourceRecord;
   get(id: string): FactSourceRecord | null;
+  /**
+   * Fontes de um fato (F03 §3: "aceitar sobre entidade existente gera novo fact_source, nada é substituído"): a
+   * fonte gravada no fato mais a de cada execução cuja proposta aceita apontou para ele (`target_id`).
+   */
+  listForFact(kind: FactKindWithTable, factId: string): FactSourceRecord[];
 }
+
+export type FactKindWithTable =
+  | "experience"
+  | "achievement"
+  | "education"
+  | "skill"
+  | "language"
+  | "project";
+
+const FACT_TABLE: Record<FactKindWithTable, string> = {
+  experience: "experience",
+  achievement: "achievement",
+  education: "education",
+  skill: "skill",
+  language: "language",
+  project: "project",
+};
 
 export function factSourcesRepo(db: Db): FactSourcesRepo {
   const insert = db.prepare(
@@ -70,6 +92,20 @@ export function factSourcesRepo(db: Db): FactSourcesRepo {
     get(id) {
       const row = get.get(id) as Row | undefined;
       return row ? map(row) : null;
+    },
+    listForFact(kind, factId) {
+      const table = FACT_TABLE[kind];
+      const rows = db
+        .prepare(
+          `select fs.* from fact_source fs where fs.id = (select source_id from ${table} where id = ?)
+           union
+           select fs.* from fact_source fs
+             join ingestion_proposal p on p.run_id = fs.run_id
+            where p.target_id = ? and p.kind = ? and p.decision in ('accepted', 'edited')
+           order by created_at`,
+        )
+        .all(factId, factId, kind) as Row[];
+      return rows.map(map);
     },
   };
 }

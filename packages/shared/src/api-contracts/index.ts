@@ -17,6 +17,7 @@ import {
 import {
   BudgetRequestSchema,
   BudgetSchema,
+  BudgetUnitSchema,
   CheckStatusSchema,
   ConflictSchema,
   EvidenceSchema,
@@ -156,6 +157,8 @@ export const ReviewDecisionSchema = z
     editedData: z.record(z.string(), z.unknown()).optional(),
     /** Resolução campo a campo de um conflito (F03-6); sem ela, aceitar um conflito é recusado (422). */
     resolution: ResolutionSchema.optional(),
+    /** Perfis em que o fato aceito entra destacado (tags por perfil, F03 §2.8 / E2E-09). */
+    profiles: z.array(IdSchema).optional(),
   })
   .refine((d) => d.decision !== "edited" || d.editedData !== undefined, {
     message: "editedData é obrigatório quando a decisão é 'edited'",
@@ -336,7 +339,11 @@ export const GithubDeviceResponseSchema = z.object({
 export type GithubDeviceResponse = z.infer<typeof GithubDeviceResponseSchema>;
 
 // POST /api/sources/github/preview
-export const GithubPreviewRequestSchema = z.object({ mode: IngestionModeSchema });
+export const GithubPreviewRequestSchema = z.object({
+  mode: IngestionModeSchema,
+  /** Análise pública sem login: o usuário informa de quem é o perfil (F03-2). */
+  login: z.string().min(1).max(39).optional(),
+});
 export const GithubPreviewResponseSchema = z.object({
   mode: IngestionModeSchema,
   authenticated: z.boolean(),
@@ -356,6 +363,8 @@ export const GithubIngestionCreateRequestSchema = z.object({
   depth: IngestionDepthSchema,
   model: z.string().min(1),
   budget: BudgetRequestSchema.optional(),
+  /** Análise pública sem login (F03-2). */
+  login: z.string().min(1).max(39).optional(),
 });
 export type GithubIngestionCreateRequest = z.infer<typeof GithubIngestionCreateRequestSchema>;
 
@@ -424,6 +433,11 @@ export const RepoDigestPutRequestSchema = RepoDigestSchema.omit({
   repoId: true,
   editedByUser: true,
 });
+/** `PUT /api/files/:id/digest` (F03 item 6): o usuário corrige o resumo; nova ingestão não sobrescreve. */
+export const FileDigestPutRequestSchema = FileDigestSchema.omit({
+  fileId: true,
+  editedByUser: true,
+});
 
 // GET /api/notifications?status= · POST /api/notifications/:id/read · /dismiss
 export const NotificationsListQuerySchema = z.object({
@@ -451,6 +465,21 @@ export const SnapshotsListResponseSchema = z.object({
   maxBytes: z.number().int().min(0),
 });
 
+// Configurações da ingestão (F03 §3 `settings`): GET devolve tudo resolvido com padrões; PUT aceita parcial.
+export const IngestSettingsSchema = z.object({
+  githubAuth: GithubAuthSourceSchema,
+  budgetDefaults: z.object({
+    quick: z.number().int().min(0),
+    balanced: z.number().int().min(0),
+    deep: z.number().int().min(0),
+  }),
+  budgetUnit: BudgetUnitSchema,
+  reviewCheckModelEnabled: z.boolean(),
+  autoConfirmBelow: z.number().int().min(0),
+  snapshotsMaxBytes: z.number().int().min(0),
+});
+export const IngestSettingsPutRequestSchema = IngestSettingsSchema.partial();
+
 // Eventos do F03: estado da execução e notificações.
 export const IngestionUpdatedEventSchema = z.object({
   type: z.literal("ingestion.updated"),
@@ -464,6 +493,12 @@ export const NotificationCreatedEventSchema = z.object({
 export const NotificationUpdatedEventSchema = z.object({
   type: z.literal("notification.updated"),
   notification: NotificationSchema,
+});
+/** Conexão do GitHub mudou (fluxo de dispositivo concluído ou falhou, desconexão). */
+export const GithubAuthUpdatedEventSchema = z.object({
+  type: z.literal("github.auth_updated"),
+  status: GithubAuthStatusResponseSchema,
+  error: z.string().optional(),
 });
 
 // Eventos do F02 (§2.5 troca de perfil, §2.2 cartão). Fazem parte da união `WsEventSchema` desde M4 (F02-20).
@@ -497,6 +532,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   IngestionUpdatedEventSchema,
   NotificationCreatedEventSchema,
   NotificationUpdatedEventSchema,
+  GithubAuthUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

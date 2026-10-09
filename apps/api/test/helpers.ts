@@ -68,6 +68,8 @@ export interface TestApp {
   queue: FakeQueueAdapter;
   bus: EventBus;
   events: AnyWsEvent[];
+  /** Pasta do `gh` (volume `gh-auth`) desta app de teste: `host-token` e login próprio. */
+  ghConfigDir: string;
   cleanup: () => void;
   /** fetch autenticado */
   api: (path: string, init?: RequestInit) => Promise<Response>;
@@ -84,7 +86,17 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
   const events: AnyWsEvent[] = [];
   bus.on((e) => events.push(e));
   const token = opts.token ?? TOKEN;
-  const app = createApp({ version: "0.0.0-test", repos, dataDir, provider, queue, bus, token });
+  const ghConfigDir = mkdtempSync(join(tmpdir(), "narnia-gh-"));
+  const app = createApp({
+    version: "0.0.0-test",
+    repos,
+    dataDir,
+    provider,
+    queue,
+    bus,
+    token,
+    ghConfigDir,
+  });
   const api = async (path: string, init: RequestInit = {}) =>
     app.request(path, {
       ...init,
@@ -99,7 +111,11 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
     bus,
     events,
     api,
-    cleanup: () => rmSync(dataDir, { recursive: true, force: true }),
+    ghConfigDir,
+    cleanup: () => {
+      rmSync(dataDir, { recursive: true, force: true });
+      rmSync(ghConfigDir, { recursive: true, force: true });
+    },
   };
 }
 

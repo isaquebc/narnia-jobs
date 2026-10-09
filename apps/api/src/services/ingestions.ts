@@ -1,4 +1,10 @@
-import { type IngestionRunRecord, type Repos, type SegmentRecord, STAGES } from "@narnia-jobs/core";
+import {
+  type IngestionRunRecord,
+  type ProposalRecord,
+  type Repos,
+  type SegmentRecord,
+  STAGES,
+} from "@narnia-jobs/core";
 import type { FactProposal } from "@narnia-jobs/shared";
 
 type Origin = "text_layer" | "ocr" | "model_read" | "consolidated";
@@ -41,6 +47,24 @@ export function inferOrigin(p: FactProposal, segments: SegmentRecord[]): Origin 
   return "consolidated";
 }
 
+/** Proposta para a revisão (F03 §2.9-6): reconciliação, evidência literal, selo e perfis sugeridos. */
+export function toProposalDto(p: ProposalRecord, segments: SegmentRecord[]) {
+  return {
+    id: p.id,
+    proposal: p.proposal,
+    decision: p.decision === "skipped" ? ("rejected" as const) : p.decision,
+    origin: inferOrigin(p.proposal, segments),
+    editedData: p.editedData,
+    match: p.match,
+    matchTargetId: p.matchTargetId,
+    conflict: p.conflict,
+    resolution: p.resolution,
+    evidence: p.evidence,
+    checkStatus: p.checkStatus,
+    suggestedProfiles: p.suggestedProfiles,
+  };
+}
+
 export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
   const segments = repos.readings.segmentsByRun(run.id);
   const jobs = repos.jobs
@@ -50,17 +74,20 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
         (STAGES[a.type as keyof typeof STAGES]?.order ?? 99) -
         (STAGES[b.type as keyof typeof STAGES]?.order ?? 99),
     );
-  const proposals = repos.proposals.listByRun(run.id).map((p) => ({
-    id: p.id,
-    proposal: p.proposal,
-    decision: p.decision === "skipped" ? ("rejected" as const) : p.decision,
-    origin: inferOrigin(p.proposal, segments),
-    editedData: p.editedData,
-  }));
+  const proposals = repos.proposals.listByRun(run.id).map((p) => toProposalDto(p, segments));
   const digest = run.fileId ? repos.digests.get(run.fileId) : null;
   return {
     id: run.id,
     fileId: run.fileId,
+    source: run.source,
+    mode: run.mode,
+    model: run.model,
+    depth: run.depth,
+    budget: run.budget,
+    report: run.report,
+    repos: run.params.repos ?? [],
+    analyses: repos.repoAnalyses.listByRun(run.id),
+    parentRunId: run.parentRunId,
     status: run.status,
     options: run.options,
     models: run.models,

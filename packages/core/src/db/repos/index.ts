@@ -71,6 +71,7 @@ export function createRepos(db: Db): Repos {
   const factSources = factSourcesRepo(db);
   const sourceFiles = sourceFilesRepo(db);
   const ingestionRuns = ingestionRunsRepo(db);
+  const githubRepos = reposRepo(db);
   return {
     db,
     settings,
@@ -91,11 +92,12 @@ export function createRepos(db: Db): Repos {
       factSources,
       runs: ingestionRuns,
       files: sourceFiles,
+      repos: githubRepos,
     }),
     jobs: jobsRepo(db),
     usageEvents: usageEventsRepo(db),
     salaryReferences: salaryReferencesRepo(db),
-    repos: reposRepo(db),
+    repos: githubRepos,
     repoAnalyses: repoAnalysesRepo(db),
     repoDigests: repoDigestsRepo(db),
     githubMetrics: githubMetricsRepo(db),
