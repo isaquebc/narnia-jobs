@@ -1,4 +1,11 @@
-import type { StageJobData, TaskJobData } from "@narnia-jobs/core";
+import { INGEST_TASKS, type StageJobData, type TaskJobData } from "@narnia-jobs/core";
+import {
+  githubPrepare,
+  githubRepo,
+  githubSynthesis,
+  ingestReconcile,
+  ingestReviewCheck,
+} from "./ingest/github";
 import type { WorkerDeps } from "./pipeline";
 import { analyzeProfiles } from "./processors/analyze-profiles";
 
@@ -30,6 +37,11 @@ export class TaskError extends Error {
 
 export const TASK_HANDLERS: Record<string, TaskHandler> = {
   "profile.analyze": analyzeProfiles,
+  [INGEST_TASKS.githubPrepare]: githubPrepare,
+  [INGEST_TASKS.githubRepo]: githubRepo,
+  [INGEST_TASKS.githubSynthesis]: githubSynthesis,
+  [INGEST_TASKS.reconcile]: ingestReconcile,
+  [INGEST_TASKS.reviewCheck]: ingestReviewCheck,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

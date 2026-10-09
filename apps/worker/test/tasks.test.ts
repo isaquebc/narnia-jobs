@@ -31,6 +31,11 @@ function harness(provider = new MockProvider()) {
       }),
     },
     enqueue: async () => {},
+    enqueueTask: async () => {},
+    publish: async () => {},
+    gh: () => {
+      throw new Error("gh não usado neste teste");
+    },
   };
   const progress: number[] = [];
   const ctx: TaskContext = {

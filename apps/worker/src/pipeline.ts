@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  type GhClient,
   type IngestionRunRecord,
   localeFromLanguage,
   nextStage,
@@ -10,14 +11,19 @@ import {
   type SourceFileRecord,
   type StageJobData,
   type StageName,
+  type TaskRequest,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
+import type { WsEvent } from "@narnia-jobs/shared";
+import { notifyRun, setRunStatus } from "./ingest/status";
 import { consolidate } from "./processors/consolidate";
 import { digest } from "./processors/digest";
 import { facts } from "./processors/facts";
 import { ocrPagesStage } from "./processors/ocr";
 import { readDoc } from "./processors/read-doc";
 import { readText } from "./processors/read-text";
+import { reconcileStage } from "./processors/reconcile";
+import { reviewCheckStage } from "./processors/review-check";
 
 export interface OcrDeps {
   render: (pdfPath: string, outDir: string) => Promise<string[]>;
@@ -31,6 +37,12 @@ export interface WorkerDeps {
   ocr: OcrDeps;
   /** Enfileira a próxima etapa (BullMQ em produção; spy em teste). */
   enqueue: (runId: string, stage: StageName) => Promise<void>;
+  /** Enfileira uma tarefa (F03: repositórios, síntese, reconciliação, conferência). */
+  enqueueTask: (req: TaskRequest) => Promise<unknown>;
+  /** Publica um evento WS (estado da execução e notificações, F03 §2.8). */
+  publish: (event: WsEvent) => Promise<void>;
+  /** Cliente `gh` com a credencial atual (host/app) ou o falso do mock (F03-1). */
+  gh: () => GhClient;
 }
 
 export interface StageContext {
@@ -66,6 +78,8 @@ const PROCESSORS: Record<StageName, Processor> = {
   "ingest.consolidate": consolidate,
   "extract.facts": facts,
   "extract.digest": digest,
+  "ingest.reconcile": reconcileStage,
+  "ingest.review_check": reviewCheckStage,
 };
 
 /* ---------- utilitários compartilhados pelos processadores ---------- */
@@ -121,7 +135,7 @@ export async function processStage(
 ): Promise<StageOutcome> {
   const env = stageEnv(data, deps);
   if (env.run.status === "queued" || env.run.status === "estimating") {
-    deps.repos.ingestionRuns.setStatus(env.run.id, "running");
+    await setRunStatus(deps, env.run.id, "running");
   }
   const outcome = await PROCESSORS[data.stage](env, ctx, deps);
   const plan = planStages({ isPdf: env.isPdf, options: env.run.options });
@@ -129,7 +143,7 @@ export async function processStage(
   if (next) {
     await deps.enqueue(env.run.id, next);
   } else {
-    deps.repos.ingestionRuns.setStatus(env.run.id, "review");
+    await setRunStatus(deps, env.run.id, "review");
   }
   await ctx.progress(100);
   return { stage: data.stage, ...outcome };
@@ -146,7 +160,8 @@ export async function onStageFailed(
     deps.repos.ingestionRuns.setStatus(data.runId, "review", {
       error: `Digest pendente: ${message}`,
     });
+    await notifyRun(deps, data.runId);
     return;
   }
-  deps.repos.ingestionRuns.setStatus(data.runId, "error", { error: message });
+  await setRunStatus(deps, data.runId, "error", { error: message });
 }

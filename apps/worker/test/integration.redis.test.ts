@@ -25,7 +25,7 @@ describe.skipIf(!REDIS_URL)("M4/worker integração com Redis real (BullMQ)", ()
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it("cadeia completa de um PDF chega a review com 6 jobs done no espelho", async () => {
+  it("cadeia completa de um PDF chega a review com 8 jobs done no espelho", async () => {
     mkdirSync(join(dataDir, "uploads"), { recursive: true });
     const buf = readFileSync(join(FIXTURES, "cv_text.pdf"));
     const sha = createHash("sha256").update(buf).digest("hex");
@@ -82,12 +82,12 @@ describe.skipIf(!REDIS_URL)("M4/worker integração com Redis real (BullMQ)", ()
     let jobs = repos.jobs.list({ parentId: run.id });
     while (
       Date.now() < jobsDeadline &&
-      !(jobs.length === 6 && jobs.every((j) => j.status === "done"))
+      !(jobs.length === 8 && jobs.every((j) => j.status === "done"))
     ) {
       await new Promise((r) => setTimeout(r, 100));
       jobs = repos.jobs.list({ parentId: run.id });
     }
-    expect(jobs).toHaveLength(6);
+    expect(jobs).toHaveLength(8); // F03: + reconciliação e conferência
     expect(jobs.every((j) => j.status === "done")).toBe(true);
     expect(await started.heartbeat()).not.toBeNull();
     expect(repos.proposals.listByRun(run.id).length).toBeGreaterThan(5);

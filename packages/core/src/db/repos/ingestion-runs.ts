@@ -98,6 +98,8 @@ export interface IngestionRunsRepo {
   usedTokens(id: string): number;
   setBudget(id: string, budget: Budget): void;
   setReport(id: string, report: RunReport): void;
+  /** Parâmetros da execução (repositórios, login, tabela de métricas, plano antes da execução…). */
+  setParams(id: string, params: RunParams): void;
 }
 
 const TERMINAL: ReadonlySet<RunStatus> = new Set(["review", "done", "error", "cancelled"]);
@@ -149,6 +151,7 @@ export function ingestionRunsRepo(db: Db): IngestionRunsRepo {
   const setUsage = db.prepare("update ingestion_run set usage_json = ? where id = ?");
   const setBudget = db.prepare("update ingestion_run set budget_json = ? where id = ?");
   const setReport = db.prepare("update ingestion_run set report_json = ? where id = ?");
+  const setParamsStmt = db.prepare("update ingestion_run set params_json = ? where id = ?");
   const repo: IngestionRunsRepo = {
     create(input) {
       const id = newId();
@@ -225,6 +228,9 @@ export function ingestionRunsRepo(db: Db): IngestionRunsRepo {
     },
     setReport(id, report) {
       setReport.run(JSON.stringify(report), id);
+    },
+    setParams(id, params) {
+      setParamsStmt.run(JSON.stringify(params), id);
     },
   };
   return repo;

@@ -9,7 +9,7 @@ function repos(): Repos {
 }
 
 describe("M4/core cadeia de ingestão (F01 §2.5)", () => {
-  it("PDF com tudo ligado = 6 etapas na ordem; OCR/leitura desligados pulam as etapas certas; texto = 4 etapas", () => {
+  it("PDF com tudo ligado = 8 etapas na ordem (F03 acrescenta reconciliação e conferência); texto = 6 etapas", () => {
     expect(planStages({ isPdf: true, options: { ocr: true, modelRead: true } })).toEqual([
       "ingest.read_text",
       "ocr.pages",
@@ -17,6 +17,8 @@ describe("M4/core cadeia de ingestão (F01 §2.5)", () => {
       "ingest.consolidate",
       "extract.facts",
       "extract.digest",
+      "ingest.reconcile",
+      "ingest.review_check",
     ]);
     expect(planStages({ isPdf: true, options: { ocr: false, modelRead: true } })).not.toContain(
       "ocr.pages",
@@ -29,6 +31,8 @@ describe("M4/core cadeia de ingestão (F01 §2.5)", () => {
       "ingest.consolidate",
       "extract.facts",
       "extract.digest",
+      "ingest.reconcile",
+      "ingest.review_check",
     ]);
   });
 
@@ -46,7 +50,8 @@ describe("M4/core cadeia de ingestão (F01 §2.5)", () => {
   it("nextStage segue o plano e devolve null no fim", () => {
     const plan = planStages({ isPdf: true, options: { ocr: false, modelRead: false } });
     expect(nextStage(plan, "ingest.read_text")).toBe("ingest.consolidate");
-    expect(nextStage(plan, "extract.digest")).toBeNull();
+    expect(nextStage(plan, "extract.digest")).toBe("ingest.reconcile");
+    expect(nextStage(plan, "ingest.review_check")).toBeNull();
   });
 
   it("enqueueStage adiciona na fila certa com jobId e espelha o job como queued (parentId = runId)", async () => {

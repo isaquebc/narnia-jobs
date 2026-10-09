@@ -14,7 +14,9 @@ export type StageName =
   | "extract.read_doc"
   | "ingest.consolidate"
   | "extract.facts"
-  | "extract.digest";
+  | "extract.digest"
+  | "ingest.reconcile"
+  | "ingest.review_check";
 
 export interface StageJobData {
   runId: string;
@@ -28,6 +30,9 @@ export const STAGES: Record<StageName, { queue: QueueName; order: number; label:
   "ingest.consolidate": { queue: "ingest", order: 4, label: "Consolidação das leituras" },
   "extract.facts": { queue: "extract", order: 5, label: "Extração de fatos" },
   "extract.digest": { queue: "extract", order: 6, label: "Registro de contexto" },
+  // F03 §2.1: CV e texto ganham reconciliação com os fatos existentes e a revisão anti-alucinação antes da revisão
+  "ingest.reconcile": { queue: "ingest", order: 7, label: "Comparação com os seus dados" },
+  "ingest.review_check": { queue: "ingest", order: 8, label: "Conferência das evidências" },
 };
 
 export const STAGE_ORDER = (Object.keys(STAGES) as StageName[]).sort(

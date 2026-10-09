@@ -83,6 +83,11 @@ function harness(provider: Provider = new MockProvider()): Harness {
     enqueue: async (_runId, stage) => {
       enqueued.push(stage);
     },
+    enqueueTask: async () => {},
+    publish: async () => {},
+    gh: () => {
+      throw new Error("gh não usado neste teste");
+    },
   };
   return { repos, dataDir, deps, enqueued, calls };
 }
@@ -156,7 +161,7 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
         .list()
         .map((e) => e.category)
         .sort(),
-    ).toEqual(["ingest.digest", "ingest.facts", "ingest.read_doc"]);
+    ).toEqual(["ingest.digest", "ingest.facts", "ingest.read_doc", "ingest.review_check"]);
     // cada etapa enfileirou a próxima; a última não enfileira nada
     expect(h.enqueued).toEqual(plan.slice(1));
     expect(h.repos.ingestionRuns.get(run.id)?.startedAt).toBeTruthy();
@@ -171,6 +176,8 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
       "ingest.consolidate",
       "extract.facts",
       "extract.digest",
+      "ingest.reconcile",
+      "ingest.review_check",
     ]);
     await runAll(h, run.id, plan);
     expect(h.repos.readings.listByRun(run.id).map((r) => r.kind)).toEqual(["text_layer"]);

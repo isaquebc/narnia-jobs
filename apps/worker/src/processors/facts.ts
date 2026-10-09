@@ -1,5 +1,5 @@
 import { recordUsage, usageFromSdkResult } from "@narnia-jobs/core";
-import { extractFactsOutputToProposals } from "@narnia-jobs/shared";
+import { extractFactsOutputWithEvidence } from "@narnia-jobs/shared";
 import { consolidatedText, type Processor, runLocale } from "../pipeline";
 
 /** Etapa 5: fatos candidatos (Haiku por padrão). Idempotente: run com propostas não chama o modelo de novo. */
@@ -13,8 +13,9 @@ export const facts: Processor = async (env, ctx, deps) => {
     locale: runLocale(deps.repos, env.run.id),
     model,
   });
-  const proposals = extractFactsOutputToProposals(result.output);
-  deps.repos.proposals.insertMany(env.run.id, proposals);
+  // F03-12: cada proposta guarda o trecho literal que a sustenta (camada 1 da revisão anti-alucinação)
+  const { proposals, evidence } = extractFactsOutputWithEvidence(result.output);
+  deps.repos.proposals.insertMany(env.run.id, proposals, evidence);
   deps.repos.ingestionRuns.addUsage(env.run.id, "facts", {
     inputTokens: result.usage.inputTokens,
     outputTokens: result.usage.outputTokens,

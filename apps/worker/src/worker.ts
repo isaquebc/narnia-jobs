@@ -1,12 +1,16 @@
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import {
   createRepos,
   createTesseractRecognizer,
+  defaultGhConfigDir,
   enqueueStage,
+  enqueueTask,
+  FAKE_GH_STATE_FILENAME,
   migrate,
   openDatabase,
   renderPdfPages,
+  resolveGhRuntime,
   type StageJobData,
   type StageName,
   type TaskJobData,
@@ -75,6 +79,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   const publish = async (event: WsEvent) => {
     await connection.publish(wsChannel(prefix), JSON.stringify(event));
   };
+  const ghConfigDir = defaultGhConfigDir();
   const deps: WorkerDeps = {
     repos,
     dataDir: opts.dataDir,
@@ -83,6 +88,23 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
     enqueue: async (runId: string, stage: StageName) => {
       await enqueueStage({ queues, repos, runId, stage });
     },
+    enqueueTask: async (req) =>
+      enqueueTask({
+        queues: queues as unknown as Parameters<typeof enqueueTask>[0]["queues"],
+        repos,
+        ...req,
+      }),
+    publish,
+    // F03-1: credencial lida a cada uso (o lançador pode renovar o token do host); mock usa o gh falso
+    gh: () =>
+      resolveGhRuntime({
+        settings: repos.settings,
+        configDir: ghConfigDir,
+        fake:
+          opts.provider.id === "mock"
+            ? { stateFile: join(opts.dataDir, FAKE_GH_STATE_FILENAME) }
+            : null,
+      }).client,
   };
 
   const workers = QUEUE_NAMES.map((name) => {
