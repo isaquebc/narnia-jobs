@@ -27,6 +27,12 @@ export function GithubConnectCard() {
   const device = startDevice.data;
   const left = device ? remaining(device.expiresAt, now) : 0;
 
+  // o código só vale para uma autorização: conectado, ele é descartado (desconectar depois oferece um novo)
+  const resetDevice = startDevice.reset;
+  useEffect(() => {
+    if (status?.connected && device) resetDevice();
+  }, [status?.connected, device, resetDevice]);
+
   useEffect(() => {
     if (!device || status?.connected) return;
     const id = setInterval(() => setNow(Date.now()), 1000);

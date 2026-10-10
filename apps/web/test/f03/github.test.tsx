@@ -88,6 +88,40 @@ describe("F03/M4 · GitHub › conexão", () => {
     expect(screen.getByRole("button", { name: "Desconectar" })).toBeInTheDocument();
   });
 
+  it("depois de conectar e desconectar, volta a oferecer 'Conectar GitHub' (o código usado não reaparece)", async () => {
+    let connected = false;
+    const startGithubDevice = vi.fn(async () => ({
+      code: "ABCD-1234",
+      verificationUri: "https://github.com/login/device",
+      expiresAt: IN_15_MIN(),
+    }));
+    const disconnectGithub = vi.fn(async () => {
+      connected = false;
+      return githubAuth({ source: "app", connected: false, login: null, scopes: [] });
+    });
+    const { ws } = renderApp({
+      api: api({
+        getGithubAuth: async () =>
+          connected
+            ? githubAuth({ source: "app", connected: true, login: "ana-exemplo" })
+            : githubAuth({ source: "app", connected: false, login: null, scopes: [] }),
+        startGithubDevice,
+        disconnectGithub,
+      }),
+      initialUrl: "/ingestao",
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Conectar GitHub" }));
+    expect(await screen.findByText("ABCD-1234")).toBeInTheDocument();
+    connected = true;
+    ws.emit({
+      type: "github.auth_updated",
+      status: githubAuth({ source: "app", connected: true, login: "ana-exemplo" }),
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Desconectar" }));
+    expect(await screen.findByRole("button", { name: "Conectar GitHub" })).toBeInTheDocument();
+    expect(screen.queryByText("ABCD-1234")).toBeNull();
+  });
+
   it("código expirado oferece gerar outro", async () => {
     const startGithubDevice = vi
       .fn()
