@@ -94,10 +94,20 @@ export function GithubConnectCard() {
             <>
               <p className="text-sm text-muted-fg">{t("github.connect.privateScopeHint")}</p>
               {!device ? (
-                <div>
-                  <Button onClick={() => startDevice.mutate()} disabled={startDevice.isPending}>
-                    {t("github.connect.connect")}
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div>
+                    <Button onClick={() => startDevice.mutate()} disabled={startDevice.isPending}>
+                      {t("github.connect.connect")}
+                    </Button>
+                  </div>
+                  {startDevice.error ? (
+                    <Alert tone="danger">
+                      {t("github.connect.startError", {
+                        message:
+                          startDevice.error instanceof Error ? startDevice.error.message : "",
+                      })}
+                    </Alert>
+                  ) : null}
                 </div>
               ) : left === 0 ? (
                 <div className="flex flex-col gap-2">

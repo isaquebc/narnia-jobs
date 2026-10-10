@@ -138,3 +138,21 @@ Describe "Backups e restore (F03-fix L1)" {
     Get-Content -Raw (Join-Path $d "uploads/aaa.pdf") | Should -Be "cv"
   }
 }
+
+Describe "Regressão 2026-10-10: imagem antiga e volume do gh com dono root" {
+  It "Send-HostGhToken corrige o dono da pasta do gh como root antes de gravar" {
+    $script:calls = [System.Collections.Generic.List[string]]::new()
+    function global:docker { $script:calls.Add(($args -join " ")); $global:LASTEXITCODE = 0 }
+    function global:Get-HostGhToken { "gho_tokenDoHost" }
+    try {
+      Send-HostGhToken @("compose", "-f", "docker-compose.dev.yml") "dev"
+      $chown = [array]::FindIndex($script:calls.ToArray(), [Predicate[string]] { param($c) $c -match "--user root" -and $c -match "chown node:node /home/node/.config/gh" })
+      $write = [array]::FindIndex($script:calls.ToArray(), [Predicate[string]] { param($c) $c -match "host-token" })
+      $chown | Should -BeGreaterOrEqual 0
+      $chown | Should -BeLessThan $write
+    } finally { Remove-Item function:global:docker, function:global:Get-HostGhToken -ErrorAction SilentlyContinue }
+  }
+  It "dev reconstrói as imagens antes de subir" {
+    (Get-Content (Join-Path $PSScriptRoot "../../start.ps1") -Raw) | Should -Match '"dev"\s*\{\s*\r?\n\s*Assert-Docker\s*\r?\n\s*Invoke-DevBuild'
+  }
+}

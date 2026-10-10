@@ -135,6 +135,8 @@ function Get-HostGhToken {
 }
 
 function Send-HostGhToken([string[]] $Compose, [string] $Service) {
+  # volumes criados por imagens antigas nascem com dono root: o app (usuário node) não grava o token nem o login próprio
+  & docker @Compose run --rm --no-deps -T --user root --entrypoint sh $Service -c 'mkdir -p /home/node/.config/gh && chown node:node /home/node/.config/gh' *> $null
   $token = Get-HostGhToken
   if ($token) {
     $token | & docker @Compose run --rm --no-deps -T --entrypoint sh $Service -c 'umask 077; mkdir -p "$HOME/.config/gh"; cat > "$HOME/.config/gh/host-token"' *> $null
@@ -145,6 +147,9 @@ function Send-HostGhToken([string[]] $Compose, [string] $Service) {
 }
 
 # --- infraestrutura ----------------------------------------------------------------------------
+
+# imagem de dev sempre atualizada (com cache leva segundos): sem isso a instância sobe com a imagem antiga (ex.: sem gh)
+function Invoke-DevBuild { & docker @script:DevCompose --profile app build *> $null; if ($LASTEXITCODE -ne 0) { Fail "não consegui construir as imagens de dev." } }
 
 function Assert-Docker {
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail "Docker não encontrado. Instale o Docker Desktop." }
@@ -303,7 +308,9 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }
     "dev"       {
-      Assert-Docker; Ensure-Installed
+      Assert-Docker
+      Invoke-DevBuild
+      Ensure-Installed
       $devPort = if ($env:NARNIA_DEV_PORT) { $env:NARNIA_DEV_PORT } else { "5173" }
       $devToken = if ($env:NARNIA_TOKEN) { $env:NARNIA_TOKEN } else { "dev-token" }
       New-Item -ItemType Directory -Force -Path (Get-DevDataHostDir), (Get-DevBackupHostDir) *> $null

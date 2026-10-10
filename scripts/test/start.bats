@@ -225,3 +225,32 @@ fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
   [[ "$(cat "$TMP/data/uploads/aaa.pdf")" == "cv" ]]
   [[ "$(cat "$TMP/data/uploads/bbb.pdf")" == "ja" ]]
 }
+
+# --- regressão 2026-10-10: instância do dono subiu com imagem antiga (sem gh) e volume gh-auth com dono root ---------
+
+docker_spy() { # substitui o docker por um registrador de chamadas em $TMP/calls
+  : > "$TMP/calls"
+  docker() { printf '%s\n' "$*" >> "$TMP/calls"; }
+  require_docker() { :; }
+}
+
+@test "dev reconstrói as imagens antes de instalar dependências, entregar o token e subir" {
+  docker_spy
+  export NARNIA_GH_BIN="$TMP/nao-existe/gh"
+  main dev -d >/dev/null 2>&1
+  first=$(head -n 1 "$TMP/calls")
+  [[ "$first" == *"--profile app build"* ]]
+  grep -q -- "--profile app up -d" "$TMP/calls"
+}
+
+@test "deliver_host_gh_token corrige o dono da pasta do gh como root antes de gravar o token" {
+  docker_spy
+  fake_gh "gho_tokenDoHost" 0
+  export NARNIA_GH_BIN="$TMP/bin/gh"
+  deliver_host_gh_token docker compose -f docker-compose.dev.yml dev >/dev/null
+  chown_line=$(grep -n -- "--user root" "$TMP/calls" | head -n 1 | cut -d: -f1)
+  write_line=$(grep -n -- "host-token" "$TMP/calls" | head -n 1 | cut -d: -f1)
+  [[ -n "$chown_line" && -n "$write_line" ]]
+  grep -q "chown node:node /home/node/.config/gh" "$TMP/calls"
+  (( chown_line < write_line ))
+}

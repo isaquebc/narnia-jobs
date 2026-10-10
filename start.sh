@@ -202,6 +202,9 @@ wait_healthy() {
 deliver_host_gh_token() {
   local service=${*: -1} token
   local -a compose=("${@:1:$#-1}")
+  # volumes criados por imagens antigas nascem com dono root: o app (usuário node) não grava o token nem o login próprio
+  "${compose[@]}" run --rm --no-deps -T --user root --entrypoint sh "$service" -c \
+    'mkdir -p /home/node/.config/gh && chown node:node /home/node/.config/gh' >/dev/null 2>&1 || true
   if token=$(host_gh_token); then
     printf '%s' "$token" | "${compose[@]}" run --rm --no-deps -T --entrypoint sh "$service" -c \
       'umask 077; mkdir -p "$HOME/.config/gh"; cat > "$HOME/.config/gh/host-token"' >/dev/null 2>&1 \
@@ -454,7 +457,10 @@ main() {
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;
     dev)
-      require_docker; ensure_installed
+      require_docker
+      # imagem sempre atualizada (com cache leva segundos): sem isso a instância sobe com a imagem antiga (ex.: sem gh)
+      "${DEV_COMPOSE[@]}" --profile app build >/dev/null || die "não consegui construir as imagens de dev."
+      ensure_installed
       mkdir -p "$(dev_data_host_dir)" "$(dev_backup_host_dir)"   # antes do Docker: pertencem ao usuário
       [[ -z "$NARNIA_INSTANCE" ]] || info "instância: ${NARNIA_INSTANCE} (projeto ${NARNIA_DEV_PROJECT_NAME:-?}, dados $(dev_data_host_dir))"
       deliver_host_gh_token "${DEV_COMPOSE[@]}" dev

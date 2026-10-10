@@ -334,3 +334,25 @@ describe("F03/M4 · execuções pendentes na página de ingestão", () => {
     expect(within(items[1] as HTMLElement).getByText("Em revisão")).toBeInTheDocument();
   });
 });
+
+describe("Regressão 2026-10-10 · erro ao conectar o GitHub aparece na tela", () => {
+  it("falha ao iniciar o fluxo (gh ausente no container) mostra a mensagem e o que fazer", async () => {
+    const { ApiError } = await import("../../src/lib/api");
+    const startGithubDevice = vi.fn(async () => {
+      throw new ApiError(503, "github_unavailable", "GitHub CLI indisponível: spawn gh ENOENT");
+    });
+    renderApp({
+      api: api({
+        getGithubAuth: async () =>
+          githubAuth({ source: "app", connected: false, login: null, scopes: [] }),
+        startGithubDevice,
+      }),
+      initialUrl: "/ingestao",
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Conectar GitHub" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Não consegui iniciar o login do GitHub");
+    expect(alert).toHaveTextContent("GitHub CLI indisponível");
+    expect(alert).toHaveTextContent("make dev-down && make dev");
+  });
+});

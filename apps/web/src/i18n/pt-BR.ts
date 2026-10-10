@@ -478,6 +478,8 @@ export const ptBR = {
   },
   github: {
     connect: {
+      startError:
+        "Não consegui iniciar o login do GitHub: {message}. Se o gh não estiver disponível no container, reconstrua a stack com make dev-down && make dev.",
       title: "Conexão com o GitHub",
       sourceLegend: "Credencial",
       source: { host: "Usar o gh do computador", app: "Login próprio do app" },
