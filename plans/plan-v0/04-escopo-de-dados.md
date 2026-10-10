@@ -68,6 +68,8 @@ Publicações, palestras, cursos ministrados, prêmios: título, veículo/evento
 | tamanho de empresa preferido, setores evitados | não | |
 Decisão de 2026-10-06: sem esses dados o recrutador não consegue qualificar vagas nem negociar; por isso são obrigatórios. Toda sugestão vinda de pesquisa guarda a fonte (URL, data).
 
+Desde a F03: projetos ganham `repo_id` quando vêm do GitHub; o repositório em si fica em `repo` (nome, URL, descrição, linguagens, tópicos, estrelas, fork/arquivado/privado, último push, commit atual, relevância, última análise), com `repo_analysis` (tipo full/incremental/aprofundar/cobrir, commit base e analisado, relatório, mapa de cobertura, uso), `repo_digest` (mesmo formato do digest de arquivo, tabela irmã, F03-11) e `github_metric` (global, por ano e por repositório: commits, PRs abertos/mergeados/fechados sem merge, revisões aprovadas, issues abertas/resolvidas, open source próprios, contribuições em terceiros).
+
 ### A9 · Evidências brutas e registro de contexto por arquivo
 Arquivos enviados (CV original, exports), snapshots de ingestão (README, metadados de repos) e trechos citáveis. Guardados para rastreabilidade e re-ingestão sem baixar de novo.
 
@@ -80,6 +82,8 @@ Todo arquivo ingerido ganha um **registro de contexto** (`file_digest`), gerado 
 | índice de seções | nome da seção + posição no texto extraído |
 | metadados | tipo, páginas, idioma detectado, data do documento, hash |
 | texto extraído | arquivo ao lado, consultável por trecho |
+
+Desde a F03: `ingestion_run` reconstruída (fonte cv/text/github, modo, profundidade, modelo, orçamento, relatório da execução, execução pai; estados `awaiting_confirmation`, `awaiting_decision`, `paused` e demais); `ingestion_proposal` com `match` (novo/existente/conflito), alvo, conflito campo a campo e resolução, trecho de evidência, selo de verificação e perfis sugeridos; `snapshot` (fonte, escopo, caminho, sha256, tamanho, uso) para reexecutar sem rede; `notification` (pendências do usuário). Execuções anteriores do mesmo arquivo ou texto são encontradas pelo hash ("já lido").
 
 Finalidade: o agente e as features leem o registro em vez de abrir o arquivo; o PDF só é reaberto se o usuário pedir ou se a extração for refeita.
 
@@ -148,4 +152,4 @@ Todo timestamp é gravado em **UTC** (ISO 8601 ou epoch). A UI converte para o f
 CPF/RG/passaporte, endereço completo, dados bancários, dados de saúde, histórico salarial detalhado por empresa (apenas a faixa pretendida, se o usuário quiser), credenciais de sites de emprego, gravações de áudio das entrevistas.
 
 ## F. Credenciais de integrações
-Client ID/secret do Google ficam na configuração do Claude Code dentro do volume `claude-auth` (é ele quem faz o OAuth); token do GitHub em `config.json` na pasta de dados, permissão 0600. Nenhum deles entra no repositório nem nas exportações.
+Client ID/secret do Google ficam na configuração do Claude Code dentro do volume `claude-auth` (é ele quem faz o OAuth); credencial do GitHub no volume `gh-auth` (arquivo do `gh` ou token do `gh` do computador em arquivo 0600, renovado pelo lançador), nunca em banco, log, `.env` ou resposta da API. Nenhum deles entra no repositório nem nas exportações.

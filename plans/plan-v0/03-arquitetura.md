@@ -138,7 +138,14 @@ Pré-processamento no `core`, sem modelo:
 
 \*Estimativas de ordem de grandeza para calibrar a UI; medir na implementação. A tool `ingest.prepare` devolve a estimativa real (contagem de caracteres/4) antes de qualquer chamada, e a skill exige confirmação do usuário.
 
-Fluxo técnico:
+**Como ficou na F03 (2026-10-09; detalhes em `tasks/F03-ingestao.md`).**
+- **GitHub pelo `gh`** no container (imagem com `gh` oficial): credencial do `gh` do computador repassada pelo lançador a um arquivo 0600 no volume `gh-auth`, ou login próprio pelo fluxo de dispositivo (`gh auth login --web` em segundo plano). Coleta pela API (`gh api`: repositórios, README, árvore, `contents` só dos arquivos escolhidos, `compare` para o diff), sem clone. Métricas pela GraphQL (`contributionsCollection`), que exige login. **Snapshots** por repositório em `snapshots/github/`: toda resposta é gravada e, sem rede, a mesma chamada é respondida a partir deles.
+- **Orçamento e plano**: o provider lê o uso do plano (adaptador sobre o `/usage` experimental do SDK, com fallback no `rate_limit_event` do stream); a conversão %→tokens é aprendida por modelo; recomendado = mín(padrão da profundidade, 70% do restante da janela de 5 h). Divisão igual por repositório sem redistribuir sobra; freio a 125% com decisão do usuário.
+- **Destaques sem tokens**: metadados → README → manifestos/CI → mensagens dos commits do usuário → entrypoints → testes → amostras, dentro da fatia; na profunda, uma chamada barata escolhe até 8 arquivos. Uma chamada por repositório (propostas com trecho literal + relatório), síntese final só sobre relatórios.
+- **Anti-alucinação**: camada 1 sem tokens (o trecho citado existe na fonte enviada) e camada 2 no modelo mais barato (sustentada/parcial/sem suporte), desligável; vale também para CV e texto (F03-12).
+- **Incremental e segunda rodada**: relatório e mapa de cobertura por análise com o commit; diff desde o commit salvo; sem diff, aprofundar ou cobrir o restante.
+
+Fluxo técnico original (as tools `ingest.*` de condução pelo agente ficaram para a F04, F03-15):
 ```
 ingest.prepare(source, depth)  → cria ingestion_run, pré-processa, devolve {estimativa, n_chunks}
 loop: ingest.next_chunk(run)   → devolve um chunk; o modelo extrai fatos e chama ingest.propose(run, facts)
@@ -240,6 +247,8 @@ api ──enqueue──► Redis (BullMQ: filas ingest · ocr · extract · clar
 no boot do worker: jobs ativos órfãos são retomados pela própria BullMQ (stalled → retry) e refletidos na tabela
 ```
 - **BullMQ + Redis** (decisão de 2026-10-07): a fila vive no Redis; a tabela `job` é o registro durável e consultável pela UI e pelas tools MCP. Jobs são idempotentes por etapa/chunk, com `jobId` determinístico para evitar duplicatas.
+- **Dois tipos de job** (F02/F03): etapas da cadeia de ingestão por arquivo (`runId` + `stage`: leitura, OCR, modelo, consolidação, fatos, digest, **reconciliação**, **conferência**) e **tarefas genéricas** (`enqueueTask`/`processTask`, id `task__<tipo>__<chave>`): análise de perfis, preparação, repositório e síntese do GitHub. Reenfileirar uma tarefa que falhou remove o job antigo da fila antes (com `removeOnFail: false` o id ficaria ocupado).
+- **Notificações** (F03-10): tabela `notification` com tipo, assunto, severidade, link, lida/dispensada/resolvida e dedupe por tipo + assunto; geradores da ingestão e da F02 sincronizam a cada mudança de estado e resolvem sozinhos o que deixou de estar pendente; WS `notification.created|updated`; sino no cabeçalho e página Pendências.
 - Toda operação que chama o modelo ou leva > 2 s é um job: ingestão (por chunk), OCR, extração, clarificação, geração de CV, análise de vaga.
 - A UI nunca bloqueia: a bandeja de atividades (shell L0) lista jobs com progresso, erro e cancelar; o usuário navega livremente.
 - Sessões de chat: várias por perfil, cada uma um processo do CLI via SDK (streaming input). Limite configurável de sessões simultâneas (padrão 3) por causa de memória; além disso, novas sessões ficam "em espera". Sessão inativa por N minutos é hibernada (processo encerrado, retomada por `resume`).

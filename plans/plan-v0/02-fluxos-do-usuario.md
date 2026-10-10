@@ -65,6 +65,15 @@ Ingestão
         └─ gravar → cada fato guarda `fonte`, `confiança`, `verificado_pelo_usuario`
 ```
 
+**Como ficou na F03 (2026-10-09).** LinkedIn adiado (`tasks/README.md`, itens adiados). Fontes: GitHub, CV adicional e texto livre ("Conte a sua história de carreira e de vida").
+- **GitHub**, primeiro campo: **análise pública** (só repositórios públicos, funciona sem login; sem login as métricas ficam indisponíveis porque a API de contribuições exige autenticação) ou **privada** (inclui privados com cadeado, exige o GitHub conectado). Conexão pelo `gh`: reaproveita o login do `gh` do computador ou faz o login próprio do app por código de dispositivo (código, copiar, "Abrir GitHub" em nova aba, sem terminal). Seleção agrupada (Pessoais expandido, organizações recolhidas), 10 mais recentes pré-marcados por grupo, forks e arquivados destacados, aviso acima de 10 no total.
+- **Antes de rodar**: modelo, profundidade, **diagnóstico do plano** (assinatura, uso das janelas de 5 h e semanal, renovação), orçamento recomendado (mil, milhão ou % da janela) e estimativa por repositório. GitHub sempre pede confirmação; CV e texto seguem sozinhos abaixo de 10 mil tokens (configurável).
+- **Durante**: um job por repositório, com fatia igual do orçamento; ao passar de 125%, **freio**: a execução para em "aguardando decisão" com notificação e o diálogo mostra gasto × estimado, restante da janela e custo para terminar (continuar com orçamento extra, encerrar com o feito, deixar para depois, que fica em Pendências).
+- **Depois**: relatório da execução e relatório por repositório salvos com o commit analisado; nova execução no mesmo repositório usa o diff desde esse commit; sem mudança, oferece segunda rodada (aprofundar ou cobrir o que ficou de fora). "Já lido" por hash para CV e texto, com link para a execução anterior.
+- **Revisão**: novo / já existe / conflito; conflito aceito bloqueia salvar até escolher manter atual, usar novo ou editar; selo de verificação anti-alucinação (sustentada, parcial, sem suporte, com o trecho citado), que nunca apaga nada; tags de perfil por linha e em lote.
+- **Pendências e notificações**: sino com contador no cabeçalho e página Pendências; revisão pendente, conflitos, execução aguardando decisão, concluída, erro, sugestões de perfil e análise de perfis concluída; a pendência some sozinha quando é resolvida.
+- **Evidências**: repositórios analisados com relatório, métricas, resumo (digest) editável, histórico de análises e reanálise; snapshots permitem reexecutar sem rede.
+
 Toda ingestão roda em **segundo plano** (fila de jobs persistida). O usuário vê o progresso na bandeja de atividades do shell e continua usando o resto do sistema; pode haver várias ingestões e várias sessões de chat ativas ao mesmo tempo, por perfil.
 
 ### F3.1 · Sessão de clarificação
