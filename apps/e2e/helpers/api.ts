@@ -117,3 +117,10 @@ export function formatInTz(iso: string, timeZone: string): string {
     "$1:$2",
   );
 }
+
+/** Limiar de autoconfirmação da ingestão (F03-13); 0 = sempre confirmar. Volta ao padrão no próximo `reset`. */
+export const setAutoConfirmBelow = (tokens: number) =>
+  api("/api/settings/ingest", {
+    method: "PUT",
+    body: JSON.stringify({ autoConfirmBelow: tokens }),
+  });

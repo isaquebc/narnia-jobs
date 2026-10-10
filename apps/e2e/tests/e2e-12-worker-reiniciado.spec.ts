@@ -14,8 +14,9 @@ test.describe("F01/E2E-12 worker reiniciado @ops", () => {
     await reset();
     await openApp(page);
     await passProvider(page);
-    await chooseFile(page, "cv.docx");
+    // o atraso vem antes do envio: abaixo do limiar a extração começa sozinha (F03-13 no onboarding)
     await setMock({ delayMs: 20_000 });
+    await chooseFile(page, "cv.docx");
     await startExtraction(page);
     await waitFor(
       jobs,

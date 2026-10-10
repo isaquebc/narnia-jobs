@@ -15,8 +15,9 @@ test("F01/E2E-11 job em segundo plano: navegar para o dashboard, acompanhar pela
   await reset();
   await openApp(page);
   await passProvider(page);
-  await chooseFile(page, "cv.docx");
+  // o atraso vem antes do envio: abaixo do limiar a extração começa sozinha (F03-13 no onboarding)
   await setMock({ delayMs: 10_000 });
+  await chooseFile(page, "cv.docx");
   await startExtraction(page);
 
   await page.getByRole("link", { name: "Dashboard" }).click();

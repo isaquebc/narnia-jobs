@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { dashboard, reset, user } from "../helpers/api";
+import { dashboard, reset, setAutoConfirmBelow, user } from "../helpers/api";
 import {
   acceptAllAndNext,
   chooseFile,
@@ -16,6 +16,9 @@ test("F01/E2E-01 caminho feliz com CV: upload, estimativa, extração, revisão,
   page,
 }) => {
   await reset();
+  // este cenário valida a estimativa na tela e o clique em "Extrair": autoconfirmação desligada (o caminho
+  // automático do F03-13 fica coberto pelo E2E-11)
+  await setAutoConfirmBelow(0);
   await openApp(page);
   await expect(page.getByText("Logado pela assinatura (login no container)").first()).toBeVisible();
   await passProvider(page);

@@ -27,12 +27,32 @@ export async function passProvider(page: Page) {
 /** Passo 2: seleciona um arquivo e espera o upload e a estimativa. */
 export async function chooseFile(page: Page, name: string) {
   await page.locator('input[type="file"]').setInputFiles(fixture(name));
-  await expect(page.getByText(`Arquivo selecionado: ${name}`)).toBeVisible();
-  await expect(page.getByText(/~.* tokens no total/)).toBeVisible();
+  // abaixo do limiar de autoconfirmação (F03-13) o passo pode seguir sozinho antes de a estimativa ficar na tela
+  if (/\/onboarding\/3$/.test(page.url())) return;
+  await expect(
+    page.getByText(`Arquivo selecionado: ${name}`).or(page.getByText("Passo 3 de 5")),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByText(/~.* tokens no total/)
+      .or(page.getByText("Abaixo do limite de confirmação: a extração começa sozinha."))
+      .or(page.getByText("Passo 3 de 5"))
+      .first(),
+  ).toBeVisible();
 }
 
+/**
+ * Passo 2 → 3. Abaixo do limiar de autoconfirmação (F03-13, também no onboarding desde as correções da auditoria F03)
+ * a extração começa sozinha; acima dele, o clique em "Extrair" é necessário.
+ */
 export async function startExtraction(page: Page) {
-  await page.getByRole("button", { name: "Extrair", exact: true }).click();
+  const extract = page.getByRole("button", { name: "Extrair", exact: true });
+  const auto = page.getByText("Abaixo do limite de confirmação: a extração começa sozinha.");
+  await expect(async () => {
+    if (/\/onboarding\/3$/.test(page.url())) return;
+    if (await auto.isVisible()) throw new Error("autoconfirmação em andamento");
+    await extract.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await expectStep(page, 3);
 }
 

@@ -40,6 +40,8 @@ test("F03/E2E-05 re-ingestão de CV com conflito: notificação, salvar bloquead
   await waitRun(runId, ["done"]);
   const after = await notifications("open");
   const mine = after.notifications.filter((x) => x.subjectId === runId).map((x) => x.kind);
-  // revisão e conflitos resolvidos sozinhos; fica só o aviso informativo de concluída
-  expect(mine).toEqual(["ingestion.done"]);
+  // revisão e conflitos resolvidos sozinhos; "concluída" é informativa (FX-3): fora do contador do sino e
+  // resolvida quando a página da execução, aberta aqui, é recarregada
+  expect(mine.filter((k) => k !== "ingestion.done")).toEqual([]);
+  expect(after.unresolved).toBe(0);
 });
