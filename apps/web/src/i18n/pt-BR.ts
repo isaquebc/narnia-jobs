@@ -102,6 +102,13 @@ export const ptBR = {
     extract_facts: "Extração de fatos",
     extract_digest: "Registro de contexto",
     profile_analyze: "Análise de possíveis perfis",
+    ingest_reconcile: "Comparação com os seus dados",
+    ingest_review_check: "Conferência das evidências",
+    ingest_github_prepare: "Preparação da análise do GitHub",
+    ingest_github_pick: "Escolha dos arquivos a ler",
+    ingest_github_repo: "Análise do repositório",
+    ingest_github_synthesis: "Síntese da análise do GitHub",
+    stalled: "Reprocessando",
   },
   wizard: {
     title: "Primeiro uso",

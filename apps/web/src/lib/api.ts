@@ -1,25 +1,46 @@
 import type {
   AnalyzeEstimateResponse,
   AnalyzeRequest,
+  Budget,
   DashboardResponseSchema,
   EmphasisListResponse,
   EmphasisPutRequest,
   EstimateResponse,
+  FileDigest,
   FileResponse,
+  GithubAuthSourceSchema,
+  GithubAuthStatusResponse,
+  GithubDeviceResponse,
+  GithubIngestionCreateRequest,
+  GithubMetrics,
+  GithubPreviewResponse,
   IngestionCreateRequest,
+  IngestionDecisionRequest,
+  IngestionEstimateRequest,
+  IngestionEstimateResponse,
+  IngestionMode,
   IngestionResponse,
+  IngestSettingsSchema,
   Job,
+  NotificationsListResponse,
   OnboardingState,
   PersonaOverrides,
   PersonaResponse,
+  PlanUsage,
   Profile,
   ProfileCardResponse,
   ProfileCreateRequest,
   ProfilePatchRequest,
   ProfileSuggestionResponseSchema,
   ProviderStatusResponse,
+  Repo,
+  RepoAnalysis,
+  RepoDigest,
   ReviewRequest,
+  RunReport,
+  RunStatus,
   SalaryReference,
+  SnapshotsListResponseSchema,
   SuggestionsListResponse,
   User,
   UserUpsertRequest,
@@ -39,7 +60,37 @@ export type IngestionDetail = IngestionResponse & {
   options?: { ocr: boolean; modelRead: boolean };
   proposals: Array<IngestionResponse["proposals"][number] & { editedData?: unknown }>;
   readings?: Array<{ id: string; kind: string; quality: number | null }>;
+  // F03: execução do GitHub (orçamento, relatório, repositórios e análises)
+  mode?: IngestionMode | null;
+  model?: string | null;
+  depth?: string | null;
+  budget?: Budget | null;
+  report?: RunReport | null;
+  repos?: string[];
+  analyses?: RepoAnalysis[];
+  parentRunId?: string | null;
 };
+export type GithubAuthSource = z.infer<typeof GithubAuthSourceSchema>;
+export type IngestSettings = z.infer<typeof IngestSettingsSchema>;
+export type SnapshotsList = z.infer<typeof SnapshotsListResponseSchema>;
+export interface RunSummary {
+  id: string;
+  source: "cv" | "text" | "github";
+  mode: IngestionMode | null;
+  status: RunStatus;
+  fileId: string | null;
+  model: string | null;
+  budget: Budget | null;
+  report: RunReport | null;
+  createdAt: string;
+}
+export interface RepoDetail {
+  repo: Repo;
+  analyses: RepoAnalysis[];
+  digest: RepoDigest | null;
+  metrics: GithubMetrics | null;
+}
+export type RepoDigestInput = Omit<RepoDigest, "repoId" | "editedByUser">;
 export type EstimateDetail = EstimateResponse & { labels?: Record<string, string> };
 
 export class ApiError extends Error {
@@ -208,6 +259,73 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         `/api/salary-reference?country=${encodeURIComponent(country)}`,
       ),
     getDashboard: () => request<Dashboard>("/api/dashboard"),
+    // F03 §2.10 — GitHub, ingestão com orçamento, repositórios, notificações e configurações
+    getGithubAuth: () => request<GithubAuthStatusResponse>("/api/github/auth"),
+    setGithubAuthSource: (source: GithubAuthSource) =>
+      request<GithubAuthStatusResponse>("/api/github/auth", {
+        method: "PUT",
+        body: JSON.stringify({ source }),
+      }),
+    startGithubDevice: () => request<GithubDeviceResponse>("/api/github/auth/device", json({})),
+    disconnectGithub: () =>
+      request<GithubAuthStatusResponse>("/api/github/auth", { method: "DELETE" }),
+    previewGithub: (body: { mode: IngestionMode; login?: string }) =>
+      request<GithubPreviewResponse>("/api/sources/github/preview", json(body)),
+    getPlanUsage: () => request<{ usage: PlanUsage | null }>("/api/plan/usage"),
+    getIngestSettings: () => request<IngestSettings>("/api/settings/ingest"),
+    putIngestSettings: (body: Partial<IngestSettings>) =>
+      request<IngestSettings>("/api/settings/ingest", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    estimateIngestion: (body: IngestionEstimateRequest) =>
+      request<IngestionEstimateResponse>("/api/ingestions/estimate", json(body)),
+    createGithubIngestion: (body: GithubIngestionCreateRequest) =>
+      request<RunSummary>("/api/ingestions", json(body)),
+    listIngestions: (opts: { status?: RunStatus[]; source?: string } = {}) => {
+      const q = new URLSearchParams();
+      if (opts.status?.length) q.set("status", opts.status.join(","));
+      if (opts.source) q.set("source", opts.source);
+      const qs = q.toString();
+      return request<{ runs: RunSummary[] }>(`/api/ingestions${qs ? `?${qs}` : ""}`);
+    },
+    confirmIngestion: (id: string) =>
+      request<{ status: RunStatus }>(`/api/ingestions/${encodeURIComponent(id)}/confirm`, json({})),
+    decideIngestion: (id: string, body: IngestionDecisionRequest) =>
+      request<{ status: RunStatus }>(
+        `/api/ingestions/${encodeURIComponent(id)}/decision`,
+        json(body),
+      ),
+    cancelIngestion: (id: string) =>
+      request<{ status: RunStatus }>(`/api/ingestions/${encodeURIComponent(id)}/cancel`, json({})),
+    retryIngestion: (id: string) =>
+      request<{ status: RunStatus }>(`/api/ingestions/${encodeURIComponent(id)}/retry`, json({})),
+    listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
+    getRepo: (id: string) => request<RepoDetail>(`/api/repos/${encodeURIComponent(id)}`),
+    putRepoDigest: (id: string, body: RepoDigestInput) =>
+      request<{ digest: RepoDigest }>(`/api/repos/${encodeURIComponent(id)}/digest`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    reanalyzeRepo: (id: string, body: { kind?: "incremental" | "deepen" | "cover" }) =>
+      request<RunSummary>(`/api/repos/${encodeURIComponent(id)}/reanalyze`, json(body)),
+    listNotifications: (status: "open" | "resolved" | "all" = "open") =>
+      request<NotificationsListResponse>(`/api/notifications?status=${status}`),
+    readNotification: (id: string) =>
+      request<{ notification: unknown }>(
+        `/api/notifications/${encodeURIComponent(id)}/read`,
+        json({}),
+      ),
+    dismissNotification: (id: string) =>
+      request<{ notification: unknown }>(
+        `/api/notifications/${encodeURIComponent(id)}/dismiss`,
+        json({}),
+      ),
+    listSnapshots: () => request<SnapshotsList>("/api/snapshots"),
+    deleteSnapshot: (id: string) =>
+      request<{ ok: true }>(`/api/snapshots/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    getFileDigest: (id: string) =>
+      request<{ digest: FileDigest | null }>(`/api/files/${encodeURIComponent(id)}/digest`),
   };
 }
 

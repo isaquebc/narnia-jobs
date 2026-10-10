@@ -14,10 +14,22 @@ const STAGE_ORDER = [
   "ingest.consolidate",
   "extract.facts",
   "extract.digest",
+  "ingest.reconcile",
+  "ingest.review_check",
+];
+/** Etapas fora da cadeia de arquivos (tarefas genéricas, F02/F03) e o estado `stalled` do worker. */
+const OTHER_STAGES = [
+  "ingest.github.prepare",
+  "ingest.github.pick",
+  "ingest.github.repo",
+  "ingest.github.synthesis",
+  "profile.analyze",
+  "stalled",
 ];
 
 export function stageLabel(stage: string): string {
-  return STAGE_ORDER.includes(stage) ? t(`stages.${stage.replace(".", "_")}` as TKey) : stage;
+  if (!STAGE_ORDER.includes(stage) && !OTHER_STAGES.includes(stage)) return stage;
+  return t(`stages.${stage.replaceAll(".", "_")}` as TKey);
 }
 
 export function stageIndex(stage: string): number {

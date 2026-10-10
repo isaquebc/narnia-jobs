@@ -8,7 +8,7 @@ export function ingestionKey(runId: string) {
   return ["ingestion", runId] as const;
 }
 
-/** Ingestão em andamento: polling enquanto roda + invalidação por eventos WS de jobs. */
+/** Ingestão em andamento: polling enquanto roda + invalidação por eventos WS de jobs e da execução (F03). */
 export function useIngestion(runId: string | undefined) {
   const api = useApi();
   const ws = useWs();
@@ -23,9 +23,10 @@ export function useIngestion(runId: string | undefined) {
     if (!runId) return;
     ws.connect();
     return ws.subscribe((event) => {
-      if ("jobId" in event && event.jobId.startsWith(`${runId}__`)) {
-        void qc.invalidateQueries({ queryKey: ingestionKey(runId) });
-      }
+      const ofRun =
+        ("jobId" in event && event.jobId.startsWith(`${runId}__`)) ||
+        (event.type === "ingestion.updated" && event.runId === runId);
+      if (ofRun) void qc.invalidateQueries({ queryKey: ingestionKey(runId) });
     });
   }, [runId, ws, qc]);
   return query;
