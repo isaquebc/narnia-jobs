@@ -9,9 +9,12 @@ export const DRAFT_KEY = "narnia.draft.cv";
 export function FreeTextEditor({
   value,
   onChange,
+  label,
 }: {
   value: string;
   onChange: (v: string) => void;
+  /** Nome acessível do campo; padrão "Texto livre" (F01). A F03 usa o convite à história de carreira. */
+  label?: string;
 }) {
   useEffect(() => {
     try {
@@ -24,7 +27,7 @@ export function FreeTextEditor({
   return (
     <div className="flex flex-col gap-2">
       <Textarea
-        aria-label={t("source.tabText")}
+        aria-label={label ?? t("source.tabText")}
         placeholder={t("source.textPlaceholder")}
         value={value}
         maxLength={TEXT_MAX}
