@@ -65,7 +65,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   mkdirSync(dirname(opts.dbPath), { recursive: true });
   mkdirSync(opts.dataDir, { recursive: true });
   const db = openDatabase(opts.dbPath);
-  migrate(db);
+  migrate(db, { backupDir: join(dirname(opts.dbPath), "backups") });
   const repos = createRepos(db);
   const queues = createQueues({
     connection,

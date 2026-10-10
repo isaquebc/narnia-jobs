@@ -27,7 +27,7 @@ const publicBase = process.env.NARNIA_PUBLIC_URL ?? `http://127.0.0.1:${port}`;
 
 mkdirSync(dataDir, { recursive: true });
 const db = openDatabase(join(dataDir, "narnia.sqlite"));
-migrate(db);
+migrate(db, { backupDir: join(dataDir, "backups") });
 const repos = createRepos(db);
 const provider = createProviderFromEnv();
 const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
