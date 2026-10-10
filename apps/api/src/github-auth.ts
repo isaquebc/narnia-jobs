@@ -195,6 +195,7 @@ export function ghClient(d: GithubAuthDeps): GhClient {
     settings: d.repos.settings,
     configDir: d.configDir,
     fake: d.fake ? { stateFile: fakeStateFile(d.dataDir) } : null,
+    snapshots: { dataDir: d.dataDir, repos: d.repos },
   }).client;
 }
 

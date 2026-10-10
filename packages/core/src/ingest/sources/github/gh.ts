@@ -142,6 +142,15 @@ export function createGhClient(opts: GhClientOptions): GhClient {
     }
     if (status === 404)
       return new GhError("not_found", `Não encontrado: ${stderr}`, { status, stderr });
+    // sem rede: o snapshot pode responder (F03-9); demais falhas seguem como "failed"
+    if (
+      status === null &&
+      /error connecting|dial tcp|no such host|could not resolve|connection refused|network is unreachable|i\/o timeout/i.test(
+        stderr,
+      )
+    ) {
+      return new GhError("unavailable", `GitHub inacessível: ${stderr}`, { stderr });
+    }
     return new GhError("failed", `Falha no gh: ${stderr || `código ${r.code}`}`, {
       status,
       stderr,

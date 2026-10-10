@@ -17,6 +17,7 @@ import {
   type StageName,
   type TaskJobData,
   type TaskRequest,
+  withSnapshots,
 } from "@narnia-jobs/core";
 import { MockProvider } from "@narnia-jobs/providers";
 import type { Budget, WsEvent } from "@narnia-jobs/shared";
@@ -60,7 +61,8 @@ function harness(o: { provider?: MockProvider; state?: FakeGhState } = {}) {
     publish: async (e) => {
       events.push(e);
     },
-    gh: () => createGhClient({ exec: fakeGh({ state }).exec }),
+    // como em produção (resolveGhRuntime com snapshots): o que foi lido responde sem rede
+    gh: () => withSnapshots(createGhClient({ exec: fakeGh({ state }).exec }), { dataDir, repos }),
   };
   /** Roda as tarefas enfileiradas até a fila esvaziar (simula a BullMQ), devolvendo os tipos processados. */
   const drain = async (max = 50): Promise<string[]> => {
@@ -270,6 +272,25 @@ describe("F03/M3 worker · execução do GitHub ponta a ponta (tarefas)", () => 
     const cover = h.repos.repoAnalyses.latestDone(repoId);
     expect(cover?.kind).toBe("cover");
     expect(cover?.coverage.files.length).toBeGreaterThanOrEqual(inc?.coverage.files.length ?? 0);
+  });
+
+  it("sem rede: re-rodar o mesmo repositório responde pelo snapshot e chega à revisão (F03-9, E2E-11)", async () => {
+    h = harness();
+    const one = ["ana-exemplo/api-pagamentos"];
+    const first = h.createRun(one);
+    await h.drain();
+    h.queue.push(...confirmRun(h.repos, first.id));
+    await h.drain();
+    expect(h.repos.snapshots.list().some((x) => x.ref === one[0])).toBe(true);
+    h.state.offline = true;
+    const second = h.createRun(one);
+    h.repos.ingestionRuns.setParams(second.id, { ...second.params, kind: "deepen" });
+    await h.drain();
+    expect(h.repos.ingestionRuns.get(second.id)?.status).toBe("awaiting_confirmation");
+    h.queue.push(...confirmRun(h.repos, second.id));
+    await h.drain();
+    expect(h.repos.ingestionRuns.get(second.id)?.status).toBe("review");
+    expect(h.repos.snapshots.list().find((x) => x.ref === one[0])?.lastUsedAt).not.toBeNull();
   });
 
   it("revisão anti-alucinação: trecho inventado vira `unsupported`; camada 2 desligável", async () => {

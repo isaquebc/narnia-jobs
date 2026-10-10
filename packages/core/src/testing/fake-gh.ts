@@ -27,6 +27,8 @@ export interface FakeGhState {
   rateLimited?: boolean;
   /** Commit atual por repositório (simula push novo para a análise incremental). */
   heads?: Record<string, string>;
+  /** true = sem rede (toda chamada falha como `error connecting to api.github.com`). */
+  offline?: boolean;
 }
 
 type Route = () => GhExecResult;
@@ -42,6 +44,13 @@ export const unauthenticated: GhExecResult = {
 export const rateLimitedResult: GhExecResult = {
   stdout: "",
   stderr: "gh: API rate limit exceeded for user. (HTTP 403)",
+  code: 1,
+};
+
+export const offlineResult: GhExecResult = {
+  stdout: "",
+  stderr:
+    "error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",
   code: 1,
 };
 
@@ -270,6 +279,7 @@ export function fakeGh(arg: Record<string, GhExecResult> | FakeGhOptions = {}): 
     calls.push(args);
     const state = readState(o);
     if (args[0] !== "api") return { stdout: "", stderr: "comando não suportado", code: 1 };
+    if (state.offline) return offlineResult;
     if (args[1] === "graphql") {
       if (state.authenticated === false) return unauthenticated;
       return graphql(args);

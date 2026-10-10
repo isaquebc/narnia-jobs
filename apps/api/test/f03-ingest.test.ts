@@ -407,6 +407,19 @@ describe("F03/M3 api · repositórios, notificações, snapshots e configuraçõ
     expect((await t.api("/api/notifications/nao-existe/read", json({}))).status).toBe(404);
   });
 
+  it("sem rede: o preview responde pelo snapshot da listagem anterior (F03-9)", async () => {
+    t = makeTestApp();
+    const first = await t.api("/api/sources/github/preview", json({ mode: "private" }));
+    expect(first.status).toBe(200);
+    await t.api("/api/_test/github", json({ offline: true }));
+    const again = await t.api("/api/sources/github/preview", json({ mode: "private" }));
+    expect(again.status).toBe(200);
+    const snaps = (await (await t.api("/api/snapshots")).json()) as {
+      snapshots: Array<{ ref: string }>;
+    };
+    expect(snaps.snapshots.length).toBeGreaterThan(0);
+  });
+
   it("snapshots e configurações da ingestão", async () => {
     t = makeTestApp();
     expect(await jsonOf(t.api("/api/snapshots"))).toMatchObject({ snapshots: [], totalBytes: 0 });

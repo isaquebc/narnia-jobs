@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { Repos } from "../../../db";
 import type { SettingsRepo } from "../../../db/repos/settings";
 import { fakeGh } from "../../../testing/fake-gh";
 import { resolveIngestSettings } from "../../settings";
 import { createDefaultGhExec, createGhClient, type GhClient } from "./gh";
+import { withSnapshots } from "./snapshot";
 
 /**
  * Credencial do `gh` em runtime (F03-1, F03 §2.2): `host` lê o token que o lançador grava no volume `gh-auth`
@@ -36,10 +38,13 @@ export function resolveGhRuntime(o: {
   settings: SettingsRepo;
   configDir: string;
   fake?: { stateFile: string | null } | null;
+  /** Grava e reaproveita snapshots (F03-9): sem rede, o que já foi lido responde. */
+  snapshots?: { dataDir: string; repos: Repos } | null;
 }): GhRuntime {
+  const wrap = (c: GhClient) => (o.snapshots ? withSnapshots(c, o.snapshots) : c);
   if (o.fake) {
     return {
-      client: createGhClient({ exec: fakeGh({ stateFile: o.fake.stateFile }).exec }),
+      client: wrap(createGhClient({ exec: fakeGh({ stateFile: o.fake.stateFile }).exec })),
       source: "fake",
     };
   }
@@ -47,5 +52,5 @@ export function resolveGhRuntime(o: {
   const token = wanted === "host" ? readHostToken(o.configDir) : null;
   const exec = createDefaultGhExec({ token });
   // o token fica só na closure do executor; o objeto devolvido não o carrega
-  return { client: createGhClient({ exec, token }), source: token ? "host" : "app" };
+  return { client: wrap(createGhClient({ exec, token })), source: token ? "host" : "app" };
 }

@@ -58,6 +58,8 @@ const TestGithubSchema = z.object({
   heads: z.record(z.string(), z.string().regex(/^[0-9a-f]{40}$/)).optional(),
   hostTokenAvailable: z.boolean().optional(),
   deviceComplete: z.boolean().optional(),
+  /** E2E-11: sem rede (o gh falso falha como `error connecting`; o snapshot responde). */
+  offline: z.boolean().optional(),
 });
 
 const SeedRequestSchema = z.object({ fixture: z.enum(FIXTURE_NAMES) });

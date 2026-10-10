@@ -104,6 +104,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
           opts.provider.id === "mock"
             ? { stateFile: join(opts.dataDir, FAKE_GH_STATE_FILENAME) }
             : null,
+        snapshots: { dataDir: opts.dataDir, repos },
       }).client,
   };
 

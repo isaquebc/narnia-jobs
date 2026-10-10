@@ -21,6 +21,7 @@ export * from "./ingest/sources/github/gh";
 export * from "./ingest/sources/github/highlights";
 export * from "./ingest/sources/github/metrics";
 export * from "./ingest/sources/github/runtime";
+export * from "./ingest/sources/github/snapshot";
 export * from "./ingest/sources-store";
 export * from "./ingest/tools";
 export * from "./jobs/tasks";
