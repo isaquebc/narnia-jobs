@@ -55,7 +55,13 @@ export interface GhClientOptions {
   /** Só para mascarar: se aparecer em stderr, vira `***`. Quem passa o token ao processo é o `exec`. */
   token?: string | null;
   now?: () => number;
+  /** Espera entre novas tentativas em erros 5xx (injetável nos testes). */
+  sleep?: (ms: number) => Promise<void>;
 }
+
+/** Erros 5xx do GitHub são transitórios (sobrecarga): até 3 tentativas, esperando 1 s e 2 s (regressão 2026-10-10). */
+export const GH_RETRY_DELAYS_MS = [1000, 2000] as const;
+const isTransient = (status: number | null) => status !== null && status >= 500 && status <= 599;
 
 const RAW_ACCEPT = "Accept: application/vnd.github.raw";
 const TOKEN_PATTERN = /\b(gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,})\b/g;
@@ -109,6 +115,7 @@ function statusOf(stderr: string): number | null {
 
 export function createGhClient(opts: GhClientOptions): GhClient {
   const now = opts.now ?? Date.now;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   async function retryAfter(): Promise<number | null> {
     try {
@@ -142,6 +149,12 @@ export function createGhClient(opts: GhClientOptions): GhClient {
     }
     if (status === 404)
       return new GhError("not_found", `Não encontrado: ${stderr}`, { status, stderr });
+    if (isTransient(status))
+      return new GhError(
+        "unavailable",
+        `GitHub instável (HTTP ${status}); tente de novo em alguns minutos: ${stderr}`,
+        { status, stderr },
+      );
     // sem rede: o snapshot pode responder (F03-9); demais falhas seguem como "failed"
     if (
       status === null &&
@@ -158,16 +171,23 @@ export function createGhClient(opts: GhClientOptions): GhClient {
   }
 
   async function run(args: string[]): Promise<string> {
-    let r: GhExecResult;
-    try {
-      r = await opts.exec(args);
-    } catch (e) {
-      const err = e as NodeJS.ErrnoException;
-      if (err.code === "ENOENT") throw new GhError("unavailable", "gh não está instalado");
-      throw new GhError("failed", sanitizeSecrets(String(err.message ?? e), opts.token));
+    for (let attempt = 0; ; attempt++) {
+      let r: GhExecResult;
+      try {
+        r = await opts.exec(args);
+      } catch (e) {
+        const err = e as NodeJS.ErrnoException;
+        if (err.code === "ENOENT") throw new GhError("unavailable", "gh não está instalado");
+        throw new GhError("failed", sanitizeSecrets(String(err.message ?? e), opts.token));
+      }
+      if (r.code === 0) return r.stdout;
+      const delay = GH_RETRY_DELAYS_MS[attempt];
+      if (delay !== undefined && isTransient(statusOf(r.stderr))) {
+        await sleep(delay);
+        continue;
+      }
+      throw await toError(r);
     }
-    if (r.code !== 0) throw await toError(r);
-    return r.stdout;
   }
 
   const client: GhClient = {

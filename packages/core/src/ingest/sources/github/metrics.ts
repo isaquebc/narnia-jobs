@@ -82,7 +82,7 @@ export interface GithubMetricsResult {
   repos: { fullName: string; metrics: GithubMetrics }[];
   failed: string[];
   /** Métricas não coletadas: a API GraphQL do GitHub exige login (análise pública anônima). */
-  unavailable?: "not_authenticated";
+  unavailable?: "not_authenticated" | "github_unstable";
 }
 
 interface Contributions {
@@ -231,6 +231,8 @@ export function metricsTable(
 ): string {
   if (r.unavailable === "not_authenticated")
     return "Métricas do GitHub indisponíveis sem login (a API de contribuições exige autenticação).";
+  if (r.unavailable === "github_unstable")
+    return "Métricas do GitHub indisponíveis nesta execução (GitHub instável); a análise segue sem elas.";
   return [
     "Métricas do GitHub (contagens do próprio usuário)",
     "| escopo | commits | PRs abertos | PRs mergeados | PRs fechados sem merge | revisões aprovadas | issues abertas | issues resolvidas |",
@@ -251,4 +253,17 @@ export function persistMetrics(repos: Repos, r: GithubMetricsResult): void {
     const repo = repos.repos.getByFullName(x.fullName);
     if (repo) repos.githubMetrics.put({ scope: "repo", repoId: repo.id }, x.metrics);
   }
+}
+
+/** Resultado sem métricas quando o GitHub falha mesmo após as novas tentativas: a execução segue sem elas. */
+export function unavailableMetrics(login: string): GithubMetricsResult {
+  return {
+    login,
+    userId: "",
+    years: [],
+    global: sumMetrics([]),
+    repos: [],
+    failed: [],
+    unavailable: "github_unstable",
+  };
 }

@@ -90,6 +90,8 @@ export const RunReportSchema = z.object({
     z.object({ at: IsoDateTimeSchema, reason: z.string().min(1), usedTokens: Tokens }),
   ),
   skipped: z.array(z.string()),
+  /** Observações da execução (ex.: métricas indisponíveis por instabilidade do GitHub). */
+  notes: z.array(z.string()).optional(),
   startedAt: IsoDateTimeSchema.nullable(),
   finishedAt: IsoDateTimeSchema.nullable(),
   synthesis: z.string().nullable(),

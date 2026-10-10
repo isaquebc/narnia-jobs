@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { GhExec } from "@narnia-jobs/core";
 import {
   confirmRun,
   createGhClient,
@@ -31,7 +32,9 @@ const REPOS = [
   "ana-exemplo/notas-privadas",
 ];
 
-function harness(o: { provider?: MockProvider; state?: FakeGhState } = {}) {
+function harness(
+  o: { provider?: MockProvider; state?: FakeGhState; wrapExec?: (exec: GhExec) => GhExec } = {},
+) {
   const db = openDatabase(":memory:");
   migrate(db);
   const repos: Repos = createRepos(db);
@@ -62,7 +65,16 @@ function harness(o: { provider?: MockProvider; state?: FakeGhState } = {}) {
       events.push(e);
     },
     // como em produção (resolveGhRuntime com snapshots): o que foi lido responde sem rede
-    gh: () => withSnapshots(createGhClient({ exec: fakeGh({ state }).exec }), { dataDir, repos }),
+    gh: () => {
+      const exec = fakeGh({ state }).exec;
+      return withSnapshots(
+        createGhClient({ exec: o.wrapExec ? o.wrapExec(exec) : exec, sleep: async () => {} }),
+        {
+          dataDir,
+          repos,
+        },
+      );
+    },
   };
   /** Roda as tarefas enfileiradas até a fila esvaziar (simula a BullMQ), devolvendo os tipos processados. */
   const drain = async (max = 50): Promise<string[]> => {
@@ -424,5 +436,23 @@ describe("F03 fix L3 · item 12: freio com repositórios em paralelo", () => {
     const statuses = (r?.report?.repos ?? []).map((x) => x.status).sort();
     expect(statuses).toEqual(["done", "pending"]);
     expect(r?.status).toBe("awaiting_decision");
+  });
+});
+
+describe("Regressão 2026-10-10 · GitHub instável (HTTP 502) na preparação", () => {
+  it("se as métricas globais falham mesmo após novas tentativas, a preparação segue sem métricas e registra o motivo", async () => {
+    const h2 = harness({
+      wrapExec: (exec) => async (args) =>
+        args[1] === "graphql" && args.join(" ").includes("contributionsCollection")
+          ? { code: 1, stdout: "", stderr: "gh: HTTP 502 (HTTP 502)" }
+          : exec(args),
+    });
+    const run = h2.createRun();
+    await h2.drain();
+    const r = h2.repos.ingestionRuns.get(run.id);
+    expect(r?.status).toBe("awaiting_confirmation");
+    expect(r?.error ?? null).toBeNull();
+    expect(JSON.stringify(r?.report ?? {})).toMatch(/métricas indisponíveis/i);
+    h2.cleanup?.();
   });
 });

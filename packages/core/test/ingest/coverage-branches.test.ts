@@ -337,9 +337,11 @@ describe("F03/M2 cobertura · collect, metrics e highlights", () => {
   it("previewGithub repassa erro que não é de autenticação; repositório sem head; campos ausentes", async () => {
     const gh = createGhClient({
       exec: fakeGh({ user: { stdout: "", stderr: "Server Error (HTTP 500)", code: 1 } }).exec,
+      sleep: async () => {},
     });
+    // 5xx é transitório desde 2026-10-10: novas tentativas e, se persistir, "unavailable" (GitHub instável)
     await expect(previewGithub(gh, { mode: "public", login: LOGIN })).rejects.toMatchObject({
-      code: "failed",
+      code: "unavailable",
     });
     const noHead = createGhClient({
       exec: fakeGh({

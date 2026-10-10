@@ -32,6 +32,7 @@ import {
   summarizeCompare,
   synthesisTask,
   TYPICAL_CONTEXT_CHARS,
+  unavailableMetrics,
 } from "@narnia-jobs/core";
 import type {
   FactProposal,
@@ -83,7 +84,8 @@ function githubErrorMessage(e: unknown): string {
       return "GitHub não conectado: conecte em Configurações › Integrações";
     if (e.code === "rate_limited")
       return "Limite de requisições do GitHub atingido; tente mais tarde ou conecte sua conta";
-    if (e.code === "unavailable") return "GitHub CLI indisponível no container";
+    if (e.code === "unavailable")
+      return e.status && e.status >= 500 ? e.message : "GitHub CLI indisponível no container";
     return `GitHub: ${e.message}`;
   }
   return (e as Error).message || String(e);
@@ -138,7 +140,14 @@ export const githubPrepare: TaskHandler = async (data, ctx, deps) => {
       await ctx.progress(10 + Math.round((60 * (i + 1)) / Math.max(1, names.length)));
     }
     const ok = sizes.map((s) => s.fullName);
-    const metrics = await collectGithubMetrics(gh, { login, repos: ok });
+    // métricas são complemento: se o GitHub falhar mesmo após as novas tentativas, a execução segue sem elas
+    let metricsNote: string | null = null;
+    const metrics = await collectGithubMetrics(gh, { login, repos: ok }).catch((e: unknown) => {
+      if (e instanceof GhError && (e.code === "not_authenticated" || e.code === "rate_limited"))
+        throw e;
+      metricsNote = `Métricas indisponíveis nesta execução: ${githubErrorMessage(e)}`;
+      return unavailableMetrics(login);
+    });
     persistMetrics(deps.repos, metrics);
     const table = metricsTable(metrics);
     const plan = await deps.provider.getPlanUsage().catch(() => null);
@@ -167,6 +176,7 @@ export const githubPrepare: TaskHandler = async (data, ctx, deps) => {
       startedAt: null,
       repos: names.map((fullName) => ({ fullName, estimatedTokens: byName.get(fullName) ?? 0 })),
     });
+    if (metricsNote) report = { ...report, notes: [...(report.notes ?? []), metricsNote] };
     for (const f of failed) {
       report = markRepo(report, f.fullName, {
         status: "error",

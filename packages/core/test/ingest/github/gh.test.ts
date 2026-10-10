@@ -87,3 +87,44 @@ describe("F03/M2 gh: cliente sobre o `gh api` (exec injetável)", () => {
     ).rejects.toMatchObject({ code: "failed" });
   });
 });
+
+describe("Regressão 2026-10-10 · erros transitórios do GitHub (5xx) ganham novas tentativas", () => {
+  const flaky = (failures: number, stderr = "gh: HTTP 502 (HTTP 502)") => {
+    let calls = 0;
+    return {
+      calls: () => calls,
+      exec: async () => {
+        calls++;
+        return calls <= failures
+          ? { code: 1, stdout: "", stderr }
+          : { code: 0, stdout: '{"login":"ana-exemplo"}', stderr: "" };
+      },
+    };
+  };
+
+  it("502 duas vezes e depois sucesso: devolve o resultado, esperando 1 s e 2 s", async () => {
+    const f = flaky(2);
+    const waits: number[] = [];
+    const gh = createGhClient({ exec: f.exec, sleep: async (ms) => void waits.push(ms) });
+    expect(await gh.json<{ login: string }>("user")).toEqual({ login: "ana-exemplo" });
+    expect(f.calls()).toBe(3);
+    expect(waits).toEqual([1000, 2000]);
+  });
+
+  it("5xx persistente vira GhError unavailable com mensagem de instabilidade após 3 tentativas", async () => {
+    const f = flaky(10, "gh: HTTP 503 (HTTP 503)");
+    const gh = createGhClient({ exec: f.exec, sleep: async () => {} });
+    const err = await gh.json("user").catch((e) => e);
+    expect(err).toBeInstanceOf(GhError);
+    expect((err as GhError).code).toBe("unavailable");
+    expect((err as GhError).message).toMatch(/GitHub instável/);
+    expect(f.calls()).toBe(3);
+  });
+
+  it("4xx não ganha nova tentativa", async () => {
+    const f = flaky(10, "gh: Not Found (HTTP 404)");
+    const gh = createGhClient({ exec: f.exec, sleep: async () => {} });
+    await gh.json("user").catch(() => null);
+    expect(f.calls()).toBe(1);
+  });
+});
