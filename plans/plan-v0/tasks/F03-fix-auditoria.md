@@ -2,7 +2,7 @@
 
 Correções dos achados das duas auditorias da F03 (plano × implementação e revisão adversarial), mais a proteção de dados motivada pelo incidente da instância do dono (banco recriado do zero e `data/uploads` ausente no `make dev` de 2026-10-10; causa não encontrada no código; ver F03 §8). Tudo em TDD: para cada item, o teste listado é escrito primeiro e precisa falhar pelo motivo certo antes da correção.
 
-Status: **plano**, aguardando o dono.
+Status: **plano aprovado** (FX-1 a FX-4 decididas em 2026-10-10); implementação em andamento.
 
 Regras de execução: só na instância `claude` (`scripts/claude-env.sh`); nenhuma migration nova sem aviso (L1 não precisa de migration); um commit por lote, verde em `lint`, `typecheck`, `test` e nos e2e do lote; a instância do dono recebe o código pelo hot reload, por isso **L1 vai primeiro** (proteção de dados antes de qualquer outra mudança).
 
@@ -71,4 +71,4 @@ Verificação do lote: unitários e bats verdes; prova na instância `claude`: a
 | FX-1 | Onde ficam os backups do dono | **Decidida (dono): `./backups`** na raiz do projeto (fora de `data/`, ignorado pelo git; `NARNIA_BACKUP_DIR` continua permitindo outro lugar) |
 | FX-2 | Retenção | **Decidida (dono): no máximo 5 backups no total** (boot diário e pré-migration contam juntos); ao atingir o teto o mais antigo sai; o teto é configurável em Configurações (`backups.max`, padrão 5, mínimo 1) |
 | FX-3 | `ingestion.done` | **Decidida (dono):** informativa; não conta no sino; resolvida ao abrir a execução ou em 7 dias |
-| FX-4 | Unidade "%" sem conversão aprendida | opção desabilitada com dica, em vez de converter por aproximação |
+| FX-4 | Unidade "%" sem conversão aprendida | **Decidida (dono): desabilitar "%" até haver conversão aprendida para o modelo escolhido**; a opção aparece desabilitada com a dica "disponível depois da primeira execução com este modelo"; com conversão, mostra o equivalente ao lado ("30% ≈ 420 mil tokens em Sonnet") |
