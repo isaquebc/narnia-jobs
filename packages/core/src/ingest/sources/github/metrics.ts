@@ -81,6 +81,8 @@ export interface GithubMetricsResult {
   global: GithubMetrics;
   repos: { fullName: string; metrics: GithubMetrics }[];
   failed: string[];
+  /** Métricas não coletadas: a API GraphQL do GitHub exige login (análise pública anônima). */
+  unavailable?: "not_authenticated";
 }
 
 interface Contributions {
@@ -136,7 +138,38 @@ export async function collectGithubMetrics(
   o: { login: string; repos: string[] },
 ): Promise<GithubMetricsResult> {
   assertName(o.login, "Usuário");
-  const u = await gh.graphql<{
+  let u: {
+    user: {
+      id: string;
+      contributionsCollection: { contributionYears: number[] };
+      ownRepos: { totalCount: number };
+      contributedTo: { totalCount: number };
+    };
+  };
+  try {
+    u = await userMetrics(gh, o.login);
+  } catch (e) {
+    // a GraphQL do GitHub não aceita chamada anônima: a análise pública sem login segue sem as métricas
+    if (e instanceof GhError && e.code === "not_authenticated") return emptyMetrics(o.login);
+    throw e;
+  }
+  return collectWithUser(gh, o, u);
+}
+
+function emptyMetrics(login: string): GithubMetricsResult {
+  return {
+    login,
+    userId: "",
+    years: [],
+    global: sumMetrics([]),
+    repos: [],
+    failed: [],
+    unavailable: "not_authenticated",
+  };
+}
+
+function userMetrics(gh: GhClient, login: string) {
+  return gh.graphql<{
     user: {
       id: string;
       contributionsCollection: { contributionYears: number[] };
@@ -152,8 +185,15 @@ export async function collectGithubMetrics(
     contributedTo: repositoriesContributedTo(includeUserRepositories: false, contributionTypes: [COMMIT, PULL_REQUEST, ISSUE, PULL_REQUEST_REVIEW]) { totalCount }
   }
 }`,
-    { login: o.login },
+    { login },
   );
+}
+
+async function collectWithUser(
+  gh: GhClient,
+  o: { login: string; repos: string[] },
+  u: Awaited<ReturnType<typeof userMetrics>>,
+): Promise<GithubMetricsResult> {
   const years = await yearMetrics(gh, o.login, u.user.contributionsCollection.contributionYears);
   const repos: GithubMetricsResult["repos"] = [];
   const failed: string[] = [];
@@ -186,7 +226,11 @@ const row = (label: string | number, m: GithubMetrics) =>
   `| ${label} | ${FIELDS.map((f) => m[f]).join(" | ")} |`;
 
 /** Tabela compacta (Markdown) que entra no contexto do modelo e na tela de métricas. */
-export function metricsTable(r: Pick<GithubMetricsResult, "global" | "years" | "repos">): string {
+export function metricsTable(
+  r: Pick<GithubMetricsResult, "global" | "years" | "repos" | "unavailable">,
+): string {
+  if (r.unavailable === "not_authenticated")
+    return "Métricas do GitHub indisponíveis sem login (a API de contribuições exige autenticação).";
   return [
     "Métricas do GitHub (contagens do próprio usuário)",
     "| escopo | commits | PRs abertos | PRs mergeados | PRs fechados sem merge | revisões aprovadas | issues abertas | issues resolvidas |",
@@ -200,6 +244,7 @@ export function metricsTable(r: Pick<GithubMetricsResult, "global" | "years" | "
 
 /** Grava em `github_metric`: global, por ano e por repositório já registrado em `repo`. */
 export function persistMetrics(repos: Repos, r: GithubMetricsResult): void {
+  if (r.unavailable) return; // sem login não há métricas: nada de gravar zeros como se fossem reais
   repos.githubMetrics.put({ scope: "global" }, r.global);
   for (const y of r.years) repos.githubMetrics.put({ scope: "year", year: y.year }, y.metrics);
   for (const x of r.repos) {

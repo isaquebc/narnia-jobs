@@ -146,3 +146,22 @@ describe("F03/M2 metrics: análise quantitativa sem tokens (F03-3 §3)", () => {
     expect(repos.githubMetrics.get({ scope: "repo", repoId: repo.id })?.commits).toBe(87);
   });
 });
+
+describe("F03/M5 métricas sem login (análise pública anônima, F03-2)", () => {
+  it("GraphQL exige login: sem login as métricas são puladas, sem derrubar a coleta", async () => {
+    const anon = createGhClient({ exec: fakeGh({ state: { authenticated: false } }).exec });
+    const r = await collectGithubMetrics(anon, {
+      login: LOGIN,
+      repos: ["ana-exemplo/api-pagamentos"],
+    });
+    expect(r.unavailable).toBe("not_authenticated");
+    expect(r.years).toEqual([]);
+    expect(r.repos).toEqual([]);
+    expect(metricsTable(r)).toContain("indisponíveis sem login");
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const repos = createRepos(db);
+    persistMetrics(repos, r);
+    expect(repos.githubMetrics.list()).toEqual([]);
+  });
+});

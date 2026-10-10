@@ -310,6 +310,19 @@ describe("F03/M3 worker · execução do GitHub ponta a ponta (tarefas)", () => 
     );
   });
 
+  it("pública sem login: prepara e analisa sem as métricas (GraphQL exige login)", async () => {
+    h = harness({ state: { authenticated: false } });
+    const r = h.createRun(["ana-exemplo/api-pagamentos"]);
+    h.repos.db.prepare("update ingestion_run set mode = 'public' where id = ?").run(r.id);
+    h.repos.ingestionRuns.setParams(r.id, { ...r.params, login: "ana-exemplo" });
+    await h.drain();
+    expect(h.repos.ingestionRuns.get(r.id)?.status).toBe("awaiting_confirmation");
+    h.queue.push(...confirmRun(h.repos, r.id));
+    await h.drain();
+    expect(h.repos.ingestionRuns.get(r.id)?.status).toBe("review");
+    expect(h.repos.githubMetrics.list()).toEqual([]);
+  });
+
   it("privada sem login: a preparação falha com mensagem e notificação de erro", async () => {
     h = harness({ state: { authenticated: false } });
     const run = h.createRun();
