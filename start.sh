@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # narnia-jobs · lançador para Linux/macOS. Só depende de Docker (com Compose v2).
-# Produção:        up | down [--purge] | login | doctor | logs | status
-# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
+# Produção:        up | down [--purge] | login | doctor | logs | status | restore
+# Desenvolvimento: dev | dev-down | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
 set -euo pipefail
 
 # --- instâncias: a do dono (padrão) e a do Claude (NARNIA_INSTANCE=claude, valores em .env.claude) -----------------
@@ -113,6 +113,52 @@ host_gh_token() {
   printf '%s\n' "$token"
 }
 
+# --- backups e restauração (F03-fix L1, incidente de 2026-10-10) ------------------------------------------------------
+
+# dev_backup_host_dir -> pasta de backups do modo dev no host (NARNIA_DEV_BACKUP_DIR é caminho do container, sob /app)
+dev_backup_host_dir() {
+  local d=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
+  printf './%s\n' "${d#/app/}"
+}
+
+# prod_backup_host_dir -> pasta de backups montada em /backups na produção local
+prod_backup_host_dir() { printf '%s\n' "${NARNIA_BACKUP_HOST_DIR:-./backups}"; }
+
+# dev_down_cmd -> comando que derruba a stack de dev DESTA instância (nunca a do dono a partir da instância claude)
+dev_down_cmd() { printf '%s\n' "${DEV_COMPOSE[*]} --profile app down --remove-orphans"; }
+
+# resolve_backup_file DIR ARG -> caminho do backup (ARG é caminho ou nome dentro de DIR); falha se não existir
+resolve_backup_file() {
+  local dir=$1 arg=${2:-}
+  [[ -n "$arg" ]] || { printf 'erro: informe o arquivo de backup (veja %s)\n' "$dir" >&2; return 1; }
+  if [[ -f "$arg" ]]; then printf '%s\n' "$arg"; return 0; fi
+  if [[ -f "$dir/$arg" ]]; then printf '%s\n' "$dir/$arg"; return 0; fi
+  printf 'erro: backup não encontrado: %s (pasta %s)\n' "$arg" "$dir" >&2
+  return 1
+}
+
+# restore_files DATA_DIR BACKUP_DIR FILE STAMP -> guarda o banco atual (e o WAL) como narnia-before-restore-STAMP,
+# põe o backup no lugar, apaga WAL/SHM do banco antigo (seriam reaplicados sobre o restaurado) e devolve os uploads
+# que faltam. Só mexe em DATA_DIR/narnia.sqlite*, DATA_DIR/uploads e no próprio arquivo de "antes".
+restore_files() {
+  local data=$1 bdir=$2 file=$3 stamp=$4 db=$1/narnia.sqlite
+  mkdir -p "$data" "$bdir"
+  if [[ -f "$db" ]]; then
+    cp -p "$db" "$bdir/narnia-before-restore-$stamp.sqlite"
+    [[ -f "$db-wal" ]] && cp -p "$db-wal" "$bdir/narnia-before-restore-$stamp.sqlite-wal"
+  fi
+  cp "$file" "$db.restoring" && mv -f "$db.restoring" "$db"
+  rm -f "$db-wal" "$db-shm"
+  if [[ -d "$bdir/uploads" ]]; then
+    mkdir -p "$data/uploads"
+    local f
+    for f in "$bdir/uploads"/*; do
+      [[ -f "$f" ]] || continue
+      [[ -e "$data/uploads/$(basename "$f")" ]] || cp -p "$f" "$data/uploads/"
+    done
+  fi
+}
+
 # app_url PORT TOKEN -> URL de abertura da interface
 app_url() { printf 'http://127.0.0.1:%s/?token=%s\n' "$1" "$2"; }
 
@@ -174,7 +220,7 @@ cmd_up() {
     port=$(env_value "$ENV_FILE" NARNIA_PORT)
     info "stack já no ar na porta ${port:-?}; aplicando alterações"
   else
-    mkdir -p "${NARNIA_DATA_DIR:-./data}"   # cria a pasta antes do Docker, para ela pertencer ao usuário e não ao root
+    mkdir -p "${NARNIA_DATA_DIR:-./data}" "$(prod_backup_host_dir)"   # antes do Docker, para pertencerem ao usuário
     mkdir -p "$(dirname "$ENV_FILE")"
     port=$(choose_port "$ENV_FILE") || die "nenhuma porta livre entre ${NARNIA_PORT_START} e ${NARNIA_PORT_END}."
     write_env "$ENV_FILE" NARNIA_PORT "$port"
@@ -336,6 +382,30 @@ cmd_e2e() {
   return $rc
 }
 
+# cmd_restore [--dev|--prod] ARQUIVO -> restaura um backup na instância corrente (para api/worker, troca, sobe)
+cmd_restore() {
+  require_docker
+  local mode="" arg=""
+  for a in "$@"; do
+    case "$a" in --dev) mode=dev ;; --prod) mode=prod ;; *) arg=$a ;; esac
+  done
+  if [[ -z "$mode" ]]; then
+    if [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then mode=dev
+    elif stack_running; then mode=prod
+    else mode=dev; fi
+  fi
+  local -a compose data bdir file running
+  if [[ "$mode" == dev ]]; then compose=("${DEV_COMPOSE[@]}" --profile app); data=$(dev_data_host_dir); bdir=$(dev_backup_host_dir)
+  else compose=("${PROD_COMPOSE[@]}"); data=${NARNIA_DATA_DIR:-./data}; bdir=$(prod_backup_host_dir); fi
+  file=$(resolve_backup_file "$bdir" "$arg") || exit 1
+  running=$("${compose[@]}" ps -q api 2>/dev/null || true)
+  info "restaurando $(basename "$file") em $data (modo $mode); o banco atual fica guardado em $bdir"
+  [[ -z "$running" ]] || "${compose[@]}" stop api worker >/dev/null
+  restore_files "$data" "$bdir" "$file" "$(date -u +%Y-%m-%dT%H-%M-%S)"
+  [[ -z "$running" ]] || "${compose[@]}" start api worker >/dev/null
+  info "pronto. Recarregue a página."
+}
+
 usage() {
   cat <<USAGE
 narnia-jobs · ./start.sh <comando>
@@ -344,12 +414,14 @@ Uso (produção, só Docker no host):
   up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis e imprime a URL
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
+  restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 
 Desenvolvimento (tudo em containers):
+  dev-down      para a stack de dev desta instância
   dev           sobe web (http://127.0.0.1:\${NARNIA_DEV_PORT:-5173}), api, worker e redis com hot reload; provider claude-code, token dev-token
   test [args]   roda os testes unitários (Vitest) de todos os pacotes
   lint          Biome (formatação + lint)
@@ -370,12 +442,20 @@ main() {
     up)     cmd_up "$@" ;;
     down)   cmd_down "$@" ;;
     login)  cmd_login ;;
-    doctor) require_docker; "${PROD_COMPOSE[@]}" run --rm api narnia-jobs doctor ;;
+    doctor)
+      # dentro do api que está no ar (enxerga os processos e o banco aberto); senão, container avulso
+      require_docker
+      if [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then
+        "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts doctor
+      elif stack_running; then "${PROD_COMPOSE[@]}" exec -T api narnia-jobs doctor
+      else "${PROD_COMPOSE[@]}" run --rm api narnia-jobs doctor; fi ;;
+    restore) cmd_restore "$@" ;;
+    dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;
     dev)
       require_docker; ensure_installed
-      mkdir -p "$(dev_data_host_dir)"
+      mkdir -p "$(dev_data_host_dir)" "$(dev_backup_host_dir)"   # antes do Docker: pertencem ao usuário
       [[ -z "$NARNIA_INSTANCE" ]] || info "instância: ${NARNIA_INSTANCE} (projeto ${NARNIA_DEV_PROJECT_NAME:-?}, dados $(dev_data_host_dir))"
       deliver_host_gh_token "${DEV_COMPOSE[@]}" dev
       printf '\n  modo dev (hot reload):  %s\n' "$(app_url "${NARNIA_DEV_PORT:-5173}" "${NARNIA_TOKEN:-dev-token}")"

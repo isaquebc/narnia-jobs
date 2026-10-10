@@ -73,6 +73,58 @@ function Choose-Port([string] $File, [int] $Start = $script:PortStart, [int] $En
 
 function Get-AppUrl([int] $Port, [string] $Token) { return "http://127.0.0.1:$Port/?token=$Token" }
 
+# --- backups e restauração (F03-fix L1, incidente de 2026-10-10) ------------------------------------------------------
+function Get-DevDataHostDir { $d = if ($env:NARNIA_DEV_DATA_DIR) { $env:NARNIA_DEV_DATA_DIR } else { "/app/data" }; return "./" + ($d -replace '^/app/', '') }
+function Get-DevBackupHostDir { $d = if ($env:NARNIA_DEV_BACKUP_DIR) { $env:NARNIA_DEV_BACKUP_DIR } else { "/app/backups" }; return "./" + ($d -replace '^/app/', '') }
+function Get-ProdBackupHostDir { if ($env:NARNIA_BACKUP_HOST_DIR) { return $env:NARNIA_BACKUP_HOST_DIR } else { return "./backups" } }
+function Get-DevDownArgs { return @($script:DevCompose + @("--profile", "app", "down", "--remove-orphans")) }
+
+function Resolve-BackupFile([string] $Dir, [string] $Arg) {
+  if ([string]::IsNullOrWhiteSpace($Arg)) { throw "informe o arquivo de backup (veja $Dir)" }
+  if (Test-Path -PathType Leaf $Arg) { return $Arg }
+  $inDir = Join-Path $Dir $Arg
+  if (Test-Path -PathType Leaf $inDir) { return $inDir }
+  throw "backup não encontrado: $Arg (pasta $Dir)"
+}
+
+# Guarda o banco atual (e o WAL) como narnia-before-restore-STAMP, põe o backup no lugar, apaga WAL/SHM do banco
+# antigo (seriam reaplicados sobre o restaurado) e devolve os uploads que faltam.
+function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [string] $Stamp) {
+  New-Item -ItemType Directory -Force -Path $DataDir, $BackupDir | Out-Null
+  $db = Join-Path $DataDir "narnia.sqlite"
+  if (Test-Path $db) {
+    Copy-Item $db (Join-Path $BackupDir "narnia-before-restore-$Stamp.sqlite")
+    if (Test-Path "$db-wal") { Copy-Item "$db-wal" (Join-Path $BackupDir "narnia-before-restore-$Stamp.sqlite-wal") }
+  }
+  Copy-Item $File "$db.restoring" -Force
+  Move-Item "$db.restoring" $db -Force
+  Remove-Item "$db-wal", "$db-shm" -Force -ErrorAction SilentlyContinue
+  $up = Join-Path $BackupDir "uploads"
+  if (Test-Path $up) {
+    $dst = Join-Path $DataDir "uploads"; New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    foreach ($f in Get-ChildItem -File $up) { if (-not (Test-Path (Join-Path $dst $f.Name))) { Copy-Item $f.FullName $dst } }
+  }
+}
+
+function Invoke-Restore {
+  Assert-Docker
+  $mode = $null; $arg = $null
+  foreach ($a in $Rest) { switch ($a) { "--dev" { $mode = "dev" } "--prod" { $mode = "prod" } default { $arg = $a } } }
+  if (-not $mode) {
+    $devApi = & docker @script:DevCompose ps -q api 2>$null
+    $mode = if ($devApi) { "dev" } elseif (Test-StackRunning) { "prod" } else { "dev" }
+  }
+  if ($mode -eq "dev") { $compose = $script:DevCompose + @("--profile", "app"); $data = Get-DevDataHostDir; $bdir = Get-DevBackupHostDir }
+  else { $compose = $script:ProdCompose; $data = if ($env:NARNIA_DATA_DIR) { $env:NARNIA_DATA_DIR } else { "./data" }; $bdir = Get-ProdBackupHostDir }
+  try { $file = Resolve-BackupFile $bdir $arg } catch { Fail $_.Exception.Message }
+  $running = & docker @compose ps -q api 2>$null
+  Info "restaurando $(Split-Path -Leaf $file) em $data (modo $mode); o banco atual fica guardado em $bdir"
+  if ($running) { & docker @compose stop api worker *> $null }
+  Restore-Files $data $bdir $file ((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH-mm-ss"))
+  if ($running) { & docker @compose start api worker *> $null }
+  Info "pronto. Recarregue a página."
+}
+
 # Token do `gh` logado no computador (F03-1); $null sem gh ou sem login. Entregue ao container pela entrada padrão.
 function Get-HostGhToken {
   $bin = if ($env:NARNIA_GH_BIN) { $env:NARNIA_GH_BIN } else { "gh" }
@@ -161,7 +213,7 @@ function Wait-Healthy([string] $Service, [int] $Seconds = 120) {
 function Invoke-Up {
   Assert-Docker
   $dataDir = if ($env:NARNIA_DATA_DIR) { $env:NARNIA_DATA_DIR } else { "./data" }
-  New-Item -ItemType Directory -Force -Path $dataDir *> $null
+  New-Item -ItemType Directory -Force -Path $dataDir, (Get-ProdBackupHostDir) *> $null
   if (Test-StackRunning) {
     $port = Get-EnvValue $script:EnvFile "NARNIA_PORT"
     Info "stack já no ar na porta $port; aplicando alterações"
@@ -213,12 +265,14 @@ Uso (produção, só Docker no host):
   up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis e imprime a URL
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
+  restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 
 Desenvolvimento (tudo em containers):
+  dev-down      para a stack de dev desta instância
   dev           sobe web (http://127.0.0.1:5173), api, worker e redis com hot reload
   test [args]   roda os testes unitários (Vitest) de todos os pacotes
   lint          Biome (formatação + lint)
@@ -237,13 +291,22 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "up"        { Invoke-Up }
     "down"      { Invoke-Down }
     "login"     { Invoke-Login }
-    "doctor"    { Assert-Docker; Invoke-Prod @("run", "--rm", "api", "narnia-jobs", "doctor") }
+    "doctor"    {
+      Assert-Docker
+      $devApi = & docker @script:DevCompose ps -q api 2>$null
+      if ($devApi) { & docker @script:DevCompose exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts doctor }
+      elseif (Test-StackRunning) { Invoke-Prod @("exec", "-T", "api", "narnia-jobs", "doctor") }
+      else { Invoke-Prod @("run", "--rm", "api", "narnia-jobs", "doctor") }
+    }
+    "restore"   { Invoke-Restore }
+    "dev-down"  { Assert-Docker; $a = Get-DevDownArgs; & docker @a }
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }
     "dev"       {
       Assert-Docker; Ensure-Installed
       $devPort = if ($env:NARNIA_DEV_PORT) { $env:NARNIA_DEV_PORT } else { "5173" }
       $devToken = if ($env:NARNIA_TOKEN) { $env:NARNIA_TOKEN } else { "dev-token" }
+      New-Item -ItemType Directory -Force -Path (Get-DevDataHostDir), (Get-DevBackupHostDir) *> $null
       Send-HostGhToken $script:DevCompose "dev"
       Write-Host ""; Write-Host "  modo dev (hot reload):  $(Get-AppUrl $devPort $devToken)"
       if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $($script:EnvFile)." }

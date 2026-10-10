@@ -9,6 +9,7 @@
       "!**/node_modules",
       "!plans",
       "!data",
+      "!backups",
       "!.claude-data",
       "!.e2e-data",
       "!**/*.snap",

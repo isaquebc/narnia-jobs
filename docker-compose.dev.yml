@@ -22,6 +22,7 @@ x-dev: &dev
   environment:
     - REDIS_URL=redis://redis:6379
     - NARNIA_DATA_DIR=${NARNIA_DEV_DATA_DIR:-/app/data}
+    - NARNIA_BACKUP_DIR=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
     - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
     - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
 
@@ -40,6 +41,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - NARNIA_DATA_DIR=${NARNIA_DEV_DATA_DIR:-/app/data}
+      - NARNIA_BACKUP_DIR=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - NARNIA_TOKEN=${NARNIA_TOKEN:-dev-token}         # token de boot previsível em dev; em produção é aleatório
@@ -54,6 +56,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - NARNIA_DATA_DIR=${NARNIA_DEV_DATA_DIR:-/app/data}
+      - NARNIA_BACKUP_DIR=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - TESSDATA_PATH=/usr/share/tessdata

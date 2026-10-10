@@ -12,10 +12,12 @@ x-app: &app
   restart: unless-stopped
   volumes:
     - ${NARNIA_DATA_DIR:-./data}:/data
+    - ${NARNIA_BACKUP_HOST_DIR:-./backups}:/backups   # backups fora da pasta de dados (F03-fix L1)
     - claude-auth:/home/node/.claude
     - gh-auth:/home/node/.config/gh   # F03-1: token do gh do computador (host-token) ou login próprio do app
   environment:
     - NARNIA_DATA_DIR=/data
+    - NARNIA_BACKUP_DIR=/backups
     - REDIS_URL=redis://redis:6379
     - NARNIA_QUEUE_PREFIX=narnia
     - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
@@ -41,6 +43,7 @@ services:
     command: ["/app/docker/entrypoint.sh"]
     environment:
       - NARNIA_DATA_DIR=/data
+      - NARNIA_BACKUP_DIR=/backups
       - REDIS_URL=redis://redis:6379
       - NARNIA_QUEUE_PREFIX=narnia
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}

@@ -13,15 +13,19 @@ services:
     ports: !override []
     volumes:
       - ./.e2e-data:/data
+      - ./.e2e-data/backups:/backups   # nunca o ./backups do dono
     environment:
       - NARNIA_PROVIDER=mock
+      - NARNIA_BACKUP_DIR=off
       - NARNIA_TOKEN=e2e-token
   worker:
     restart: "no"
     volumes:
       - ./.e2e-data:/data
+      - ./.e2e-data/backups:/backups   # nunca o ./backups do dono
     environment:
       - NARNIA_PROVIDER=mock
+      - NARNIA_BACKUP_DIR=off
   redis:
     restart: "no"
   playwright:

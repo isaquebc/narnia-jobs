@@ -6,7 +6,7 @@ ENV_FILE ?= .env
 DATA_DIR ?= ./data
 
 # Instância do Claude (testes, isolada da do dono): make claude-<cmd> = scripts/claude-env.sh <cmd>
-.PHONY: help dev dev-down up down purge restart login doctor logs status tunnel \
+.PHONY: help dev dev-down up down purge restore restart login doctor logs status tunnel \
         test lint typecheck build e2e e2e-ui check install shell
 
 help: ## lista os comandos
@@ -16,8 +16,8 @@ help: ## lista os comandos
 dev: ## sobe web (:5173), api (:3100), worker e redis com hot reload; mesma assinatura da produção (NARNIA_PROVIDER=mock para não gastar)
 	./start.sh dev
 
-dev-down: ## derruba os containers de desenvolvimento
-	docker compose -f docker-compose.dev.yml --profile app down --remove-orphans
+dev-down: ## derruba os containers de desenvolvimento desta instância
+	./start.sh dev-down
 
 install: ## instala dependências no volume node_modules
 	./start.sh install
@@ -34,6 +34,9 @@ down: ## para a stack (dados e login preservados)
 
 purge: ## para e remove os volumes (apaga o login da assinatura; ./data fica)
 	./start.sh down --purge
+
+restore: ## restaura um backup de ./backups (ARQ=narnia-boot-....sqlite)
+	./start.sh restore $(ARQ)
 
 restart: down up ## down + up
 

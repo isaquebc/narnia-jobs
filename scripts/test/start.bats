@@ -185,3 +185,43 @@ fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
     grep -q '^  gh-auth:' "$f"
   done
 }
+
+# --- F03-fix L1: dev-down por instância, pastas de backup e restore (incidente de 2026-10-10) ------------------------
+
+@test "dev_down_cmd: instância padrão sem -p; instância claude com -p narnia-claude" {
+  [[ "$(dev_down_cmd)" == "docker compose -f docker-compose.dev.yml --profile app down --remove-orphans" ]]
+  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; dev_down_cmd'
+  [[ "$output" == *"-p narnia-claude "* ]]
+}
+
+@test "pastas de backup: ./backups no dono; ./.claude-data/... na instância claude" {
+  unset NARNIA_DEV_BACKUP_DIR NARNIA_BACKUP_HOST_DIR
+  [[ "$(dev_backup_host_dir)" == "./backups" ]]
+  [[ "$(prod_backup_host_dir)" == "./backups" ]]
+  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; printf "%s|%s" "$(dev_backup_host_dir)" "$(prod_backup_host_dir)"'
+  [[ "$output" == "./.claude-data/backups|./.claude-data/prod-backups" ]]
+}
+
+@test "resolve_backup_file aceita caminho ou nome dentro da pasta e recusa inexistente" {
+  mkdir -p "$TMP/b"; : > "$TMP/b/narnia-boot-2026-10-10T08-00-00-000Z.sqlite"
+  [[ "$(resolve_backup_file "$TMP/b" narnia-boot-2026-10-10T08-00-00-000Z.sqlite)" == "$TMP/b/narnia-boot-2026-10-10T08-00-00-000Z.sqlite" ]]
+  [[ "$(resolve_backup_file "$TMP/b" "$TMP/b/narnia-boot-2026-10-10T08-00-00-000Z.sqlite")" == "$TMP/b/narnia-boot-2026-10-10T08-00-00-000Z.sqlite" ]]
+  run resolve_backup_file "$TMP/b" nao-existe.sqlite
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"não encontrado"* ]]
+}
+
+@test "restore_files guarda o banco atual (com WAL), troca pelo backup, apaga WAL/SHM velhos e devolve uploads" {
+  mkdir -p "$TMP/data/uploads" "$TMP/b/uploads"
+  printf 'atual' > "$TMP/data/narnia.sqlite"; printf 'wal' > "$TMP/data/narnia.sqlite-wal"; printf 'shm' > "$TMP/data/narnia.sqlite-shm"
+  printf 'backup' > "$TMP/b/narnia-boot-x.sqlite"
+  printf 'cv' > "$TMP/b/uploads/aaa.pdf"; printf 'ja' > "$TMP/data/uploads/bbb.pdf"
+  restore_files "$TMP/data" "$TMP/b" "$TMP/b/narnia-boot-x.sqlite" STAMP
+  [[ "$(cat "$TMP/data/narnia.sqlite")" == "backup" ]]
+  [ ! -e "$TMP/data/narnia.sqlite-wal" ]
+  [ ! -e "$TMP/data/narnia.sqlite-shm" ]
+  [[ "$(cat "$TMP/b/narnia-before-restore-STAMP.sqlite")" == "atual" ]]
+  [[ "$(cat "$TMP/b/narnia-before-restore-STAMP.sqlite-wal")" == "wal" ]]
+  [[ "$(cat "$TMP/data/uploads/aaa.pdf")" == "cv" ]]
+  [[ "$(cat "$TMP/data/uploads/bbb.pdf")" == "ja" ]]
+}

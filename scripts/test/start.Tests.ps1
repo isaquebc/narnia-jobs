@@ -108,3 +108,33 @@ Describe "Get-HostGhToken (F03-1)" {
     try { Get-HostGhToken | Should -BeNullOrEmpty } finally { Remove-Item env:NARNIA_GH_BIN }
   }
 }
+
+Describe "Backups e restore (F03-fix L1)" {
+  It "pastas de backup do dono e dev-down sem -p na instância padrão" {
+    Get-DevBackupHostDir | Should -Be "./backups"
+    Get-ProdBackupHostDir | Should -Be "./backups"
+    (Get-DevDownArgs) -join " " | Should -Be "compose -f docker-compose.dev.yml --profile app down --remove-orphans"
+  }
+  It "Resolve-BackupFile aceita nome dentro da pasta e recusa inexistente" {
+    $b = Join-Path $script:Tmp "bk"; New-Item -ItemType Directory -Force -Path $b | Out-Null
+    $f = Join-Path $b "narnia-boot-x.sqlite"; Set-Content -Path $f -Value ""
+    Resolve-BackupFile $b "narnia-boot-x.sqlite" | Should -Be $f
+    { Resolve-BackupFile $b "nao-existe.sqlite" } | Should -Throw "*não encontrado*"
+  }
+  It "Restore-Files guarda o atual com WAL, troca, apaga WAL/SHM velhos e devolve uploads" {
+    $d = Join-Path $script:Tmp "rdata"; $b = Join-Path $script:Tmp "rbk"
+    New-Item -ItemType Directory -Force -Path (Join-Path $d "uploads"), (Join-Path $b "uploads") | Out-Null
+    Set-Content -NoNewline -Path (Join-Path $d "narnia.sqlite") -Value "atual"
+    Set-Content -NoNewline -Path (Join-Path $d "narnia.sqlite-wal") -Value "wal"
+    Set-Content -NoNewline -Path (Join-Path $d "narnia.sqlite-shm") -Value "shm"
+    Set-Content -NoNewline -Path (Join-Path $b "narnia-boot-x.sqlite") -Value "backup"
+    Set-Content -NoNewline -Path (Join-Path $b "uploads/aaa.pdf") -Value "cv"
+    Restore-Files $d $b (Join-Path $b "narnia-boot-x.sqlite") "STAMP"
+    Get-Content -Raw (Join-Path $d "narnia.sqlite") | Should -Be "backup"
+    Test-Path (Join-Path $d "narnia.sqlite-wal") | Should -BeFalse
+    Test-Path (Join-Path $d "narnia.sqlite-shm") | Should -BeFalse
+    Get-Content -Raw (Join-Path $b "narnia-before-restore-STAMP.sqlite") | Should -Be "atual"
+    Get-Content -Raw (Join-Path $b "narnia-before-restore-STAMP.sqlite-wal") | Should -Be "wal"
+    Get-Content -Raw (Join-Path $d "uploads/aaa.pdf") | Should -Be "cv"
+  }
+}
