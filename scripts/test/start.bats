@@ -154,3 +154,34 @@ occupy_port() { # ocupa a porta $1 com um servidor TCP em Node (aceita várias c
   [ "$status" -eq 0 ]
   [[ "$output" == "./.claude-data/prod|/app/.claude-data/dev|claude-code" ]]
 }
+
+# --- F03-1: token do gh do computador entregue ao container (volume gh-auth), nunca por argumento nem .env
+
+fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
+  mkdir -p "$TMP/bin"
+  printf '#!/bin/sh\n[ "$1 $2" = "auth token" ] || exit 9\nprintf "%%s\\n" "%s"\nexit %s\n' "$1" "$2" > "$TMP/bin/gh"
+  chmod +x "$TMP/bin/gh"
+}
+
+@test "host_gh_token devolve o token do gh logado no computador" {
+  fake_gh "gho_tokenDoHost" 0
+  run env NARNIA_GH_BIN="$TMP/bin/gh" bash -c 'source ./start.sh; host_gh_token'
+  [ "$status" -eq 0 ]
+  [[ "$output" == "gho_tokenDoHost" ]]
+}
+
+@test "host_gh_token falha sem login ou sem gh no computador" {
+  fake_gh "" 1
+  run env NARNIA_GH_BIN="$TMP/bin/gh" bash -c 'source ./start.sh; host_gh_token'
+  [ "$status" -ne 0 ]
+  run env NARNIA_GH_BIN="$TMP/nao-existe/gh" bash -c 'source ./start.sh; host_gh_token'
+  [ "$status" -ne 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "api e worker montam o volume gh-auth na pasta do gh (dev e produção)" {
+  for f in docker-compose.yml docker-compose.dev.yml; do
+    grep -q 'gh-auth:/home/node/.config/gh' "$f"
+    grep -q '^  gh-auth:' "$f"
+  done
+}

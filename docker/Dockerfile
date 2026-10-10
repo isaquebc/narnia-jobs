@@ -3,7 +3,7 @@
 #   dev       -> desenvolvimento, lint, testes e build (fonte montada em /app); inclui bats para testar start.sh
 #   build     -> instala tudo e roda o build (valida o monorepo; o web usa docker/web.Dockerfile)
 #   deps-prod -> node_modules só de produção para api e worker (pnpm install --prod --filter)
-#   runtime   -> api e worker em produção (node:22-slim + git + poppler + tessdata + CLI do Claude embutido no SDK)
+#   runtime   -> api e worker em produção (node:22-slim + git + gh + poppler + tessdata + CLI do Claude embutido no SDK)
 # As apps rodam a fonte TypeScript com `tsx` (F01-62): os pacotes do workspace exportam fonte TS (F01-28).
 
 ARG PNPM_VERSION=12.9.1
@@ -21,16 +21,20 @@ ENV PNPM_HOME=/pnpm \
     TESSDATA_PATH=/usr/share/tessdata
 # poppler-utils: `pdftoppm` renderiza páginas de PDF para o OCR (F01-25). Dados de idioma do Tesseract (por+eng,
 # tessdata_fast) ficam em /usr/share/tessdata para o OCR rodar sem rede (F01 §2.1). bats: testes do start.sh (F01-65).
+# GitHub CLI (F03-1): coleta da ingestão do GitHub pela API e fluxo de dispositivo, do repositório oficial.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates curl poppler-utils bats procps \
+ && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+ && apt-get update && apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p ${TESSDATA_PATH} \
  && curl -fsSL -o ${TESSDATA_PATH}/por.traineddata.gz ${TESSDATA_BASE}/por.traineddata.gz \
  && curl -fsSL -o ${TESSDATA_PATH}/eng.traineddata.gz ${TESSDATA_BASE}/eng.traineddata.gz \
  && corepack enable \
  && corepack prepare pnpm@${PNPM_VERSION} --activate \
- && mkdir -p /app/node_modules /pnpm/store /pnpm/corepack /home/node/.claude \
- && chown -R node:node /app /pnpm /home/node/.claude
+ && mkdir -p /app/node_modules /pnpm/store /pnpm/corepack /home/node/.claude /home/node/.config/gh \
+ && chown -R node:node /app /pnpm /home/node/.claude /home/node/.config
 USER node
 WORKDIR /app
 CMD ["pnpm", "--version"]
@@ -56,11 +60,18 @@ ENV NODE_OPTIONS=--no-warnings=ExperimentalWarning \
     TESSDATA_PATH=/usr/share/tessdata \
     NARNIA_DATA_DIR=/data \
     PORT=3100
+# gh (F03-1) pela mesma chave e lista do repositório oficial copiadas do estágio dev (o runtime não tem curl)
+COPY --from=dev /usr/share/keyrings/githubcli-archive-keyring.gpg /usr/share/keyrings/githubcli-archive-keyring.gpg
+COPY --from=dev /etc/apt/sources.list.d/github-cli.list /tmp/github-cli.list
+# o repositório do GitHub é HTTPS: certificados primeiro, depois a lista (senão o apt cai no gh antigo do Debian)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates poppler-utils \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && mv /tmp/github-cli.list /etc/apt/sources.list.d/github-cli.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends git poppler-utils gh \
  && rm -rf /var/lib/apt/lists/* \
- && mkdir -p /data /home/node/.claude \
- && chown -R node:node /data /home/node/.claude
+ && mkdir -p /data /home/node/.claude /home/node/.config/gh \
+ && chown -R node:node /data /home/node/.claude /home/node/.config
 COPY --from=dev /usr/share/tessdata /usr/share/tessdata
 WORKDIR /app
 COPY --from=deps-prod --chown=node:node /app /app

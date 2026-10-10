@@ -73,6 +73,25 @@ function Choose-Port([string] $File, [int] $Start = $script:PortStart, [int] $En
 
 function Get-AppUrl([int] $Port, [string] $Token) { return "http://127.0.0.1:$Port/?token=$Token" }
 
+# Token do `gh` logado no computador (F03-1); $null sem gh ou sem login. Entregue ao container pela entrada padrão.
+function Get-HostGhToken {
+  $bin = if ($env:NARNIA_GH_BIN) { $env:NARNIA_GH_BIN } else { "gh" }
+  if (-not (Get-Command $bin -ErrorAction SilentlyContinue)) { return $null }
+  try { $token = (& $bin auth token 2>$null) -join "" } catch { return $null }
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) { return $null }
+  return $token.Trim()
+}
+
+function Send-HostGhToken([string[]] $Compose, [string] $Service) {
+  $token = Get-HostGhToken
+  if ($token) {
+    $token | & docker @Compose run --rm --no-deps -T --entrypoint sh $Service -c 'umask 077; mkdir -p "$HOME/.config/gh"; cat > "$HOME/.config/gh/host-token"' *> $null
+    if ($LASTEXITCODE -eq 0) { Info "GitHub: usando o login do gh deste computador." }
+  } else {
+    & docker @Compose run --rm --no-deps -T --entrypoint sh $Service -c 'rm -f "$HOME/.config/gh/host-token"' *> $null
+  }
+}
+
 # --- infraestrutura ----------------------------------------------------------------------------
 
 function Assert-Docker {
@@ -153,7 +172,9 @@ function Invoke-Up {
     Write-Env $script:EnvFile "NARNIA_PORT" $port
     Info "porta escolhida: $port (gravada em $($script:EnvFile))"
   }
-  Invoke-Prod (@("up", "-d", "--build") + $Rest)
+  Invoke-Prod @("build")
+  Send-HostGhToken $script:ProdCompose "api"
+  Invoke-Prod (@("up", "-d") + $Rest)
   Info "aguardando a api ficar saudável…"
   if (-not (Wait-Healthy "api" 120)) { & docker @script:ProdCompose logs --tail=40 api; Fail "a api não ficou saudável em 120 s. Veja '.\start.ps1 logs api'." }
   $token = (& docker @script:ProdCompose exec -T api cat /data/.token) -join ""
@@ -223,6 +244,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       Assert-Docker; Ensure-Installed
       $devPort = if ($env:NARNIA_DEV_PORT) { $env:NARNIA_DEV_PORT } else { "5173" }
       $devToken = if ($env:NARNIA_TOKEN) { $env:NARNIA_TOKEN } else { "dev-token" }
+      Send-HostGhToken $script:DevCompose "dev"
       Write-Host ""; Write-Host "  modo dev (hot reload):  $(Get-AppUrl $devPort $devToken)"
       if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $($script:EnvFile)." }
       else { Info "login da assinatura (uma vez, vale para dev e produção): .\start.ps1 login   · mock: `$env:NARNIA_PROVIDER='mock'" }

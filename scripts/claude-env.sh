@@ -46,6 +46,7 @@ is_mock() { [[ "$(api GET /api/provider/status 2>/dev/null)" == *'"authMethod"'*
 cmd_env_up() {
   require_docker; ensure_installed
   mkdir -p "$(claude_data_dir)"
+  deliver_host_gh_token "${DEV_COMPOSE[@]}" dev
   "${DEV_COMPOSE[@]}" --profile app up -d "$@" >/dev/null
   wait_api
   info "instância claude no ar (provider ${NARNIA_PROVIDER}): $(ui_url)"

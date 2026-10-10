@@ -101,6 +101,18 @@ dev_data_host_dir() {
   printf './%s\n' "${d#/app/}"
 }
 
+# host_gh_token -> token do `gh` logado no computador (F03-1); falha sem `gh` ou sem login. Nunca vai para argumento
+# de processo nem para .env: quem chama entrega pela entrada padrão ao container (volume gh-auth).
+host_gh_token() {
+  local bin=${NARNIA_GH_BIN:-gh} token
+  command -v "$bin" >/dev/null 2>&1 || return 1
+  token=$("$bin" auth token 2>/dev/null) || return 1
+  token=${token//$'\r'/}
+  token=${token//$'\n'/}
+  [[ -n "$token" ]] || return 1
+  printf '%s\n' "$token"
+}
+
 # app_url PORT TOKEN -> URL de abertura da interface
 app_url() { printf 'http://127.0.0.1:%s/?token=%s\n' "$1" "$2"; }
 
@@ -139,6 +151,20 @@ wait_healthy() {
   return 1
 }
 
+# deliver_host_gh_token COMPOSE_ARGS… SERVICE -> grava o token do gh do computador em ~/.config/gh/host-token
+# (0600) no volume gh-auth do projeto; sem gh logado, apaga o arquivo (a api cai no login próprio do app).
+deliver_host_gh_token() {
+  local service=${*: -1} token
+  local -a compose=("${@:1:$#-1}")
+  if token=$(host_gh_token); then
+    printf '%s' "$token" | "${compose[@]}" run --rm --no-deps -T --entrypoint sh "$service" -c \
+      'umask 077; mkdir -p "$HOME/.config/gh"; cat > "$HOME/.config/gh/host-token"' >/dev/null 2>&1 \
+      && info "GitHub: usando o login do gh deste computador." || info "GitHub: não consegui entregar o token do gh (siga com o login do app)."
+  else
+    "${compose[@]}" run --rm --no-deps -T --entrypoint sh "$service" -c 'rm -f "$HOME/.config/gh/host-token"' >/dev/null 2>&1 || true
+  fi
+}
+
 read_token() { "${PROD_COMPOSE[@]}" exec -T api cat /data/.token 2>/dev/null | tr -d '\r\n'; }
 
 cmd_up() {
@@ -155,7 +181,9 @@ cmd_up() {
     info "porta escolhida: $port (gravada em $ENV_FILE)"
   fi
   export NARNIA_PORT="$port"   # o compose só lê o .env padrão; com NARNIA_ENV_FILE diferente, a porta vai pelo ambiente
-  "${PROD_COMPOSE[@]}" up -d --build "$@"
+  "${PROD_COMPOSE[@]}" build
+  deliver_host_gh_token "${PROD_COMPOSE[@]}" api
+  "${PROD_COMPOSE[@]}" up -d "$@"
   info "aguardando a api ficar saudável…"
   if ! wait_healthy api 120; then
     "${PROD_COMPOSE[@]}" logs --tail=40 api >&2 || true
@@ -349,6 +377,7 @@ main() {
       require_docker; ensure_installed
       mkdir -p "$(dev_data_host_dir)"
       [[ -z "$NARNIA_INSTANCE" ]] || info "instância: ${NARNIA_INSTANCE} (projeto ${NARNIA_DEV_PROJECT_NAME:-?}, dados $(dev_data_host_dir))"
+      deliver_host_gh_token "${DEV_COMPOSE[@]}" dev
       printf '\n  modo dev (hot reload):  %s\n' "$(app_url "${NARNIA_DEV_PORT:-5173}" "${NARNIA_TOKEN:-dev-token}")"
       if env_has_value "$ENV_FILE" CLAUDE_CODE_OAUTH_TOKEN; then info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $ENV_FILE."
       else info "login da assinatura (uma vez, vale para dev e produção): ./start.sh login   · mock: NARNIA_PROVIDER=mock ./start.sh dev"; fi

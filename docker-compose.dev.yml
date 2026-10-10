@@ -18,6 +18,7 @@ x-dev: &dev
     - node_modules:/app/node_modules
     - pnpm-store:/pnpm/store
     - claude-auth:/home/node/.claude
+    - gh-auth:/home/node/.config/gh   # F03-1: token do gh do computador (host-token) ou login próprio do app
   environment:
     - REDIS_URL=redis://redis:6379
     - NARNIA_DATA_DIR=${NARNIA_DEV_DATA_DIR:-/app/data}
@@ -74,3 +75,4 @@ volumes:
   node_modules:
   pnpm-store:
   claude-auth:   # mesmo nome que no docker-compose.yml: o login vale para dev e produção
+  gh-auth:       # F03-1: por projeto Docker (cada instância tem o seu); o lançador grava o token do gh do host

@@ -13,6 +13,7 @@ x-app: &app
   volumes:
     - ${NARNIA_DATA_DIR:-./data}:/data
     - claude-auth:/home/node/.claude
+    - gh-auth:/home/node/.config/gh   # F03-1: token do gh do computador (host-token) ou login próprio do app
   environment:
     - NARNIA_DATA_DIR=/data
     - REDIS_URL=redis://redis:6379
@@ -84,4 +85,5 @@ services:
 
 volumes:
   claude-auth:
+  gh-auth:
   redis-data:

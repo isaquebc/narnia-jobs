@@ -94,3 +94,17 @@ Describe "Instâncias (NARNIA_INSTANCE)" {
     ($script:DevCompose -join " ") | Should -Be "compose -f docker-compose.dev.yml"
   }
 }
+
+Describe "Get-HostGhToken (F03-1)" {
+  It "devolve o token do gh logado e nulo sem gh" {
+    $bin = Join-Path $script:Tmp "ghbin"
+    New-Item -ItemType Directory -Force -Path $bin | Out-Null
+    $gh = Join-Path $bin "gh"
+    Set-Content -Path $gh -Value "#!/bin/sh`nprintf 'gho_tokenDoHost\n'"
+    chmod +x $gh
+    $env:NARNIA_GH_BIN = $gh
+    try { Get-HostGhToken | Should -Be "gho_tokenDoHost" } finally { Remove-Item env:NARNIA_GH_BIN }
+    $env:NARNIA_GH_BIN = (Join-Path $script:Tmp "nao-existe/gh")
+    try { Get-HostGhToken | Should -BeNullOrEmpty } finally { Remove-Item env:NARNIA_GH_BIN }
+  }
+}
