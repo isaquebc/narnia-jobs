@@ -295,6 +295,10 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
               setResolution.run(JSON.stringify(resolution), p.id);
             }
             const edited = d.decision === "edit";
+            // FX item 6: a edição do usuário sobre um fato existente vale para o fato (bump de facts_version no repo)
+            if (edited && d.editedData && Object.keys(d.editedData).length > 0) {
+              factRepo(p.kind)?.update(p.matchTargetId, d.editedData);
+            }
             decide.run(
               edited ? "edited" : "accepted",
               edited ? JSON.stringify(d.editedData) : null,

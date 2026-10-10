@@ -15,7 +15,13 @@ import { FreeTextEditor, TEXT_MIN } from "../onboarding/components/FreeTextEdito
 import { EstimateCard } from "./EstimateCard";
 
 /** Aviso de conteúdo já lido (F03, hash do arquivo/texto): abre a execução anterior ou lê de novo. */
-function AlreadyReadNotice({ file, onReadAgain }: { file: FileResponse; onReadAgain: () => void }) {
+export function AlreadyReadNotice({
+  file,
+  onReadAgain,
+}: {
+  file: FileResponse;
+  onReadAgain: () => void;
+}) {
   const tz = useTimezone();
   const last = (file.previousRuns ?? []).at(-1);
   if (!last) return null;

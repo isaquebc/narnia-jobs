@@ -43,6 +43,15 @@ export function GithubSource() {
   const [depth, setDepth] = useState<IngestionDepth>("balanced");
   const [model, setModel] = useState<string>(defaultModel("balanced"));
   const [unit, setUnit] = useState<BudgetUnit>("thousand");
+  const ingestSettings = useQuery({
+    queryKey: ["settings", "ingest"],
+    queryFn: () => api.getIngestSettings(),
+  });
+  // FX-4: conversão aprendida % → tokens do modelo escolhido; sem ela a unidade % fica indisponível
+  const pctToTokens = ingestSettings.data?.pctToTokens?.[model] ?? null;
+  useEffect(() => {
+    if (unit === "window_pct" && !pctToTokens) setUnit("thousand");
+  }, [unit, pctToTokens]);
   const [amount, setAmount] = useState<string>("");
   const [touched, setTouched] = useState(false);
 
@@ -95,8 +104,8 @@ export function GithubSource() {
 
   useEffect(() => {
     if (estimate.data && !touched)
-      setAmount(String(fromTokens(estimate.data.recommendedBudget, unit)));
-  }, [estimate.data, touched, unit]);
+      setAmount(String(fromTokens(estimate.data.recommendedBudget, unit, pctToTokens)));
+  }, [estimate.data, touched, unit, pctToTokens]);
 
   const start = useMutation({
     mutationFn: () => {
@@ -104,7 +113,7 @@ export function GithubSource() {
       return api.createGithubIngestion({
         ...baseBody(),
         ...(Number.isFinite(value) && value > 0
-          ? { budget: { amount: toTokens(value, unit), unit } }
+          ? { budget: { amount: toTokens(value, unit, pctToTokens), unit } }
           : {}),
       });
     },
@@ -215,6 +224,8 @@ export function GithubSource() {
           <BudgetInput
             value={amount}
             unit={unit}
+            model={model}
+            pctToTokens={pctToTokens}
             onValueChange={(v) => {
               setTouched(true);
               setAmount(v);
@@ -222,7 +233,7 @@ export function GithubSource() {
             onUnitChange={(u) => {
               const current = Number(amount);
               if (Number.isFinite(current) && current > 0) {
-                setAmount(String(fromTokens(toTokens(current, unit), u)));
+                setAmount(String(fromTokens(toTokens(current, unit, pctToTokens), u, pctToTokens)));
               }
               setUnit(u);
             }}

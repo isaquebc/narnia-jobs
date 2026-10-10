@@ -547,7 +547,8 @@ export const ptBR = {
     amount: "Orçamento",
     unit: "Unidade",
     units: { thousand: "mil tokens", million: "milhão de tokens", window_pct: "% da janela" },
-    pctHint: "Sem conversão aprendida ainda: o valor é lido em mil tokens.",
+    pctUnavailable: "% da janela: disponível depois da primeira execução com este modelo.",
+    pctEquivalent: "{pct}% ≈ {tokens} mil tokens em {model}",
   },
   fileSource: {
     textLabel: "Conte a sua história de carreira e de vida",

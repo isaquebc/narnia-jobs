@@ -14,6 +14,9 @@ export function notificationsRoutes(deps: { repos: Repos; bus: EventBus }) {
 
   app.get("/api/notifications", validate("query", NotificationsListQuerySchema), (c) => {
     const { status } = c.req.valid("query");
+    // FX-3: informativas com mais de 7 dias se resolvem sozinhas
+    for (const n of deps.repos.notifications.expireInformational())
+      deps.bus.emit({ type: "notification.updated", notification: n });
     return c.json({
       notifications: deps.repos.notifications.list({ status: status ?? "open" }),
       unresolved: deps.repos.notifications.countUnresolved(),

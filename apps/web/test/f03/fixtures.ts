@@ -105,6 +105,7 @@ export function ingestSettings(partial: Record<string, unknown> = {}) {
     reviewCheckModelEnabled: true,
     autoConfirmBelow: 10_000,
     snapshotsMaxBytes: 2 * 1024 ** 3,
+    pctToTokens: {},
     ...partial,
   };
 }

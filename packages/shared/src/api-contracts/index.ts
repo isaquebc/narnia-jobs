@@ -477,8 +477,12 @@ export const IngestSettingsSchema = z.object({
   reviewCheckModelEnabled: z.boolean(),
   autoConfirmBelow: z.number().int().min(0),
   snapshotsMaxBytes: z.number().int().min(0),
+  /** FX-4: conversão aprendida % da janela → tokens, por modelo (só leitura). */
+  pctToTokens: z.record(z.string(), z.number().positive()).default({}),
 });
-export const IngestSettingsPutRequestSchema = IngestSettingsSchema.partial();
+export const IngestSettingsPutRequestSchema = IngestSettingsSchema.omit({
+  pctToTokens: true,
+}).partial();
 
 // F03-fix L1 · backups (FX-2: no máximo `max` cópias no total, padrão 5, mínimo 1)
 export const BackupSettingsPutRequestSchema = z.object({ max: z.number().int().min(1).max(100) });

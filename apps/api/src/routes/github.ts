@@ -95,8 +95,8 @@ export function githubRoutes(deps: {
   });
 
   app.get("/api/settings/ingest", (c) => {
-    const { pctToTokens: _learned, ...rest } = resolveIngestSettings(deps.repos.settings);
-    return c.json(rest);
+    // FX-4: a conversão aprendida % → tokens por modelo vai para a interface (só leitura; PUT não a aceita)
+    return c.json(resolveIngestSettings(deps.repos.settings));
   });
 
   app.put("/api/settings/ingest", validate("json", IngestSettingsPutRequestSchema), (c) => {
@@ -105,8 +105,8 @@ export function githubRoutes(deps: {
       const key = INGEST_SETTING_KEYS[field as keyof typeof INGEST_SETTING_KEYS];
       if (key && value !== undefined) deps.repos.settings.set(key, value);
     }
-    const { pctToTokens: _learned, ...rest } = resolveIngestSettings(deps.repos.settings);
-    return c.json(rest);
+    // FX-4: a conversão aprendida % → tokens por modelo vai para a interface (só leitura; PUT não a aceita)
+    return c.json(resolveIngestSettings(deps.repos.settings));
   });
 
   return app;

@@ -6,6 +6,7 @@ import {
   estimateRun,
   type IngestionRunRecord,
   ingestModelsForDepth,
+  markRunOpened,
   prepareTask,
   type Repos,
   type ReviewDecision,
@@ -231,6 +232,9 @@ export function ingestionsRoutes(deps: {
   app.get("/api/ingestions/:id", (c) => {
     const run = find(c.req.param("id"));
     if (!run) return apiError(c, 404, "not_found", "Ingestão não encontrada");
+    // FX-3: abrir a execução resolve a notificação informativa "ingestão concluída"
+    for (const ev of markRunOpened(deps.repos, run.id))
+      deps.bus.emit({ type: "notification.updated", notification: ev.notification });
     return c.json(toIngestionResponse(deps.repos, run));
   });
 

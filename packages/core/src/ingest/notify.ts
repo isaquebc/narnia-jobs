@@ -112,3 +112,10 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
   }
   return events;
 }
+
+/** FX-3: abrir a execução resolve a notificação informativa "ingestão concluída". */
+export function markRunOpened(repos: Repos, runId: string): NotificationEvent[] {
+  return repos.notifications
+    .resolveSubject(RUN_SUBJECT, runId, ["ingestion.done"])
+    .map((notification) => ({ notification, created: false }));
+}

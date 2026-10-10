@@ -37,9 +37,15 @@ export interface NotificationsRepo {
   dismiss(id: string): Notification | null;
   /** `open` (padrão): não resolvidas e não dispensadas; `resolved`; `all`. Mais novas primeiro. */
   list(filter?: { status?: "open" | "resolved" | "all" }): Notification[];
-  /** Contador do sino: abertas e não dispensadas. */
+  /** Contador do sino: abertas e não dispensadas, sem as informativas (`INFORMATIONAL_KINDS`, FX-3). */
   countUnresolved(): number;
+  /** Resolve as informativas abertas criadas antes de `now - INFORMATIONAL_TTL_DAYS` (FX-3); devolve as resolvidas. */
+  expireInformational(now?: Date): Notification[];
 }
+
+/** Tipos informativos (FX-3): não contam no sino e se resolvem ao abrir o assunto ou após `INFORMATIONAL_TTL_DAYS`. */
+export const INFORMATIONAL_KINDS: readonly NotificationKind[] = ["ingestion.done"];
+export const INFORMATIONAL_TTL_DAYS = 7;
 
 function map(r: Row): Notification {
   return NotificationSchema.parse({
@@ -79,8 +85,12 @@ export function notificationsRepo(db: Db): NotificationsRepo {
     "update notification set dismissed_at = coalesce(dismissed_at, ?) where id = ?",
   );
   const all = db.prepare("select * from notification order by created_at desc, rowid desc");
+  const informational = INFORMATIONAL_KINDS.map((k) => `'${k}'`).join(", ");
   const count = db.prepare(
-    "select count(*) as n from notification where resolved_at is null and dismissed_at is null",
+    `select count(*) as n from notification where resolved_at is null and dismissed_at is null and kind not in (${informational})`,
+  );
+  const staleInformational = db.prepare(
+    `select * from notification where resolved_at is null and kind in (${informational}) and created_at < ?`,
   );
   const repo: NotificationsRepo = {
     upsert(i) {
@@ -115,6 +125,13 @@ export function notificationsRepo(db: Db): NotificationsRepo {
         .filter((n) => !kinds || kinds.includes(n.kind));
       for (const n of open) resolve.run(now, n.id);
       return open.map((n) => repo.get(n.id) as Notification);
+    },
+    expireInformational(now = new Date()) {
+      const cutoff = new Date(now.getTime() - INFORMATIONAL_TTL_DAYS * 86_400_000).toISOString();
+      const stale = (staleInformational.all(cutoff) as Row[]).map(map);
+      const at = nowUtc();
+      for (const n of stale) resolve.run(at, n.id);
+      return stale.map((n) => repo.get(n.id) as Notification);
     },
     markRead(id) {
       read.run(nowUtc(), id);

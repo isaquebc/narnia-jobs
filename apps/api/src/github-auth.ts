@@ -109,7 +109,9 @@ export function createGhDeviceFlow(o: {
           }
         });
         child.on("close", (code) => {
-          if (current === child) current = null;
+          // FX item 10: um fluxo substituído por "gerar outro código" morre calado; só o atual avisa o resultado
+          if (current !== child) return;
+          current = null;
           if (settled)
             onDone(code === 0 ? { ok: true } : { ok: false, error: "Autorização não concluída" });
         });
