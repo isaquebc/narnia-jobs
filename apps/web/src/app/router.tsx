@@ -12,10 +12,6 @@ import { ErrorState } from "../components/ErrorState";
 import { Shell } from "../components/shell/Shell";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { Dashboard } from "../features/dashboard/Dashboard";
-import { RepoDetailPage } from "../features/evidence/RepoDetailPage";
-import { ReposPage } from "../features/evidence/ReposPage";
-import { IngestionPage } from "../features/ingestion/IngestionPage";
-import { RunPage } from "../features/ingestion/RunPage";
 import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { Wizard } from "../features/onboarding/Wizard";
 import { NewProfilePage, type NewProfileSearch } from "../features/profiles/NewProfilePage";
@@ -24,7 +20,6 @@ import { PitchEditor } from "../features/profiles/PitchEditor";
 import { ProfileCardView } from "../features/profiles/ProfileCardView";
 import { ProfilePage, useProfile } from "../features/profiles/ProfilePage";
 import { ProfilesPage } from "../features/profiles/ProfilesPage";
-import { SettingsPage } from "../features/settings/SettingsPage";
 import { t } from "../i18n";
 import type { AppServices } from "./context";
 import { FormGuardProvider } from "./FormGuard";
@@ -163,7 +158,22 @@ const profileCardRoute = createRoute({
   },
 });
 
-// F03 §4 — ingestão, execução, evidências, pendências e configurações
+// F03 §4 — ingestão, execução, evidências, pendências e configurações. As páginas carregam sob demanda para não
+// pesar o bundle inicial (F01-56); o sino e a página de pendências ficam no bundle principal (cabeçalho).
+const IngestionPage = lazyRouteComponent(
+  () => import("../features/ingestion/IngestionPage"),
+  "IngestionPage",
+);
+const RunPage = lazyRouteComponent(() => import("../features/ingestion/RunPage"), "RunPage");
+const ReposPage = lazyRouteComponent(() => import("../features/evidence/ReposPage"), "ReposPage");
+const RepoDetailPage = lazyRouteComponent(
+  () => import("../features/evidence/RepoDetailPage"),
+  "RepoDetailPage",
+);
+const SettingsPage = lazyRouteComponent(
+  () => import("../features/settings/SettingsPage"),
+  "SettingsPage",
+);
 const ingestionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ingestao",
