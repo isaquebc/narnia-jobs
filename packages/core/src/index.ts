@@ -16,6 +16,7 @@ export * from "./ingest/reconcile";
 export * from "./ingest/report";
 export * from "./ingest/review-check";
 export * from "./ingest/settings";
+export * from "./ingest/snapshot-cap";
 export * from "./ingest/sources/github/collect";
 export * from "./ingest/sources/github/gh";
 export * from "./ingest/sources/github/highlights";

@@ -218,6 +218,11 @@ export class ClaudeCodeProvider implements Provider {
     return planUsageFromRateLimits(this.rateLimits);
   }
 
+  planWindowSnapshot(): { utilization: number | null; resetsAt: string | null } | null {
+    const w = planUsageFromRateLimits(this.rateLimits)?.windows.fiveHour;
+    return w ? { utilization: w.utilization, resetsAt: w.resetsAt } : null;
+  }
+
   async detect(): Promise<ProviderStatus> {
     const notInstalled: ProviderStatus = {
       installed: false,

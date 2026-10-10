@@ -7,6 +7,19 @@ export function shouldBrake(budget: { amount: number }, usedTokens: number): boo
   return usedTokens > budget.amount * BRAKE_FACTOR;
 }
 
+/**
+ * Correções F03, item 12: com repositórios em paralelo, cada um em andamento reserva o seu custo estimado. Um
+ * repositório só inicia se `usado + reservado + a própria estimativa` couber em 125% do orçamento.
+ */
+export function canStartRepo(
+  budget: { amount: number },
+  usedTokens: number,
+  reservedTokens: number,
+  ownEstimate: number,
+): boolean {
+  return usedTokens + reservedTokens + ownEstimate <= budget.amount * BRAKE_FACTOR;
+}
+
 /** Custo estimado para terminar: repositórios restantes + síntese + revisor. */
 export function costToFinish(i: {
   remainingRepos: { tokens: number }[];

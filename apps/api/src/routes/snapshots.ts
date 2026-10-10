@@ -1,29 +1,59 @@
 import { existsSync, realpathSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { type Repos, resolveIngestSettings } from "@narnia-jobs/core";
+import {
+  planSnapshotPrune,
+  type Repos,
+  resolveIngestSettings,
+  syncSnapshotCapNotification,
+} from "@narnia-jobs/core";
 import { Hono } from "hono";
 import { apiError } from "../errors";
+import type { EventBus } from "../events";
 
 /** Gestão de espaço dos snapshots (F03-9): uso total, teto configurável e remoção manual. */
-export function snapshotsRoutes(deps: { repos: Repos; dataDir: string }) {
+export function snapshotsRoutes(deps: { repos: Repos; dataDir: string; bus?: EventBus }) {
   const app = new Hono();
+  const maxBytes = () => resolveIngestSettings(deps.repos.settings).snapshotsMaxBytes;
+  /** Aviso de teto (correções F03, item 15): criado acima do teto, resolvido abaixo; retransmitido por WS. */
+  const syncCap = () => {
+    for (const ev of syncSnapshotCapNotification(deps.repos, maxBytes()))
+      deps.bus?.emit({
+        type: ev.created ? "notification.created" : "notification.updated",
+        notification: ev.notification,
+      });
+  };
+  const removeSnapshot = (snap: { id: string; path: string }): boolean => {
+    const abs = isAbsolute(snap.path) ? snap.path : join(deps.dataDir, snap.path);
+    if (!isInsideSnapshots(deps.dataDir, abs)) return false;
+    rmSync(abs, { recursive: true, force: true });
+    deps.repos.snapshots.remove(snap.id);
+    return true;
+  };
 
-  app.get("/api/snapshots", (c) =>
-    c.json({
-      snapshots: deps.repos.snapshots.list().map(({ path: _p, sha256: _s, ...rest }) => rest),
+  // ordem de último uso, do menos usado para o mais usado (candidatos à limpeza primeiro)
+  app.get("/api/snapshots", (c) => {
+    syncCap();
+    return c.json({
+      snapshots: deps.repos.snapshots.lru().map(({ path: _p, sha256: _s, ...rest }) => rest),
       totalBytes: deps.repos.snapshots.totalBytes(),
-      maxBytes: resolveIngestSettings(deps.repos.settings).snapshotsMaxBytes,
-    }),
-  );
+      maxBytes: maxBytes(),
+    });
+  });
+
+  app.post("/api/snapshots/prune", (c) => {
+    let removed = 0;
+    for (const snap of planSnapshotPrune(deps.repos, maxBytes()))
+      if (removeSnapshot(snap)) removed++;
+    syncCap();
+    return c.json({ removed, totalBytes: deps.repos.snapshots.totalBytes(), maxBytes: maxBytes() });
+  });
 
   app.delete("/api/snapshots/:id", (c) => {
     const snap = deps.repos.snapshots.get(c.req.param("id"));
     if (!snap) return apiError(c, 404, "not_found", "Snapshot não encontrado");
-    const abs = isAbsolute(snap.path) ? snap.path : join(deps.dataDir, snap.path);
-    if (!isInsideSnapshots(deps.dataDir, abs))
+    if (!removeSnapshot(snap))
       return apiError(c, 400, "invalid_snapshot_path", "Caminho do snapshot fora de snapshots/");
-    rmSync(abs, { recursive: true, force: true });
-    deps.repos.snapshots.remove(snap.id);
+    syncCap();
     return c.json({ ok: true });
   });
 

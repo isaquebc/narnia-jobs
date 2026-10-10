@@ -1,6 +1,10 @@
+import { execFile } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { IngestionMode, RepoGroup, RepoPreviewItem } from "@narnia-jobs/shared";
 import type { RepoInput } from "../../../db/repos/github";
-import { type GhClient, GhError } from "./gh";
+import { type GhClient, GhError, type GhExec } from "./gh";
 
 /** Coleta sem tokens do GitHub (F03 §2.2–§2.3): seletor agrupado, dados de um repositório, arquivos e diff. */
 
@@ -213,7 +217,13 @@ export function repoRelevance(
 export async function collectRepo(
   gh: GhClient,
   fullName: string,
-  o: { login: string; maxCommitMessages?: number; now?: Date },
+  o: {
+    login: string;
+    maxCommitMessages?: number;
+    now?: Date;
+    /** F03-4 fallback (correções F03, item 13): lista completa de arquivos quando a árvore da API vem truncada. */
+    cloneTree?: ((fullName: string) => Promise<TreeEntry[]>) | null;
+  },
 ): Promise<CollectedRepo> {
   const [owner, name] = splitFullName(fullName);
   assertName(o.login, "Usuário");
@@ -238,6 +248,18 @@ export async function collectRepo(
     : null;
   const userCommits = commits ?? [];
   const firstLine = (m: string) => m.split("\n")[0]?.trim() ?? "";
+  let entries: TreeEntry[] = (tree?.tree ?? [])
+    .filter((e) => e.type === "blob")
+    .map((e) => ({ path: e.path, size: e.size ?? 0 }));
+  let truncated = Boolean(tree?.truncated);
+  if (truncated && o.cloneTree) {
+    const known = new Map(entries.map((e) => [e.path, e.size]));
+    entries = (await o.cloneTree(fullName)).map((e) => ({
+      path: e.path,
+      size: known.get(e.path) ?? e.size,
+    }));
+    truncated = false;
+  }
   return {
     repo: {
       fullName: meta.full_name,
@@ -265,18 +287,63 @@ export async function collectRepo(
       ),
     },
     readme,
-    tree: {
-      entries: (tree?.tree ?? [])
-        .filter((e) => e.type === "blob")
-        .map((e) => ({ path: e.path, size: e.size ?? 0 })),
-      truncated: Boolean(tree?.truncated),
-    },
+    tree: { entries, truncated },
     userCommits: {
       count: userCommits.length,
       messages: userCommits
         .slice(0, o.maxCommitMessages ?? 30)
         .map((c) => firstLine(c.commit.message)),
     },
+  };
+}
+
+export type GitExec = (args: string[]) => Promise<string>;
+
+/** `git` real (o runtime tem `git`); só leitura de uma pasta temporária. */
+export function createDefaultGitExec(): GitExec {
+  return (args) =>
+    new Promise((resolve, reject) => {
+      execFile("git", args, { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) =>
+        err ? reject(err) : resolve(String(stdout)),
+      );
+    });
+}
+
+/**
+ * Clone de fallback (F03-4, correções F03 item 13): `gh repo clone` raso, sem blobs e sem checkout, numa pasta
+ * temporária; lista os arquivos do HEAD e apaga a pasta. Nenhum conteúdo de arquivo é baixado aqui: a leitura dos
+ * escolhidos continua pela API (`fetchFiles`).
+ */
+export function createCloneTreeLister(o: {
+  exec: GhExec;
+  git: GitExec;
+  tmpRoot?: string;
+}): (fullName: string) => Promise<TreeEntry[]> {
+  return async (fullName) => {
+    splitFullName(fullName);
+    const dir = mkdtempSync(join(o.tmpRoot ?? tmpdir(), "narnia-clone-"));
+    try {
+      const r = await o.exec([
+        "repo",
+        "clone",
+        fullName,
+        dir,
+        "--",
+        "--depth",
+        "1",
+        "--filter=blob:none",
+        "--no-checkout",
+      ]);
+      if (r.code !== 0) throw new GhError("failed", `Clone de ${fullName} falhou`);
+      const out = await o.git(["-C", dir, "ls-tree", "-r", "--name-only", "HEAD"]);
+      return out
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .map((path) => ({ path, size: 0 }));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   };
 }
 

@@ -9,6 +9,7 @@ import {
   FAKE_GH_STATE_FILENAME,
   migrate,
   openDatabase,
+  recordPctSample,
   renderPdfPages,
   resolveBackupDir,
   resolveGhRuntime,
@@ -21,6 +22,7 @@ import { nowUtc, type WsEvent } from "@narnia-jobs/shared";
 import { type Job, Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { handleQueueEvent } from "./events";
+import { withPlanSampling } from "./ingest/plan-sampling";
 import { type OcrDeps, onStageFailed, processStage, type WorkerDeps } from "./pipeline";
 import { createQueues, QUEUE_NAMES } from "./queues";
 import { isTaskJob, processTask } from "./tasks";
@@ -84,7 +86,8 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   const deps: WorkerDeps = {
     repos,
     dataDir: opts.dataDir,
-    provider: opts.provider,
+    // aprendizado %→tokens por chamada (correções F03, item 11): um amostrador por processo
+    provider: withPlanSampling(opts.provider, (s) => recordPctSample(repos.settings, s)),
     ocr: opts.ocr ?? defaultOcrDeps,
     enqueue: async (runId: string, stage: StageName) => {
       await enqueueStage({ queues, repos, runId, stage });
@@ -97,6 +100,12 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       }),
     publish,
     // F03-1: credencial lida a cada uso (o lançador pode renovar o token do host); mock usa o gh falso
+    ghCloneTree: () =>
+      resolveGhRuntime({
+        settings: repos.settings,
+        configDir: ghConfigDir,
+        fake: opts.provider.id === "mock" ? { stateFile: null } : null,
+      }).cloneTree,
     gh: () =>
       resolveGhRuntime({
         settings: repos.settings,

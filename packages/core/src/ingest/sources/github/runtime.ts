@@ -5,6 +5,7 @@ import type { Repos } from "../../../db";
 import type { SettingsRepo } from "../../../db/repos/settings";
 import { fakeGh } from "../../../testing/fake-gh";
 import { resolveIngestSettings } from "../../settings";
+import { createCloneTreeLister, createDefaultGitExec, type TreeEntry } from "./collect";
 import { createDefaultGhExec, createGhClient, type GhClient } from "./gh";
 import { withSnapshots } from "./snapshot";
 
@@ -32,6 +33,8 @@ export function readHostToken(configDir: string): string | null {
 export interface GhRuntime {
   client: GhClient;
   source: GhCredentialSource;
+  /** Clone de fallback para árvore truncada (F03-4, correções F03 item 13); `null` com o `gh` falso. */
+  cloneTree: ((fullName: string) => Promise<TreeEntry[]>) | null;
 }
 
 export function resolveGhRuntime(o: {
@@ -46,11 +49,16 @@ export function resolveGhRuntime(o: {
     return {
       client: wrap(createGhClient({ exec: fakeGh({ stateFile: o.fake.stateFile }).exec })),
       source: "fake",
+      cloneTree: null,
     };
   }
   const wanted = resolveIngestSettings(o.settings).githubAuth;
   const token = wanted === "host" ? readHostToken(o.configDir) : null;
   const exec = createDefaultGhExec({ token });
   // o token fica só na closure do executor; o objeto devolvido não o carrega
-  return { client: wrap(createGhClient({ exec, token })), source: token ? "host" : "app" };
+  return {
+    client: wrap(createGhClient({ exec, token })),
+    source: token ? "host" : "app",
+    cloneTree: createCloneTreeLister({ exec, git: createDefaultGitExec() }),
+  };
 }

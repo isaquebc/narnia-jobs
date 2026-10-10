@@ -333,6 +333,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     listSnapshots: () => request<SnapshotsList>("/api/snapshots"),
     deleteSnapshot: (id: string) =>
       request<{ ok: true }>(`/api/snapshots/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    pruneSnapshots: () =>
+      request<{ removed: number; totalBytes: number; maxBytes: number }>("/api/snapshots/prune", {
+        method: "POST",
+      }),
     getFileDigest: (id: string) =>
       request<{ digest: FileDigest | null }>(`/api/files/${encodeURIComponent(id)}/digest`),
   };

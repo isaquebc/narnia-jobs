@@ -59,7 +59,11 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
     case "review": {
       const pending = repos.proposals.listByRun(run.id).filter((p) => p.decision === "pending");
       const conflicts = pending.filter((p) => p.match === "conflict" && !p.resolution).length;
-      resolve(["ingestion.awaiting_decision", "ingestion.error"]);
+      resolve([
+        "ingestion.awaiting_decision",
+        "ingestion.awaiting_confirmation",
+        "ingestion.error",
+      ]);
       upsert(
         "review.pending",
         `Revisão pendente: ${name}`,
@@ -80,7 +84,12 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
     }
     case "awaiting_decision":
     case "paused":
-      resolve(["review.pending", "review.conflicts", "ingestion.error"]);
+      resolve([
+        "review.pending",
+        "review.conflicts",
+        "ingestion.error",
+        "ingestion.awaiting_confirmation",
+      ]);
       upsert(
         "ingestion.awaiting_decision",
         run.status === "paused" ? `Execução pausada: ${name}` : `Orçamento esgotado: ${name}`,
@@ -92,6 +101,7 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
       break;
     case "done":
       resolve([
+        "ingestion.awaiting_confirmation",
         "review.pending",
         "review.conflicts",
         "ingestion.awaiting_decision",
@@ -99,16 +109,29 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
       ]);
       upsert("ingestion.done", `Ingestão concluída: ${name}`, null, "info");
       break;
+    case "awaiting_confirmation":
+      resolve(["ingestion.awaiting_decision", "ingestion.error"]);
+      upsert(
+        "ingestion.awaiting_confirmation",
+        `Confirme a estimativa: ${name}`,
+        "A execução está pronta e espera você confirmar o custo estimado",
+        "info",
+      );
+      break;
     case "error":
-      resolve(["ingestion.awaiting_decision"]);
+      resolve(["ingestion.awaiting_decision", "ingestion.awaiting_confirmation"]);
       upsert("ingestion.error", `Falha na ingestão: ${name}`, run.error, "error");
       break;
     case "cancelled":
       resolve();
       break;
     default:
-      // preparando, na fila, rodando ou aguardando confirmação: nada pendente com o usuário além da própria tela
-      resolve(["ingestion.awaiting_decision", "ingestion.error"]);
+      // preparando, na fila ou rodando: nada pendente com o usuário além da própria tela
+      resolve([
+        "ingestion.awaiting_decision",
+        "ingestion.awaiting_confirmation",
+        "ingestion.error",
+      ]);
   }
   return events;
 }

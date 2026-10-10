@@ -83,6 +83,7 @@ export const ptBR = {
   },
   activity: {
     title: "Atividades",
+    stopped: "Execuções paradas",
     empty: "Nenhuma atividade em andamento.",
     pending: "{count} em andamento",
     open: "Abrir",
@@ -465,6 +466,8 @@ export const ptBR = {
       profile_suggestion: "Sugestões de perfil",
       profile_analysis_done: "Análises de perfil concluídas",
       data_recreated: "Banco de dados recriado",
+      snapshots_over_cap: "Snapshots acima do teto",
+      ingestion_awaiting_confirmation: "Aguardando confirmação da estimativa",
     },
   },
   ingestion: {
@@ -744,6 +747,9 @@ export const ptBR = {
       empty: "Nenhum snapshot guardado.",
       delete: "Apagar snapshot de {ref}",
       deleteShort: "Apagar",
+      overCap: "Acima do teto: apague os menos usados para liberar espaço.",
+      prune: "Apagar os mais antigos até caber",
+      order: "Do menos usado para o mais usado.",
     },
   },
   dashboard: {

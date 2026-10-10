@@ -23,6 +23,8 @@ export interface SnapshotsRepo {
   list(): SnapshotRecord[];
   /** Marca uso (re-rodar a partir do snapshot). */
   touch(id: string): void;
+  /** Atualiza tamanho e hash de um registro (snapshots incrementais, correções F03 item 14). */
+  setSize(id: string, size: number, sha256: string): void;
   remove(id: string): void;
   totalBytes(): number;
   /** Menos usados primeiro (nunca usado conta pela data de criação): candidatos à limpeza manual. */
@@ -60,6 +62,7 @@ export function snapshotsRepo(db: Db): SnapshotsRepo {
     clock = now > clock ? now : new Date(new Date(clock).getTime() + 1).toISOString();
     return clock;
   };
+  const setSize = db.prepare("update snapshot set size = ?, sha256 = ? where id = ?");
   const repo: SnapshotsRepo = {
     create(i) {
       const id = newId();
@@ -75,6 +78,9 @@ export function snapshotsRepo(db: Db): SnapshotsRepo {
     },
     touch(id) {
       touch.run(tick(), id);
+    },
+    setSize(id, size, sha256) {
+      setSize.run(size, sha256, id);
     },
     remove(id) {
       del.run(id);

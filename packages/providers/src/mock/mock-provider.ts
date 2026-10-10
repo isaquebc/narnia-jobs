@@ -350,6 +350,11 @@ export class MockProvider implements Provider {
     return this.result(output, JSON.stringify(input.items), input.model);
   }
 
+  planWindowSnapshot(): { utilization: number | null; resetsAt: string | null } | null {
+    const w = this.mode.planUsage?.windows.fiveHour;
+    return w ? { utilization: w.utilization, resetsAt: w.resetsAt } : null;
+  }
+
   async getPlanUsage(): Promise<PlanUsage | null> {
     this.load();
     return this.mode.planUsage ? structuredClone(this.mode.planUsage) : null;

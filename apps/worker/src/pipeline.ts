@@ -12,6 +12,7 @@ import {
   type StageJobData,
   type StageName,
   type TaskRequest,
+  type TreeEntry,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
 import type { WsEvent } from "@narnia-jobs/shared";
@@ -43,6 +44,8 @@ export interface WorkerDeps {
   publish: (event: WsEvent) => Promise<void>;
   /** Cliente `gh` com a credencial atual (host/app) ou o falso do mock (F03-1). */
   gh: () => GhClient;
+  /** Clone de fallback para árvore truncada (correções F03 item 13); ausente ou `null` = sem fallback. */
+  ghCloneTree?: () => ((fullName: string) => Promise<TreeEntry[]>) | null;
 }
 
 export interface StageContext {

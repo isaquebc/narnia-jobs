@@ -48,7 +48,13 @@ function Snapshots() {
     mutationFn: (id: string) => api.deleteSnapshot(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshots"] }),
   });
+  // correções F03, item 15: acima do teto, aviso e poda dos menos usados até caber
+  const prune = useMutation({
+    mutationFn: () => api.pruneSnapshots(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshots"] }),
+  });
   if (!snaps.data) return null;
+  const overCap = snaps.data.maxBytes > 0 && snaps.data.totalBytes > snaps.data.maxBytes;
   return (
     <section aria-label={t("settings.snapshots.title")} className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold">{t("settings.snapshots.title")}</h3>
@@ -58,6 +64,19 @@ function Snapshots() {
           max: bytesLabel(snaps.data.maxBytes),
         })}
       </span>
+      {overCap ? (
+        <Alert tone="warn" className="flex flex-col gap-2">
+          <span>{t("settings.snapshots.overCap")}</span>
+          <div>
+            <Button size="sm" disabled={prune.isPending} onClick={() => prune.mutate()}>
+              {t("settings.snapshots.prune")}
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
+      {snaps.data.snapshots.length > 0 ? (
+        <span className="text-xs text-muted-fg">{t("settings.snapshots.order")}</span>
+      ) : null}
       {snaps.data.snapshots.length === 0 ? (
         <span className="text-sm text-muted-fg">{t("settings.snapshots.empty")}</span>
       ) : (

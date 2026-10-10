@@ -128,7 +128,7 @@ export function createApp(deps: AppDeps) {
     reposRoutes({ repos: deps.repos, provider: deps.provider, queue: deps.queue, bus: deps.bus }),
   );
   app.route("/", notificationsRoutes({ repos: deps.repos, bus: deps.bus }));
-  app.route("/", snapshotsRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
+  app.route("/", snapshotsRoutes({ repos: deps.repos, dataDir: deps.dataDir, bus: deps.bus }));
   app.route("/", usageRoutes({ repos: deps.repos }));
   app.route("/", userRoutes({ repos: deps.repos, bus: deps.bus }));
   app.route("/", profilesRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue }));

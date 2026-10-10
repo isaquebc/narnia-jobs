@@ -381,3 +381,48 @@ describe("F03/M3 worker · cadeia do F01 com evidência, reconciliação e confe
     expect(notificationKinds(h.events)).toContain("review.pending");
   });
 });
+
+describe("F03 fix L3 · item 12: freio com repositórios em paralelo", () => {
+  let h: ReturnType<typeof harness>;
+  afterEach(() => h?.cleanup());
+
+  it("orçamento para ~1,2 fatias: o segundo repositório em paralelo não inicia", async () => {
+    h = harness();
+    const budget: Budget = {
+      amount: 10_000,
+      unit: "thousand",
+      depth: "quick",
+      perRepo: 10_000,
+      reserve: { synthesis: 0, check: 0 },
+    };
+    const run = h.repos.ingestionRuns.createGithub({
+      provider: "mock",
+      mode: "private",
+      depth: "quick",
+      model: "haiku",
+      params: { repos: REPOS.slice(0, 2) },
+      budget,
+    });
+    h.queue.push(prepareTask(run.id));
+    await h.drain();
+    // orçamento de 1,2 vezes a estimativa de um repositório: cabe um, não cabem dois em paralelo
+    const est = h.repos.ingestionRuns.get(run.id)?.report?.repos[0]?.estimatedTokens ?? 0;
+    expect(est).toBeGreaterThan(0);
+    h.repos.ingestionRuns.setBudget(run.id, { ...budget, amount: Math.floor(est * 1.2) });
+    const tasks = confirmRun(h.repos, run.id).filter((t) => t.type === INGEST_TASKS.githubRepo);
+    expect(tasks).toHaveLength(2);
+    await Promise.all(
+      tasks.map((req) =>
+        processTask(
+          { kind: "task", type: req.type, key: req.key, payload: req.payload },
+          { jobId: `task__${req.type}__${req.key}`, progress: async () => {} },
+          h.deps,
+        ),
+      ),
+    );
+    const r = h.repos.ingestionRuns.get(run.id);
+    const statuses = (r?.report?.repos ?? []).map((x) => x.status).sort();
+    expect(statuses).toEqual(["done", "pending"]);
+    expect(r?.status).toBe("awaiting_decision");
+  });
+});

@@ -85,3 +85,18 @@ describe("F03 fix L2 · item 7: 'ingestão concluída' é informativa", () => {
     expect(repos.notifications.list({ status: "open" })).toEqual([]);
   });
 });
+
+describe("F03 fix L3 · item 16: aguardando confirmação vira pendência", () => {
+  it("awaiting_confirmation gera notificação; ao confirmar (running) ela se resolve", () => {
+    const { repos, run } = setup();
+    repos.ingestionRuns.setStatus(run.id, "awaiting_confirmation");
+    syncRunNotifications(repos, run.id);
+    expect(repos.notifications.list({ status: "open" }).map((n) => n.kind)).toEqual([
+      "ingestion.awaiting_confirmation",
+    ]);
+    expect(repos.notifications.countUnresolved()).toBe(1);
+    repos.ingestionRuns.setStatus(run.id, "running");
+    syncRunNotifications(repos, run.id);
+    expect(repos.notifications.list({ status: "open" })).toEqual([]);
+  });
+});

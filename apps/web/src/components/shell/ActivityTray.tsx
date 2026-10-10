@@ -1,11 +1,14 @@
-import type { Job } from "@narnia-jobs/shared";
+import type { Job, RunStatus } from "@narnia-jobs/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useApi, useWs } from "../../app/context";
 import { useJobs } from "../../hooks/useJobs";
 import { type TKey, t } from "../../i18n";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
+import { NavLink } from "./NavLink";
 
 const STAGE_ORDER = [
   "ingest.read_text",
@@ -86,8 +89,34 @@ export function JobRow({
   );
 }
 
+/** Execuções que esperam o usuário (correções F03, item 16): aparecem na bandeja com "abrir". */
+export const STOPPED_STATUSES: RunStatus[] = [
+  "awaiting_confirmation",
+  "awaiting_decision",
+  "paused",
+];
+
+function useStoppedRuns() {
+  const api = useApi();
+  const ws = useWs();
+  const qc = useQueryClient();
+  const runs = useQuery({
+    queryKey: ["ingestions", "stopped"],
+    queryFn: () => api.listIngestions({ status: STOPPED_STATUSES }),
+  });
+  useEffect(() => {
+    ws.connect();
+    return ws.subscribe((event) => {
+      if (event.type === "ingestion.updated")
+        void qc.invalidateQueries({ queryKey: ["ingestions", "stopped"] });
+    });
+  }, [ws, qc]);
+  return runs.data?.runs ?? [];
+}
+
 export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const { jobs, activeCount, cancel, retry } = useJobs();
+  const stopped = useStoppedRuns();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="relative">
@@ -109,7 +138,29 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
           className="absolute right-0 z-30 mt-2 w-96 rounded-lg border border-border bg-card p-3 shadow-lg"
         >
           <h3 className="mb-2 text-sm font-semibold">{t("activity.title")}</h3>
-          {jobs.length === 0 ? (
+          {stopped.length > 0 ? (
+            <ul aria-label={t("activity.stopped")} className="mb-2 flex flex-col gap-2">
+              {stopped.map((run) => {
+                const label = t(`run.status.${run.status}` as TKey);
+                return (
+                  <li
+                    key={run.id}
+                    aria-label={label}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+                  >
+                    <Badge tone="warn">{label}</Badge>
+                    <NavLink
+                      to={`/ingestao/${run.id}`}
+                      className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                    >
+                      {t("activity.open")}
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {jobs.length === 0 && stopped.length === 0 ? (
             <p className="text-sm text-muted-fg">{t("activity.empty")}</p>
           ) : (
             <ul className="flex max-h-96 flex-col gap-2 overflow-auto">

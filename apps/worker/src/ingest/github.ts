@@ -1,6 +1,7 @@
 import {
   addStop,
   candidatePathsForDepth,
+  canStartRepo,
   collectGithubMetrics,
   collectRepo,
   DEEPEN_CHARS_FACTOR,
@@ -22,7 +23,6 @@ import {
   readmeForDepth,
   reanalysisKind,
   reconcileTask,
-  recordPctSample,
   resolveIngestSettings,
   reviewCheckTask,
   saveRunSource,
@@ -115,7 +115,10 @@ export const githubPrepare: TaskHandler = async (data, ctx, deps) => {
     const failed: Array<{ fullName: string; reason: string }> = [];
     for (const [i, fullName] of names.entries()) {
       try {
-        const c = await collectRepo(gh, fullName, { login });
+        const c = await collectRepo(gh, fullName, {
+          login,
+          cloneTree: deps.ghCloneTree?.() ?? null,
+        });
         deps.repos.repos.upsert(c.repo);
         const wanted = new Set(candidatePathsForDepth(c.tree.entries, depth));
         const filesChars = c.tree.entries
@@ -239,8 +242,15 @@ export const githubRepo: TaskHandler = async (data, ctx, deps) => {
   if (run.status === "queued") await setRunStatus(deps, id, "running");
 
   const budget = run.budget;
+  // relê depois do await acima: outra tarefa em paralelo pode ter começado (correções F03, item 12)
+  const fresh = load(deps, id);
   const used = deps.repos.ingestionRuns.usedTokens(id);
-  if (budget && shouldBrake(budget, used)) {
+  const repoRows = fresh.report?.repos ?? [];
+  const reserved = repoRows
+    .filter((r) => r.status === "running")
+    .reduce((n, r) => n + r.estimatedTokens, 0);
+  const own = repoRows.find((r) => r.fullName === fullName)?.estimatedTokens ?? 0;
+  if (budget && (shouldBrake(budget, used) || !canStartRepo(budget, used, reserved, own))) {
     if (deps.repos.ingestionRuns.get(id)?.status !== "awaiting_decision")
       await brake(deps, id, used);
     return { braked: true, used };
@@ -297,6 +307,16 @@ export const githubRepo: TaskHandler = async (data, ctx, deps) => {
         );
         const inTree = new Set(c.tree.entries.map((e) => e.path));
         paths = pick.output.files.map((f) => f.path).filter((p) => inTree.has(p));
+        // checagem depois de cada chamada: estourou, para antes da próxima chamada deste repositório (item 12)
+        const usedNow = deps.repos.ingestionRuns.usedTokens(id);
+        if (budget && shouldBrake(budget, usedNow)) {
+          updateReport(deps, id, (r) =>
+            markRepo(r, fullName, { status: "pending", usedTokens: spent }),
+          );
+          if (deps.repos.ingestionRuns.get(id)?.status !== "awaiting_decision")
+            await brake(deps, id, usedNow);
+          return { braked: true, used: usedNow };
+        }
       }
     }
     const files: FetchedFile[] = await fetchFiles(gh, fullName, ref, paths, { maxChars });
@@ -428,19 +448,7 @@ export const githubSynthesis: TaskHandler = async (data, ctx, deps) => {
     finishReport(r, { finishedAt: nowUtc(), synthesis, extraUsedTokens: extra }),
   );
 
-  // conversão % da janela → tokens aprendida com a execução (F03-3 §1)
-  const before = (run.params.planBefore as { utilization?: number | null } | undefined)
-    ?.utilization;
-  const after = (await deps.provider.getPlanUsage().catch(() => null))?.windows.fiveHour
-    ?.utilization;
-  if (typeof before === "number" && typeof after === "number") {
-    recordPctSample(deps.repos.settings, {
-      model: models.repo,
-      utilizationBefore: before,
-      utilizationAfter: after,
-      tokens: deps.repos.ingestionRuns.usedTokens(id),
-    });
-  }
+  // a conversão % → tokens é aprendida por chamada (plan-sampling.ts), não mais por execução
   await deps.enqueueTask(reconcileTask(id));
   return { reports: reports.length };
 };

@@ -132,6 +132,11 @@ export interface Provider {
    * aplica (API key, terceiros) ou não há dado.
    */
   getPlanUsage(): Promise<PlanUsage | null>;
+  /**
+   * Janela de 5 h no instante, do último evento de limite visto (sem chamada nova; correções F03, item 11).
+   * `null` quando não há dado (API key, mock sem plano).
+   */
+  planWindowSnapshot(): { utilization: number | null; resetsAt: string | null } | null;
 }
 
 export type ProviderErrorCode =

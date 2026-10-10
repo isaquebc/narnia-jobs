@@ -14,6 +14,8 @@ export const NOTIFICATION_KINDS = [
   "profile.suggestion",
   "profile.analysis_done",
   "data.recreated",
+  "snapshots.over_cap",
+  "ingestion.awaiting_confirmation",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
