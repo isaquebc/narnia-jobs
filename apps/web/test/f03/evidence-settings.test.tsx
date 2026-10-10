@@ -199,3 +199,61 @@ describe("F03/M4 · Configurações › Integrações", () => {
     expect(deleteSnapshot).toHaveBeenCalledWith("s1");
   });
 });
+
+describe("F03-fix L1 · Configurações › Backups (FX-2)", () => {
+  it("mostra o teto (no máximo N cópias), o backup mais recente e grava o teto novo", async () => {
+    const putBackupSettings = vi.fn(async (b: { max: number }) => ({
+      max: b.max,
+      enabled: true,
+      latest: {
+        file: "narnia-boot-2026-10-10T11-00-00-000Z.sqlite",
+        at: "2026-10-10T11:00:00.000Z",
+      },
+      count: 2,
+    }));
+    renderApp({
+      api: api({
+        getIngestSettings: async () => ingestSettings(),
+        listSnapshots: async () => ({ snapshots: [], totalBytes: 0, maxBytes: 2 * 1024 ** 3 }),
+        getBackupSettings: async () => ({
+          max: 5,
+          enabled: true,
+          latest: {
+            file: "narnia-boot-2026-10-10T11-00-00-000Z.sqlite",
+            at: "2026-10-10T11:00:00.000Z",
+          },
+          count: 2,
+        }),
+        putBackupSettings,
+      }),
+      initialUrl: "/configuracoes",
+    });
+    const region = await screen.findByRole("region", { name: "Backups" });
+    expect(
+      await within(region).findByText("Último backup: 10/10/2026 08:00 · 2 cópias"),
+    ).toBeInTheDocument();
+    const max = within(region).getByLabelText("Máximo de backups");
+    expect(max).toHaveValue(5);
+    expect(max).toHaveAttribute("min", "1");
+    await userEvent.clear(max);
+    await userEvent.type(max, "3");
+    await userEvent.click(within(region).getByRole("button", { name: "Salvar backups" }));
+    await waitFor(() => expect(putBackupSettings).toHaveBeenCalledWith({ max: 3 }));
+    expect(await within(region).findByText("Backups salvos.")).toBeInTheDocument();
+  });
+
+  it("sem backup ainda e com backups desligados, explica", async () => {
+    renderApp({
+      api: api({
+        getIngestSettings: async () => ingestSettings(),
+        listSnapshots: async () => ({ snapshots: [], totalBytes: 0, maxBytes: 2 * 1024 ** 3 }),
+        getBackupSettings: async () => ({ max: 5, enabled: false, latest: null, count: 0 }),
+      }),
+      initialUrl: "/configuracoes",
+    });
+    const region = await screen.findByRole("region", { name: "Backups" });
+    expect(
+      await within(region).findByText("Backups desligados nesta instância."),
+    ).toBeInTheDocument();
+  });
+});

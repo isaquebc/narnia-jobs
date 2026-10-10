@@ -6,6 +6,7 @@ import {
   DEFAULT_JOB_OPTIONS,
   migrate,
   openDatabase,
+  resolveBackupDir,
   type StageJobData,
 } from "@narnia-jobs/core";
 import { createProviderFromEnv } from "@narnia-jobs/providers";
@@ -13,6 +14,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { createApp } from "./app";
 import { generateBootToken } from "./auth";
+import { bootData } from "./boot";
 import { EventBus } from "./events";
 import { BullQueueAdapter } from "./queue";
 import { startRedisRelay } from "./relay";
@@ -26,9 +28,12 @@ const token = process.env.NARNIA_TOKEN || generateBootToken();
 const publicBase = process.env.NARNIA_PUBLIC_URL ?? `http://127.0.0.1:${port}`;
 
 mkdirSync(dataDir, { recursive: true });
+const backupDir = resolveBackupDir(process.env, dataDir);
 const db = openDatabase(join(dataDir, "narnia.sqlite"));
-migrate(db, { backupDir: join(dataDir, "backups") });
+migrate(db, { backupDir });
 const repos = createRepos(db);
+// F03-fix L1: backup do dia fora da pasta de dados e aviso de banco recriado; nunca impede o boot
+bootData({ db, repos, dataDir, backupDir });
 const provider = createProviderFromEnv();
 const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const queueOpts = { connection, prefix, defaultJobOptions: { ...DEFAULT_JOB_OPTIONS } };
@@ -48,6 +53,7 @@ const app = createApp({
   queue: new BullQueueAdapter(queues, repos),
   bus,
   token,
+  backupDir,
 });
 
 const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => {

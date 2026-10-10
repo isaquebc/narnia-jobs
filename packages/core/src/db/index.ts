@@ -1,3 +1,4 @@
+export * from "./backup";
 export * from "./migrate";
 export * from "./open";
 export * from "./repos";

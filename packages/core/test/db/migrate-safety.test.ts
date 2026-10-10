@@ -45,6 +45,8 @@ describe("migrate · concorrência e backup", () => {
     const db = openDatabase(file);
     migrate(db, { until: "0002_profiles" });
     db.exec("insert into settings (key, value_json) values ('marcador', '\"ok\"')");
+    // pré-migration só copia banco com dados de usuário (F03-fix L1: cópia vazia nunca empurra cópia boa para fora)
+    db.exec("insert into user (id, created_at, updated_at) values ('u1', 'x', 'x')");
     const r = migrate(db, { backupDir: backups });
     expect(r.applied).toEqual(["0003_ingest"]);
     const files = readdirSync(backups);
@@ -55,6 +57,16 @@ describe("migrate · concorrência e backup", () => {
       value_json: '"ok"',
     });
     copy.close();
+    db.close();
+  });
+
+  it("banco com migrations mas sem dados de usuário não gera backup pré-migration (F03-fix L1)", () => {
+    dir = mkdtempSync(join(tmpdir(), "narnia-mig-"));
+    const backups = join(dir, "backups");
+    const db = openDatabase(join(dir, "narnia.sqlite"));
+    migrate(db, { until: "0002_profiles" });
+    migrate(db, { backupDir: backups });
+    expect(existsSync(backups) ? readdirSync(backups) : []).toEqual([]);
     db.close();
   });
 
@@ -73,6 +85,7 @@ describe("migrate · concorrência e backup", () => {
     const backups = join(dir, "backups");
     const db = openDatabase(join(dir, "narnia.sqlite"));
     migrate(db, { until: "0002_profiles" });
+    db.exec("insert into user (id, created_at, updated_at) values ('u1', 'x', 'x')");
     mkdirSync(backups, { recursive: true });
     for (let i = 0; i < 6; i++)
       writeFileSync(join(backups, `narnia-pre-0000_x-2026-01-0${i}T00-00-00Z.sqlite`), "");

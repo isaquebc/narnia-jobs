@@ -10,6 +10,7 @@ import {
   migrate,
   openDatabase,
   renderPdfPages,
+  resolveBackupDir,
   resolveGhRuntime,
   type StageJobData,
   type StageName,
@@ -65,7 +66,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   mkdirSync(dirname(opts.dbPath), { recursive: true });
   mkdirSync(opts.dataDir, { recursive: true });
   const db = openDatabase(opts.dbPath);
-  migrate(db, { backupDir: join(dirname(opts.dbPath), "backups") });
+  migrate(db, { backupDir: resolveBackupDir(process.env, dirname(opts.dbPath)) });
   const repos = createRepos(db);
   const queues = createQueues({
     connection,

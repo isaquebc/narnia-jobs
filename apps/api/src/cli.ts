@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolveBackupDir } from "@narnia-jobs/core";
 import { createProviderFromEnv, resolveClaudeBinary } from "@narnia-jobs/providers";
 import IORedis from "ioredis";
 import { runDoctor } from "./doctor";
@@ -26,6 +27,7 @@ async function doctor(): Promise<number> {
       return redis.ping();
     },
     workerHeartbeat: () => redis.get(`${prefix}:worker:heartbeat`),
+    backupDir: resolveBackupDir(process.env, dataDir),
   });
   redis.disconnect();
   console.log(JSON.stringify(report, null, 2));

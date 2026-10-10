@@ -1,7 +1,7 @@
 import type { BudgetUnit } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useApi } from "../../app/context";
+import { useApi, useTimezone } from "../../app/context";
 import { describeError } from "../../components/ErrorState";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
 import { t } from "../../i18n";
 import type { IngestSettings } from "../../lib/api";
+import { formatDate } from "../../lib/format";
 import { GithubConnectCard } from "../ingestion/github/GithubConnectCard";
 import { bytesLabel } from "../ingestion/units";
 
@@ -78,6 +79,64 @@ function Snapshots() {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** Backups (F03-fix L1, FX-2): teto total e o mais recente. */
+function Backups() {
+  const api = useApi();
+  const tz = useTimezone();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["settings", "backups"], queryFn: () => api.getBackupSettings() });
+  const [max, setMax] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (n: number) => api.putBackupSettings({ max: n }),
+    onSuccess: (r) => qc.setQueryData(["settings", "backups"], r),
+  });
+  if (!q.data) return null;
+  const value = max ?? String(q.data.max);
+  return (
+    <section aria-label={t("settings.backups.title")} className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">{t("settings.backups.title")}</h3>
+      {!q.data.enabled ? (
+        <span className="text-sm text-muted-fg">{t("settings.backups.disabled")}</span>
+      ) : q.data.latest ? (
+        <span className="text-sm">
+          {t("settings.backups.latest", {
+            date: formatDate(q.data.latest.at, tz),
+            count: q.data.count,
+          })}
+        </span>
+      ) : (
+        <span className="text-sm text-muted-fg">{t("settings.backups.none")}</span>
+      )}
+      <Field
+        label={t("settings.backups.max")}
+        htmlFor="backups-max"
+        hint={t("settings.backups.maxHint")}
+      >
+        <Input
+          id="backups-max"
+          type="number"
+          min={1}
+          value={value}
+          onChange={(e) => {
+            save.reset();
+            setMax(e.target.value);
+          }}
+        />
+      </Field>
+      <div className="flex items-center gap-3">
+        <Button
+          size="sm"
+          onClick={() => save.mutate(Math.max(1, Math.round(Number(value)) || 1))}
+          disabled={save.isPending}
+        >
+          {t("settings.backups.save")}
+        </Button>
+        {save.isSuccess ? <span className="text-sm">{t("settings.backups.saved")}</span> : null}
+      </div>
     </section>
   );
 }
@@ -200,6 +259,7 @@ export function SettingsPage() {
             </Button>
           </div>
           <Snapshots />
+          <Backups />
         </Card>
       ) : null}
     </div>

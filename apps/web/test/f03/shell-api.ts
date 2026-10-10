@@ -13,4 +13,5 @@ export const shellApi = {
   listProfiles: async () => ({ profiles: [profile("p1", { isActive: true, name: "Eng" })] }),
   listSuggestions: async () => ({ suggestions: [] }),
   getUser: async () => ({ user: null }),
+  getBackupSettings: async () => ({ max: 5, enabled: true, latest: null, count: 0 }),
 };

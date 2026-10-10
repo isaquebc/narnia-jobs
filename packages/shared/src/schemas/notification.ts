@@ -13,6 +13,7 @@ export const NOTIFICATION_KINDS = [
   "ingestion.error",
   "profile.suggestion",
   "profile.analysis_done",
+  "data.recreated",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

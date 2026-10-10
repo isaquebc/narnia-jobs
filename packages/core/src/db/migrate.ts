@@ -1,7 +1,7 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { nowUtc } from "@narnia-jobs/shared";
+import { hasUserData, writeBackup } from "./backup";
 import type { Db } from "./open";
 
 export interface Migration {
@@ -23,15 +23,14 @@ export interface MigrateOptions {
   /** Para depois de aplicar esta migration (inclusive). Usado pelos testes de upgrade. */
   until?: string;
   /**
-   * Pasta de backups: antes de migrar um banco que já tinha migrations aplicadas, grava uma cópia consistente
-   * (`VACUUM INTO`) em `narnia-pre-<migration>-<instante>.sqlite` e mantém só as `BACKUPS_KEPT` mais recentes.
+   * Pasta de backups: antes de migrar um banco que já tinha migrations aplicadas e tem dados de usuário, grava uma
+   * cópia consistente (`VACUUM INTO`) em `narnia-pre-<migration>-<instante>.sqlite`, com a mesma poda única do
+   * backup de boot (`backups.max`, F03-fix L1). `null`/ausente desliga.
    */
-  backupDir?: string;
+  backupDir?: string | null;
   /** Só para testes: chamado depois de calcular as pendentes e antes de travar (simula outro processo migrando). */
   afterPlan?: () => void;
 }
-
-export const BACKUPS_KEPT = 5;
 
 /**
  * Migrations que reconstroem tabelas referenciadas (SQLite não altera CHECK/NOT NULL) declaram na primeira linha
@@ -53,17 +52,6 @@ function appliedNames(db: Db): Set<string> {
   );
 }
 
-function backup(db: Db, dir: string, migration: string): void {
-  mkdirSync(dir, { recursive: true });
-  const stamp = nowUtc().replace(/[:.]/g, "-");
-  db.prepare("vacuum into ?").run(join(dir, `narnia-pre-${migration}-${stamp}.sqlite`));
-  const files = readdirSync(dir)
-    .filter((f) => /^narnia-pre-.*\.sqlite$/.test(f))
-    .map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs }))
-    .sort((x, y) => y.t - x.t || y.f.localeCompare(x.f));
-  for (const { f } of files.slice(BACKUPS_KEPT)) rmSync(join(dir, f), { force: true });
-}
-
 export function migrate(db: Db, opts: MigrateOptions = {}): { applied: string[] } {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null)",
@@ -76,7 +64,8 @@ export function migrate(db: Db, opts: MigrateOptions = {}): { applied: string[] 
   const applied: string[] = [];
   if (pending.length === 0) return { applied };
   opts.afterPlan?.();
-  if (opts.backupDir && done.size > 0) backup(db, opts.backupDir, (pending[0] as Migration).name);
+  if (opts.backupDir && done.size > 0 && hasUserData(db))
+    writeBackup(db, opts.backupDir, `pre-${(pending[0] as Migration).name}`);
   const insert = db.prepare("insert into schema_migrations (name, applied_at) values (?, ?)");
   for (const m of pending) {
     const fkOff = FK_OFF.test(m.sql);

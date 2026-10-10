@@ -1,6 +1,7 @@
 import type {
   AnalyzeEstimateResponse,
   AnalyzeRequest,
+  BackupSettingsResponse,
   Budget,
   DashboardResponseSchema,
   EmphasisListResponse,
@@ -274,6 +275,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     previewGithub: (body: { mode: IngestionMode; login?: string }) =>
       request<GithubPreviewResponse>("/api/sources/github/preview", json(body)),
     getPlanUsage: () => request<{ usage: PlanUsage | null }>("/api/plan/usage"),
+    getBackupSettings: () => request<BackupSettingsResponse>("/api/settings/backups"),
+    putBackupSettings: (body: { max: number }) =>
+      request<BackupSettingsResponse>("/api/settings/backups", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
     getIngestSettings: () => request<IngestSettings>("/api/settings/ingest"),
     putIngestSettings: (body: Partial<IngestSettings>) =>
       request<IngestSettings>("/api/settings/ingest", {

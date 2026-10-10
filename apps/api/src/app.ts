@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { defaultGhConfigDir, type Repos } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
 import { nowUtc } from "@narnia-jobs/shared";
@@ -14,6 +15,7 @@ import {
 } from "./github-auth";
 import { createJsonlLogger, type JsonlLogger } from "./log";
 import type { QueueAdapter } from "./queue";
+import { backupsRoutes } from "./routes/backups";
 import { dashboardRoutes } from "./routes/dashboard";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
@@ -42,6 +44,8 @@ export interface AppDeps {
   ghConfigDir?: string;
   /** Fluxo de dispositivo do GitHub; padrão: real, ou falso com o provider mock. */
   deviceFlow?: DeviceFlowRunner;
+  /** Pasta de backups (F03-fix L1); `null` = desligado; ausente = `<dados>/backups`. */
+  backupDir?: string | null;
 }
 
 /** Monta a aplicação Hono (F01 §2.6). Tudo atrás do token de boot, exceto health e a rota de entrada. */
@@ -101,6 +105,13 @@ export function createApp(deps: AppDeps) {
   );
   app.route("/", onboardingRoutes({ repos: deps.repos }));
   app.route("/", filesRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
+  app.route(
+    "/",
+    backupsRoutes({
+      repos: deps.repos,
+      backupDir: deps.backupDir === undefined ? join(deps.dataDir, "backups") : deps.backupDir,
+    }),
+  );
   app.route(
     "/",
     ingestionsRoutes({

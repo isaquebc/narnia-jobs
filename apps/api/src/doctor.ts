@@ -1,5 +1,15 @@
-import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
+import { listBackups } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
 
 export interface DoctorDeps {
@@ -7,6 +17,10 @@ export interface DoctorDeps {
   dataDir: string;
   redisPing: () => Promise<string>;
   workerHeartbeat: () => Promise<string | null>;
+  /** F03-fix L1 item 5: pasta de backups (ausente = não verificar), raiz do /proc (testes) e pasta de logs. */
+  backupDir?: string | null;
+  procRoot?: string;
+  logsDir?: string;
 }
 
 export interface DoctorReport {
@@ -18,6 +32,11 @@ export interface DoctorReport {
     redis: boolean;
     dataDirWritable: boolean;
     workerAlive: boolean;
+    database: { path: string; sizeBytes: number | null; walBytes: number | null };
+    /** Processos com o banco APAGADO ainda aberto (sinal do incidente de 2026-10-10). */
+    deletedOpen: Array<{ pid: number; fd: string }>;
+    lastBackup: { file: string; at: string } | null;
+    lastRequest: string | null;
   };
   hints: string[];
 }
@@ -70,6 +89,27 @@ export async function runDoctor(deps: DoctorDeps): Promise<DoctorReport> {
   }
   if (!workerAlive) hints.push("Worker sem heartbeat recente: verifique o serviço `worker`.");
 
+  const dbPath = join(deps.dataDir, "narnia.sqlite");
+  const size = (p: string) => (existsSync(p) ? statSync(p).size : null);
+  const database = { path: dbPath, sizeBytes: size(dbPath), walBytes: size(`${dbPath}-wal`) };
+  const deletedOpen = findDeletedDatabase(deps.procRoot ?? "/proc");
+  for (const d of deletedOpen)
+    hints.push(
+      `O banco foi APAGADO enquanto o processo ${d.pid} o mantém aberto. NÃO reinicie: copie /proc/${d.pid}/fd/${d.fd} para outro arquivo para recuperar os dados.`,
+    );
+  const latest =
+    deps.backupDir === undefined
+      ? null
+      : (listBackups(deps.backupDir).filter((b) => /^narnia-(boot|pre-)/.test(b.file))[0] ?? null);
+  const lastBackup = latest ? { file: latest.file, at: latest.at } : null;
+  if (deps.backupDir !== undefined && !lastBackup)
+    hints.push(
+      deps.backupDir === null
+        ? "Backups desligados (NARNIA_BACKUP_DIR=off)."
+        : `Nenhum backup em ${deps.backupDir}: o primeiro é feito no boot do api, quando já houver dados.`,
+    );
+  const lastRequest = lastLoggedRequest(deps.logsDir ?? join(deps.dataDir, "logs"));
+
   const checks = {
     auth,
     cliInstalled: status.installed,
@@ -77,6 +117,62 @@ export async function runDoctor(deps: DoctorDeps): Promise<DoctorReport> {
     redis,
     dataDirWritable,
     workerAlive,
+    database,
+    deletedOpen,
+    lastBackup,
+    lastRequest,
   };
-  return { ok: auth !== "none" && redis && dataDirWritable && workerAlive, checks, hints };
+  return {
+    ok: auth !== "none" && redis && dataDirWritable && workerAlive && deletedOpen.length === 0,
+    checks,
+    hints,
+  };
+}
+
+/** Varre `/proc/<pid>/fd` atrás de `narnia.sqlite* (deleted)` (arquivo removido com o processo ainda aberto). */
+export function findDeletedDatabase(procRoot: string): Array<{ pid: number; fd: string }> {
+  const found: Array<{ pid: number; fd: string }> = [];
+  let pids: string[] = [];
+  try {
+    pids = readdirSync(procRoot).filter((p) => /^\d+$/.test(p));
+  } catch {
+    return found;
+  }
+  for (const pid of pids) {
+    let fds: string[] = [];
+    try {
+      fds = readdirSync(join(procRoot, pid, "fd"));
+    } catch {
+      continue;
+    }
+    for (const fd of fds) {
+      try {
+        const target = readlinkSync(join(procRoot, pid, "fd", fd));
+        if (
+          /narnia\.sqlite$/.test(target.replace(/ \(deleted\)$/, "")) &&
+          target.endsWith(" (deleted)")
+        )
+          found.push({ pid: Number(pid), fd });
+      } catch {
+        // fd fechado no meio da varredura
+      }
+    }
+  }
+  return found;
+}
+
+/** Instante da última requisição registrada (`api-*.jsonl` mais recente, última linha). */
+export function lastLoggedRequest(logsDir: string): string | null {
+  try {
+    const files = readdirSync(logsDir)
+      .filter((f) => /^api-.*\.jsonl$/.test(f))
+      .sort();
+    const last = files.at(-1);
+    if (!last) return null;
+    const lines = readFileSync(join(logsDir, last), "utf8").trim().split("\n").filter(Boolean);
+    const ts = (JSON.parse(lines.at(-1) ?? "{}") as { ts?: string }).ts;
+    return ts ?? null;
+  } catch {
+    return null;
+  }
 }

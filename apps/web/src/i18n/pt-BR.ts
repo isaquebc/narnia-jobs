@@ -464,6 +464,7 @@ export const ptBR = {
       ingestion_error: "Falhas na ingestão",
       profile_suggestion: "Sugestões de perfil",
       profile_analysis_done: "Análises de perfil concluídas",
+      data_recreated: "Banco de dados recriado",
     },
   },
   ingestion: {
@@ -725,6 +726,17 @@ export const ptBR = {
     snapshotsCap: "Teto dos snapshots (GB)",
     save: "Salvar configurações",
     saved: "Configurações salvas.",
+    backups: {
+      title: "Backups",
+      max: "Máximo de backups",
+      maxHint:
+        "Cópias do banco fora da pasta de dados (./backups). Ao passar do máximo, a mais antiga sai. Para restaurar: ./start.sh restore <arquivo>.",
+      latest: "Último backup: {date} · {count} cópias",
+      none: "Nenhum backup ainda: o primeiro é feito quando o app sobe com dados.",
+      disabled: "Backups desligados nesta instância.",
+      save: "Salvar backups",
+      saved: "Backups salvos.",
+    },
     snapshots: {
       title: "Snapshots",
       usage: "Em uso: {used} de {max}",

@@ -480,6 +480,16 @@ export const IngestSettingsSchema = z.object({
 });
 export const IngestSettingsPutRequestSchema = IngestSettingsSchema.partial();
 
+// F03-fix L1 · backups (FX-2: no máximo `max` cópias no total, padrão 5, mínimo 1)
+export const BackupSettingsPutRequestSchema = z.object({ max: z.number().int().min(1).max(100) });
+export const BackupSettingsResponseSchema = z.object({
+  max: z.number().int().min(1),
+  enabled: z.boolean(),
+  latest: z.object({ file: z.string(), at: z.string() }).nullable(),
+  count: z.number().int().min(0),
+});
+export type BackupSettingsResponse = z.infer<typeof BackupSettingsResponseSchema>;
+
 // Eventos do F03: estado da execução e notificações.
 export const IngestionUpdatedEventSchema = z.object({
   type: z.literal("ingestion.updated"),
