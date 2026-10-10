@@ -3,6 +3,7 @@ import { useTimezone } from "../../app/context";
 import { useWsStatus } from "../../hooks/useWsStatus";
 import { type TKey, t } from "../../i18n";
 import { ActivityTray } from "./ActivityTray";
+import { NotificationBell } from "./NotificationBell";
 import { ProfileSwitcher } from "./ProfileSwitcher";
 import { ProviderIndicator } from "./ProviderIndicator";
 import { SideNav } from "./SideNav";
@@ -20,6 +21,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
         <div className="flex items-center gap-3">
           <ProviderIndicator />
+          <NotificationBell />
           <ActivityTray />
           <ThemeToggle />
         </div>

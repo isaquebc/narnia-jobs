@@ -22,9 +22,12 @@ export function NavLink({
   params,
   search,
   className,
+  ariaLabel,
   children,
 }: {
   to: string;
+  /** Nome acessível quando o conteúdo é só um ícone (sino de notificações). */
+  ariaLabel?: string;
   /** Parâmetros de caminho (`$id`) da rota de destino. */
   params?: Record<string, string>;
   /** Query string tipada pela rota de destino (ex.: pré-preenchimento de `/perfis/novo`). */
@@ -35,7 +38,11 @@ export function NavLink({
   const router = useRouter({ warn: false });
   if (!router) {
     return (
-      <a href={withSearch(withParams(to, params), search)} className={className}>
+      <a
+        href={withSearch(withParams(to, params), search)}
+        className={className}
+        {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
+      >
         {children}
       </a>
     );
@@ -46,6 +53,7 @@ export function NavLink({
       {...(params ? { params: params as never } : {})}
       {...(search ? { search: search as never } : {})}
       className={className}
+      {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
       activeProps={{ className: `${className ?? ""} active` }}
     >
       {children}

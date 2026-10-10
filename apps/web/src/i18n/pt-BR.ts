@@ -25,6 +25,10 @@ export const ptBR = {
     dashboard: "Dashboard",
     onboarding: "Primeiro uso",
     profiles: "Perfis",
+    ingestion: "Ingestão",
+    evidence: "Evidências",
+    notifications: "Pendências",
+    settings: "Configurações",
     soon: "Disponível em {task}",
   },
   shell: {
@@ -438,6 +442,40 @@ export const ptBR = {
     rebuilding: "Atualizando…",
     summary: "Resumo objetivo",
     viewAll: "Ver cartão completo",
+  },
+  notifications: {
+    title: "Pendências",
+    bell: "Notificações",
+    bellCount: "Notificações ({count})",
+    hint: "Revisões, conflitos e decisões ficam aqui até você resolver; somem sozinhas quando resolvidas.",
+    empty: "Nada pendente. Tudo em dia.",
+    go: "Ir para resolver",
+    markRead: "Marcar como lida",
+    dismiss: "Dispensar",
+    resolvedAt: "Resolvida em {date}",
+    filter: { open: "Abertas", resolved: "Resolvidas", all: "Todas" },
+    severity: { info: "Informação", warning: "Atenção", error: "Erro" },
+    kinds: {
+      review_pending: "Revisões pendentes",
+      review_conflicts: "Conflitos para resolver",
+      ingestion_awaiting_decision: "Aguardando sua decisão",
+      ingestion_done: "Ingestões concluídas",
+      ingestion_error: "Falhas na ingestão",
+      profile_suggestion: "Sugestões de perfil",
+      profile_analysis_done: "Análises de perfil concluídas",
+    },
+  },
+  ingestion: {
+    title: "Ingestão",
+  },
+  run: {
+    title: "Execução da ingestão",
+  },
+  evidence: {
+    title: "Evidências › Repositórios",
+  },
+  settings: {
+    title: "Configurações",
   },
   dashboard: {
     title: "Dashboard",

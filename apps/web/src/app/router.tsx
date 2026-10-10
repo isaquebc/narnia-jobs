@@ -12,6 +12,11 @@ import { ErrorState } from "../components/ErrorState";
 import { Shell } from "../components/shell/Shell";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { Dashboard } from "../features/dashboard/Dashboard";
+import { RepoDetailPage } from "../features/evidence/RepoDetailPage";
+import { ReposPage } from "../features/evidence/ReposPage";
+import { IngestionPage } from "../features/ingestion/IngestionPage";
+import { RunPage } from "../features/ingestion/RunPage";
+import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { Wizard } from "../features/onboarding/Wizard";
 import { NewProfilePage, type NewProfileSearch } from "../features/profiles/NewProfilePage";
 import { PersonaOverrides } from "../features/profiles/PersonaOverrides";
@@ -19,6 +24,7 @@ import { PitchEditor } from "../features/profiles/PitchEditor";
 import { ProfileCardView } from "../features/profiles/ProfileCardView";
 import { ProfilePage, useProfile } from "../features/profiles/ProfilePage";
 import { ProfilesPage } from "../features/profiles/ProfilesPage";
+import { SettingsPage } from "../features/settings/SettingsPage";
 import { t } from "../i18n";
 import type { AppServices } from "./context";
 import { FormGuardProvider } from "./FormGuard";
@@ -157,6 +163,44 @@ const profileCardRoute = createRoute({
   },
 });
 
+// F03 §4 — ingestão, execução, evidências, pendências e configurações
+const ingestionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ingestao",
+  component: IngestionPage,
+});
+const runRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ingestao/$runId",
+  component: function RunRoute() {
+    const { runId } = runRoute.useParams();
+    return <RunPage key={runId} runId={runId} />;
+  },
+});
+const reposRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/evidencias/repositorios",
+  component: ReposPage,
+});
+const repoDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/evidencias/repositorios/$repoId",
+  component: function RepoDetailRoute() {
+    const { repoId } = repoDetailRoute.useParams();
+    return <RepoDetailPage key={repoId} repoId={repoId} />;
+  },
+});
+const notificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pendencias",
+  component: NotificationsPage,
+});
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/configuracoes",
+  component: SettingsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   onboardingRoute,
@@ -169,6 +213,12 @@ const routeTree = rootRoute.addChildren([
     profilePersonaRoute,
     profileCardRoute,
   ]),
+  ingestionRoute,
+  runRoute,
+  reposRoute,
+  repoDetailRoute,
+  notificationsRoute,
+  settingsRoute,
 ]);
 
 export function createAppRouter(opts: {
