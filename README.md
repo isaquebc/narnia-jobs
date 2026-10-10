@@ -2,7 +2,7 @@
 
 Projeto **open source**: clone, rode localmente e use a assinatura da IA que preferir (Claude Code primeiro; Codex planejado). Coleção de ferramentas locais para apoiar a busca de emprego: um recrutador(a) sênior como agente, perfis múltiplos (um por cargo-alvo), ingestão de dados (CV, GitHub, LinkedIn) e features isoladas (gerar CV, analisar vaga, candidaturas, simular entrevista). Roda na máquina do usuário via Docker (Linux, Windows e Mac), com dados persistidos em pasta do host fora do versionamento.
 
-**Estado:** F01 (primeiro uso) implementado: instalação por Docker, extração do currículo com revisão e primeiro perfil, até o dashboard. O plano está em `plans/plan-v0/`; as próximas entregas (perfis múltiplos, chat com o recrutador, ingestão de GitHub/LinkedIn, features) seguem a ordem de `plans/plan-v0/tasks/README.md`.
+**Estado:** F01 (primeiro uso), F02 (perfis) e F03 (ingestão e GitHub) implementados: instalação por Docker, extração do currículo e de texto livre com revisão, perfis múltiplos com ênfases, cartão e persona do recrutador, ingestão do GitHub com orçamento e notificações, e backups automáticos. O plano está em `plans/plan-v0/`; a próxima entrega é o chat com o recrutador (F04), na ordem de `plans/plan-v0/tasks/README.md`.
 
 | Documento | Conteúdo |
 |-----------|----------|
@@ -62,7 +62,11 @@ Em **Ingestão** você adiciona dados depois do primeiro uso: **GitHub**, **Curr
 
 ### Onde ficam os dados e como fazer backup
 
-Tudo que é seu fica em `./data` (ou na pasta apontada por `NARNIA_DATA_DIR` no `.env`): banco SQLite, currículos enviados, textos extraídos, documentos gerados e logs de uso. Essa pasta nunca entra no repositório (`.gitignore`). **Backup = copiar `./data`** com os serviços parados (`./start.sh down`). O login da assinatura fica no volume Docker `claude-auth`, e a fila no volume `redis-data`.
+Tudo que é seu fica em `./data` (ou na pasta apontada por `NARNIA_DATA_DIR` no `.env`): banco SQLite, currículos enviados, textos extraídos, documentos gerados e logs de uso. Essa pasta nunca entra no repositório (`.gitignore`). O login da assinatura fica no volume Docker `claude-auth`, e a fila no volume `redis-data`.
+
+**Backups automáticos** ficam em `./backups`, na raiz do projeto, **fora** de `./data` (ou em `NARNIA_BACKUP_DIR`, por exemplo um disco externo ou uma pasta sincronizada): uma cópia consistente do banco no primeiro boot de cada dia em que há dados e outra antes de cada migration, mais os uploads copiados sem duplicar. Ficam no máximo 5 cópias no total (configurável em Configurações › Backups); ao bater o teto, a mais antiga sai. **Apagar `./data` apaga os seus dados, mas não os backups.** Se o banco for recriado vazio e houver backup, a aplicação avisa com uma notificação crítica que traz o comando de restauração.
+
+Para restaurar: `./start.sh restore backups/<arquivo>.sqlite` (para a stack, guarda o banco atual em `backups/narnia-before-restore-…`, copia o escolhido e sobe de novo). Backup manual continua valendo: copiar `./data` com os serviços parados (`./start.sh down`).
 
 ### Comandos
 
@@ -72,7 +76,8 @@ Tudo que é seu fica em `./data` (ou na pasta apontada por `NARNIA_DATA_DIR` no 
 | `./start.sh down` | para os serviços; dados e login preservados |
 | `./start.sh down --purge` | para e **remove os volumes**: apaga o login da assinatura e a fila; a pasta `./data` fica |
 | `./start.sh login` | login da assinatura dentro do container |
-| `./start.sh doctor` | diagnóstico |
+| `./start.sh doctor` | diagnóstico: login, Redis, worker, caminho e tamanho do banco e do WAL, processo com o banco apagado ainda aberto, último backup e última requisição |
+| `./start.sh restore <arquivo>` | restaura um backup de `./backups` (guarda o banco atual antes) |
 | `./start.sh logs [api\|worker\|web\|redis]` | acompanha os logs |
 | `./start.sh status` | estado dos containers |
 

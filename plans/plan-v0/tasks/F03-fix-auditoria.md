@@ -2,7 +2,7 @@
 
 Correções dos achados das duas auditorias da F03 (plano × implementação e revisão adversarial), mais a proteção de dados motivada pelo incidente da instância do dono (banco recriado do zero e `data/uploads` ausente no `make dev` de 2026-10-10; causa não encontrada no código; ver F03 §8). Tudo em TDD: para cada item, o teste listado é escrito primeiro e precisa falhar pelo motivo certo antes da correção.
 
-Status: **plano aprovado** (FX-1 a FX-4 decididas em 2026-10-10); implementação em andamento.
+Status: **concluído** (2026-10-10). L1 `423bfc8` `1c48348` `58d5e24`; L2 `70c6bd4`; L3 `e8a7618`; L4 `5d150ec` e o commit de documentação; registro no §8 da F03.
 
 Regras de execução: só na instância `claude` (`scripts/claude-env.sh`); nenhuma migration nova sem aviso (L1 não precisa de migration); um commit por lote, verde em `lint`, `typecheck`, `test` e nos e2e do lote; a instância do dono recebe o código pelo hot reload, por isso **L1 vai primeiro** (proteção de dados antes de qualquer outra mudança).
 
