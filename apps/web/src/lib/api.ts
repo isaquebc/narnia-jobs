@@ -241,7 +241,9 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         method: "PUT",
         body: JSON.stringify(overrides),
       }),
-    listSuggestions: () => request<SuggestionsListResponse>("/api/profiles/suggestions"),
+    /** `seen`: a página de perfis foi aberta; a api resolve a notificação "análise concluída" (F03-10). */
+    listSuggestions: (opts: { seen?: boolean } = {}) =>
+      request<SuggestionsListResponse>(`/api/profiles/suggestions${opts.seen ? "?seen=1" : ""}`),
     dismissSuggestion: (id: string) =>
       request<{ ok: true }>(
         `/api/profiles/suggestions/${encodeURIComponent(id)}/dismiss`,

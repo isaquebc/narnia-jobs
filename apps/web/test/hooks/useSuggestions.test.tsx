@@ -67,3 +67,18 @@ describe("Auditoria F02 (2026-10-08) · useSuggestions (13)", () => {
     await waitFor(() => expect(listSuggestions).toHaveBeenCalledTimes(3));
   });
 });
+
+describe("F03/M5 · useSuggestions marca a página de perfis como vista (F03-10)", () => {
+  it("markSeen pede ?seen=1 (resolve 'análise concluída'); sem a opção, não", async () => {
+    const listSuggestions = vi.fn(async (_opts?: { seen?: boolean }) => ({ suggestions: [] }));
+    const { wrapper } = setup({ listSuggestions });
+    renderHook(() => useSuggestions({ markSeen: true }), { wrapper });
+    await waitFor(() => expect(listSuggestions).toHaveBeenCalledWith({ seen: true }));
+
+    const other = vi.fn(async (_opts?: { seen?: boolean }) => ({ suggestions: [] }));
+    const second = setup({ listSuggestions: other });
+    renderHook(() => useSuggestions(), { wrapper: second.wrapper });
+    await waitFor(() => expect(other).toHaveBeenCalledTimes(1));
+    expect(other.mock.calls[0]?.[0]).toEqual({ seen: false });
+  });
+});

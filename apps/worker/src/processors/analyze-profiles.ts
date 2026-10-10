@@ -1,7 +1,9 @@
 import {
   buildAnalyzeInput,
+  notifyAnalysisDone,
   recordUsage,
   resolveModel,
+  syncSuggestionNotifications,
   usageFromSdkResult,
 } from "@narnia-jobs/core";
 import type { TaskHandler } from "../tasks";
@@ -32,5 +34,16 @@ export const analyzeProfiles: TaskHandler = async (data, ctx, deps) => {
     deps.dataDir,
     usageFromSdkResult(result.sdk, { category: "profile.analyze", model, jobId: ctx.jobId }),
   );
+  // notificações (F03-10): uma por sugestão nova + "análise concluída", retransmitidas por WS
+  const events = [
+    ...syncSuggestionNotifications(deps.repos),
+    notifyAnalysisDone(deps.repos, ctx.jobId, { created, skipped }),
+  ];
+  for (const ev of events) {
+    await deps.publish({
+      type: ev.created ? "notification.created" : "notification.updated",
+      notification: ev.notification,
+    });
+  }
   return { created, skipped, model };
 };

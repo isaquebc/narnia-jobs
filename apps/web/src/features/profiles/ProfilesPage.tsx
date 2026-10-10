@@ -18,7 +18,7 @@ export function ProfilesPage() {
   const [started, setStarted] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const list = useProfiles({ includeArchived: showArchived });
-  const suggestions = useSuggestions();
+  const suggestions = useSuggestions({ markSeen: true });
 
   const onError = (error: unknown) => setActionError(profileErrorMessage(error));
   const actions = {

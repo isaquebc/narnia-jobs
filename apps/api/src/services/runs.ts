@@ -1,7 +1,9 @@
 import {
   type IngestionRunRecord,
   type Repos,
+  resolveAnalysisDone,
   syncRunNotifications,
+  syncSuggestionNotifications,
   type TaskRequest,
 } from "@narnia-jobs/core";
 import type { EventBus } from "../events";
@@ -37,4 +39,25 @@ export function runSummary(run: IngestionRunRecord) {
     report: run.report,
     createdAt: run.createdAt,
   };
+}
+
+/**
+ * Notificações das sugestões de perfil (F03-10): sincroniza as de sugestões novas/decididas e, quando o usuário viu
+ * a página de perfis ou decidiu uma sugestão, resolve as de "análise concluída"; tudo retransmitido por WS.
+ */
+export function emitSuggestionNotifications(
+  bus: EventBus,
+  repos: Repos,
+  opts: { resolveAnalysis?: boolean } = {},
+): void {
+  for (const ev of syncSuggestionNotifications(repos)) {
+    bus.emit({
+      type: ev.created ? "notification.created" : "notification.updated",
+      notification: ev.notification,
+    });
+  }
+  if (opts.resolveAnalysis) {
+    for (const n of resolveAnalysisDone(repos))
+      bus.emit({ type: "notification.updated", notification: n });
+  }
 }

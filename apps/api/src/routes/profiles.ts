@@ -31,6 +31,7 @@ import { Hono } from "hono";
 import { apiError, profileErrorResponse } from "../errors";
 import type { EventBus } from "../events";
 import type { QueueAdapter } from "../queue";
+import { emitSuggestionNotifications } from "../services/runs";
 import { validate } from "./validate";
 
 export interface ProfilesRouteDeps {
@@ -203,6 +204,7 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
       } catch {
         /* sugestão já decidida ou inexistente */
       }
+      emitSuggestionNotifications(bus, repos, { resolveAnalysis: true });
     }
     if (others > 0 && activate === true)
       bus.emit({ type: "profile.switched", profileId: profile.id });
@@ -264,12 +266,16 @@ export function profilesRoutes(deps: ProfilesRouteDeps) {
   // ---- F02: sugestões (heurísticas + modelo) ----
   app.get("/api/profiles/suggestions", (c) => {
     refreshHeuristicSuggestions(repos);
+    // ?seen=1: a página de perfis foi aberta, então "análise concluída" deixa de ser pendência (F03-10)
+    emitSuggestionNotifications(bus, repos, { resolveAnalysis: c.req.query("seen") === "1" });
     return c.json({ suggestions: repos.suggestions.list({ status: "new" }) });
   });
 
   app.post("/api/profiles/suggestions/:id/dismiss", (c) => {
     try {
-      return c.json({ suggestion: repos.suggestions.dismiss(c.req.param("id")) });
+      const suggestion = repos.suggestions.dismiss(c.req.param("id"));
+      emitSuggestionNotifications(bus, repos, { resolveAnalysis: true });
+      return c.json({ suggestion });
     } catch (e) {
       return profileErrorResponse(c, e);
     }

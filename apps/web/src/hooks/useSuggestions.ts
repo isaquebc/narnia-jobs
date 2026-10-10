@@ -8,13 +8,14 @@ import { jobsKey } from "./useJobs";
 export const suggestionsKey = ["suggestions"] as const;
 
 /** Sugestões de perfil (F02 §2.6): uma chamada por tela; recarrega em `profile.switched` e ao concluir a análise. */
-export function useSuggestions(opts: { enabled?: boolean } = {}) {
+/** `markSeen`: usado pela página de perfis; a abertura resolve a notificação "análise concluída" (F03-10). */
+export function useSuggestions(opts: { enabled?: boolean; markSeen?: boolean } = {}) {
   const api = useApi();
   const ws = useWs();
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: suggestionsKey,
-    queryFn: async () => (await api.listSuggestions()).suggestions,
+    queryFn: async () => (await api.listSuggestions({ seen: opts.markSeen ?? false })).suggestions,
     enabled: opts.enabled ?? true,
     staleTime: 60_000,
   });

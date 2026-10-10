@@ -122,7 +122,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", userRoutes({ repos: deps.repos, bus: deps.bus }));
   app.route("/", profilesRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue }));
   app.route("/", salaryReferenceRoutes({ repos: deps.repos }));
-  app.route("/", dashboardRoutes({ repos: deps.repos }));
+  app.route("/", dashboardRoutes({ repos: deps.repos, bus: deps.bus }));
 
   app.notFound((c) => apiError(c, 404, "not_found", "Rota não encontrada"));
   return app;

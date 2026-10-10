@@ -159,3 +159,18 @@ describe("lib/api · rotas de perfil (F02)", () => {
     expect(calls[11]?.body).toEqual({ tone: null });
   });
 });
+
+describe("F03/M5 · listSuggestions com seen", () => {
+  it("anexa ?seen=1 só quando pedido", async () => {
+    const calls: string[] = [];
+    const fetchFn = (async (url: string) => {
+      calls.push(String(url));
+      return new Response(JSON.stringify({ suggestions: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const api = createApiClient({ fetch: fetchFn, baseUrl: "" });
+    await api.listSuggestions({ seen: true });
+    await api.listSuggestions();
+    expect(calls[0]).toBe("/api/profiles/suggestions?seen=1");
+    expect(calls[1]).toBe("/api/profiles/suggestions");
+  });
+});

@@ -83,6 +83,29 @@ describe("F02/M3 worker · jobs de tarefa (despacho stage | task) e profile.anal
     expect(h.progress.at(-1)).toBe(100);
   });
 
+  it("profile.analyze publica notificações: uma por sugestão nova e 'análise concluída' (F03-10)", async () => {
+    h = harness();
+    seedFixture(h.repos, "leader");
+    const events: Array<{ type: string; notification?: { kind: string; actionUrl: string } }> = [];
+    h.deps.publish = async (e) => {
+      events.push(e as (typeof events)[number]);
+    };
+    await processTask(DATA, h.ctx, h.deps);
+    const created = events
+      .filter((e) => e.type === "notification.created")
+      .map((e) => e.notification);
+    expect(created.filter((n) => n?.kind === "profile.suggestion").length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(created.filter((n) => n?.kind === "profile.analysis_done")).toHaveLength(1);
+    expect(created.every((n) => n?.actionUrl === "/perfis")).toBe(true);
+    expect(
+      h.repos.notifications
+        .list({ status: "open" })
+        .filter((n) => n.kind === "profile.analysis_done"),
+    ).toHaveLength(1);
+  });
+
   it("profile.analyze é idempotente por título: segunda execução não duplica (skipped)", async () => {
     h = harness();
     seedFixture(h.repos, "leader");
