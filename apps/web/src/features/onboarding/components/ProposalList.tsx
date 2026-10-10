@@ -29,6 +29,7 @@ const KIND_ORDER: FactKind[] = [
   "skill",
   "language",
   "link",
+  "project",
 ];
 
 export function proposalSummary(p: FactProposal): string {
@@ -49,6 +50,8 @@ export function proposalSummary(p: FactProposal): string {
       return `${p.data.name} · ${p.data.level}`;
     case "link":
       return `${p.data.label} · ${p.data.url}`;
+    case "project":
+      return p.data.name;
     default:
       return "";
   }
