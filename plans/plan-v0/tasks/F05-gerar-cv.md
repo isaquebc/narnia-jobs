@@ -26,6 +26,9 @@ Com o onboarding concluído (F01) e o recrutador funcionando (F04), a pessoa con
 - Versionamento (`document`, `document_version`), edição inline com re-render, exportação.
 - Job `cv.generate` (modelo) e job `cv.render` (sem modelo), ambos na bandeja de atividades.
 - Página L5 de `../05-layouts.md`.
+- **Dois modos de geração (requisito do dono, 2026-10-11):** **sem vaga alvo** (CV do perfil, destacando pela relevância da F02) e **com vaga alvo** (lê a vaga/`JobAnalysis` da F06 e destaca o que ela pede: palavras-chave, conquistas aderentes, ordem das experiências); disponível pela tela e pelo chat (F04).
+- **Todo arquivo gerado é salvo** (`document_version` com PDF, DOCX e prévia; nada é descartável); gerar para uma vaga cria/atualiza a candidatura da F07 ligando vaga + CV.
+- **Botões de ação no chat (F04-6, movido da F04):** tool `ui.suggest_action({ action, label, params })` validada pelo servidor (ação existe, parâmetros no schema, ids do usuário) → botão na mensagem do chat que abre a feature já preenchida; no terminal (modo B) a tool devolve um link. Primeira ação: "Gerar CV para esta vaga".
 
 ### Fora do escopo (e para onde vai)
 - Análise da vaga e fit (a vaga aqui é só contexto para o conteúdo) → F06.
@@ -205,6 +208,9 @@ Rodam contra o compose com `NARNIA_PROVIDER=mock` (o mock devolve um `CvContent`
 - **E2E-10 modo B**: `claude -p "/narnia-jobs:gerar-cv" --plugin-dir plugin/` contra o container (mock) → resposta contém link da prévia → link abre a página com v1.
 - **E2E-11 persistência**: `docker compose down/up` → versões, PDFs e templates do usuário continuam disponíveis.
 
+- **E2E-x CV com vaga alvo**: vaga analisada (F06) → "Gerar CV para esta vaga" → `CvContent` destaca as palavras-chave da vaga e ordena as experiências aderentes → arquivo salvo → candidatura da F07 mostra vaga + CV.
+- **E2E-y botão no chat**: o recrutador sugere "Gerar CV para esta vaga" via `ui.suggest_action` → botão aparece na mensagem → clique abre a tela já preenchida; ação inválida (id de outro usuário) é recusada e não vira botão.
+
 ### 6.4 Teste manual com provider real (antes de fechar F05)
 Com 3 perfis reais (pt-BR backend, en-US backend, pt-BR gestão): gerar com os 3 templates, 1 e 2 páginas; registrar tokens reais × estimativa, taxa de edição inline necessária, se o conteúdo inventou algo (deve ser zero), legibilidade do PDF impresso, abertura do DOCX no Word/LibreOffice/Google Docs. Decide F05-7 e ajusta a skill.
 
@@ -230,5 +236,6 @@ Com 3 perfis reais (pt-BR backend, en-US backend, pt-BR gestão): gerar com os 3
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
 |------|-------|-----------------|
+| 2026-10-11 | — | **Plano incrementado (dono):** modos sem/com vaga alvo, todo arquivo salvo, ligação com a candidatura (F07) e os botões de ação no chat (`ui.suggest_action`), movidos da F04-6; testes e2e correspondentes. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** o agente gera CV **sem vaga alvo** (perfil puro) e/ou **com vaga alvo**, destacando o que a vaga pede; **todo arquivo gerado é salvo** (versões, PDF/DOCX); quando o CV é feito para uma vaga, a vaga e o CV ficam ligados numa candidatura (F07); geração disponível também pelo chat (F04). |
 (Preencher durante a implementação: datas, prévias dos templates, resultados do teste manual, decisões tomadas.)

@@ -26,6 +26,8 @@ Com F01 e F04 prontos (F05 e F06 enriquecem), a pessoa consegue:
 - Exportação de evento: link `calendar.google.com/calendar/render?action=TEMPLATE…` e arquivo `.ics` (RFC 5545) gerados no servidor.
 - Integração opcional com o MCP oficial do Google Calendar: comando `narnia-jobs google connect`, detecção de "conectado", uso condicional pela skill.
 - Página L7 de `../05-layouts.md`.
+- **Candidatura a partir do CV com vaga (requisito do dono, 2026-10-11):** gerar CV para uma vaga (F05) cria/atualiza a candidatura com a vaga salva e o CV gerado; **lista de candidaturas** além do kanban, abrir uma candidatura (vaga, CV, análise, histórico, contatos), **conversar sobre ela no chat** (sessão da F04 com a candidatura como contexto) e **atualizar o status** pela tela ou pelo chat.
+- **Pessoas e cadeia de contatos:** em cada candidatura, quem está do outro lado (nome, papel: recrutador, gestor, indicação; empresa, canal) e a **cadeia de contatos** em ordem (quem indicou quem, data, canal, resumo); o recrutador registra pelas tools `contact.*` quando o assunto da conversa é uma vaga.
 
 ### Fora do escopo (e para onde vai)
 - Análise da vaga → F06; CV → F05; carta/mensagem → F09; simulação → F08 (o cartão só linka).
@@ -195,6 +197,9 @@ Compose com `NARNIA_PROVIDER=mock`; para o Google, um **mock do servidor MCP** H
 - **E2E-12 troca de fuso**: alterar `timezone` do usuário → horários exibidos mudam, UTC gravado não.
 - **E2E-13 persistência**: `down/up` → candidaturas, eventos e `.ics` continuam.
 
+- **E2E-x candidatura via CV**: gerar CV para uma vaga (F05) → candidatura aparece na lista com vaga e CV → abrir → "Conversar sobre esta candidatura" abre o chat com o contexto → mudar status pelo chat → histórico registra.
+- **E2E-y cadeia de contatos**: no chat sobre uma vaga, informar "falei com a Maria, que me indicou ao João, gestor" → recrutador registra os dois contatos em ordem com papel e data → a candidatura mostra a cadeia.
+
 ### 6.4 Teste manual com provider real (antes de fechar F07)
 Usar o kanban por 1 semana com candidaturas reais: pedir ao recrutador (modo A e B) para listar, mover e agendar em linguagem natural (10 comandos), conferir conversão de horários, importar 3 `.ics` no Google Calendar/Outlook/Apple e ver se atualizações (`SEQUENCE`) substituem o evento. Se a conexão Google estiver na fase 7: conectar com cliente OAuth real, criar/editar 3 eventos.
 
@@ -220,5 +225,6 @@ Usar o kanban por 1 semana com candidaturas reais: pedir ao recrutador (modo A e
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
 |------|-------|-----------------|
+| 2026-10-11 | — | **Plano incrementado (dono):** candidatura criada pelo CV com vaga, lista, abrir, conversar no chat, status pelo chat, pessoas e cadeia de contatos (`contact.*`); testes e2e correspondentes. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** gerar CV para uma vaga salva **a vaga e o CV** como uma candidatura; **lista de candidaturas**, abrir uma candidatura, **conversar com o chat sobre ela** e **atualizar o status**; quando o assunto é uma vaga, salvar **o nome de quem está do outro lado e a cadeia de pessoas contactadas** (recrutador, indicação, gestor, com data e canal de cada contato). |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)

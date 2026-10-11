@@ -25,6 +25,8 @@ Com F01 e F04 prontos, a pessoa consegue:
 - Cache: mesma vaga (hash do texto normalizado) + mesmo perfil + mesma versão dos fatos → reaproveita a análise sem tokens.
 - Página L6 de `../05-layouts.md`; ações para F05/F08.
 - Job `job_posting.analyze` com etapas persistidas.
+- **Perfil mais indicado (requisito do dono, 2026-10-11):** a análise compara a vaga com **todos os perfis não arquivados** (cartões e relevância da F02), devolve o fit de cada um e recomenda o melhor com justificativa; oferece trocar o perfil ativo ou criar um perfil sugerido; disponível pela tela e pelo chat (F04).
+- A vaga analisada fica salva e é a entrada do CV com vaga alvo (F05) e da candidatura (F07).
 
 ### Fora do escopo (e para onde vai)
 - Kanban, etapas e agenda da candidatura → F07 (F06 só cria/vincula a candidatura mínima: empresa, cargo, vaga).
@@ -198,6 +200,8 @@ Compose com `NARNIA_PROVIDER=mock` (o mock devolve um `JobAnalysis` fixo coerent
 - **E2E-09 modo B**: `claude -p "/narnia-jobs:analisar-vaga <texto>" --plugin-dir plugin/` → resposta com fit e link → link abre o resultado.
 - **E2E-10 persistência**: `down/up` → análises e snapshots continuam.
 
+- **E2E-x perfil mais indicado**: usuário com perfis "Backend" e "Engineering Manager" → vaga de gestão → análise mostra o fit dos dois e recomenda "Engineering Manager" com justificativa → "Usar este perfil" troca o perfil ativo.
+
 ### 6.4 Teste manual com provider real (antes de fechar F06)
 10 vagas reais (5 pt-BR, 5 en-US, de 3 job boards, 2 por URL) contra 2 perfis reais: medir tokens × estimativa, se alguma "lacuna" era falsa (havia evidência), se algum "atende" não tinha fato, utilidade das perguntas prováveis, taxa de sucesso do fetch por URL. Decide F06-5 e ajusta heurística/skill.
 
@@ -222,5 +226,6 @@ Compose com `NARNIA_PROVIDER=mock` (o mock devolve um `JobAnalysis` fixo coerent
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
 |------|-------|-----------------|
+| 2026-10-11 | — | **Plano incrementado (dono):** comparação com todos os perfis e recomendação do mais indicado; vaga salva como entrada da F05/F07; teste e2e correspondente. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** o agente analisa uma vaga, mostra a compatibilidade com a carreira do usuário e **indica qual perfil é o mais indicado** para ela (comparando todos os perfis, não só o ativo); disponível pela tela e pelo chat (F04). |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)
