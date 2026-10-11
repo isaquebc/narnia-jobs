@@ -624,6 +624,10 @@ export const ptBR = {
       ingest_review_check: "Refazer a conferência",
     },
     redoKeeps: "Os repositórios já analisados não serão refeitos.",
+    retryRepo: "Tentar este repositório de novo",
+    links: "Execuções relacionadas",
+    parentRun: "Execução de origem",
+    childRun: "Reanálise {n}",
     technical: "Detalhes técnicos",
     budget: "Orçamento: {amount} tokens · fatia por repositório: {perRepo}",
     confirm: "Confirmar e iniciar",
@@ -778,6 +782,7 @@ export const ptBR = {
       cover: "Sem commits novos: lê os arquivos e temas que a análise anterior não cobriu.",
     },
     confirmHint: "A reanálise passa pela confirmação do orçamento, como qualquer execução.",
+    newRunNotice: "Isto cria uma nova análise só deste repositório. A execução anterior não muda.",
     create: "Criar reanálise",
   },
   settings: {

@@ -17,6 +17,7 @@ import {
   mergeCoverage,
   metricsTable,
   newRunReport,
+  normalizeSkillName,
   packContext,
   persistMetrics,
   planCandidates,
@@ -464,7 +465,19 @@ export const githubSynthesis: TaskHandler = async (data, ctx, deps) => {
       );
       const proposals: FactProposal[] = [];
       const evidence: Array<{ ref: string; quote: string }> = [];
+      // síntese refeita (repositório refeito na mesma execução, C4): não repete skills já propostas na execução
+      const known = new Set(
+        deps.repos.proposals
+          .listByRun(id)
+          .filter((p) => p.proposal.kind === "skill")
+          .map((p) =>
+            normalizeSkillName(String((p.proposal.data as { name?: string }).name ?? "")),
+          ),
+      );
       for (const { confidence, evidence: e, ...rest } of result.output.skills) {
+        const key = normalizeSkillName(String((rest as { name?: string }).name ?? ""));
+        if (known.has(key)) continue;
+        known.add(key);
         proposals.push({ kind: "skill", confidence, data: rest } as FactProposal);
         evidence.push(e);
       }

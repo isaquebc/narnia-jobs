@@ -90,6 +90,7 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
     repos: run.params.repos ?? [],
     analyses: repos.repoAnalyses.listByRun(run.id),
     parentRunId: run.parentRunId,
+    childRunIds: repos.ingestionRuns.listChildren(run.id).map((r) => r.id),
     status: run.status,
     options: run.options,
     models: run.models,

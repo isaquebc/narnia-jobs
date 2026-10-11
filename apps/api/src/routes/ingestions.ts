@@ -12,6 +12,8 @@ import {
   type Repos,
   type ReviewDecision,
   recommendBudget,
+  reopenRepo,
+  repoTask,
   resolveExtractionModels,
   resolveIngestSettings,
   splitBudget,
@@ -307,6 +309,41 @@ export function ingestionsRoutes(deps: {
     emitRun(deps.bus, deps.repos, run.id);
     return c.json({ status: "estimating" });
   });
+
+  // Plano de comunicação C4 (CM-5): refazer um repositório falho na mesma execução, enquanto a revisão não foi salva
+  app.post(
+    "/api/ingestions/:id/repos/retry",
+    validate("json", z.object({ fullName: z.string().min(3) })),
+    async (c) => {
+      const run = find(c.req.param("id"));
+      if (!run) return apiError(c, 404, "run_not_found", "Ingestão não encontrada");
+      const { fullName } = c.req.valid("json");
+      const row = run.report?.repos.find((r) => r.fullName === fullName);
+      if (run.source !== "github" || !run.report || !row)
+        return apiError(c, 404, "repo_not_in_run", "Repositório fora desta execução");
+      if (!["running", "error", "review"].includes(run.status))
+        return apiError(
+          c,
+          409,
+          "invalid_state",
+          "Com a revisão salva, use Reanalisar para criar uma nova análise deste repositório",
+        );
+      if (row.status !== "error")
+        return apiError(
+          c,
+          409,
+          "repo_not_failed",
+          "Só repositórios que falharam podem ser refeitos",
+        );
+      deps.repos.ingestionRuns.setReport(run.id, reopenRepo(run.report, fullName));
+      const { failedTask: _done, ...params } = run.params;
+      deps.repos.ingestionRuns.setParams(run.id, params);
+      deps.repos.ingestionRuns.setStatus(run.id, "running", { error: null });
+      await deps.queue.enqueueTask(repoTask(run.id, fullName));
+      emitRun(deps.bus, deps.repos, run.id);
+      return c.json({ status: "running" });
+    },
+  );
 
   app.get("/api/ingestions/:id/proposals", (c) => {
     const run = find(c.req.param("id"));

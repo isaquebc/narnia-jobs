@@ -16,6 +16,7 @@ import {
   prepareTask,
   type Repos,
   type StageName,
+  synthesisTask,
   type TaskJobData,
   type TaskRequest,
   withSnapshots,
@@ -523,5 +524,35 @@ describe("Regressão 2026-10-11 · falha definitiva de tarefa atualiza a execuç
     );
     expect(h5.repos.ingestionRuns.get(run.id)?.status).toBe("review");
     h5.cleanup();
+  });
+});
+
+describe("CM3 · síntese refeita após repositório refeito não duplica as skills que propõe", () => {
+  it("a segunda síntese ignora skills já propostas na execução", async () => {
+    const h6 = harness();
+    const run = h6.createRun();
+    await h6.drain();
+    h6.queue.push(...confirmRun(h6.repos, run.id));
+    await h6.drain();
+    const skills = () =>
+      h6.repos.proposals
+        .listByRun(run.id)
+        .filter((p) => p.proposal.kind === "skill")
+        .map((p) => String((p.proposal.data as { name: string }).name).toLowerCase());
+    const before = skills();
+    expect(before.length).toBeGreaterThan(0);
+    const r = h6.repos.ingestionRuns.get(run.id);
+    h6.repos.ingestionRuns.setReport(run.id, {
+      ...(r?.report as NonNullable<typeof r>["report"] & object),
+      finishedAt: null,
+      synthesis: null,
+    });
+    h6.repos.ingestionRuns.setStatus(run.id, "running");
+    h6.queue.push(synthesisTask(run.id));
+    await h6.drain();
+    const after = skills();
+    expect(after.length).toBe(before.length);
+    expect(new Set(after).size).toBe(new Set(before).size);
+    h6.cleanup();
   });
 });

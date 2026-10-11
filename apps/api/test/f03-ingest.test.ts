@@ -2,8 +2,10 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   applyReconciliation,
+  finishReport,
   GH_HOST_TOKEN_FILE,
   INGEST_TASKS,
+  markRepo,
   newRunReport,
   syncRunNotifications,
   synthesisTask,
@@ -640,5 +642,88 @@ describe("Comunicação C1 · linha do tempo na execução e na lista", () => {
     };
     const mine = list.runs.find((x) => x.id === body.id);
     expect(mine?.progress).toEqual({ current: 1, total: 6, stepKey: "prepare", stuck: false });
+  });
+});
+
+describe("CM3 · repositório falho refeito na mesma execução e reanálises ligadas à origem", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  const withFailedRepo = async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    prepared(t, body.id);
+    const run = t.repos.ingestionRuns.get(body.id);
+    let report = run?.report as NonNullable<typeof run>["report"] & object;
+    for (const [i, fullName] of REPOS.entries())
+      report =
+        i === 0
+          ? markRepo(report, fullName, {
+              status: "error",
+              usedTokens: 50,
+              stoppedReason: "limite de turnos",
+            })
+          : markRepo(report, fullName, { status: "done", usedTokens: 500 });
+    report = finishReport(report, {
+      finishedAt: new Date().toISOString(),
+      synthesis: "s",
+      extraUsedTokens: 0,
+    });
+    t.repos.ingestionRuns.setReport(body.id, report);
+    t.repos.ingestionRuns.setStatus(body.id, "review");
+    t.queue.tasks.length = 0;
+    return body.id;
+  };
+
+  it("em revisão ainda não salva: reabre o repositório e a síntese, volta a rodar e enfileira só ele", async () => {
+    const id = await withFailedRepo();
+    const r = await t.api(`/api/ingestions/${id}/repos/retry`, json({ fullName: REPOS[0] }));
+    expect(r.status).toBe(200);
+    const run = t.repos.ingestionRuns.get(id);
+    expect(run?.status).toBe("running");
+    expect(run?.report?.finishedAt).toBeNull();
+    expect(run?.report?.repos.find((x) => x.fullName === REPOS[0])?.status).toBe("pending");
+    expect(t.queue.tasks.map((x) => [x.type, x.payload?.fullName])).toEqual([
+      ["ingest.github.repo", REPOS[0]],
+    ]);
+  });
+
+  it("depois da revisão salva só por Reanalisar (409); repositório que não falhou também 409", async () => {
+    const id = await withFailedRepo();
+    expect(
+      (await t.api(`/api/ingestions/${id}/repos/retry`, json({ fullName: REPOS[1] }))).status,
+    ).toBe(409);
+    t.repos.ingestionRuns.setStatus(id, "done");
+    expect(
+      (await t.api(`/api/ingestions/${id}/repos/retry`, json({ fullName: REPOS[0] }))).status,
+    ).toBe(409);
+  });
+
+  it("GET devolve parentRunId e childRunIds nas duas pontas", async () => {
+    t = makeTestApp();
+    const { body: parent } = await createGithubRun(t);
+    const child = t.repos.ingestionRuns.createGithub({
+      provider: "mock",
+      mode: "private",
+      depth: "quick",
+      model: "haiku",
+      params: { repos: [REPOS[0] as string] },
+      budget: {
+        amount: 1000,
+        unit: "thousand",
+        depth: "quick",
+        perRepo: 1000,
+        reserve: { synthesis: 0, check: 0 },
+      },
+      parentRunId: parent.id,
+    });
+    const p = (await (await t.api(`/api/ingestions/${parent.id}`)).json()) as {
+      childRunIds: string[];
+    };
+    const c = (await (await t.api(`/api/ingestions/${child.id}`)).json()) as {
+      parentRunId: string;
+    };
+    expect(p.childRunIds).toEqual([child.id]);
+    expect(c.parentRunId).toBe(parent.id);
   });
 });

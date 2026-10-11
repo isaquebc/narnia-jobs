@@ -94,6 +94,7 @@ function ReanalyzeDialog({
             </div>
           ))}
         </fieldset>
+        <span className="text-sm">{t("reanalyze.newRunNotice")}</span>
         <span className="text-xs text-muted-fg">{t("reanalyze.confirmHint")}</span>
         {error ? <Alert tone="danger">{describeError(error).title}</Alert> : null}
         <div className="flex justify-end gap-2">

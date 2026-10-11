@@ -182,6 +182,9 @@ export const IngestionResponseSchema = z.object({
   errorFriendly: FriendlyErrorSchema.nullable().optional(),
   /** Tarefa que falhou e será refeita pelo "Tentar de novo" (rótulo do botão, C4). */
   failedTaskType: z.string().nullable().optional(),
+  /** Execução de origem (reanálise) e reanálises criadas a partir desta (plano de comunicação C4). */
+  parentRunId: IdSchema.nullable().optional(),
+  childRunIds: z.array(IdSchema).optional(),
   /** Etapas reais da execução (plano de comunicação C1). */
   timeline: TimelineSchema.optional(),
 });

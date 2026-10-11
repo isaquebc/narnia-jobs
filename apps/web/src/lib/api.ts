@@ -311,6 +311,11 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ status: RunStatus }>(`/api/ingestions/${encodeURIComponent(id)}/cancel`, json({})),
     retryIngestion: (id: string) =>
       request<{ status: RunStatus }>(`/api/ingestions/${encodeURIComponent(id)}/retry`, json({})),
+    retryIngestionRepo: (id: string, fullName: string) =>
+      request<{ status: RunStatus }>(
+        `/api/ingestions/${encodeURIComponent(id)}/repos/retry`,
+        json({ fullName }),
+      ),
     listRepos: () => request<{ repos: Repo[] }>("/api/repos"),
     getRepo: (id: string) => request<RepoDetail>(`/api/repos/${encodeURIComponent(id)}`),
     putRepoDigest: (id: string, body: RepoDigestInput) =>

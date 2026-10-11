@@ -78,3 +78,20 @@ export function finishReport(
     totals: totals(report, f.extraUsedTokens ?? 0),
   };
 }
+
+/**
+ * Refazer um repositório falho na mesma execução (plano de comunicação C4): a linha volta a pendente (uso e motivo
+ * zerados) e a síntese é reaberta, para rodar de novo quando o repositório terminar.
+ */
+export function reopenRepo(report: RunReport, fullName: string): RunReport {
+  if (!report.repos.some((r) => r.fullName === fullName)) {
+    throw new Error(`Repositório fora da execução: ${fullName}`);
+  }
+  const repos = report.repos.map((r) => {
+    if (r.fullName !== fullName) return r;
+    const { stoppedReason: _gone, ...rest } = r;
+    return { ...rest, status: "pending" as const, usedTokens: 0 };
+  });
+  const next = { ...report, repos, finishedAt: null, synthesis: null };
+  return { ...next, totals: totals(next) };
+}

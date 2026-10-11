@@ -91,6 +91,8 @@ export interface IngestionRunsRepo {
   listByFile(fileId: string): IngestionRunRecord[];
   /** Mais novas primeiro; `status` filtra (pendências: `paused`, `awaiting_decision`…). */
   list(filter?: { status?: RunStatus[]; source?: IngestionSource }): IngestionRunRecord[];
+  /** Reanálises criadas a partir desta execução (`parent_run_id`), mais antigas primeiro. */
+  listChildren(parentId: string): IngestionRunRecord[];
   setEstimate(id: string, estimate: RunEstimate): void;
   setStatus(id: string, status: RunStatus, patch?: { error?: string | null }): void;
   addUsage(id: string, call: string, usage: CallUsage): void;
@@ -195,6 +197,12 @@ export function ingestionRunsRepo(db: Db): IngestionRunsRepo {
         .map(map)
         .filter((r) => !filter.status || filter.status.includes(r.status))
         .filter((r) => !filter.source || r.source === filter.source);
+    },
+    listChildren(parentId) {
+      return (all.all() as Row[])
+        .map(map)
+        .filter((r) => r.parentRunId === parentId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
     setEstimate(id, estimate) {
       setEst.run(JSON.stringify(estimate), id);

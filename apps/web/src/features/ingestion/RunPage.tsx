@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useApi } from "../../app/context";
 import { describeError, ErrorState } from "../../components/ErrorState";
 import { stageLabel } from "../../components/shell/ActivityTray";
+import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -22,7 +23,15 @@ import { runHeadline } from "./runHeadline";
 
 const ACTIVE = new Set(["estimating", "queued", "running"]);
 
-function RepoProgress({ run }: { run: IngestionDetail }) {
+function RepoProgress({
+  run,
+  onRetryRepo,
+  retrying,
+}: {
+  run: IngestionDetail;
+  onRetryRepo?: (fullName: string) => void;
+  retrying?: boolean;
+}) {
   const repos = run.report?.repos ?? [];
   const done = repos.filter((r) => r.status === "done").length;
   return (
@@ -43,7 +52,19 @@ function RepoProgress({ run }: { run: IngestionDetail }) {
           {repos.map((r) => (
             <li key={r.fullName} className="flex items-center justify-between gap-2 text-sm">
               <span>{r.fullName}</span>
-              <Badge>{t(`report.repoStatus.${r.status}` as TKey)}</Badge>
+              <span className="flex items-center gap-2">
+                <Badge>{t(`report.repoStatus.${r.status}` as TKey)}</Badge>
+                {onRetryRepo && r.status === "error" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={retrying}
+                    onClick={() => onRetryRepo(r.fullName)}
+                  >
+                    {t("runPage.retryRepo")}
+                  </Button>
+                ) : null}
+              </span>
             </li>
           ))}
         </ul>
@@ -85,6 +106,11 @@ export function RunPage({ runId }: { runId: string }) {
   });
   const cancel = useMutation({ mutationFn: () => api.cancelIngestion(runId), onSuccess: refresh });
   const retry = useMutation({ mutationFn: () => api.retryIngestion(runId), onSuccess: refresh });
+  // C4 (CM-5): refazer um repositório falho na mesma execução, enquanto a revisão não foi salva
+  const retryRepo = useMutation({
+    mutationFn: (fullName: string) => api.retryIngestionRepo(runId, fullName),
+    onSuccess: refresh,
+  });
   const decide = useMutation({
     mutationFn: (d: IngestionDecisionRequest) => api.decideIngestion(runId, d),
     onSuccess: refresh,
@@ -93,7 +119,12 @@ export function RunPage({ runId }: { runId: string }) {
 
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (!run) return <p className="text-sm text-muted-fg">{t("app.loading")}</p>;
-  const err = confirm.error ?? cancel.error ?? retry.error ?? decide.error;
+  const err = confirm.error ?? cancel.error ?? retry.error ?? retryRepo.error ?? decide.error;
+  const canRetryRepo =
+    run.source === "github" && ["running", "error", "review"].includes(run.status);
+  const repoActions = canRetryRepo
+    ? { onRetryRepo: (f: string) => retryRepo.mutate(f), retrying: retryRepo.isPending }
+    : {};
   const tl = run.timeline;
   const progress = tl
     ? {
@@ -107,6 +138,20 @@ export function RunPage({ runId }: { runId: string }) {
 
   return (
     <div className="flex max-w-4xl flex-col gap-4">
+      {run.parentRunId || (run.childRunIds?.length ?? 0) > 0 ? (
+        <nav aria-label={t("runPage.links")} className="flex flex-wrap gap-3 text-sm">
+          {run.parentRunId ? (
+            <NavLink to={`/ingestao/${run.parentRunId}`} className="underline">
+              {t("runPage.parentRun")}
+            </NavLink>
+          ) : null}
+          {(run.childRunIds ?? []).map((id, i) => (
+            <NavLink key={id} to={`/ingestao/${id}`} className="underline">
+              {t("runPage.childRun", { n: i + 1 })}
+            </NavLink>
+          ))}
+        </nav>
+      ) : null}
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-semibold">{t("run.title")}</h1>
         <span className="text-sm text-muted-fg">
@@ -147,7 +192,7 @@ export function RunPage({ runId }: { runId: string }) {
 
       {ACTIVE.has(run.status) ? (
         <Card className="flex flex-col gap-3">
-          <RepoProgress run={run} />
+          <RepoProgress run={run} {...repoActions} />
           <div>
             <Button variant="outline" onClick={() => cancel.mutate()}>
               {t("runPage.cancel")}
@@ -208,6 +253,13 @@ export function RunPage({ runId }: { runId: string }) {
 
       {run.status === "cancelled" ? (
         <p className="text-sm text-muted-fg">{t("runPage.cancelled")}</p>
+      ) : null}
+
+      {(run.status === "error" || run.status === "review") &&
+      (run.report?.repos.length ?? 0) > 0 ? (
+        <Card className="flex flex-col gap-3">
+          <RepoProgress run={run} {...repoActions} />
+        </Card>
       ) : null}
 
       {run.status === "review" ? <ReviewPanel run={run} /> : null}
