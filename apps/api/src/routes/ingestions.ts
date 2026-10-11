@@ -231,8 +231,11 @@ export function ingestionsRoutes(deps: {
   });
 
   app.get("/api/ingestions/:id", (c) => {
-    const run = find(c.req.param("id"));
-    if (!run) return apiError(c, 404, "not_found", "Ingestão não encontrada");
+    const found = find(c.req.param("id"));
+    if (!found) return apiError(c, 404, "not_found", "Ingestão não encontrada");
+    // execução presa (tarefa falhou de vez antes da correção de 2026-10-11): vira erro com a tarefa guardada
+    if (healStuckRun(deps.repos, found.id)) emitRun(deps.bus, deps.repos, found.id);
+    const run = find(found.id) ?? found;
     // FX-3: abrir a execução resolve a notificação informativa "ingestão concluída"
     for (const ev of markRunOpened(deps.repos, run.id))
       deps.bus.emit({ type: "notification.updated", notification: ev.notification });
@@ -359,4 +362,34 @@ export function ingestionsRoutes(deps: {
   });
 
   return app;
+}
+
+const IN_PROGRESS = new Set(["queued", "estimating", "running"]);
+const LIVE_JOB = new Set(["queued", "active", "stalled"]);
+
+/**
+ * Execução "em andamento" sem nenhum job vivo e com tarefa em erro está presa: marca como erro e guarda a tarefa
+ * que falhou em `params.failedTask`, para o "Tentar de novo" refazer só ela. Devolve true se mudou algo.
+ */
+export function healStuckRun(repos: Repos, runId: string): boolean {
+  const run = repos.ingestionRuns.get(runId);
+  if (!run || !IN_PROGRESS.has(run.status)) return false;
+  const jobs = repos.jobs
+    .list({ limit: 1000 })
+    .filter((j) => j.type.startsWith("ingest.") && j.payload.runId === runId);
+  if (jobs.length === 0 || jobs.some((j) => LIVE_JOB.has(j.status))) return false;
+  const failed = jobs.find((j) => j.status === "error");
+  if (!failed) return false;
+  const prefix = `task__${failed.type}__`;
+  repos.ingestionRuns.setParams(runId, {
+    ...run.params,
+    failedTask: {
+      queue: failed.queue,
+      type: failed.type,
+      key: failed.id.startsWith(prefix) ? failed.id.slice(prefix.length) : runId,
+      payload: failed.payload,
+    },
+  });
+  repos.ingestionRuns.setStatus(runId, "error", { error: failed.error ?? "Tarefa falhou" });
+  return true;
 }

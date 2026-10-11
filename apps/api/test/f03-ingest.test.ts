@@ -490,3 +490,59 @@ describe('Regressão 2026-10-11 · tarefa que falha de vez não deixa a execuç�
     expect(t.repos.ingestionRuns.get(body.id)?.status).toBe("running");
   });
 });
+
+describe("Regressão 2026-10-11 · execução presa antes da correção se recupera ao abrir", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("running sem job ativo e com tarefa em erro vira erro com a tarefa guardada; o retry refaz só ela", async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    t.repos.ingestionRuns.setStatus(body.id, "running");
+    const at = new Date().toISOString();
+    const jobId = `task__ingest.github.synthesis__${body.id}`;
+    t.repos.jobs.upsertQueued({
+      id: jobId,
+      queue: "ingest",
+      type: "ingest.github.synthesis",
+      parentId: null,
+      profileId: null,
+      payload: { runId: body.id },
+      stage: "ingest.github.synthesis",
+      at,
+    });
+    t.repos.jobs.applyEvent({
+      jobId,
+      type: "failed",
+      at,
+      error: "Reached maximum number of turns (1)",
+    });
+    const r = await t.api(`/api/ingestions/${body.id}`);
+    expect(r.status).toBe(200);
+    const run = t.repos.ingestionRuns.get(body.id);
+    expect(run?.status).toBe("error");
+    expect(run?.error).toMatch(/turns/);
+    t.queue.tasks.length = 0;
+    expect((await t.api(`/api/ingestions/${body.id}/retry`, json({}))).status).toBe(200);
+    expect(t.queue.tasks.map((x) => x.type)).toEqual(["ingest.github.synthesis"]);
+  });
+
+  it("running com job ativo não é tocada", async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    t.repos.ingestionRuns.setStatus(body.id, "running");
+    const at = new Date().toISOString();
+    t.repos.jobs.upsertQueued({
+      id: `task__ingest.github.repo__${body.id}__a`,
+      queue: "ingest",
+      type: "ingest.github.repo",
+      parentId: null,
+      profileId: null,
+      payload: { runId: body.id },
+      stage: "ingest.github.repo",
+      at,
+    });
+    await t.api(`/api/ingestions/${body.id}`);
+    expect(t.repos.ingestionRuns.get(body.id)?.status).toBe("running");
+  });
+});
