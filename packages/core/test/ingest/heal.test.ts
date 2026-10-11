@@ -85,11 +85,37 @@ describe("heal · estado real da fila e recuperação de execução presa", () =
     );
   });
 
-  it("job sumido da fila (missing) também vira erro", async () => {
+  it("job sumido da fila (missing) e sem sinal há mais de 2 min vira erro", async () => {
     const { repos, runId } = setup();
-    const jobId = await activeSynthesis(repos, runId, new Date().toISOString());
-    await syncRunJobs(repos, runId, async () => ({ state: "missing" }));
+    const t0 = new Date("2026-10-11T10:00:00Z");
+    const jobId = await activeSynthesis(repos, runId, t0.toISOString());
+    await syncRunJobs(
+      repos,
+      runId,
+      async () => ({ state: "missing" }),
+      new Date(t0.getTime() + 121_000),
+    );
     expect(repos.jobs.get(jobId)?.status).toBe("error");
+  });
+
+  it("regressão (e2e 2026-10-11): job recém-concluído some da fila (removeOnComplete) e NÃO vira erro", async () => {
+    const { repos, runId } = setup();
+    const t0 = new Date("2026-10-11T10:00:00Z");
+    const jobId = await activeSynthesis(repos, runId, t0.toISOString());
+    const r = await syncRunJobs(
+      repos,
+      runId,
+      async () => ({ state: "missing" }),
+      new Date(t0.getTime() + 5_000),
+    );
+    expect(r.failed).toEqual([]);
+    expect(repos.jobs.get(jobId)?.status).toBe("active");
+    repos.jobs.applyEvent({
+      jobId,
+      type: "completed",
+      at: new Date(t0.getTime() + 6_000).toISOString(),
+    });
+    expect(repos.jobs.get(jobId)?.status).toBe("done");
   });
 
   it("job vivo na fila não é tocado", async () => {

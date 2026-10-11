@@ -42,12 +42,19 @@ export async function syncRunJobs(
   repos: Repos,
   runId: string,
   state: QueueStateFn,
+  now: Date = new Date(),
 ): Promise<{ failed: Job[] }> {
   const failed: Job[] = [];
   for (const job of runJobs(repos, runId)) {
     if (!LIVE.has(job.status)) continue;
     const s = await state(job);
     if (s.state !== "failed" && s.state !== "missing") continue;
+    // job concluído sai da fila na hora (removeOnComplete) e o evento "completed" pode chegar depois: "sumido" só é
+    // falha se também estiver sem sinal há mais de STALE_AFTER_MS (regressão vista no e2e em 2026-10-11)
+    if (s.state === "missing") {
+      const last = Date.parse(job.updatedAt ?? job.startedAt ?? job.createdAt);
+      if (!Number.isFinite(last) || now.getTime() - last <= STALE_AFTER_MS) continue;
+    }
     const error =
       s.state === "missing"
         ? "Tarefa interrompida: o job sumiu da fila"

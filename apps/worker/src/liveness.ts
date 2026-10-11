@@ -96,7 +96,7 @@ export async function runSweep(
   const inProgress = repos.ingestionRuns.list({ status: [...IN_PROGRESS] });
   const active = new Set(inProgress.map((r) => r.id));
   for (const run of inProgress) {
-    const { failed } = await syncRunJobs(repos, run.id, opts.state);
+    const { failed } = await syncRunJobs(repos, run.id, opts.state, now);
     for (const j of failed) {
       await deps.publish({ type: "job.error", jobId: j.id, error: j.error ?? "Tarefa falhou" });
       const err = new Error(j.error ?? "Tarefa falhou");

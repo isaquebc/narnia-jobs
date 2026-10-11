@@ -34,7 +34,7 @@ test("F01/E2E-11 job em segundo plano: navegar para o dashboard, acompanhar pela
     label: "jobs concluídos",
   });
   await expect(count).toHaveText("0", { timeout: 15_000 });
-  await expect(tray.getByText("Concluído").first()).toBeVisible();
+  await expect(tray.getByText("Concluída").first()).toBeVisible();
 
   await openApp(page);
   await expectStep(page, 3);
