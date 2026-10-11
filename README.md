@@ -109,6 +109,8 @@ O modo dev funciona como a produção: provider **Claude Code** com a sua assina
 
 ### Duas instâncias: a sua e a de testes do agente
 
+**Código da sua instância (`.owner-src`).** Para que edições em andamento não cheguem à sua instância, ela pode rodar de uma cópia separada do código: `./start.sh promote` cria (na primeira vez) ou atualiza a pasta `.owner-src` para o último commit, e o `make dev` passa a usá-la sozinho. Dados (`./data`), backups (`./backups`) e `.env` continuam na raiz. Rode `promote` quando o agente avisar que um marco fechou verde; se mudaram dependências, composes ou a imagem, depois rode `make dev-down && make dev`. Para voltar a usar o código da raiz, apague `.owner-src` com `git worktree remove .owner-src`.
+
 O mesmo código roda em duas instâncias independentes. A **sua** (`make dev`, dados em `./data`, :5173/:3100) é a de uso real e nunca é tocada pelos testes. A **do agente de desenvolvimento** (`NARNIA_INSTANCE=claude`, valores em `.env.claude`, dados em `./.claude-data`, :5174/:3200, provider mock) é operada por `scripts/claude-env.sh` (`make claude-up`, `make claude-seed ARGS=engineer`, `make claude-wipe`…). Regras completas em `CLAUDE.md`.
 
 ### Fluxo completo da API com `curl` (provider mock)

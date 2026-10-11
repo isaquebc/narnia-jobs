@@ -22,9 +22,14 @@ ambiente (exceto `NARNIA_PROVIDER`). `.claude/settings.json` exporta essa variá
 **Regra inegociável:** tudo que o Claude faz (subir, reiniciar, resetar, semear, migrar, testar, e2e, navegador) afeta
 **somente** a instância `claude`. Nunca parar, reiniciar ou recriar containers do projeto `narnia-jobs-helpper`, nunca
 ler/escrever/apagar `./data`, nunca usar as portas 5173/3100 nem o token `dev-token`. O dono usa a versão mais recente
-do código pelo hot reload da instância dele e não pode perder dados entre testes. Mudanças de código chegam à instância
-do dono sozinhas (hot reload); migrations rodam no boot da api dela quando o dono reiniciar. Se uma mudança exigir
-reiniciar a instância do dono (dependência nova, migration urgente), **avisar o dono e deixar que ele reinicie**.
+do código já pronta e não pode perder dados entre testes.
+
+**Código da instância do dono (`.owner-src`, decisão CM-4):** o Claude trabalha sempre na raiz. A instância do dono roda
+de `.owner-src`, uma worktree git que só muda por `./start.sh promote` (ou `.\start.ps1 promote`), então edições em
+andamento não chegam a ela. Ao fechar um marco verde (lint, typecheck, testes, e2e), o Claude **avisa o dono** para
+rodar `./start.sh promote` e, se mudaram dependências, composes ou a imagem, `make dev-down && make dev`. O Claude
+**nunca roda `promote`** (a ferramenta recusa na instância `claude`) nem reinicia a instância do dono. Sem `.owner-src`
+(antes do primeiro `promote`), a instância do dono monta a raiz e recebe as edições pelo hot reload, como antes.
 
 ## Comandos
 
