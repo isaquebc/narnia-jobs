@@ -24,7 +24,7 @@ import { MockProvider } from "@narnia-jobs/providers";
 import type { Budget, WsEvent } from "@narnia-jobs/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { processStage, type WorkerDeps } from "../src/pipeline";
-import { processTask } from "../src/tasks";
+import { onTaskFailed, processTask } from "../src/tasks";
 
 const REPOS = [
   "ana-exemplo/api-pagamentos",
@@ -496,4 +496,32 @@ describe("Regressão 2026-10-11 · falha do modelo na síntese ou na conferênci
       h4.cleanup();
     });
   }
+});
+
+describe("Regressão 2026-10-11 · falha definitiva de tarefa atualiza a execução", () => {
+  it("onTaskFailed marca a execução como erro e guarda a tarefa para o retry; não mexe em execução terminada", async () => {
+    const h5 = harness();
+    const run = h5.createRun();
+    await h5.drain();
+    h5.repos.ingestionRuns.setStatus(run.id, "running");
+    await onTaskFailed(
+      { kind: "task", type: "ingest.github.synthesis", key: run.id, payload: { runId: run.id } },
+      new Error("Reached maximum number of turns (1)"),
+      h5.deps,
+    );
+    const r = h5.repos.ingestionRuns.get(run.id);
+    expect(r?.status).toBe("error");
+    expect(r?.error).toMatch(/turns/);
+    expect((r?.params.failedTask as { type?: string } | undefined)?.type).toBe(
+      "ingest.github.synthesis",
+    );
+    h5.repos.ingestionRuns.setStatus(run.id, "review");
+    await onTaskFailed(
+      { kind: "task", type: "ingest.github.synthesis", key: run.id, payload: { runId: run.id } },
+      new Error("x"),
+      h5.deps,
+    );
+    expect(h5.repos.ingestionRuns.get(run.id)?.status).toBe("review");
+    h5.cleanup();
+  });
 });

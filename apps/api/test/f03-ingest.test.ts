@@ -440,3 +440,53 @@ describe("F03/M3 api · repositórios, notificações, snapshots e configuraçõ
     });
   });
 });
+
+describe('Regressão 2026-10-11 · tarefa que falha de vez não deixa a execução em "Analisando"', () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("retry da execução com tarefa falha reenfileira só essa tarefa e volta a rodar", async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    const run = t.repos.ingestionRuns.get(body.id);
+    t.repos.ingestionRuns.setParams(body.id, {
+      ...run?.params,
+      failedTask: {
+        queue: "ingest",
+        type: "ingest.github.synthesis",
+        key: body.id,
+        payload: { runId: body.id },
+      },
+    });
+    t.repos.ingestionRuns.setStatus(body.id, "error", { error: "Síntese: limite de turnos" });
+    t.queue.tasks.length = 0;
+    const r = await t.api(`/api/ingestions/${body.id}/retry`, json({}));
+    expect(r.status).toBe(200);
+    expect(t.queue.tasks.map((x) => x.type)).toEqual(["ingest.github.synthesis"]);
+    const after = t.repos.ingestionRuns.get(body.id);
+    expect(after?.status).toBe("running");
+    expect(after?.params.failedTask).toBeUndefined();
+  });
+
+  it('retry de um job de tarefa na bandeja devolve a execução com erro a "running"', async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    const jobId = `task__ingest.github.synthesis__${body.id}`;
+    const at = new Date().toISOString();
+    t.repos.jobs.upsertQueued({
+      id: jobId,
+      queue: "ingest",
+      type: "ingest.github.synthesis",
+      parentId: null,
+      profileId: null,
+      payload: { runId: body.id },
+      stage: "ingest.github.synthesis",
+      at,
+    });
+    t.repos.jobs.applyEvent({ jobId, type: "failed", at, error: "limite de turnos" });
+    t.repos.ingestionRuns.setStatus(body.id, "error", { error: "Síntese: limite de turnos" });
+    const r = await t.api(`/api/jobs/${jobId}/retry`, json({}));
+    expect(r.status).toBe(200);
+    expect(t.repos.ingestionRuns.get(body.id)?.status).toBe("running");
+  });
+});

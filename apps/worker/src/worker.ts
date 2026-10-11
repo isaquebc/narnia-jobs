@@ -25,7 +25,7 @@ import { handleQueueEvent } from "./events";
 import { withPlanSampling } from "./ingest/plan-sampling";
 import { type OcrDeps, onStageFailed, processStage, type WorkerDeps } from "./pipeline";
 import { createQueues, QUEUE_NAMES } from "./queues";
-import { isTaskJob, processTask } from "./tasks";
+import { isTaskJob, onTaskFailed, processTask } from "./tasks";
 
 type JobData = StageJobData | TaskJobData;
 /** Rótulo de etapa para os eventos: etapas usam `stage`, tarefas usam o `type` (F02 §2.9-1). */
@@ -186,6 +186,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       }
       log(`[worker] falha definitiva em ${job.id}: ${err.message}`);
       if (!isTaskJob(job.data)) void onStageFailed(job.data, err, deps);
+      else void onTaskFailed(job.data, err, deps, job.queueName);
       void handleQueueEvent(
         {
           type: "failed",

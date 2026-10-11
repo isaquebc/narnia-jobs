@@ -14,6 +14,7 @@ import {
   resolveExtractionModels,
   resolveIngestSettings,
   splitBudget,
+  type TaskRequest,
   trackInvalidation,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
@@ -280,6 +281,16 @@ export function ingestionsRoutes(deps: {
     if (!run) return apiError(c, 404, "run_not_found", "Ingestão não encontrada");
     if (run.source !== "github" || run.status !== "error") {
       return apiError(c, 409, "invalid_state", "Só execuções do GitHub com erro voltam a preparar");
+    }
+    // tarefa que falhou de vez (síntese, repositório, conferência…): refaz só ela, sem repetir o que já terminou
+    const failed = run.params.failedTask as TaskRequest | undefined;
+    if (failed?.type) {
+      const { failedTask: _done, ...params } = run.params;
+      deps.repos.ingestionRuns.setParams(run.id, params);
+      deps.repos.ingestionRuns.setStatus(run.id, "running", { error: null });
+      await deps.queue.enqueueTask(failed);
+      emitRun(deps.bus, deps.repos, run.id);
+      return c.json({ status: "running" });
     }
     deps.repos.ingestionRuns.setStatus(run.id, "estimating", { error: null });
     await deps.queue.enqueueTask(prepareTask(run.id));
