@@ -11,6 +11,8 @@ export interface FakeGithub {
   hostTokenAvailable?: boolean;
   deviceComplete?: boolean;
   offline?: boolean;
+  /** CM3: repositórios que falham no GitHub simulado. */
+  failRepos?: string[];
 }
 
 /** Estado do `gh` falso (persistido na pasta de dados da stack e2e; o reset do banco não o limpa). */

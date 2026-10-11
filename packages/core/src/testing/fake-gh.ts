@@ -29,6 +29,8 @@ export interface FakeGhState {
   heads?: Record<string, string>;
   /** true = sem rede (toda chamada falha como `error connecting to api.github.com`). */
   offline?: boolean;
+  /** Repositórios cujas rotas REST falham (HTTP 422, sem nova tentativa): e2e de "refazer este repositório". */
+  failRepos?: string[];
 }
 
 type Route = () => GhExecResult;
@@ -287,6 +289,8 @@ export function fakeGh(arg: Record<string, GhExecResult> | FakeGhOptions = {}): 
     const path = args[1] ?? "";
     if (o.overrides?.[path]) return o.overrides[path] as GhExecResult;
     if (state.rateLimited && path !== "rate_limit") return rateLimitedResult;
+    if (state.failRepos?.some((r) => path === `repos/${r}` || path.startsWith(`repos/${r}/`)))
+      return { stdout: "", stderr: "gh: Validation Failed (HTTP 422)", code: 1 };
     if (path === "user")
       return state.authenticated === false ? unauthenticated : json(load("user.json"));
     const route = routes[path];

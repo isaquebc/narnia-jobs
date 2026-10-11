@@ -60,6 +60,8 @@ const TestGithubSchema = z.object({
   deviceComplete: z.boolean().optional(),
   /** E2E-11: sem rede (o gh falso falha como `error connecting`; o snapshot responde). */
   offline: z.boolean().optional(),
+  /** CM3: repositórios que falham (e2e de refazer um repositório na mesma execução). */
+  failRepos: z.array(z.string()).optional(),
 });
 
 const SeedRequestSchema = z.object({ fixture: z.enum(FIXTURE_NAMES) });
