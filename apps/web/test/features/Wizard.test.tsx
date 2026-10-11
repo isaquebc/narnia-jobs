@@ -178,7 +178,11 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
     await user.click(screen.getByRole("button", { name: "Criar perfil e ir ao dashboard" }));
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     await waitFor(() => expect(createProfile).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("Analista de dados", { selector: "span" })).toBeInTheDocument();
+    // o nome do perfil ativo aparece no seletor do topo e como título do grupo no menu lateral
+    expect(await screen.findByRole("button", { name: /Trocar perfil/ })).toHaveTextContent(
+      "Analista de dados",
+    );
+    expect(await screen.findByRole("group", { name: "Analista de dados" })).toBeInTheDocument();
     expect(await screen.findByText("Olá, Bia")).toBeInTheDocument();
   });
 

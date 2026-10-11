@@ -1,15 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { jobs, reset, setMock, waitFor } from "../helpers/api";
-import {
-  chooseFile,
-  expectDashboard,
-  expectStep,
-  openApp,
-  passProvider,
-  startExtraction,
-} from "../helpers/flows";
+import { chooseFile, expectStep, openApp, passProvider, startExtraction } from "../helpers/flows";
 
-test("F01/E2E-11 job em segundo plano: navegar para o dashboard, acompanhar pela bandeja e voltar", async ({
+test("F01/E2E-11 job em segundo plano: menu só com Primeiro uso, progresso pela bandeja e retomada do wizard", async ({
   page,
 }) => {
   await reset();
@@ -20,8 +13,10 @@ test("F01/E2E-11 job em segundo plano: navegar para o dashboard, acompanhar pela
   await chooseFile(page, "cv.docx");
   await startExtraction(page);
 
-  await page.getByRole("link", { name: "Dashboard" }).click();
-  await expectDashboard(page);
+  // antes de concluir o primeiro uso, o menu só oferece "Primeiro uso" (pedido do dono, 2026-10-11)
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: "Primeiro uso" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
   const count = page.getByTestId("activity-count");
   await expect(count).not.toHaveText("0");
   await page.getByRole("button", { name: "Atividades" }).click();

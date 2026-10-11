@@ -30,6 +30,8 @@ export const ptBR = {
     notifications: "Pendências",
     settings: "Configurações",
     soon: "Disponível em {task}",
+    general: "Geral",
+    currentProfile: "Perfil atual",
   },
   shell: {
     noProfile: "Sem perfil ainda",

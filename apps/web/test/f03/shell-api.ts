@@ -2,6 +2,8 @@ import { profile } from "../components/profile-fixture";
 
 /** API mínima do shell (seletor de perfil, provider, bandeja) para testes de rota da F03. */
 export const shellApi = {
+  // menu em grupos: sem onboarding concluído só "Primeiro uso" aparece
+  getOnboardingState: async () => ({ step: 5, completed: true }),
   listJobs: async () => ({ jobs: [] }),
   getProviderStatus: async () => ({
     installed: true,

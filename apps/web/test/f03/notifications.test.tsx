@@ -110,15 +110,15 @@ describe("F03/M4 · página de pendências (/pendencias)", () => {
     });
     await screen.findByRole("heading", { name: "Pendências" });
     const nav = screen.getByRole("navigation");
-    expect(within(nav).getByRole("link", { name: "Ingestão" })).toHaveAttribute(
+    expect(await within(nav).findByRole("link", { name: "Ingestão" })).toHaveAttribute(
       "href",
       "/ingestao",
     );
-    expect(within(nav).getByRole("link", { name: "Evidências" })).toHaveAttribute(
+    expect(await within(nav).findByRole("link", { name: "Evidências" })).toHaveAttribute(
       "href",
       "/evidencias/repositorios",
     );
-    expect(within(nav).getByRole("link", { name: "Configurações" })).toHaveAttribute(
+    expect(await within(nav).findByRole("link", { name: "Configurações" })).toHaveAttribute(
       "href",
       "/configuracoes",
     );
