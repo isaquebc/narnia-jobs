@@ -136,6 +136,13 @@ export const ProposalWithIdSchema = z.object({
   checkStatus: CheckStatusSchema.optional(),
   suggestedProfiles: z.array(IdSchema).optional(),
 });
+export const FriendlyErrorSchema = z.object({
+  key: z.string().min(1),
+  hint: z.string().min(1),
+  technical: z.string(),
+});
+export type FriendlyErrorDto = z.infer<typeof FriendlyErrorSchema>;
+
 export const IngestionResponseSchema = z.object({
   id: IdSchema,
   /** Nulo para o GitHub, que não tem arquivo (F03 §2.9-2). */
@@ -146,6 +153,10 @@ export const IngestionResponseSchema = z.object({
   proposals: z.array(ProposalWithIdSchema),
   digest: FileDigestSchema.nullable(),
   error: z.string().nullable(),
+  /** Erro em linguagem simples (plano de comunicação C5): chaves do dicionário + texto técnico. */
+  errorFriendly: FriendlyErrorSchema.nullable().optional(),
+  /** Tarefa que falhou e será refeita pelo "Tentar de novo" (rótulo do botão, C4). */
+  failedTaskType: z.string().nullable().optional(),
 });
 export type IngestionResponse = z.infer<typeof IngestionResponseSchema>;
 

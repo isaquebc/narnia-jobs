@@ -6,6 +6,7 @@ import {
   INGEST_TASKS,
   newRunReport,
   syncRunNotifications,
+  synthesisTask,
 } from "@narnia-jobs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeTestApp, type TestApp, uploadFixture, VALID_PROFILE } from "./helpers";
@@ -563,6 +564,45 @@ describe("Regressão 2026-10-11 · execução presa antes da correção se recup
       stage: "ingest.github.repo",
       at,
     });
+    await t.api(`/api/ingestions/${body.id}`);
+    expect(t.repos.ingestionRuns.get(body.id)?.status).toBe("running");
+  });
+});
+
+describe("Comunicação C3/C5 · fila real, erro amigável e tarefa que falhou", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("espelho active, fila failed (travado além do limite): abrir a execução vira erro amigável com a tarefa", async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    for (const j of t.repos.jobs.list({ status: "queued" }))
+      t.repos.jobs.applyEvent({ jobId: j.id, type: "completed", at: new Date().toISOString() });
+    t.repos.ingestionRuns.setStatus(body.id, "running");
+    const { job } = await t.queue.enqueueTask(synthesisTask(body.id));
+    t.repos.jobs.applyEvent({ jobId: job.id, type: "active", at: new Date().toISOString() });
+    t.queue.states[job.id] = {
+      state: "failed",
+      failedReason: "job stalled more than allowable limit",
+    };
+    const r = await t.api(`/api/ingestions/${body.id}`);
+    const run = (await r.json()) as {
+      status: string;
+      errorFriendly: { key: string; hint: string; technical: string } | null;
+      failedTaskType: string | null;
+    };
+    expect(run.status).toBe("error");
+    expect(run.errorFriendly?.key).toBe("error.interrupted");
+    expect(run.errorFriendly?.technical).toMatch(/stalled/);
+    expect(run.failedTaskType).toBe("ingest.github.synthesis");
+  });
+
+  it("job vivo na fila mantém a execução em andamento", async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    t.repos.ingestionRuns.setStatus(body.id, "running");
+    const { job } = await t.queue.enqueueTask(synthesisTask(body.id));
+    t.queue.states[job.id] = { state: "active" };
     await t.api(`/api/ingestions/${body.id}`);
     expect(t.repos.ingestionRuns.get(body.id)?.status).toBe("running");
   });

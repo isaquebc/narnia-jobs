@@ -1,4 +1,5 @@
 import {
+  friendlyError,
   type IngestionRunRecord,
   type ProposalRecord,
   type Repos,
@@ -114,6 +115,8 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
     })),
     segments,
     error: run.error,
+    errorFriendly: run.error ? friendlyError(run.error) : null,
+    failedTaskType: (run.params.failedTask as { type?: string } | undefined)?.type ?? null,
     createdAt: run.createdAt,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,

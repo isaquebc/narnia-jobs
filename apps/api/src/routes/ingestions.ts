@@ -4,6 +4,7 @@ import {
   decideRun,
   estimateExtraction,
   estimateRun,
+  healStuckRun,
   type IngestionRunRecord,
   ingestModelsForDepth,
   markRunOpened,
@@ -14,8 +15,8 @@ import {
   resolveExtractionModels,
   resolveIngestSettings,
   splitBudget,
+  syncRunJobs,
   type TaskRequest,
-  taskOfJob,
   trackInvalidation,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
@@ -231,11 +232,16 @@ export function ingestionsRoutes(deps: {
     return c.json({ runs: runs.map(runSummary) });
   });
 
-  app.get("/api/ingestions/:id", (c) => {
+  app.get("/api/ingestions/:id", async (c) => {
     const found = find(c.req.param("id"));
     if (!found) return apiError(c, 404, "not_found", "Ingestão não encontrada");
-    // execução presa (tarefa falhou de vez antes da correção de 2026-10-11): vira erro com a tarefa guardada
-    if (healStuckRun(deps.repos, found.id)) emitRun(deps.bus, deps.repos, found.id);
+    // execução presa: confere a fila real (o espelho pode ficar "rodando" para sempre) e, se não há nada vivo e
+    // alguma tarefa falhou, vira erro com a tarefa guardada (plano de comunicação C3)
+    const synced = await syncRunJobs(deps.repos, found.id, (j) => deps.queue.state(j.id));
+    for (const j of synced.failed)
+      deps.bus.emit({ type: "job.error", jobId: j.id, error: j.error ?? "Tarefa falhou" });
+    if (healStuckRun(deps.repos, found.id) || synced.failed.length > 0)
+      emitRun(deps.bus, deps.repos, found.id);
     const run = find(found.id) ?? found;
     // FX-3: abrir a execução resolve a notificação informativa "ingestão concluída"
     for (const ev of markRunOpened(deps.repos, run.id))
@@ -363,29 +369,4 @@ export function ingestionsRoutes(deps: {
   });
 
   return app;
-}
-
-const IN_PROGRESS = new Set(["queued", "estimating", "running"]);
-const LIVE_JOB = new Set(["queued", "active", "stalled"]);
-
-/**
- * Execução "em andamento" sem nenhum job vivo e com tarefa em erro está presa: marca como erro e guarda a tarefa
- * que falhou em `params.failedTask`, para o "Tentar de novo" refazer só ela. Devolve true se mudou algo.
- */
-export function healStuckRun(repos: Repos, runId: string): boolean {
-  const run = repos.ingestionRuns.get(runId);
-  if (!run || !IN_PROGRESS.has(run.status)) return false;
-  const jobs = repos.jobs
-    .list({ limit: 1000 })
-    .filter((j) => j.type.startsWith("ingest.") && taskOfJob(j)?.runId === runId);
-  if (jobs.length === 0 || jobs.some((j) => LIVE_JOB.has(j.status))) return false;
-  const failed = jobs.find((j) => j.status === "error");
-  const task = failed ? taskOfJob(failed) : null;
-  if (!failed || !task) return false;
-  repos.ingestionRuns.setParams(runId, {
-    ...run.params,
-    failedTask: { queue: task.queue, type: task.type, key: task.key, payload: task.payload },
-  });
-  repos.ingestionRuns.setStatus(runId, "error", { error: failed.error ?? "Tarefa falhou" });
-  return true;
 }

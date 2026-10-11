@@ -25,5 +25,7 @@ export const JobSchema = z.object({
   createdAt: IsoDateTimeSchema,
   startedAt: IsoDateTimeSchema.nullable(),
   finishedAt: IsoDateTimeSchema.nullable(),
+  /** Último sinal do job (evento, progresso ou batimento): base do "parece parada" (plano de comunicação C3). */
+  updatedAt: IsoDateTimeSchema.nullable().optional(),
 });
 export type Job = z.infer<typeof JobSchema>;

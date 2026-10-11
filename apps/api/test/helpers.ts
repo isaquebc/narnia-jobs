@@ -6,6 +6,7 @@ import {
   enqueueTask,
   migrate,
   openDatabase,
+  type QueueJobState,
   type Repos,
   type StageName,
   stageJobId,
@@ -24,6 +25,8 @@ export class FakeQueueAdapter implements QueueAdapter {
   cancelled: string[] = [];
   retried: string[] = [];
   tasks: EnqueueTaskRequest[] = [];
+  /** Estado real na fila por job (plano de comunicação C3); sem entrada, deriva do espelho. */
+  states: Record<string, { state: QueueJobState; failedReason?: string | null }> = {};
   /** Estado que a BullMQ reportaria para cancel(): por padrão "removed". */
   cancelResult: "removed" | "active" | "missing" = "removed";
   constructor(private readonly repos: Repos) {}
@@ -57,6 +60,20 @@ export class FakeQueueAdapter implements QueueAdapter {
   async retry(jobId: string) {
     this.retried.push(jobId);
     return true;
+  }
+  async state(jobId: string) {
+    const forced = this.states[jobId];
+    if (forced) return forced;
+    const mirror = this.repos.jobs.get(jobId);
+    const byStatus: Record<string, QueueJobState> = {
+      queued: "waiting",
+      active: "active",
+      stalled: "active",
+      done: "completed",
+      error: "failed",
+      cancelled: "missing",
+    };
+    return { state: mirror ? (byStatus[mirror.status] ?? "missing") : ("missing" as const) };
   }
 }
 

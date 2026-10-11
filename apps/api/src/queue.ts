@@ -2,6 +2,7 @@ import {
   type EnqueueTaskResult,
   enqueueStage,
   enqueueTask,
+  type QueueJobState,
   type QueueName,
   type Repos,
   STAGES,
@@ -28,7 +29,19 @@ export interface QueueAdapter {
   /** "removed" (estava na fila), "active" (não dá para cancelar em execução) ou "missing". */
   cancel(jobId: string): Promise<"removed" | "active" | "missing">;
   retry(jobId: string): Promise<boolean>;
+  /** Estado real do job na fila (plano de comunicação C3): o espelho pode ficar para trás. */
+  state(jobId: string): Promise<{ state: QueueJobState; failedReason?: string | null }>;
 }
+
+const BULL_STATE: Record<string, QueueJobState> = {
+  waiting: "waiting",
+  "waiting-children": "waiting",
+  prioritized: "waiting",
+  delayed: "delayed",
+  active: "active",
+  completed: "completed",
+  failed: "failed",
+};
 
 type Queues = Record<"ingest" | "ocr" | "extract", Queue<StageJobData>>;
 /** As mesmas filas aceitam dados de tarefa (F02 §2.9-1); o tipo genérico da BullMQ é só anotação. */
@@ -67,6 +80,18 @@ export class BullQueueAdapter implements QueueAdapter {
     if (state === "active") return "active" as const;
     await job.remove();
     return "removed" as const;
+  }
+
+  async state(jobId: string) {
+    const queue = this.queueFor(jobId);
+    if (!queue) return { state: "missing" as const };
+    const job = await Job.fromId(queue, jobId);
+    if (!job) return { state: "missing" as const };
+    const raw = await job.getState();
+    return {
+      state: BULL_STATE[raw] ?? ("missing" as const),
+      failedReason: job.failedReason ?? null,
+    };
   }
 
   async retry(jobId: string) {

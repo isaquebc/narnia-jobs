@@ -57,6 +57,7 @@ function map(r: Row): Job {
     createdAt: String(r.created_at),
     startedAt: str(r.started_at),
     finishedAt: str(r.finished_at),
+    updatedAt: str(r.updated_at),
   });
 }
 
