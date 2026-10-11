@@ -22,6 +22,15 @@ case "$NARNIA_INSTANCE" in
   *) printf 'erro: NARNIA_INSTANCE desconhecida: %s (use vazio ou "claude")\n' "$NARNIA_INSTANCE" >&2; exit 1 ;;
 esac
 
+# --- código da instância do dono (plano de comunicação C7, decisão CM-4) ----------------------------------------------
+# Com `.owner-src` (worktree git criada e atualizada por `./start.sh promote`), a instância do dono monta esse código em
+# vez da raiz: o que o Claude edita na raiz só chega a ela quando um marco verde é promovido. Dados, backups e `.env`
+# continuam na raiz. A instância do Claude nunca usa `.owner-src` (`.env.claude` fixa NARNIA_SRC_DIR=.).
+owner_src_dir() { printf '%s\n' "${NARNIA_OWNER_SRC_DIR:-./.owner-src}"; }
+if [[ -z "$NARNIA_INSTANCE" || "$NARNIA_INSTANCE" == owner ]] && [[ -z "${NARNIA_SRC_DIR:-}" ]]; then
+  if [[ -d "$(owner_src_dir)" ]]; then export NARNIA_SRC_DIR; NARNIA_SRC_DIR=$(owner_src_dir); fi
+fi
+
 NARNIA_PORT_START=${NARNIA_PORT_START:-3100}
 NARNIA_PORT_END=${NARNIA_PORT_END:-3199}
 ENV_FILE=${NARNIA_ENV_FILE:-.env}
@@ -409,6 +418,26 @@ cmd_restore() {
   info "pronto. Recarregue a página."
 }
 
+# cmd_promote [COMMIT] -> move o código da instância do dono (.owner-src) para um commit verde (padrão HEAD)
+cmd_promote() {
+  if [[ "$NARNIA_INSTANCE" == claude || "${NARNIA_DEV_PROJECT_NAME:-}" == narnia-claude ]]; then
+    die "promote atualiza a instância do dono: quem roda é o dono (./start.sh promote), não a instância claude."
+  fi
+  command -v git >/dev/null 2>&1 || die "git não encontrado."
+  local commit=${1:-HEAD} dir sha
+  dir=$(owner_src_dir)
+  [[ -z "$(git status --porcelain --untracked-files=no)" ]] \
+    || die "há alterações não commitadas na raiz; commite (ou descarte) antes de promover."
+  sha=$(git rev-parse --verify --quiet "${commit}^{commit}") || die "commit inválido: ${commit}"
+  if [[ -d "$dir" ]]; then
+    git -C "$dir" checkout -q --detach "$sha" || die "não consegui mover ${dir} para ${sha:0:7}."
+  else
+    git worktree add -q --detach "$dir" "$sha" >/dev/null 2>&1 || die "não consegui criar ${dir}."
+  fi
+  info "instância do dono agora no commit ${sha:0:7} (${dir})."
+  info "o hot reload aplica o código; se mudaram dependências, composes ou a imagem: make dev-down && make dev"
+}
+
 usage() {
   cat <<USAGE
 narnia-jobs · ./start.sh <comando>
@@ -417,6 +446,7 @@ Uso (produção, só Docker no host):
   up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis e imprime a URL
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
+  promote [c]   leva a instância do dono (.owner-src) para um commit verde (padrão HEAD)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker
@@ -453,6 +483,7 @@ main() {
       elif stack_running; then "${PROD_COMPOSE[@]}" exec -T api narnia-jobs doctor
       else "${PROD_COMPOSE[@]}" run --rm api narnia-jobs doctor; fi ;;
     restore) cmd_restore "$@" ;;
+    promote) cmd_promote "$@" ;;
     dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;

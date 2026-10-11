@@ -14,3 +14,4 @@ apps/e2e
 scripts/test
 .claude-data
 backups
+.owner-src

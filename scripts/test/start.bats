@@ -272,3 +272,55 @@ docker_spy() { # substitui o docker por um registrador de chamadas em $TMP/calls
     done
   done
 }
+
+# --- plano de comunicação C7 / CM-4: cópia separada do código para a instância do dono (.owner-src) --------------------
+
+@test "instância do dono usa .owner-src como código quando a pasta existe; sem ela, a raiz" {
+  mkdir -p "$TMP/src"
+  run env NARNIA_OWNER_SRC_DIR="$TMP/src" bash -c 'source ./start.sh; printf "%s" "$NARNIA_SRC_DIR"'
+  [[ "$output" == "$TMP/src" ]]
+  run env NARNIA_OWNER_SRC_DIR="$TMP/nao-existe" bash -c 'source ./start.sh; printf "%s" "${NARNIA_SRC_DIR:-.}"'
+  [[ "$output" == "." ]]
+}
+
+@test "instância claude nunca usa .owner-src e monta os dados da própria pasta" {
+  mkdir -p "$TMP/src"
+  run env NARNIA_INSTANCE=claude NARNIA_OWNER_SRC_DIR="$TMP/src" \
+    bash -c 'source ./start.sh; printf "%s|%s|%s" "$NARNIA_SRC_DIR" "$NARNIA_DATA_MOUNT" "$NARNIA_BACKUP_MOUNT"'
+  [[ "$output" == ".|./.claude-data/dev|./.claude-data/backups" ]]
+}
+
+@test "compose de dev monta o código de NARNIA_SRC_DIR e dados/backups da raiz por variável" {
+  grep -q '\${NARNIA_SRC_DIR:-.}:/app' docker-compose.dev.yml
+  grep -q '\${NARNIA_DATA_MOUNT:-./data}:/app/data' docker-compose.dev.yml
+  grep -q '\${NARNIA_BACKUP_MOUNT:-./backups}:/app/backups' docker-compose.dev.yml
+}
+
+git_repo() { # git_repo DIR -> repositório git com um commit
+  mkdir -p "$1" && git -C "$1" init -q && git -C "$1" config user.email t@t && git -C "$1" config user.name t
+  echo a > "$1/a.txt" && git -C "$1" add a.txt && git -C "$1" commit -qm um
+}
+
+@test "promote cria .owner-src no HEAD e depois move para o commit novo" {
+  git_repo "$TMP/repo"
+  run bash -c "cd '$TMP/repo' && source '$BATS_TEST_DIRNAME/../../start.sh' && cmd_promote"
+  [ "$status" -eq 0 ]
+  [[ "$(git -C "$TMP/repo/.owner-src" rev-parse HEAD)" == "$(git -C "$TMP/repo" rev-parse HEAD)" ]]
+  echo b > "$TMP/repo/b.txt" && git -C "$TMP/repo" add b.txt && git -C "$TMP/repo" commit -qm dois
+  run bash -c "cd '$TMP/repo' && source '$BATS_TEST_DIRNAME/../../start.sh' && cmd_promote"
+  [ "$status" -eq 0 ]
+  [[ "$(git -C "$TMP/repo/.owner-src" rev-parse HEAD)" == "$(git -C "$TMP/repo" rev-parse HEAD)" ]]
+  [[ "$output" == *"make dev-down && make dev"* ]]
+}
+
+@test "promote recusa árvore suja e recusa rodar pela instância claude" {
+  git_repo "$TMP/repo"
+  echo mudou > "$TMP/repo/a.txt"
+  run bash -c "cd '$TMP/repo' && source '$BATS_TEST_DIRNAME/../../start.sh' && cmd_promote"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"alterações não commitadas"* ]]
+  git -C "$TMP/repo" checkout -q a.txt
+  run bash -c "cd '$TMP/repo' && export NARNIA_INSTANCE=claude && source '$BATS_TEST_DIRNAME/../../start.sh' && cmd_promote"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"dono"* ]]
+}

@@ -20,6 +20,12 @@ switch ($env:NARNIA_INSTANCE) {
   }
   default { Write-Error "erro: NARNIA_INSTANCE desconhecida: $($env:NARNIA_INSTANCE) (use vazio ou 'claude')"; exit 1 }
 }
+# Código da instância do dono (C7/CM-4): com `.owner-src` (worktree criada e atualizada por `promote`), a instância
+# padrão monta esse código em vez da raiz; dados, backups e .env continuam na raiz. A instância claude nunca usa.
+function Get-OwnerSrcDir { if ($env:NARNIA_OWNER_SRC_DIR) { $env:NARNIA_OWNER_SRC_DIR } else { "./.owner-src" } }
+if ($env:NARNIA_INSTANCE -in $null, "", "owner" -and -not $env:NARNIA_SRC_DIR -and (Test-Path (Get-OwnerSrcDir))) {
+  $env:NARNIA_SRC_DIR = Get-OwnerSrcDir
+}
 $script:PortStart  = if ($env:NARNIA_PORT_START) { [int]$env:NARNIA_PORT_START } else { 3100 }
 $script:PortEnd    = if ($env:NARNIA_PORT_END)   { [int]$env:NARNIA_PORT_END }   else { 3199 }
 $script:EnvFile    = if ($env:NARNIA_ENV_FILE)   { $env:NARNIA_ENV_FILE }        else { ".env" }
@@ -104,6 +110,22 @@ function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [
     $dst = Join-Path $DataDir "uploads"; New-Item -ItemType Directory -Force -Path $dst | Out-Null
     foreach ($f in Get-ChildItem -File $up) { if (-not (Test-Path (Join-Path $dst $f.Name))) { Copy-Item $f.FullName $dst } }
   }
+}
+
+# Leva a instância do dono (.owner-src) para um commit verde (padrão HEAD); só o dono roda
+function Invoke-Promote([string] $Commit = "HEAD") {
+  if ($env:NARNIA_INSTANCE -eq "claude" -or $env:NARNIA_DEV_PROJECT_NAME -eq "narnia-claude") {
+    throw "promote atualiza a instância do dono: quem roda é o dono (.\start.ps1 promote), não a instância claude."
+  }
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Fail "git não encontrado." }
+  $dir = Get-OwnerSrcDir
+  if (git status --porcelain --untracked-files=no) { Fail "há alterações não commitadas na raiz; commite (ou descarte) antes de promover." }
+  $sha = git rev-parse --verify --quiet "$Commit^{commit}"
+  if (-not $sha) { Fail "commit inválido: $Commit" }
+  if (Test-Path $dir) { git -C $dir checkout -q --detach $sha; if ($LASTEXITCODE -ne 0) { Fail "não consegui mover $dir." } }
+  else { git worktree add -q --detach $dir $sha *> $null; if ($LASTEXITCODE -ne 0) { Fail "não consegui criar $dir." } }
+  Info "instância do dono agora no commit $($sha.Substring(0,7)) ($dir)."
+  Info "o hot reload aplica o código; se mudaram dependências, composes ou a imagem: make dev-down; make dev"
 }
 
 function Invoke-Restore {
@@ -304,6 +326,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       else { Invoke-Prod @("run", "--rm", "api", "narnia-jobs", "doctor") }
     }
     "restore"   { Invoke-Restore }
+    "promote"   { Invoke-Promote @Rest }
     "dev-down"  { Assert-Docker; $a = Get-DevDownArgs; & docker @a }
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }

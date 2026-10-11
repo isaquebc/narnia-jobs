@@ -14,7 +14,10 @@ x-dev: &dev
   user: node
   working_dir: /app
   volumes:
-    - .:/app
+    # código: a raiz ou, na instância do dono com cópia separada, `.owner-src` (C7/CM-4); dados e backups sempre da raiz
+    - ${NARNIA_SRC_DIR:-.}:/app
+    - ${NARNIA_DATA_MOUNT:-./data}:/app/data
+    - ${NARNIA_BACKUP_MOUNT:-./backups}:/app/backups
     - node_modules:/app/node_modules
     - pnpm-store:/pnpm/store
     - claude-auth:/home/node/.claude

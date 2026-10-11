@@ -156,3 +156,27 @@ Describe "Regressão 2026-10-10: imagem antiga e volume do gh com dono root" {
     (Get-Content (Join-Path $PSScriptRoot "../../start.ps1") -Raw) | Should -Match '"dev"\s*\{\s*\r?\n\s*Assert-Docker\s*\r?\n\s*Invoke-DevBuild'
   }
 }
+
+Describe "C7 / CM-4: cópia separada da instância do dono (.owner-src)" {
+  BeforeAll { $script:Ps1 = Join-Path $PSScriptRoot "../../start.ps1" }
+  It "instância do dono usa .owner-src quando existe" {
+    $dir = Join-Path $script:Tmp "src"; New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $env:NARNIA_OWNER_SRC_DIR = $dir
+    try { $out = pwsh -NoProfile -Command ". '$($script:Ps1)'; `$env:NARNIA_SRC_DIR" }
+    finally { Remove-Item env:NARNIA_OWNER_SRC_DIR -ErrorAction SilentlyContinue }
+    $out | Should -Be $dir
+  }
+  It "instância claude nunca usa .owner-src e monta os próprios dados" {
+    $dir = Join-Path $script:Tmp "src2"; New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $env:NARNIA_OWNER_SRC_DIR = $dir; $env:NARNIA_INSTANCE = "claude"
+    try { $out = pwsh -NoProfile -Command ". '$($script:Ps1)'; '{0}|{1}|{2}' -f `$env:NARNIA_SRC_DIR, `$env:NARNIA_DATA_MOUNT, `$env:NARNIA_BACKUP_MOUNT" }
+    finally { Remove-Item env:NARNIA_OWNER_SRC_DIR, env:NARNIA_INSTANCE, env:NARNIA_SRC_DIR, env:NARNIA_DATA_MOUNT, env:NARNIA_BACKUP_MOUNT, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue }
+    $out | Should -Be ".|./.claude-data/dev|./.claude-data/backups"
+  }
+  It "promote recusa pela instância claude" {
+    $env:NARNIA_INSTANCE = "claude"
+    try { $out = pwsh -NoProfile -Command ". '$($script:Ps1)'; try { Invoke-Promote } catch { `$_.Exception.Message }" 2>&1 | Out-String }
+    finally { Remove-Item env:NARNIA_INSTANCE, env:NARNIA_SRC_DIR, env:NARNIA_DATA_MOUNT, env:NARNIA_BACKUP_MOUNT, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue }
+    $out | Should -Match "dono"
+  }
+}

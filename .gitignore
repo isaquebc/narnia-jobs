@@ -22,3 +22,4 @@ report/
 .e2e-port.env
 .claude-data/
 backups/
+.owner-src/
