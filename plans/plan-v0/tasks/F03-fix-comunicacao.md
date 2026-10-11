@@ -2,7 +2,7 @@
 
 Plano para que o usuário entenda, a qualquer momento, **em que ponto a ingestão está, o que falta, se está viva e o que fazer quando algo dá errado**. Motivado pelo uso real do dono em 2026-10-11: repositórios aparecendo como "Concluído" enquanto a execução seguia em "Analisando", uma execução presa sem sinal na tela, "Tentar de novo" que não dizia o que refazia, "Reanalisar" que criava outra execução sem avisar e erros com texto técnico em inglês.
 
-Status: **plano refinado contra o código** (2026-10-11), aguardando o dono (decisões em §5). TDD em todos os itens; só na instância `claude` (`scripts/claude-env.sh`); nenhuma migration nova.
+Status: **decisões CM-1 a CM-6 aceitas pelo dono em 2026-10-11 (todas as recomendações); implementação em andamento.**
 
 ---
 
@@ -133,3 +133,4 @@ Status: **plano refinado contra o código** (2026-10-11), aguardando o dono (dec
 |------|-----------------|
 | 2026-10-11 | Plano criado após o uso real do dono (execuções `01a12a6f`, que chegou à revisão depois de "Refazer a síntese", e `01a12a97`, presa). |
 | 2026-10-11 | **Refinamento contra o código.** Gaps encontrados: (1) o `failed` emitido pelo verificador de travados da BullMQ não chega ao `worker.on("failed")`, por isso o espelho fica `active` e `healStuckRun` não age (precisa de `QueueEvents` e consulta ao estado real); (2) jobs do GitHub têm `parentId = null` e `run.jobs` da página vem vazio; a timeline precisa de `taskOfJob`; (3) não há nenhum sinal durante uma chamada longa ao modelo, e `updated_at` do espelho existe mas não é exposto; (4) o batimento atual é do worker, não por job; (5) PID 1 dos containers é o `pnpm`, que não recolhe os processos `claude` mortos (zumbis vistos no worker do dono); (6) `finishedAt` do relatório bloqueia refazer a síntese, então o retry de repositório precisa reabrir o relatório; (7) `parentRunId` já é gravado pela reanálise, mas não sai na API nem na UI; (8) mensagens de erro nascem em quatro lugares sem mapa comum; (9) `read_at` existe e é ignorado pela contagem do sino; (10) `tsx watch` mata em 5 s sem opção de espera, então o desligamento gracioso só protege o dono junto com a cópia separada. Decisões novas CM-5 e CM-6. |
+| 2026-10-11 | — | **Decisões:** o dono aceitou as recomendações de CM-1 a CM-6 (vocabulário de C2; 2 min para "parece parada"; sino conta só não vistas e agrupa sugestões; cópia separada `.owner-src` atualizada pelo `promote` a cada marco verde; retry de repositório permitido até a revisão ser salva, depois só por "Reanalisar"; fragmentos do stream só como batimento). Implementação iniciada. |
