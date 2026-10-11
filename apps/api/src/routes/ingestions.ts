@@ -229,7 +229,7 @@ export function ingestionsRoutes(deps: {
       ...(statuses?.length ? { status: statuses } : {}),
       ...(q.source ? { source: q.source } : {}),
     });
-    return c.json({ runs: runs.map(runSummary) });
+    return c.json({ runs: runs.map((r) => runSummary(r, deps.repos)) });
   });
 
   app.get("/api/ingestions/:id", async (c) => {

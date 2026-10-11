@@ -143,6 +143,31 @@ export const FriendlyErrorSchema = z.object({
 });
 export type FriendlyErrorDto = z.infer<typeof FriendlyErrorSchema>;
 
+export const TimelineStepSchema = z.object({
+  key: z.string().min(1),
+  state: z.enum(["pending", "running", "done", "skipped", "error", "stuck"]),
+  progress: z.object({ done: z.number().int(), total: z.number().int() }).optional(),
+  failures: z.number().int().optional(),
+  startedAt: IsoDateTimeSchema.nullable().optional(),
+  finishedAt: IsoDateTimeSchema.nullable().optional(),
+  durationMs: z.number().nullable().optional(),
+  lastActivityAt: IsoDateTimeSchema.nullable().optional(),
+  error: FriendlyErrorSchema.nullable().optional(),
+});
+export const TimelineSchema = z.object({
+  steps: z.array(TimelineStepSchema),
+  current: z.number().int().nullable(),
+  total: z.number().int(),
+  stuck: z.boolean(),
+});
+export type TimelineDto = z.infer<typeof TimelineSchema>;
+export const RunProgressSchema = z.object({
+  current: z.number().int().nullable(),
+  total: z.number().int(),
+  stepKey: z.string().nullable(),
+  stuck: z.boolean(),
+});
+
 export const IngestionResponseSchema = z.object({
   id: IdSchema,
   /** Nulo para o GitHub, que não tem arquivo (F03 §2.9-2). */
@@ -157,6 +182,8 @@ export const IngestionResponseSchema = z.object({
   errorFriendly: FriendlyErrorSchema.nullable().optional(),
   /** Tarefa que falhou e será refeita pelo "Tentar de novo" (rótulo do botão, C4). */
   failedTaskType: z.string().nullable().optional(),
+  /** Etapas reais da execução (plano de comunicação C1). */
+  timeline: TimelineSchema.optional(),
 });
 export type IngestionResponse = z.infer<typeof IngestionResponseSchema>;
 
@@ -426,6 +453,8 @@ export const IngestionRunSummarySchema = z.object({
   budget: BudgetSchema.nullable(),
   report: RunReportSchema.nullable(),
   createdAt: IsoDateTimeSchema,
+  /** "Etapa x de y" para bandeja, lista e pendências (plano de comunicação C1). */
+  progress: RunProgressSchema.optional(),
 });
 export const IngestionsListResponseSchema = z.object({ runs: z.array(IngestionRunSummarySchema) });
 

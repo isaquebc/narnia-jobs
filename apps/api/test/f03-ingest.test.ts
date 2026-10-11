@@ -607,3 +607,38 @@ describe("Comunicação C3/C5 · fila real, erro amigável e tarefa que falhou",
     expect(t.repos.ingestionRuns.get(body.id)?.status).toBe("running");
   });
 });
+
+describe("Comunicação C1 · linha do tempo na execução e na lista", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("GET da execução do GitHub traz a linha do tempo com os jobs de tarefa; a lista traz o resumo", async () => {
+    t = makeTestApp();
+    const { body } = await createGithubRun(t);
+    const r = (await (await t.api(`/api/ingestions/${body.id}`)).json()) as {
+      timeline: {
+        steps: Array<{ key: string; state: string }>;
+        current: number | null;
+        total: number;
+      };
+    };
+    expect(r.timeline.steps.map((s) => s.key)).toEqual([
+      "prepare",
+      "repos",
+      "synthesis",
+      "reconcile",
+      "review_check",
+      "review",
+    ]);
+    expect(r.timeline.steps[0]?.state).toBe("running");
+    expect(r.timeline.current).toBe(1);
+    const list = (await (await t.api("/api/ingestions")).json()) as {
+      runs: Array<{
+        id: string;
+        progress: { current: number | null; total: number; stepKey: string | null; stuck: boolean };
+      }>;
+    };
+    const mine = list.runs.find((x) => x.id === body.id);
+    expect(mine?.progress).toEqual({ current: 1, total: 6, stepKey: "prepare", stuck: false });
+  });
+});

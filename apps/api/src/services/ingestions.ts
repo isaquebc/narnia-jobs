@@ -3,10 +3,12 @@ import {
   type IngestionRunRecord,
   type ProposalRecord,
   type Repos,
+  runJobs,
   type SegmentRecord,
   STAGES,
 } from "@narnia-jobs/core";
 import type { FactProposal } from "@narnia-jobs/shared";
+import { runTimeline } from "./runs";
 
 type Origin = "text_layer" | "ocr" | "model_read" | "consolidated";
 
@@ -68,13 +70,12 @@ export function toProposalDto(p: ProposalRecord, segments: SegmentRecord[]) {
 
 export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
   const segments = repos.readings.segmentsByRun(run.id);
-  const jobs = repos.jobs
-    .list({ parentId: run.id, limit: 50 })
-    .sort(
-      (a, b) =>
-        (STAGES[a.type as keyof typeof STAGES]?.order ?? 99) -
-        (STAGES[b.type as keyof typeof STAGES]?.order ?? 99),
-    );
+  // etapas (parentId) e tarefas do GitHub (runId dentro da tarefa): antes a página do GitHub vinha sem jobs (C1)
+  const jobs = runJobs(repos, run.id).sort(
+    (a, b) =>
+      (STAGES[a.type as keyof typeof STAGES]?.order ?? 99) -
+      (STAGES[b.type as keyof typeof STAGES]?.order ?? 99),
+  );
   const proposals = repos.proposals.listByRun(run.id).map((p) => toProposalDto(p, segments));
   const digest = run.fileId ? repos.digests.get(run.fileId) : null;
   return {
@@ -116,6 +117,7 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
     segments,
     error: run.error,
     errorFriendly: run.error ? friendlyError(run.error) : null,
+    timeline: runTimeline(repos, run),
     failedTaskType: (run.params.failedTask as { type?: string } | undefined)?.type ?? null,
     createdAt: run.createdAt,
     startedAt: run.startedAt,

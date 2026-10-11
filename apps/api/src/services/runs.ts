@@ -1,7 +1,9 @@
 import {
+  buildTimeline,
   type IngestionRunRecord,
   type Repos,
   resolveAnalysisDone,
+  runJobs,
   syncRunNotifications,
   syncSuggestionNotifications,
   type TaskRequest,
@@ -26,9 +28,31 @@ export async function enqueueAll(queue: QueueAdapter, tasks: TaskRequest[]): Pro
   for (const t of tasks) await queue.enqueueTask(t);
 }
 
-/** Resumo da execução para listas (bandeja, pendências); nunca inclui credenciais. */
-export function runSummary(run: IngestionRunRecord) {
+/** Linha do tempo da execução (plano de comunicação C1): jobs de etapa e de tarefa + relatório. */
+export function runTimeline(repos: Repos, run: IngestionRunRecord) {
+  const file = run.fileId ? repos.sourceFiles.get(run.fileId) : null;
+  return buildTimeline({
+    run,
+    jobs: runJobs(repos, run.id),
+    isPdf: file?.mime === "application/pdf",
+  });
+}
+
+/** Resumo da linha do tempo para listas, bandeja e pendências: a mesma frase "etapa x de y" (C1). */
+export function runProgress(repos: Repos, run: IngestionRunRecord) {
+  const t = runTimeline(repos, run);
   return {
+    current: t.current,
+    total: t.total,
+    stepKey: t.current ? (t.steps[t.current - 1]?.key ?? null) : null,
+    stuck: t.stuck,
+  };
+}
+
+/** Resumo da execução para listas (bandeja, pendências); nunca inclui credenciais. */
+export function runSummary(run: IngestionRunRecord, repos?: Repos) {
+  return {
+    ...(repos ? { progress: runProgress(repos, run) } : {}),
     id: run.id,
     source: run.source,
     mode: run.mode,
