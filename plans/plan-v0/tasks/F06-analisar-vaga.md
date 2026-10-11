@@ -220,4 +220,7 @@ Compose com `NARNIA_PROVIDER=mock` (o mock devolve um `JobAnalysis` fixo coerent
 | Dicionário de tecnologias desatualizado | arquivo versionado em `core`, fácil de ampliar; n-gramas cobrem termos novos |
 
 ## 8 · Registro de execução
+| Data | Marco | O que aconteceu |
+|------|-------|-----------------|
+| 2026-10-11 | — | **Requisitos do dono (registro antecipado):** o agente analisa uma vaga, mostra a compatibilidade com a carreira do usuário e **indica qual perfil é o mais indicado** para ela (comparando todos os perfis, não só o ativo); disponível pela tela e pelo chat (F04). |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)

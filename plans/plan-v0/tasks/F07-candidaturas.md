@@ -218,4 +218,7 @@ Usar o kanban por 1 semana com candidaturas reais: pedir ao recrutador (modo A e
 | Login do MCP Google exige sessão interativa (não roda no SDK) | comando dedicado `narnia-jobs google connect` documentado; status claro na UI |
 
 ## 8 · Registro de execução
+| Data | Marco | O que aconteceu |
+|------|-------|-----------------|
+| 2026-10-11 | — | **Requisitos do dono (registro antecipado):** gerar CV para uma vaga salva **a vaga e o CV** como uma candidatura; **lista de candidaturas**, abrir uma candidatura, **conversar com o chat sobre ela** e **atualizar o status**; quando o assunto é uma vaga, salvar **o nome de quem está do outro lado e a cadeia de pessoas contactadas** (recrutador, indicação, gestor, com data e canal de cada contato). |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)

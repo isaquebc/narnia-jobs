@@ -228,4 +228,7 @@ Com 3 perfis reais (pt-BR backend, en-US backend, pt-BR gestão): gerar com os 3
 | Documento longo estoura 1 página sem o modelo perceber | contagem real de páginas pós-render + "regerar mais curto" |
 
 ## 8 · Registro de execução
+| Data | Marco | O que aconteceu |
+|------|-------|-----------------|
+| 2026-10-11 | — | **Requisitos do dono (registro antecipado):** o agente gera CV **sem vaga alvo** (perfil puro) e/ou **com vaga alvo**, destacando o que a vaga pede; **todo arquivo gerado é salvo** (versões, PDF/DOCX); quando o CV é feito para uma vaga, a vaga e o CV ficam ligados numa candidatura (F07); geração disponível também pelo chat (F04). |
 (Preencher durante a implementação: datas, prévias dos templates, resultados do teste manual, decisões tomadas.)

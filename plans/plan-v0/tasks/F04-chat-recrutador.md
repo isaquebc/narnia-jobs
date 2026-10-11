@@ -137,14 +137,14 @@ Regras de UI: ações viram botões; no modo B o mesmo texto traz links. Horári
 | # | Decisão | Opções | Padrão proposto |
 |---|---------|--------|-----------------|
 | F04-1 | Persona no modo A | só hook `SessionStart` · hook + `systemPrompt` mínimo com persona | **hook + systemPrompt mínimo** (não depender do hook para o essencial) |
-| F04-2 | Restrição de tools por categoria | `scopes` no registro MCP · expor tudo sempre | **`scopes`** (lazy load real) |
-| F04-3 | Limite de sessões vivas | 3 · 2 · configurável | **3, configurável** |
-| F04-4 | Hibernação | 10 min · 30 min | **10 min** (memória do CLI) |
-| F04-5 | Fontes confiáveis para pesquisa | lista de domínios permitidos · critério no prompt | **critério no prompt + `trust_tag`**; lista opcional em Configurações |
+| F04-2 | Restrição de tools por categoria | `scopes` no registro MCP · expor tudo sempre | **Decidida (dono, 2026-10-11): `scopes`** (lazy load real) |
+| F04-3 | Limite de sessões vivas | 3 · 2 · configurável | **Decidida (dono, 2026-10-11): 5, configurável**; ao atingir o teto, a UI pergunta qual sessão encerrar (em vez de enfileirar) |
+| F04-4 | Hibernação | 10 min · 30 min | **Decidida (dono, 2026-10-11): 1 h**, configurável |
+| F04-5 | Fontes confiáveis para pesquisa | lista de domínios permitidos · critério no prompt | **Decidida (dono, 2026-10-11): lista padrão de domínios confiáveis** editável em Configurações, cadastro por domínio com máscara (`*.gov.br`, `glassdoor.*`); `trust_tag` por entrada; fora da lista, o agente avisa e não usa a fonte sem confirmação |
 | F04-6 | Convenção de ação | `[[action:...]]` no texto · tool `ui.suggest_action` | **tool `ui.suggest_action`** (estruturado, sem parse frágil); fallback regex |
-| F04-7 | Autenticação do `/mcp` | token de boot no header · sem auth em loopback | **token no header** |
-| F04-8 | Instalação do plugin no host | mecanismo de plugin local documentado · só `claude mcp add` + skills copiadas | **ambos** (plugin para skills/persona, `mcp add` para garantir tools) |
-| F04-9 | Modelo padrão do chat | Sonnet · Haiku | **Sonnet**; Haiku na clarificação |
+| F04-7 | Autenticação do `/mcp` | token de boot no header · sem auth em loopback | **Decidida (dono, 2026-10-11): token no header** |
+| F04-8 | Instalação do plugin no host | mecanismo de plugin local documentado · só `claude mcp add` + skills copiadas | **Decidida (dono, 2026-10-11): ambos** (plugin para skills/persona, `mcp add` para as tools) |
+| F04-9 | Modelo padrão do chat | Sonnet · Haiku | **Decidida (dono, 2026-10-11): Sonnet padrão, configurável por sessão** |
 
 ---
 
@@ -215,4 +215,8 @@ Com assinatura real: (1) conversa de 20 turnos no modo A medindo tokens por turn
 | Formato de eventos do SDK mudar (0.3.x) | normalizador com testes por fixture de versão; SDK fixado |
 
 ## 8 · Registro de execução
+| Data | Marco | O que aconteceu |
+|------|-------|-----------------|
+| 2026-10-11 | — | **Requisitos do dono (registro antecipado):** (1) **testes do chat com LangSmith** (datasets e avaliações das conversas do recrutador); envia conversas e dados de carreira a um serviço externo, por isso entra opcional, desligado por padrão, com a chave do próprio usuário e aviso de privacidade; (2) o recrutador **ingere qualquer informação durante a conversa** e atualiza os dados do usuário por tools: texto livre, PDF/currículo enviado no chat e link do GitHub, reaproveitando os pipelines da F01/F03 (as propostas vão para a revisão; nada é gravado direto); (3) análise de vaga, CV com/sem vaga alvo e candidaturas pelo chat (registradas nas tasks F06, F05 e F07). |
+| 2026-10-11 | — | **Decisões do dono:** F04-2 lazy load real (`scopes`); F04-3 **5 sessões vivas**, configurável, e ao atingir o teto **perguntar qual sessão encerrar**; F04-4 hibernação após **1 h**, configurável; F04-5 **lista padrão de domínios confiáveis**, editável em Configurações, cadastro por domínio com máscara (ex. `*.gov.br`); F04-7 token no header; F04-8 plugin + `claude mcp add`; F04-9 **Sonnet padrão, configurável por sessão**. F04-1 e F04-6 aguardam explicação ao dono. |
 (Preencher durante a implementação: datas, medições de 6.4, decisões tomadas.)
