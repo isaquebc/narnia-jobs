@@ -1,8 +1,8 @@
 # F04 · Chat com o recrutador
 
-Entregável 4 do plan-v0, o mais estrutural. Cobre o fluxo **F4** de `../02-fluxos-do-usuario.md` e entrega as duas peças que todos os fluxos seguintes usam: o **servidor MCP** (`/mcp`, streamable HTTP) com todas as tools de `../03-arquitetura.md §5`, e a pasta **`plugin/`** (persona, skills, hooks, `.mcp.json`), fonte única de prompts para os modos A (chat na web via Agent SDK) e B (Claude Code no host). Inclui a sessão de clarificação pós-ingestão, a pesquisa na internet para dados obrigatórios, sessões múltiplas por perfil e o medidor por sessão. Depende de F01 (SDK, jobs, `usage_event`), F02 (cartão do perfil, tools `profile.*`) e F03 (tools `ingest.*`/`file.*`).
+Entregável 4 do plan-v0, o mais estrutural. Cobre o fluxo **F4** de `../02-fluxos-do-usuario.md` e entrega as duas peças que todos os fluxos seguintes usam: o **servidor MCP** (`/mcp`, streamable HTTP) com as tools de `../03-arquitetura.md §5`, e a pasta **`plugin/`** (persona, skills, hooks, `.mcp.json`), fonte única de prompts para os modos A (chat na web via Agent SDK) e B (Claude Code no host). Inclui a ingestão pela conversa, a clarificação pós-ingestão (agora possível: a F03 já foi entregue), a pesquisa na internet para dados obrigatórios, sessões múltiplas por perfil, o medidor por sessão e a observabilidade local com Arize Phoenix. Depende de F01, F02 e F03 (todas entregues).
 
-Status: **em escopo** (2026-10-07). Nada implementado.
+Status: **refinada contra o código em 2026-10-11** (decisões F04-1 a F04-9 fechadas pelo dono; F04-10 a F04-15 aguardam o dono, §5). Implementação ainda não iniciada; marcos em §6.1.
 
 ---
 
@@ -11,31 +11,30 @@ Status: **em escopo** (2026-10-07). Nada implementado.
 Uma pessoa com perfil e dados ingeridos consegue:
 
 1. abrir o Chat na web, ver o recrutador se apresentar como especialista no cargo/área/nível do perfil ativo e responder com franqueza sobre os dados, citando de onde cada afirmação veio;
-2. ver, em chips discretos, quais tools o agente chamou (ex.: `experience.list`) e quanto a sessão já consumiu;
-3. manter várias conversas abertas por perfil (abas), cada uma com categoria, trocar de perfil sem perder as conversas, fechar o navegador e retomar;
-4. responder "não sei" para um dado obrigatório e ver o recrutador pesquisar em fontes confiáveis, citar a fonte e propor um valor para confirmação;
-5. depois de uma ingestão, clicar em "Clarificar" e ter uma sessão que faz perguntas objetivas e devolve propostas para a tela de revisão;
-6. clicar em ações sugeridas pelo agente ("Gerar CV para esta vaga") que abrem a feature correspondente (ou, antes de F05, mostram "em breve");
-7. no modo B, rodar `narnia-jobs install-plugin claude`, abrir o Claude Code no terminal e ter a mesma conversa, com o mesmo cartão de perfil e as mesmas tools.
+2. ver, em chips discretos, quais tools o agente chamou e quanto a sessão já consumiu;
+3. manter até 5 conversas vivas (configurável) por instalação, organizadas por perfil e categoria; ao atingir o teto, escolher qual encerrar; fechar o navegador e retomar (hibernação após 1 h, retomada transparente);
+4. colar um texto de carreira, anexar um PDF/currículo ou mandar um link do GitHub no chat e ver o recrutador abrir a ingestão correspondente (mesmos pipelines da F01/F03), com estimativa e confirmação; as propostas vão para a revisão;
+5. responder "não sei" para um dado obrigatório e ver o recrutador pesquisar só em domínios confiáveis, citar a fonte e propor um valor para confirmação;
+6. depois de uma ingestão, clicar em "Clarificar com o recrutador" (hoje desabilitado na F03) e ter uma sessão que faz perguntas objetivas e devolve propostas para a revisão da mesma execução;
+7. no modo B, rodar `./start.sh install-plugin` (ou `narnia-jobs install-plugin claude`), abrir o Claude Code no terminal e ter o mesmo recrutador, com o mesmo cartão e as mesmas tools.
 
 ### Dentro do escopo
-- `apps/api/src/mcp/`: servidor MCP streamable HTTP em `/mcp` com todas as tools de `../03 §5` (profile.*, evidence.*, fact.*, file.*, ingest.*, research.*, job.*, session.*, usage.log), protegido pelo token de boot.
-- `plugin/`: `.claude-plugin/plugin.json`, `.mcp.json` (URL com porta atual), `agents/recrutador.md` (persona + honestidade total + `tools:` restrito), `skills/recrutador`, `skills/perfil`, `skills/clarificar`, `hooks/hooks.json` (`SessionStart` injeta cartão do perfil via chamada HTTP ao `api`).
-- Modo A: `ClaudeCodeProvider.openSession()` com `plugins: [{type:"local", path}]`, `systemPrompt` mínimo + persona, `tools: ["WebSearch"]`, streaming input, `resume`, `maxTurns` por mensagem; normalização de eventos para WS; abas e categorias; limite de sessões vivas; hibernação/retomada.
-- Modo B: `narnia-jobs install-plugin claude` (copia/aponta `plugin/`, gera `.mcp.json` com a porta do `.env`, registra o servidor MCP HTTP no escopo user via `claude mcp add --transport http`), `narnia-jobs doctor` checa a conexão; smoke test com `claude -p`.
-- Pesquisa na internet: só por `WebSearch`, só para dados obrigatórios marcados `needs_research` ou pedidos explícitos; registro em `research_source` via `research.save`; o valor proposto vira sugestão para o usuário confirmar (nunca grava direto).
-- Sessão de clarificação: skill `clarificar` recebe digest + propostas pendentes de uma `ingestion_run`, pergunta, e chama `ingest.propose` com correções; a revisão continua na tela de F03.
-- Ações sugeridas (F04-6, decidida 2026-10-11): **só texto na F04**. O recrutador pergunta no chat ("quer que eu gere seu CV para esta vaga?"), o usuário responde por texto e o próprio recrutador executa pelas tools; nada de botões nem formulário montado pelo agente. Botões (`ui.suggest_action`) entram na F05, quando houver telas para onde levar.
-- **Ingestão pela conversa (requisito do dono, 2026-10-11):** o recrutador recebe texto livre, um PDF/currículo anexado no chat ou um link do GitHub e atualiza os dados do usuário pelas tools `ingest.text`, `ingest.file` e `ingest.github`, que criam execuções pelos mesmos pipelines da F01/F03 (orçamento, confirmação do GitHub, conferência anti-alucinação); as propostas vão para a revisão (pendência + link no chat), nunca são gravadas direto. O recrutador avisa custo estimado antes de ingestões caras.
-- **Observabilidade e testes do chat com Arize Phoenix local (decidido 2026-10-11):** container `arizephoenix/phoenix` num perfil opcional do compose (`--profile observability`, desligado por padrão, só `127.0.0.1`), recebendo rastros OpenTelemetry de cada sessão/turno/tool; datasets de conversas e avaliações (modelo como juiz) rodados sob demanda contra a instância de testes; nenhum dado sai da máquina. Licença Elastic 2.0: usamos a imagem oficial, sem redistribuir.
-- Medidor por sessão: `usage_event` com `session_id` e `category`; chips de uso no chat; leitura dos logs do Claude Code fica para F10.
+- **Servidor MCP** em `/mcp` (Hono + transporte streamable HTTP padrão web do `@modelcontextprotocol/sdk`), autenticado pelo token de boot no header (F04-7), com registro de tools e `scopes` por categoria de sessão (F04-2).
+- **Tools** com handler puro no `core` e schema no `shared`: as existentes (`profile.*`, `file.*`, `ingest.status`, `ingest.propose`) e as novas (`evidence.*`, `fact.search/get/timeline` com FTS5, `research.save/list`, `job.status/list`, `session.set_category/get`, `usage.log`, `ingest.text/file/github`).
+- **`plugin/`** na raiz: `.claude-plugin/plugin.json`, `.mcp.json.template`, `agents/recrutador.md` (template da persona, fonte única, F04-1), `skills/{recrutador,perfil,clarificar}/SKILL.md`, `hooks/hooks.json` + `hooks/session-start.sh`.
+- **Modo A (web):** sessões longas no `api` com o Agent SDK (`query` com entrada em streaming, `systemPrompt` montado do template, `plugins`, `mcpServers` http, `resume`), gerenciador de sessões (teto 5 com escolha, hibernação 1 h), eventos de chat no WebSocket, persistência de mensagens, nota de cartão atualizado por turno (F04-1), modelo por sessão (F04-9).
+- **Modo B (terminal):** `install-plugin` (gera `.mcp.json` com porta e token da instância, registra o servidor com `claude mcp add --transport http`), `doctor` checando a conexão, nas duas instâncias.
+- **Pesquisa web** só por `WebSearch`/`WebFetch` para dados `needs_research` ou pedido explícito; lista de domínios confiáveis com máscara e `trust_tag` (F04-5); registro em `research_source`; valor proposto vira sugestão para confirmar.
+- **Clarificação pós-ingestão**: skill `clarificar`, rota que cria sessão ligada à execução, botão da F03 habilitado.
+- **Medidor por sessão**: `usage_event` com `session_id`; chips de uso; total por sessão.
+- **Observabilidade local (Arize Phoenix)**: perfil `observability` do compose, desligado por padrão, só em `127.0.0.1`; rastros OpenTelemetry das sessões e tools; avaliações sob demanda com datasets em `evals/chat/`.
+- **Só texto** (F04-6): nada de botões ou formulários montados pelo agente; o recrutador pergunta, o usuário responde, o recrutador executa pelas tools.
 
 ### Fora do escopo (e para onde vai)
-- Features (gerar CV, analisar vaga, candidaturas) → F05–F07; aqui só a convenção de ação.
-- Entrevista por voz → F08 (reutiliza o canal de sessão daqui).
+- Botões de ação (`ui.suggest_action`) e geração de CV → F05. Análise de vaga e perfil mais indicado → F06. Candidaturas, contatos e cadeia de pessoas (`contact.*`) → F07.
+- Entrevista por voz → F08 (reutiliza o gerenciador de sessões daqui).
 - Medidor completo, coletor de logs do Claude Code, "limpar cache" → F10.
-- Provider Codex e gerador de `AGENTS.md` → F11.
-- Gerador de `config.toml` do Codex → F11.
+- Provider Codex → F11.
 
 ---
 
@@ -43,79 +42,100 @@ Uma pessoa com perfil e dados ingeridos consegue:
 
 ### 2.1 Visão
 ```
-modo A: navegador ─WS─► apps/api ─SDK─► claude CLI (container) ─MCP HTTP─► apps/api /mcp ─► core ─► SQLite
-modo B: Claude Code (host) ─MCP HTTP (127.0.0.1:<porta>/mcp)─► apps/api ─► core ─► SQLite
-ambos: plugin/ (persona, skills, hooks) é lido pelo CLI; nada de prompt fora dele
+modo A: navegador ─WS /ws (eventos chat.*)─► api ─SDK query(stream)─► claude CLI (processo filho do api)
+                                                        └─MCP http 127.0.0.1:3100/mcp─► api /mcp ─► core ─► SQLite
+modo B: Claude Code (host) ─MCP http 127.0.0.1:<porta>/mcp─► api ─► core ─► SQLite
+ambos: plugin/ (persona, skills, hooks) é a fonte única de texto de prompt
 ```
 
-### 2.2 Servidor MCP (`apps/api/src/mcp/server.ts`)
-- `@modelcontextprotocol/sdk` com transporte streamable HTTP montado em `/mcp` (Hono). Uma sessão MCP por conexão; stateless quanto ao domínio (tudo no SQLite).
-- Autenticação: header `Authorization: Bearer <token de boot>`; no modo B o token vai no `.mcp.json` gerado (`headers`), no modo A o SDK recebe o mesmo via `.mcp.json` do plugin.
-- Registro de tools a partir de `packages/core/src/*/tools.ts` + schemas de `packages/shared/src/mcp/*`: uma tabela `TOOL_REGISTRY` com `{name, schema, handler, scopes}`; `scopes` permite restringir o conjunto por sessão (`session.set_category` ↔ skill) para manter o lazy load.
-- Respostas: resumo de uma linha por item em `*.list`; detalhe em `*.get`; paginação `limit/cursor`; erro tipado `{code, message}`.
-- **Busca sem ler tudo (decisão F02-2, 2026-10-08)**: índice FTS5 sobre experiências, conquistas, projetos, skills, formação e digests, mantido pelos hooks de escrita do `core`; `fact.search {q, kinds?, from?, to?, limit=10}` devolve linhas de 30–40 tokens (id, tipo, título, período, uma linha, nota de relevância de `profile/relevance.ts`), `fact.get {ids}` o detalhe, `fact.timeline {from, to}` por período; o prompt do recrutador manda buscar antes de listar e nunca pedir a lista completa. Resumo objetivo do perfil escrito pelo modelo (opcional, cache em `profile`, custo mostrado antes) entra aqui.
-- `usage.log` aceita o `usage` que o próprio agente informa (modo B) e é ignorado quando o `result` do SDK já registrou (modo A, dedupe por `provider_session_id`).
+### 2.2 Servidor MCP (`apps/api/src/mcp/`)
+- `@modelcontextprotocol/sdk` 1.32.1 já está no lockfile (dependência transitiva do Agent SDK): vira dependência direta do `api`, versão fixada. Transporte `WebStandardStreamableHTTPServerTransport` (Request/Response padrão web), montado em `app.all("/mcp", …)` do Hono, sem Express.
+- Autenticação: `Authorization: Bearer <token de boot>` checado antes do transporte (o mesmo `auth.ts`); 401 sem token.
+- `registry.ts`: `TOOL_REGISTRY = [{ name, input, output, handler, scopes }]` montado a partir de `createProfileTools`, `createIngestTools` e dos novos handlers; cada handler recebe `Repos` (+ `dataDir`, fila e provider quando precisa enfileirar ingestão) e valida entrada e saída pelos schemas do `shared` (sem `$schema`, F01 `e06eeda`).
+- `scopes` por categoria (F04-2): `career` (profile, evidence, fact, research, file, usage), `clarify` (ingest.status/propose, file.*, fact.*), `ingest` (ingest.text/file/github/status), `interview` (reservado F08). O escopo vem da sessão: no modo A o `api` cria um `mcpServers.narnia` com header extra `X-Narnia-Session: <id>` e o servidor filtra `tools/list` e `tools/call`; no modo B (sem header) vale o escopo `career` + `ingest`.
+- Respostas compactas: `*.list` uma linha por item, `*.get` detalhe, paginação `limit/cursor`, erro tipado `{ code, message }` mapeado pelo `friendlyError` (C5 da comunicação) para `isError` com texto em pt-BR.
 
-### 2.3 Plugin (`plugin/`)
+### 2.3 Tools: o que existe e o que falta
+| Tool | Estado no código | Trabalho |
+|------|------------------|----------|
+| `profile.list/get_card/switch/update_emphasis/update_pitch/create` | handler puro em `core/profile/tools.ts`, schema em `shared/mcp/profile.ts` | só registrar |
+| `file.list/get_digest/get_text`, `ingest.status/propose` | `core/ingest/tools.ts`, `shared/mcp/ingest.ts` | registrar; `ingest.propose` com `run` da sessão de clarificação |
+| `evidence.experience/project/skill/education.list` + `.get` | não existe | handlers sobre `facts.*` com relevância do perfil ativo (F02) |
+| `fact.search/get/timeline` | não existe; FTS5 ausente | migration FTS5 (§3) + handlers; ordena por `profile_fact_relevance` |
+| `fact.unverified` | não existe | lista fatos com `verified = 0` |
+| `research.save/list` | não existe (`research` só como `source` de `salary_reference`) | tabela nova + handlers; `save` exige `used_for` e normaliza URL |
+| `job.status/list` | não existe | sobre `jobs` + `taskOfJob` (só da instância) |
+| `session.get/set_category` | não existe | sobre `chat_session` |
+| `usage.log` | não existe | grava `usage_event` com `origin = claude-log` no modo B; ignorado se o `result` do SDK já registrou (dedupe por `provider_session_id` + `turn_index`) |
+| `ingest.text/file/github` | não existe; os pipelines existem (`ingestionRuns.create`, `enqueueStage`, `createGithub` + `prepareTask`) | handlers que só **criam** a execução e devolvem `{ runId, estimate, needsConfirmation, url }`; nada é gravado em fatos |
+
+### 2.4 Plugin (`plugin/`, ainda não existe na raiz)
 | Arquivo | Conteúdo |
 |---------|----------|
 | `.claude-plugin/plugin.json` | nome `narnia-jobs`, versão, descrição |
-| `.mcp.json` | `{"narnia-jobs": {"type":"http","url":"http://127.0.0.1:${NARNIA_PORT}/mcp","headers":{"Authorization":"Bearer ${NARNIA_TOKEN}"}}}` (gerado pelo instalador com valores reais) |
-| `agents/recrutador.md` | frontmatter: `name`, `description`, `model: sonnet`, `tools:` só MCP `narnia-jobs` + `WebSearch`; corpo: persona derivada (placeholders preenchidos pelo hook), regras de honestidade (citar fonte, marcar inferência, não inventar, apontar lacunas e exageros), regra de pesquisa (só dados obrigatórios, fontes confiáveis: pesquisas salariais, órgãos oficiais, grandes job boards; sempre `research.save`), convenção de ações |
-| `skills/recrutador/SKILL.md` | `/narnia-jobs:recrutador`: abre a conversa de carreira com o cartão; instrui a usar `fact.unverified` e `profile.get_card` |
-| `skills/perfil/SKILL.md` | `/narnia-jobs:perfil <nome>`: `profile.list` → `profile.switch` → `profile.get_card` |
-| `skills/github-publico/SKILL.md` | (decisão F03-2, 2026-10-09) `/narnia-jobs:github-publico`: o recrutador revisa o perfil público do GitHub do usuário (página do perfil, README de perfil, repositórios fixados, descrições, tópicos, atividade) com base nos relatórios e digests salvos pela ingestão (F03) e, se preciso, `WebFetch` da página pública; devolve orientação de atualizações (o que fixar, o que descrever melhor, projetos novos que fortaleceriam o cargo-alvo, versões open source de trabalho privado) com fonte por item |
-| `skills/clarificar/SKILL.md` | `/narnia-jobs:clarificar <run>`: `file.get_digest`, propostas pendentes, perguntas objetivas uma de cada vez, `ingest.propose` por resposta, encerra com resumo |
-| `hooks/hooks.json` | `SessionStart`: comando que chama `GET /api/profiles/active/card` (com token) e imprime o cartão + 1 linha de persona; falha silenciosa com aviso se o `api` estiver fora |
-Regra de ouro: nenhum texto de persona, instrução ou tool fora de `plugin/` e `packages/{shared,core}`. O modo A só escolhe modelo, perfil, tools e categoria.
+| `.mcp.json.template` (versionado) → `.mcp.json` (gerado, gitignored) | `{"narnia-jobs":{"type":"http","url":"http://127.0.0.1:${PORTA}/mcp","headers":{"Authorization":"Bearer ${TOKEN}"}}}` |
+| `agents/recrutador.md` | frontmatter (`name`, `description`, `model`, `tools:` só `mcp__narnia-jobs__*` + `WebSearch`/`WebFetch`) e corpo com placeholders `{{persona.*}}`, `{{card}}`, `{{trusted_domains}}`; regras de honestidade, pesquisa e "só texto" (F04-6) |
+| `skills/recrutador/SKILL.md` · `skills/perfil/SKILL.md` · `skills/clarificar/SKILL.md` | como no plano original; `clarificar` recebe `run` e usa `ingest.status`, `file.get_digest`, `ingest.propose` |
+| `hooks/hooks.json` + `hooks/session-start.sh` | `SessionStart`: se `NARNIA_SESSION_HAS_CARD=1` (modo A) não faz nada; senão chama `GET /api/profiles/active/persona-card` com o token e imprime persona + cartão; com a API fora imprime o aviso visível (F04-1) |
+- `packages/core/src/chat/persona-prompt.ts`: `renderRecruiterPrompt(template, persona, card, domains)` lê `plugin/agents/recrutador.md` e preenche os placeholders; usado pelo `api` no modo A e pela rota do hook no modo B (fonte única).
+- Teste que varre `apps/` e `packages/` atrás de texto de persona/instrução fora de `plugin/` (§6.5).
 
-### 2.4 Modo A: sessões (`apps/api/src/chat/`)
-```
-POST /api/sessions {profile_id, category} ─► chat_session ─► provider.openSession({plugins:[plugin/], model, systemPrompt: persona+card, tools:["WebSearch"], resume?})
-WS /ws/sessions/:id  ◄─► {user_message} / {text_delta|tool_use|tool_result|action|turn_end{usage}|error}
-```
-- `SessionManager`: mapa `session_id → processo do CLI` (streaming input). Limite de sessões vivas (padrão 3); além disso `queued`. Inatividade > 10 min → hibernar (encerrar processo, guardar `provider_session_id`); próxima mensagem → `resume`.
-- Troca de perfil não encerra sessões; a UI só mostra as do perfil ativo.
-- `maxTurns` por mensagem (padrão 8) e `maxBudget` por sessão configurável; estouro → evento `limit` com opção de continuar.
-- Cada `turn_end` grava `chat_message` (ambos os lados, tool calls resumidas) e `usage_event` (`session_id`, `category`, modelo, tokens).
-- Parser de ações: regex sobre o texto final; evento `action` separado para a UI.
+### 2.5 Sessões no modo A (`apps/api/src/chat/`)
+- **Onde vivem:** no processo do `api` (o CLI do Claude é processo filho do `api`, como as chamadas estruturadas de hoje), ver F04-10. Um reinício do `api` (hot reload na instância `claude`, `promote` na do dono) encerra os processos; as sessões ficam `hibernated` com `provider_session_id` e a próxima mensagem retoma com `resume`. O `init: true` do compose (CM1) recolhe os processos órfãos.
+- **`SessionManager`:** mapa `sessionId → { query, inputQueue, abort, lastActivity }`. Abrir: `query({ prompt: asyncIterable, options: { systemPrompt: renderRecruiterPrompt(...), plugins: [{ type: "local", path: PLUGIN_DIR }], mcpServers: { "narnia-jobs": { type: "http", url, headers } }, tools: ["WebSearch", "WebFetch"], model: session.model, resume?, includePartialMessages: true, env: { NARNIA_SESSION_HAS_CARD: "1" }, settingSources: [] } })`.
+- **Teto de 5 (F04-3):** abrir a 6ª devolve 409 `session_limit` com a lista das vivas; a UI pergunta qual encerrar (hibernar) e repete.
+- **Hibernação 1 h (F04-4):** varredura a cada minuto; sessão sem atividade há `chat.hibernate_after_min` (60) é encerrada (`interrupt` + fechamento da fila) e marcada `hibernated`; nova mensagem → `resume`.
+- **Turnos:** cada mensagem do usuário entra na fila de entrada; `maxTurns` por mensagem (`chat.max_turns`, padrão 8); `result` fecha o turno: grava `chat_message` (usuário e assistente, tool calls resumidas) e `usage_event` com `session_id`; estouro → evento `chat.limit` com "continuar".
+- **Nota de cartão atualizado (F04-1):** antes de enviar a mensagem, compara o `hash` do cartão do perfil da sessão com o da abertura; se mudou, antepõe "(cartão do perfil atualizado: …)" e grava o novo `hash` na sessão.
+- **Eventos:** no `/ws` existente (F04-13), novos `chat.delta`, `chat.tool`, `chat.turn_end`, `chat.error`, `chat.limit`, `chat.session_updated`, todos com `sessionId`; o cliente filtra pela sessão aberta.
+- **Persistência:** mensagens em Markdown, tool calls só com nome, argumentos resumidos e duração.
 
-### 2.5 Modo B: instalador
-`narnia-jobs install-plugin claude`:
-1. lê `NARNIA_PORT` e o token de `.env`/`./data/config.json`;
-2. gera `plugin/.mcp.json` com valores reais (arquivo gitignored; o versionado é `.mcp.json.template`);
-3. registra o plugin no Claude Code do host pelo mecanismo de plugins locais documentado (`--plugin-dir` para testes; instalação persistente conforme a documentação de plugins vigente na implementação) e, em paralelo, `claude mcp add --transport http narnia-jobs http://127.0.0.1:<porta>/mcp --header "Authorization: Bearer <token>"` no escopo user, para que as tools existam mesmo fora do plugin;
-4. `narnia-jobs doctor` faz `GET /mcp` autenticado e lista tools.
-Mudança de porta entre execuções → `install-plugin` é idempotente e reescreve.
+### 2.6 Modo B
+- `apps/api/src/cli.ts install-plugin claude` (hoje só a mensagem "disponível em F04") + subcomando `./start.sh install-plugin` / `.\start.ps1 install-plugin` que roda no host (o plugin vai para o Claude Code do **host**): gera `plugin/.mcp.json` com a porta e o token da instância corrente (dono: porta do `.env`/5173-3100 em dev; Claude: 3200 e `claude-token`), registra `claude mcp add --transport http narnia-jobs <url> --header "Authorization: Bearer <token>"` no escopo do usuário e aponta o plugin local (`--plugin-dir` nos testes; instalação persistente pelo mecanismo vigente, ver F04-14). Idempotente; reescreve quando a porta muda.
+- `doctor` ganha `mcp`: `initialize` + `tools/list` autenticados contra a URL da instância.
 
-### 2.6 API
-| Método e rota | Função |
-|---------------|--------|
-| `POST /api/sessions` · `GET /api/sessions?profile=` · `PATCH /api/sessions/:id` (título, categoria, arquivar) · `DELETE /api/sessions/:id` | sessões |
-| `GET /api/sessions/:id/messages?cursor=` | histórico |
-| `POST /api/sessions/:id/hibernate` · `/wake` | controle manual |
-| `POST /api/ingestions/:id/clarify` | cria sessão `category=clarify` ligada ao run |
-| `GET /api/research?profile=` | fontes pesquisadas |
-| `GET /api/profiles/active/card` | usado pelo hook `SessionStart` |
-| `ALL /mcp` | servidor MCP |
-| `WS /ws/sessions/:id` | stream da sessão |
+### 2.7 Pesquisa web (F04-5)
+- `trusted_domain` (§3) com padrão semeado (órgãos oficiais `*.gov.br`, `ibge.gov.br`, pesquisas salariais conhecidas, grandes plataformas de vagas) e edição em Configurações; máscara `*` só no início ou como rótulo inteiro (`*.gov.br`, `glassdoor.*`); `trust_tag` official/survey/jobboard/other.
+- O template injeta a lista; `research.save` rejeita URL fora da lista com `untrusted_domain` e o recrutador pede confirmação ao usuário antes de usar; tudo auditado em `research_source`.
+
+### 2.8 Clarificação pós-ingestão
+- `POST /api/ingestions/:id/clarify` cria sessão `category = clarify` com `ingestion_run_id`; o escopo `clarify` libera `ingest.propose` só para essa execução (o handler confere `runId`).
+- A F03 (`ReviewPanel`) habilita "Clarificar com o recrutador" (remove o tooltip "disponível com o chat") e abre o chat nessa sessão; propostas novas aparecem na revisão pelo `ingestion.updated` existente.
+
+### 2.9 Observabilidade local (Arize Phoenix)
+- Serviço `phoenix` (imagem oficial `arizephoenix/phoenix`, versão fixada) no `docker-compose.dev.yml` e no `docker-compose.yml` com `profiles: ["observability"]`, porta da UI só em `127.0.0.1` (dono 6006; instância `claude` 6106 via `.env.claude`), dados em volume próprio.
+- `api` e `worker` exportam rastros OTLP (`@opentelemetry/sdk-node` + exportador http) **só** quando `NARNIA_OTEL_ENDPOINT` está definido; spans por turno de chat, por tool MCP e por chamada estruturada (F01–F03); atributos sem conteúdo sensível por padrão (`NARNIA_OTEL_CONTENT=1` inclui prompts e respostas, desligado).
+- Avaliações: `evals/chat/*.jsonl` (conversas de referência) + script `scripts/evals-chat.ts` rodado por `scripts/claude-env.sh evals` com o provider real, registrando experimentos no Phoenix; nunca na CI.
+
+### 2.10 Encaixe no código (o que existe e o que muda)
+1. **Provider sem sessão longa.** `Provider` só tem chamadas de um tiro (`run<T>` com prompt string). Entra `openChat(opts) → ChatHandle { send(text), events: AsyncIterable<ChatEvent>, interrupt(), close() }` no `ClaudeCodeProvider` (SDK `query` com `AsyncIterable<SDKUserMessage>`, `streamInput`, `interrupt`, `setModel`) e no `MockProvider` (roteiros). Os eventos do SDK são normalizados num `ChatEvent` do `shared`.
+2. **SDK 0.3.292 confirma as opções** usadas: `plugins: [{ type: "local", path }]`, `mcpServers` com `type: "http"`, `headers` e `timeout`, `systemPrompt` string, `resume`, `forkSession`, `includePartialMessages`, `env`, `maxTurns`, `maxBudgetUsd`, `hooks`, `settingSources`. O `maxBudgetUsd` por sessão substitui o "maxBudget" do plano original.
+3. **WebSocket é um só e transmite a todos** (`ws.ts`), validado por `WsEventSchema`; os eventos `chat.*` entram na união (como `profile.*` na F02) com `sessionId`; ver F04-13.
+4. **`usage_event` já tem `session_id`**; faltam `provider_session_id` e `turn_index` para o dedupe com `usage.log` (§3).
+5. **FTS5 funciona no `node:sqlite` 22.23** com `tokenize = "unicode61 remove_diacritics 2"` (verificado: `computacao*` acha "Computação"). Manutenção por gatilhos SQL nas tabelas de fatos (F04-12), porque toda escrita de fato já passa pelos repos mas o índice precisa ficar consistente mesmo em migrations e reset.
+6. **`plugin/` não existe**; `install-plugin` é só uma mensagem no `cli.ts`; o `/mcp` já tem proxy no `docker/nginx.conf` (produção).
+7. **Settings:** nenhuma chave de chat; entram `chat.max_live_sessions` (5), `chat.hibernate_after_min` (60), `chat.max_turns` (8), `chat.default_model` (`sonnet`), `chat.max_budget_usd` (nulo = sem teto), `research.require_trusted` (true).
+8. **Erros e i18n:** o chat usa o `friendlyError` (C5) para erros do provider e das tools; textos via `t()`; o teste de literais cobre `features/chat`.
+9. **Rotas web:** não há `/chat`; entram `/chat` e `/chat/$sessionId`, item "Chat" no grupo do **perfil atual** do menu (tem viés de perfil), e Configurações › Chat / Modo plugin / Pesquisa.
+10. **Instâncias:** o `api` da instância `claude` atende o `/mcp` em 3200; `install-plugin` precisa receber a instância (`NARNIA_INSTANCE=claude` → porta 3200, token `claude-token`) para o Claude nunca registrar o servidor do dono por engano.
 
 ---
 
 ## 3 · Dados deste entregável
 
+Migration `0004_chat.sql` (só para frente; teste de upgrade a partir de um banco 0003 com dados, como na F03):
+
 | Tabela | Colunas |
 |--------|---------|
-| `chat_session` (nova) | `id`, `profile_id`, `category` (career/clarify/feature:<nome>/interview), `title`, `provider` (claude-code), `provider_session_id?`, `model`, `state` (live/queued/hibernated/archived), `ingestion_run_id?`, `tokens_in`, `tokens_out`, `created_at`, `last_activity_at` (UTC) |
-| `chat_message` (nova) | `id`, `session_id`, `role` (user/assistant/system), `content_md`, `tool_calls_json?` (nome, args resumidos, duração), `actions_json?`, `usage_json?`, `created_at` |
-| `research_source` (nova) | `id`, `profile_id`, `session_id?`, `url`, `title`, `accessed_at`, `excerpt`, `used_for` (campo/fato), `trust_tag` (official/survey/jobboard/other), `accepted?` |
-| `usage_event` (completar) | `session_id?`, `provider_session_id?`, `turn_index?` |
-| `settings` | `chat.max_live_sessions`, `chat.max_turns`, `chat.hibernate_after_min`, `chat.default_model` |
+| `chat_session` (nova) | `id`, `profile_id` (fk), `category` (career/clarify/ingest/interview), `title`, `provider`, `provider_session_id`, `model`, `state` (live/hibernated/archived/error), `ingestion_run_id` (fk, nulo), `card_hash`, `tokens_in`, `tokens_out`, `cost_usd_est`, `created_at`, `last_activity_at` |
+| `chat_message` (nova) | `id`, `session_id` (fk, cascade), `turn_index`, `role` (user/assistant/system_note), `content_md`, `tool_calls_json`, `usage_json`, `created_at` |
+| `research_source` (nova) | `id`, `profile_id`, `session_id`, `url`, `domain`, `title`, `accessed_at`, `excerpt`, `used_for`, `trust_tag`, `accepted` (nulo/0/1) |
+| `trusted_domain` (nova) | `id`, `pattern` (único), `trust_tag`, `builtin` (0/1), `enabled`, `created_at`; semeada com a lista padrão |
+| `fact_fts` (nova, virtual FTS5) | `kind`, `fact_id` (UNINDEXED), `title`, `body`; `tokenize = "unicode61 remove_diacritics 2"`; gatilhos `after insert/update/delete` em `experience`, `achievement`, `project`, `skill`, `education`, `language` e em `file_digest`/`repo_digest`; preenchida na migration com os dados existentes |
+| `usage_event` (completar) | `provider_session_id`, `turn_index` |
+| `settings` | chaves de §2.10-7 |
 
-Regras:
-- `research_source` é só registro; o valor sugerido entra em `profile`/fatos apenas após confirmação do usuário (via tool `profile.*`/`fact.*` com `source.kind = pesquisa`).
-- Mensagens guardam Markdown; tool calls resumidas (sem payload completo) para não inflar o banco.
-- Apagar sessão (F10 "limpar cache") remove `chat_message`, `usage_event` da sessão e pede ao CLI para esquecer a sessão; nunca toca fatos.
+Regras: `research_source` é só registro (valor entra em perfil/fatos só após confirmação, com `source.kind = pesquisa`); apagar sessão (F10) remove mensagens e uso da sessão e nunca toca fatos.
 
 ---
 
@@ -123,21 +143,23 @@ Regras:
 
 | Tela | Componentes | Estados a cobrir |
 |------|-------------|------------------|
-| Chat (L2) | `SessionTabs` (por perfil, categoria, "+ nova"), `MessageList` (Markdown, chips `ToolCallChip` expansíveis, `ActionButton`), `Composer` (texto, anexar arquivo → F03, enviar, parar), `SessionUsage` (tokens, custo equivalente, limite) | vazia · streaming · aguardando tool · hibernada (acordar) · na fila · limite atingido · erro do provider · provider deslogado |
-| Painel direito "Contexto" | cartão do perfil atual, lista do que foi carregado por tool nesta sessão, fontes pesquisadas | vazio · com itens |
-| Clarificação | mesma L2 com cabeçalho "Clarificando ingestão X", contador de propostas geradas, botão "ir para revisão" | em andamento · concluída |
-| Pesquisa | `ResearchCard` inline na mensagem (fonte, trecho, data, "usar este valor" / "ignorar") | proposta · aceita · ignorada |
-| Configurações › Chat | modelo padrão, sessões simultâneas, turnos por mensagem, hibernação | — |
-| Configurações › Modo plugin | status do plugin no host (via `doctor`), comando `install-plugin`, porta/URL do MCP | não instalado · instalado · porta mudou (reinstalar) |
+| Chat (`/chat`, `/chat/$sessionId`) | `SessionTabs` (do perfil ativo, categoria, "+ nova"), `MessageList` (Markdown, `ToolCallChip` expansível), `Composer` (texto, anexar arquivo → `ingest.file`, enviar, parar), `SessionUsage` (tokens, custo equivalente, teto) | vazia · digitando · aguardando tool · hibernada (retoma ao enviar) · teto de sessões (escolher qual encerrar) · limite de turnos (continuar) · erro do provider (mensagem amigável) · provider deslogado |
+| Painel "Contexto" | cartão do perfil, o que foi carregado por tool nesta sessão, fontes pesquisadas, ingestões abertas pela conversa (link para a execução) | vazio · com itens |
+| Clarificação | mesma tela com cabeçalho "Clarificando: <execução>", contador de propostas geradas, "Ir para a revisão" | em andamento · concluída |
+| Pesquisa | `ResearchCard` na mensagem (fonte, domínio, selo de confiança, trecho, data, "usar este valor" / "ignorar") | proposta · aceita · ignorada · domínio fora da lista (pede confirmação) |
+| Configurações › Chat | modelo padrão, sessões vivas, turnos por mensagem, hibernação, teto de custo por sessão | — |
+| Configurações › Pesquisa | lista de domínios (máscara, selo, ligar/desligar, adicionar, restaurar padrão) | padrão · editada |
+| Configurações › Modo plugin | status (via `doctor`), comando `install-plugin`, URL do MCP da instância | não instalado · instalado · porta mudou |
+| Menu | "Chat" no grupo do perfil atual | — |
 
-Regras de UI: ações viram botões; no modo B o mesmo texto traz links. Horários no fuso do usuário. Textos via `t()`.
+Regras: só texto (F04-6); horários no fuso do usuário; textos via `t()`; erros pelo `friendlyError`.
 
 ---
 
-## 5 · Decisões em aberto deste entregável
+## 5 · Decisões deste entregável
 
-| # | Decisão | Opções | Padrão proposto |
-|---|---------|--------|-----------------|
+| # | Decisão | Opções | Decidido / recomendação |
+|---|---------|--------|-------------------------|
 | F04-1 | Persona no modo A | só hook `SessionStart` · hook + `systemPrompt` mínimo com persona | **Decidida (dono, 2026-10-11): hook + system prompt**. Modo A: o servidor monta persona (F02 `buildPersona`) + cartão a partir do template `plugin/agents/recrutador.md` (fonte única, sem segundo texto) e passa como `systemPrompt` na abertura da sessão; marca a sessão (`NARNIA_SESSION_HAS_CARD=1`) para o hook `SessionStart` não reinjetar. Modo B: só o hook, que busca persona + cartão na API; com a API fora, imprime aviso visível e o modelo informa o usuário. Cartão alterado no meio da conversa: a cada turno o servidor compara o `hash` do cartão e, se mudou, antepõe uma nota curta à mensagem do usuário. Sessão pertence a um perfil. Custo: centenas de tokens no 1º turno, reaproveitados pelo cache de prompt. |
 | F04-2 | Restrição de tools por categoria | `scopes` no registro MCP · expor tudo sempre | **Decidida (dono, 2026-10-11): `scopes`** (lazy load real) |
 | F04-3 | Limite de sessões vivas | 3 · 2 · configurável | **Decidida (dono, 2026-10-11): 5, configurável**; ao atingir o teto, a UI pergunta qual sessão encerrar (em vez de enfileirar) |
@@ -147,77 +169,89 @@ Regras de UI: ações viram botões; no modo B o mesmo texto traz links. Horári
 | F04-7 | Autenticação do `/mcp` | token de boot no header · sem auth em loopback | **Decidida (dono, 2026-10-11): token no header** |
 | F04-8 | Instalação do plugin no host | mecanismo de plugin local documentado · só `claude mcp add` + skills copiadas | **Decidida (dono, 2026-10-11): ambos** (plugin para skills/persona, `mcp add` para as tools) |
 | F04-9 | Modelo padrão do chat | Sonnet · Haiku | **Decidida (dono, 2026-10-11): Sonnet padrão, configurável por sessão** |
+| F04-10 | Onde vivem as sessões vivas | no processo do `api` · serviço `chat` dedicado no compose | **Aguarda o dono. Recomendação: no `api`.** Os processos do CLI já são filhos do `api` nas chamadas de hoje e o `/mcp` está no mesmo processo; um reinício hiberna as sessões e o `resume` as retoma, e com `.owner-src` a instância do dono só reinicia no `promote`. Um serviço dedicado isolaria reinícios, mas exige um segundo canal entre api e chat (Redis) e duplica a autenticação. |
+| F04-11 | Dependência do servidor MCP | `@modelcontextprotocol/sdk` 1.32.1 direto, transporte web padrão · implementar o protocolo à mão | **Aguarda o dono. Recomendação: SDK oficial 1.32.1 fixado** (já está no lockfile pelo Agent SDK), transporte `WebStandardStreamableHTTPServerTransport`, que encaixa no Hono sem Express. |
+| F04-12 | Manutenção do índice FTS5 | gatilhos SQL na migration · hooks nos repos (como o cartão) | **Aguarda o dono. Recomendação: gatilhos SQL.** O índice fica consistente em qualquer escrita (inclusive migrations e reset), e o FTS5 do `node:sqlite` com `remove_diacritics` foi verificado; os hooks nos repos esqueceriam escritas feitas por SQL direto. |
+| F04-13 | Canal dos eventos de chat | o `/ws` atual com eventos `chat.*` + `sessionId` · `/ws/sessions/:id` por sessão | **Aguarda o dono. Recomendação: o `/ws` atual.** Já autentica, reconecta e valida pelo schema; com um usuário só, mandar os deltas a todas as abas custa pouco, e evita um segundo tipo de conexão. |
+| F04-14 | Instalação persistente do plugin no host | `claude plugin` (mecanismo de plugins locais vigente) · `--plugin-dir` a cada uso · só `claude mcp add` + skills copiadas para `~/.claude` | **Aguarda o dono. Recomendação: `claude mcp add` (garante as tools, F04-8) + plugin pelo mecanismo vigente na data da implementação**, conferido na documentação antes de codar; `--plugin-dir` só nos testes. |
+| F04-15 | Phoenix também no compose de produção | só no dev · dev e produção (perfil desligado) | **Aguarda o dono. Recomendação: nos dois, sempre desligado por padrão**; quem usa a versão de produção também pode querer inspecionar as conversas localmente, e o perfil não sobe nada sem `--profile observability`. |
 
 ---
 
 ## 6 · O que precisa estar coberto para o F04 funcionar
 
-### 6.1 Pré-requisitos e dependências
-1. F01, F02, F03 concluídos (tools `profile.*`, `ingest.*`, `file.*` já com handlers em `core`).
-2. Migration `0004_chat.sql` (§3).
-3. `packages/shared`: schemas de todas as tools (`evidence.*`, `fact.*`, `research.*`, `job.*`, `session.*`, `usage.log`, `ui.suggest_action`), eventos WS da sessão.
-4. `packages/core`: handlers restantes (`evidence/tools.ts`, `facts/tools.ts`, `research/tools.ts`, `jobs/tools.ts`), FTS5 para `fact.search`.
-5. `apps/api`: `mcp/server.ts` + registro + auth; `chat/SessionManager`; provider `openSession`; rotas §2.6; `MockProvider` com roteiro de tool calls.
-6. `plugin/` completo; `narnia-jobs install-plugin`, `doctor`.
-7. `apps/web`: Chat, painel Contexto, Configurações › Chat/Modo plugin.
-8. Fixtures: roteiros do mock (carreira, clarificação, pesquisa com fonte), perfil com `needs_research`.
+### 6.1 Marcos de implementação (ordem obrigatória; TDD como em `../09-metodologia-tdd.md`; só na instância `claude`; a do dono recebe por `promote`)
+
+| Marco | Entrega | Verificação |
+|-------|---------|-------------|
+| **M1 Dados e tools** | `0004_chat.sql` (sessões, mensagens, pesquisa, domínios semeados, `fact_fts` com gatilhos e carga inicial, colunas de `usage_event`) com teste de upgrade; schemas `shared/mcp/{evidence,fact,research,job,session,usage,ingest-chat}.ts` e eventos `chat.*`; handlers puros no `core` (`evidence.*`, `fact.*`, `research.*`, `job.*`, `session.*`, `usage.log`, `ingest.text/file/github` que só criam execuções); `renderRecruiterPrompt` | unitários de `shared` e `core`; busca FTS com acento e prefixo; teste de upgrade |
+| **M2 Servidor MCP e plugin** | `apps/api/src/mcp/` (transporte, auth, registro, `scopes` pelo header da sessão, `friendlyError`); `plugin/` completo; rota `GET /api/profiles/active/persona-card` para o hook; `session-start.sh`; teste de prompt fora do plugin | cliente MCP de teste: `initialize`, `tools/list` por escopo, `tools/call` de cada tool, 401 sem token, erro tipado como `isError` |
+| **M3 Sessões no api** | `openChat` no provider (Claude Code e mock com roteiros que chamam o `/mcp` real), `SessionManager` (teto 5 com 409 e escolha, hibernação 1 h, `resume`, nota de cartão, `maxTurns`, `maxBudgetUsd`, modelo por sessão), rotas de sessão e mensagens, clarificação, eventos `chat.*`, medidor e dedupe com `usage.log` | unitários de api e providers; prova com mock: abrir 6 sessões, hibernar, retomar, ingestão pela conversa abre execução com confirmação |
+| **M4 Web** | `/chat` com abas, mensagens, chips, composer com anexo, uso, painel Contexto, `ResearchCard`, Configurações › Chat/Pesquisa/Modo plugin, "Chat" no menu do perfil atual, botão "Clarificar" habilitado na revisão da F03 | unitários web; smoke no navegador contra a instância `claude` |
+| **M5 Modo B e Phoenix** | `install-plugin` e `doctor` (`start.sh`/`start.ps1`, nas duas instâncias), Phoenix no perfil `observability`, OTel no api/worker, `evals/chat/` + `scripts/claude-env.sh evals` | bats/Pester; `claude -p` com `--plugin-dir plugin/` contra a instância `claude` devolve o cartão (manual com credencial real); rastro aparece no Phoenix local |
+| **M6 E2E e fechamento** | cenários de §6.3, documentos `../02`, `../03 §4–5, §10, §13`, `../07`, README; §8 | `scripts/claude-env.sh e2e` verde; §6.5 |
 
 ### 6.2 Testes unitários (Vitest) · obrigatórios
-**`packages/core`**
-- Handlers de tools: cada um valida entrada/saída pelo schema; `evidence.*.list` devolve 1 linha por item e pagina; `fact.search` com FTS5 (acentos, prefixo); `research.save` normaliza URL e exige `used_for`; `job.status` para job de outro perfil → erro tipado.
-- `scopes`: registro filtra por categoria; tool fora do escopo → erro `tool_not_in_scope`.
+**`packages/shared`:** schemas de todas as tools novas com snapshot do JSON Schema (sem `$schema`); eventos `chat.*` na união do `WsEventSchema`.
 
-**`apps/api`**
-- Servidor MCP com cliente MCP de teste (`@modelcontextprotocol/sdk` client sobre HTTP em memória): `initialize`, `tools/list` reflete scopes, `tools/call` para cada tool com fixtures, 401 sem token, erros tipados chegam como `isError`.
-- `SessionManager`: abre até N sessões, enfileira a N+1, hiberna por inatividade (timer fake), acorda com `resume`, encerra no `DELETE`, sobrevive a erro do processo (estado `error`, sem vazar processo).
-- Provider `openSession` (SDK mockado): opções exatas (`plugins`, `systemPrompt`, `tools: ["WebSearch"]`, `model`, `resume`); normaliza `text_delta`, `tool_use`, `tool_result`, `result` → eventos WS; `usage` do `result` vira `usage_event` com `session_id`/`category`; dedupe com `usage.log`.
-- Parser/handler de ações: `ui.suggest_action` gera evento; regex fallback.
-- Hook `SessionStart`: script devolve cartão com `api` no ar; aviso sem derrubar com `api` fora.
-- Clarificação: `POST /ingestions/:id/clarify` cria sessão com categoria e `ingestion_run_id`; propostas geradas via tool entram no run certo.
+**`packages/core`:**
+- Migration 0004: upgrade a partir de 0003 com dados preserva tudo; `fact_fts` carregada com os fatos existentes; gatilhos mantêm o índice em insert/update/delete de cada tabela de fato e de digests.
+- `fact.search`: acento (`computacao` acha "Computação"), prefixo, filtro por tipo e período, ordenação pela relevância do perfil; linhas de 30–40 tokens.
+- `evidence.*.list` uma linha por item e paginação; `get` detalhe.
+- `research.save`: normaliza URL, exige `used_for`, rejeita domínio fora da lista (`untrusted_domain`), aceita máscara `*.gov.br`; `research.list` por perfil.
+- `ingest.text/file/github`: criam execução pelo mesmo caminho da UI (`ingestionRuns.create` + etapas; `createGithub` + `prepareTask`), devolvem estimativa e `needsConfirmation`; nunca gravam fatos; GitHub sempre pede confirmação (F03-13).
+- `usage.log`: grava com `origin = claude-log`; ignora duplicata do mesmo `provider_session_id` + `turn_index`.
+- `renderRecruiterPrompt`: preenche todos os placeholders; falha se sobrar algum; persona configurável da F02 refletida.
+- Montar os dados dos testes pelo mesmo caminho da produção (lição registrada na F03 §8).
 
-**`apps/web`**
-- `SessionTabs`: cria, troca, arquiva; filtra por perfil ativo; `profile.switched` troca o conjunto.
-- `MessageList`: renderiza stream incremental, chips de tool, botão de ação dispara navegação; `ResearchCard` aceitar/ignorar chama API.
-- `Composer`: envia, desabilita durante streaming, "parar" envia abort.
-- `SessionUsage`: atualiza em `turn_end`; mostra limite atingido.
+**`apps/api`:**
+- `/mcp` com cliente MCP de teste sobre o `app.fetch`: `initialize`, `tools/list` respeita o escopo do header da sessão, `tools/call` de cada tool, 401 sem token, erro tipado → `isError` com texto amigável.
+- `SessionManager` com provider fake: 5 vivas, a 6ª → 409 `session_limit` com a lista; hibernação por relógio fake; `resume` na mensagem seguinte; erro do processo → `error` sem processo órfão; nota de cartão quando o `hash` muda; modelo por sessão.
+- Clarificação: `POST /ingestions/:id/clarify` cria sessão `clarify`; `ingest.propose` só aceita o `runId` da sessão.
+- Rota do hook devolve persona + cartão; 401 sem token.
 
-### 6.3 Testes e2e (Playwright, Chromium) · obrigatórios
-Compose com `NARNIA_PROVIDER=mock`; o mock executa roteiros que chamam o `/mcp` real (as tools são reais, só o modelo é falso).
-- **E2E-01 conversa de carreira**: abrir Chat → recrutador se apresenta com cargo/área do perfil ativo → perguntar "o que está fraco?" → chip `experience.list` aparece → resposta cita fonte do fato → uso da sessão > 0.
-- **E2E-02 abas e perfis**: abrir 2 sessões no perfil A → trocar para B → abas de A somem → voltar → abas de A reaparecem com histórico.
-- **E2E-03 retomada**: fechar o navegador no meio → reabrir → sessão hibernada → enviar mensagem → acorda e responde (mock responde a `resume`).
-- **E2E-04 limite de sessões**: abrir 4 sessões → a 4ª fica "na fila" → fechar uma → a 4ª inicia.
-- **E2E-05 pesquisa**: perfil com `needs_research` em salário → perguntar → mock chama `WebSearch` (simulado) e `research.save` → `ResearchCard` com fonte → "usar este valor" → perfil atualizado com `source.kind = pesquisa`.
-- **E2E-06 clarificação**: concluir ingestão de texto livre (F03) → "Clarificar" → sessão faz pergunta → responder → proposta nova aparece na revisão.
-- **E2E-07 ação sugerida**: mock emite `ui.suggest_action("gerar-cv")` → botão aparece → clique leva à rota (ou "em breve").
-- **E2E-08 provider deslogado**: mock em `loggedOut` → chat mostra instrução de login e não cria sessão.
-- **E2E-09 modo B smoke** (job de CI separado, com CLI real e `claude -p` + `--plugin-dir plugin/` + `NARNIA_PROVIDER` irrelevante): `claude -p "/narnia-jobs:perfil" --max-turns 2` contra o `api` do compose devolve o cartão do perfil ativo. Marcado como opcional na CI quando não houver credencial; obrigatório antes de fechar F04 localmente.
-- **E2E-10 porta mudou**: alterar `NARNIA_PORT` → `install-plugin` reescreve `.mcp.json` → `doctor` lista tools.
+**`packages/providers`:** `openChat` monta as opções exatas (`plugins`, `mcpServers` http com header de sessão, `systemPrompt`, `tools`, `model`, `resume`, `includePartialMessages`, `env.NARNIA_SESSION_HAS_CARD`); normaliza `stream_event`, `assistant`, tool use/result e `result` em `ChatEvent`; mock executa roteiros chamando o `/mcp` real.
 
-- **E2E-11 ingestão pela conversa** (mock): colar texto de carreira no chat → recrutador chama `ingest.text` → execução criada → revisão com propostas e pendência; anexar PDF → `ingest.file`; link do GitHub → `ingest.github` → confirmação do GitHub exigida antes de rodar.
-- **Avaliações do chat (Phoenix, sob demanda, com assinatura real):** dataset versionado em `evals/chat/` com conversas de referência (pedir pontos fracos, pedir salário de mercado, mandar texto livre, pedir CV sem vaga) e avaliadores: cita fonte, não inventa data/empresa, pede confirmação antes de gravar, respeita orçamento; resultados ficam no Phoenix local.
+**`apps/web`:** abas por perfil e troca por `profile.switched`; stream incremental; chips de tool; composer desabilita durante o turno e "parar" interrompe; teto de sessões com escolha; `ResearchCard` aceitar/ignorar; Configurações › Pesquisa edita a lista; botão "Clarificar" habilitado abre a sessão; i18n e `friendlyError`.
 
-### 6.4 Teste manual com provider real (antes de fechar F04)
-Com assinatura real: (1) conversa de 20 turnos no modo A medindo tokens por turno e comparando com `usage_event`; (2) a mesma conversa no modo B no terminal e no app desktop; (3) pesquisa salarial real para um cargo em pt-BR e en-US, avaliando fontes e citação; (4) clarificação de um texto livre real; (5) troca de perfil no meio e verificação da persona. Registrar em §8 os tokens do cartão (F02 §6.4) e a diferença entre modos A e B por turno.
+### 6.3 Testes e2e (Playwright, Chromium)
+Compose e2e com `NARNIA_PROVIDER=mock`; os roteiros do mock chamam o `/mcp` real (tools reais, modelo falso).
+- **E2E-01 conversa de carreira**: abrir Chat → recrutador se apresenta com cargo/área do perfil → "o que está fraco?" → chip `fact.search` → resposta cita fonte → uso da sessão > 0.
+- **E2E-02 abas e perfis**: 2 sessões no perfil A → trocar para B → abas de A somem → voltar → reaparecem com histórico.
+- **E2E-03 retomada**: sessão hibernada (relógio de teste) → enviar mensagem → retoma com `resume`.
+- **E2E-04 teto de sessões**: abrir a 6ª → diálogo pede qual encerrar → escolher → a nova abre.
+- **E2E-05 pesquisa**: `needs_research` em salário → mock chama `WebSearch` simulado e `research.save` → `ResearchCard` → "usar este valor" → perfil atualizado com fonte; domínio fora da lista pede confirmação.
+- **E2E-06 clarificação**: ingestão de texto concluída → "Clarificar com o recrutador" → pergunta → resposta → proposta nova na revisão da mesma execução.
+- **E2E-07 ingestão pela conversa**: colar texto → `ingest.text` → execução criada → pendência de revisão; anexar PDF → `ingest.file`; link do GitHub → `ingest.github` → confirmação exigida antes de rodar.
+- **E2E-08 provider deslogado**: mock `loggedOut` → chat mostra instrução de login e não abre sessão.
+- **E2E-09 modo B** (manual/CI opcional com credencial): `claude -p "/narnia-jobs:perfil" --plugin-dir plugin/ --max-turns 2` contra a instância `claude` devolve o cartão.
+- **E2E-10 porta mudou**: `install-plugin` reescreve `.mcp.json`; `doctor` lista as tools.
+- **Avaliações do chat (Phoenix, sob demanda, assinatura real)**: `evals/chat/` com conversas de referência e avaliadores (cita fonte, não inventa data/empresa, pede confirmação antes de gravar, respeita orçamento e lista de domínios); resultados no Phoenix local.
+
+### 6.4 Teste manual com provider real (antes de fechar)
+(1) conversa de 20 turnos no modo A medindo tokens por turno contra `usage_event` e o efeito do cache de prompt; (2) a mesma conversa no modo B no terminal; (3) pesquisa salarial real pt-BR e en-US, avaliando fontes e a lista de domínios; (4) clarificação de um texto livre real; (5) ingestão pela conversa (texto, PDF, GitHub) com o dono; (6) troca de perfil no meio e nota de cartão atualizado; registrar tokens do cartão (F02 §6.4) e a diferença A × B por turno.
 
 ### 6.5 Definição de pronto
-- Testes 6.2 e 6.3 verdes; E2E-09 executado ao menos localmente com credencial real.
-- Nenhuma string de persona/instrução fora de `plugin/` (teste que procura por marcadores de prompt em `apps/`).
-- Todas as tools de `../03 §5` expostas e cobertas por teste de `tools/call`.
-- `tokens_est` do cartão (F02) calibrado contra o real.
-- `../03 §4, §5, §10, §13` e `../07` atualizados.
+- §6.2 e §6.3 verdes (E2E-09 executado localmente com credencial real); cobertura ≥ 80% em `core/src/{chat,research,facts}/**`.
+- Nenhum texto de persona/instrução fora de `plugin/` (teste de varredura).
+- Todas as tools de §2.3 expostas e cobertas por `tools/call`.
+- `tokensEst` do cartão (F02) calibrado contra o real.
+- Phoenix desligado por padrão e nenhum dado sai da máquina (teste que confere a ausência de exportador sem `NARNIA_OTEL_ENDPOINT`).
+- `../02`, `../03 §4, §5, §10, §13`, `../07` e README atualizados; `promote` avisado ao dono ao fechar cada marco.
 
 ---
 
 ## 7 · Riscos específicos
 | Risco | Mitigação |
 |-------|-----------|
-| Política da Anthropic sobre login de assinatura em wrappers (modo A) | modo B entregue na mesma task e tratado como primeira classe; `README` explica |
-| Mecanismo de instalação de plugins locais mudar | instalador isola o passo; `claude mcp add` garante as tools; `--plugin-dir` nos testes |
-| Processos do CLI consumirem memória com várias sessões | limite + hibernação (F04-3/4); monitor em `doctor` |
-| Agente pesquisar além do permitido | `WebSearch` só com `scopes` de categoria carreira/clarificação; prompt restringe; `research_source` audita |
-| Hook `SessionStart` falhar sem `api` | aviso e fallback: skill `perfil` recarrega o cartão |
-| Formato de eventos do SDK mudar (0.3.x) | normalizador com testes por fixture de versão; SDK fixado |
+| Política da Anthropic sobre login de assinatura em wrappers (modo A) | modo B de primeira classe na mesma task; README explica |
+| Processos do CLI consumindo memória | teto de 5 + hibernação 1 h; `init: true` recolhe órfãos; `doctor` mostra sessões vivas |
+| Reinício do `api` derruba conversas | hibernação + `resume` transparente; `.owner-src` limita reinícios na instância do dono |
+| Mecanismo de plugins locais mudar | `install-plugin` isola o passo; `claude mcp add` garante as tools; conferir a documentação na implementação (F04-14) |
+| Agente pesquisar fora do permitido | lista de domínios com máscara, `research.save` recusa fora da lista, prompt restringe, auditoria em `research_source` |
+| Hook `SessionStart` falhar no modo B | aviso visível; skill `perfil` recarrega o cartão |
+| Formato de eventos do SDK mudar | normalizador com testes por fixture da versão 0.3.292; SDK fixado |
+| Ingestão pela conversa gastar demais | estimativa e confirmação dos pipelines da F03 (GitHub sempre confirma; CV/texto até 10 mil seguem) |
 
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
@@ -226,4 +260,4 @@ Com assinatura real: (1) conversa de 20 turnos no modo A medindo tokens por turn
 | 2026-10-11 | — | **Decisões do dono:** observabilidade e avaliações do chat com **Arize Phoenix local** (LangSmith descartado: auto-hospedagem só no Enterprise; Langfuse e promptfoo considerados); F04-6 **só texto** na F04, botões na F05. Escopo ampliado com ingestão pela conversa (`ingest.text/file/github`) e com os testes correspondentes. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** (1) **testes do chat com LangSmith** (datasets e avaliações das conversas do recrutador); envia conversas e dados de carreira a um serviço externo, por isso entra opcional, desligado por padrão, com a chave do próprio usuário e aviso de privacidade; (2) o recrutador **ingere qualquer informação durante a conversa** e atualiza os dados do usuário por tools: texto livre, PDF/currículo enviado no chat e link do GitHub, reaproveitando os pipelines da F01/F03 (as propostas vão para a revisão; nada é gravado direto); (3) análise de vaga, CV com/sem vaga alvo e candidaturas pelo chat (registradas nas tasks F06, F05 e F07). |
 | 2026-10-11 | — | **Decisões do dono:** F04-2 lazy load real (`scopes`); F04-3 **5 sessões vivas**, configurável, e ao atingir o teto **perguntar qual sessão encerrar**; F04-4 hibernação após **1 h**, configurável; F04-5 **lista padrão de domínios confiáveis**, editável em Configurações, cadastro por domínio com máscara (ex. `*.gov.br`); F04-7 token no header; F04-8 plugin + `claude mcp add`; F04-9 **Sonnet padrão, configurável por sessão**. F04-1 e F04-6 aguardam explicação ao dono. |
-(Preencher durante a implementação: datas, medições de 6.4, decisões tomadas.)
+| 2026-10-11 | — | **Refinamento contra o código.** Gaps: (1) `Provider` só tem chamadas de um tiro: falta sessão longa (`openChat` sobre `query` com entrada em streaming, `streamInput`, `interrupt`, `setModel`); (2) `plugin/` não existe e `install-plugin` é só uma mensagem; (3) `@modelcontextprotocol/sdk` 1.32.1 só como dependência transitiva; o transporte web padrão encaixa no Hono; (4) das tools do plano, só `profile.*`, `file.*`, `ingest.status/propose` têm handler; faltam `evidence.*`, `fact.*`, `research.*`, `job.*`, `session.*`, `usage.log` e `ingest.text/file/github`; (5) FTS5 ausente, mas funciona no `node:sqlite` 22.23 com `remove_diacritics` (verificado); (6) o `/ws` transmite tudo a todos, sem canal por sessão; (7) `usage_event` já tem `session_id`, faltam `provider_session_id`/`turn_index`; (8) nenhuma chave de settings do chat; (9) a dependência F03 → F04 do plano antigo se inverteu: a clarificação agora é implementável e o botão da F03 é habilitado aqui; (10) o SDK 0.3.292 tem `maxBudgetUsd` por sessão, que substitui o "maxBudget" do plano; (11) `install-plugin` precisa respeitar a instância para o Claude não registrar o servidor do dono; (12) "Chat" entra no grupo do perfil atual do menu. Decisões novas F04-10 a F04-15 aguardam o dono. |
