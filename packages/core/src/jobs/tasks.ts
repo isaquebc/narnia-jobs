@@ -95,3 +95,26 @@ export async function enqueueTask(input: EnqueueTaskInput): Promise<EnqueueTaskR
 }
 
 export { DEFAULT_JOB_OPTIONS as TASK_JOB_OPTIONS };
+
+/**
+ * Lê a tarefa a partir do espelho em `job`: `enqueueTask` grava a `TaskJobData` inteira em `payload`, então o
+ * `runId` fica em `payload.payload.runId` (regressão 2026-10-11: código que lia `payload.runId` nunca achava a execução).
+ */
+export function taskOfJob(job: Pick<Job, "queue" | "type" | "payload">): {
+  queue: Job["queue"];
+  type: string;
+  key: string;
+  payload: Record<string, unknown>;
+  runId: string | null;
+} | null {
+  const data = job.payload as Partial<TaskJobData>;
+  if (data.kind !== "task" || typeof data.key !== "string") return null;
+  const payload = (data.payload ?? {}) as Record<string, unknown>;
+  return {
+    queue: job.queue,
+    type: data.type ?? job.type,
+    key: data.key,
+    payload,
+    runId: typeof payload.runId === "string" ? payload.runId : null,
+  };
+}

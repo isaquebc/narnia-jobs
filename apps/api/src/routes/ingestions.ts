@@ -15,6 +15,7 @@ import {
   resolveIngestSettings,
   splitBudget,
   type TaskRequest,
+  taskOfJob,
   trackInvalidation,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
@@ -376,19 +377,14 @@ export function healStuckRun(repos: Repos, runId: string): boolean {
   if (!run || !IN_PROGRESS.has(run.status)) return false;
   const jobs = repos.jobs
     .list({ limit: 1000 })
-    .filter((j) => j.type.startsWith("ingest.") && j.payload.runId === runId);
+    .filter((j) => j.type.startsWith("ingest.") && taskOfJob(j)?.runId === runId);
   if (jobs.length === 0 || jobs.some((j) => LIVE_JOB.has(j.status))) return false;
   const failed = jobs.find((j) => j.status === "error");
-  if (!failed) return false;
-  const prefix = `task__${failed.type}__`;
+  const task = failed ? taskOfJob(failed) : null;
+  if (!failed || !task) return false;
   repos.ingestionRuns.setParams(runId, {
     ...run.params,
-    failedTask: {
-      queue: failed.queue,
-      type: failed.type,
-      key: failed.id.startsWith(prefix) ? failed.id.slice(prefix.length) : runId,
-      payload: failed.payload,
-    },
+    failedTask: { queue: task.queue, type: task.type, key: task.key, payload: task.payload },
   });
   repos.ingestionRuns.setStatus(runId, "error", { error: failed.error ?? "Tarefa falhou" });
   return true;

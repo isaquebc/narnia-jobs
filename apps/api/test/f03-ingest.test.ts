@@ -479,7 +479,13 @@ describe('Regressão 2026-10-11 · tarefa que falha de vez não deixa a execuç�
       type: "ingest.github.synthesis",
       parentId: null,
       profileId: null,
-      payload: { runId: body.id },
+      // formato real do espelho (enqueueTask grava a tarefa inteira; o runId fica em payload.payload)
+      payload: {
+        kind: "task",
+        type: "ingest.github.synthesis",
+        key: body.id,
+        payload: { runId: body.id },
+      },
       stage: "ingest.github.synthesis",
       at,
     });
@@ -498,6 +504,9 @@ describe("Regressão 2026-10-11 · execução presa antes da correção se recup
   it("running sem job ativo e com tarefa em erro vira erro com a tarefa guardada; o retry refaz só ela", async () => {
     t = makeTestApp();
     const { body } = await createGithubRun(t);
+    // como na instância do dono: a preparação já terminou
+    for (const j of t.repos.jobs.list({ status: "queued" }))
+      t.repos.jobs.applyEvent({ jobId: j.id, type: "completed", at: new Date().toISOString() });
     t.repos.ingestionRuns.setStatus(body.id, "running");
     const at = new Date().toISOString();
     const jobId = `task__ingest.github.synthesis__${body.id}`;
@@ -507,7 +516,13 @@ describe("Regressão 2026-10-11 · execução presa antes da correção se recup
       type: "ingest.github.synthesis",
       parentId: null,
       profileId: null,
-      payload: { runId: body.id },
+      // formato real do espelho (enqueueTask grava a tarefa inteira; o runId fica em payload.payload)
+      payload: {
+        kind: "task",
+        type: "ingest.github.synthesis",
+        key: body.id,
+        payload: { runId: body.id },
+      },
       stage: "ingest.github.synthesis",
       at,
     });
@@ -538,7 +553,13 @@ describe("Regressão 2026-10-11 · execução presa antes da correção se recup
       type: "ingest.github.repo",
       parentId: null,
       profileId: null,
-      payload: { runId: body.id },
+      // formato real do espelho (enqueueTask grava a tarefa inteira; o runId fica em payload.payload)
+      payload: {
+        kind: "task",
+        type: "ingest.github.repo",
+        key: body.id,
+        payload: { runId: body.id },
+      },
       stage: "ingest.github.repo",
       at,
     });

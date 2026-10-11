@@ -1,4 +1,5 @@
 import type { Repos } from "@narnia-jobs/core";
+import { taskOfJob } from "@narnia-jobs/core";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
@@ -55,7 +56,7 @@ export function jobsRoutes(deps: { repos: Repos; queue: QueueAdapter }) {
     if (!ok) return apiError(c, 500, "retry_failed", "Não foi possível reenfileirar o job");
     if (job.parentId) deps.repos.ingestionRuns.setStatus(job.parentId, "running");
     // tarefa de ingestão (GitHub, reconciliação, conferência): a execução com erro volta a rodar para não ignorar o job
-    const taskRun = typeof job.payload.runId === "string" ? job.payload.runId : null;
+    const taskRun = taskOfJob(job)?.runId ?? null;
     if (!job.parentId && taskRun && job.type.startsWith("ingest.")) {
       const run = deps.repos.ingestionRuns.get(taskRun);
       if (run?.status === "error") {
