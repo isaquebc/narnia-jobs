@@ -16,6 +16,8 @@ export const NOTIFICATION_KINDS = [
   "data.recreated",
   "snapshots.over_cap",
   "ingestion.awaiting_confirmation",
+  /** Execução sem sinal de atividade há mais de 2 minutos (plano de comunicação C3). */
+  "ingestion.stuck",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

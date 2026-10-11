@@ -17,6 +17,7 @@ import {
   mapSdkUsageResponse,
   PROMPTS,
   type QueryFn,
+  runWithActivity,
   type SdkMessageLike,
 } from "../src/index";
 
@@ -369,5 +370,47 @@ describe("F03/M3 providers · MockProvider da ingestão", () => {
     expect(await m.getPlanUsage()).toBeNull();
     m.setMode({ planUsage: { ...MOCK_PLAN_USAGE, subscription: "pro" } });
     expect((await m.getPlanUsage())?.subscription).toBe("pro");
+  });
+});
+
+describe("Comunicação C3 · batimento por job durante a chamada ao modelo", () => {
+  it("cada mensagem do stream chama o observador de atividade do job; pede fragmentos parciais só como sinal", async () => {
+    const msgs: SdkMessageLike[] = [
+      { type: "stream_event" } as SdkMessageLike,
+      { type: "stream_event" } as SdkMessageLike,
+      { type: "assistant" } as SdkMessageLike,
+      result({ files: [{ path: "README.md", reason: "visão geral" }] }),
+    ];
+    const query = fakeQuery(msgs);
+    const p = new ClaudeCodeProvider({ exec, query, binaryPath: "/bin/claude" });
+    let beats = 0;
+    await runWithActivity(
+      () => {
+        beats++;
+      },
+      () =>
+        p.pickFiles({
+          repo: "ana/api",
+          candidates: ["README.md"],
+          tree: ["README.md"],
+          maxFiles: 1,
+          model: "haiku",
+        }),
+    );
+    expect(beats).toBe(4);
+    expect(query.captured[0]?.options.includePartialMessages).toBe(true);
+  });
+
+  it("fora de um job (sem observador) a chamada funciona igual", async () => {
+    const query = fakeQuery([result({ files: [{ path: "README.md", reason: "visão geral" }] })]);
+    const p = new ClaudeCodeProvider({ exec, query, binaryPath: "/bin/claude" });
+    const r = await p.pickFiles({
+      repo: "ana/api",
+      candidates: ["README.md"],
+      tree: ["README.md"],
+      maxFiles: 1,
+      model: "haiku",
+    });
+    expect(r.output.files.map((f) => f.path)).toEqual(["README.md"]);
   });
 });

@@ -1,6 +1,15 @@
 #!/usr/bin/env bats
 # Testes do lançador start.sh (funções puras). Rodar com: ./start.sh test:sh (bats dentro da imagem de dev)
 
+docker_compose_service_has_init() { # docker_compose_service_has_init ARQUIVO SERVIÇO -> 0 se o serviço declara init: true
+  awk -v svc="  $2:" '
+    $0 == svc { inside = 1; next }
+    inside && /^  [a-z]/ { inside = 0 }
+    inside && /^    init: true/ { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$1"
+}
+
 setup() {
   source "$BATS_TEST_DIRNAME/../../start.sh"
   TMP=$(mktemp -d)
@@ -253,4 +262,13 @@ docker_spy() { # substitui o docker por um registrador de chamadas em $TMP/calls
   [[ -n "$chown_line" && -n "$write_line" ]]
   grep -q "chown node:node /home/node/.config/gh" "$TMP/calls"
   (( chown_line < write_line ))
+}
+
+@test "api e worker rodam com init (tini como PID 1 recolhe processos claude mortos; plano de comunicação C3)" {
+  for f in docker-compose.yml docker-compose.dev.yml; do
+    for svc in api worker; do
+      run docker_compose_service_has_init "$f" "$svc"
+      [ "$status" -eq 0 ] || { echo "$f:$svc sem init: true"; return 1; }
+    done
+  done
 }

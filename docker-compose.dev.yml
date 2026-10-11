@@ -34,6 +34,7 @@ services:
 
   api:
     <<: *dev
+    init: true   # tini como PID 1: recolhe processos claude mortos (plano de comunicação C3)
     profiles: ["app"]
     command: ["pnpm", "--filter", "@narnia-jobs/api", "exec", "tsx", "watch", "src/server.ts"]
     ports:
@@ -51,6 +52,7 @@ services:
 
   worker:
     <<: *dev
+    init: true   # tini como PID 1: recolhe processos claude mortos (plano de comunicação C3)
     profiles: ["app"]
     command: ["pnpm", "--filter", "@narnia-jobs/worker", "exec", "tsx", "watch", "src/main.ts"]
     environment:

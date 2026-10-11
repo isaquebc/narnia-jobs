@@ -25,6 +25,7 @@ import {
   toJsonSchema,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
+import { reportActivity } from "../activity";
 import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
@@ -96,6 +97,8 @@ export interface SdkMessageLike {
 
 export interface SdkQueryOptions {
   model: string;
+  /** Fragmentos parciais no stream (usado só como batimento por job, plano de comunicação C3). */
+  includePartialMessages?: boolean;
   tools: string[];
   allowedTools?: string[];
   maxTurns: number;
@@ -273,6 +276,8 @@ export class ClaudeCodeProvider implements Provider {
   ): Promise<ProviderResult<T>> {
     const fullOptions: SdkQueryOptions = {
       ...options,
+      // fragmentos parciais só como sinal de vida (CM-6); o texto não sai daqui
+      includePartialMessages: true,
       settingSources: [],
       ...(this.binaryPath ? { pathToClaudeCodeExecutable: this.binaryPath } : {}),
     };
@@ -282,6 +287,7 @@ export class ClaudeCodeProvider implements Provider {
         ? this.query({ prompt, options: fullOptions })
         : await defaultQuery({ prompt, options: fullOptions });
       for await (const message of stream) {
+        reportActivity();
         if (message.type === "result") result = message;
         if (message.type === "rate_limit_event" && message.rate_limit_info) {
           const info = message.rate_limit_info;

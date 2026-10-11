@@ -1,3 +1,4 @@
+export { reportActivity, runWithActivity } from "./activity";
 export { type ResolveBinaryOptions, resolveClaudeBinary } from "./claude-code/binary";
 export {
   ANALYZE_PROFILES_JSON_SCHEMA,

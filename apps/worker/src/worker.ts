@@ -17,15 +17,16 @@ import {
   type StageName,
   type TaskJobData,
 } from "@narnia-jobs/core";
-import type { Provider } from "@narnia-jobs/providers";
+import { type Provider, runWithActivity } from "@narnia-jobs/providers";
 import { nowUtc, type WsEvent } from "@narnia-jobs/shared";
-import { type Job, Queue, Worker } from "bullmq";
+import { Job, Queue, QueueEvents, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { handleQueueEvent } from "./events";
 import { withPlanSampling } from "./ingest/plan-sampling";
-import { type OcrDeps, onStageFailed, processStage, type WorkerDeps } from "./pipeline";
+import { createBeat, type FailedJobTarget, handleFinalFailure, runSweep } from "./liveness";
+import { type OcrDeps, processStage, type WorkerDeps } from "./pipeline";
 import { createQueues, QUEUE_NAMES } from "./queues";
-import { isTaskJob, onTaskFailed, processTask } from "./tasks";
+import { isTaskJob, processTask } from "./tasks";
 
 type JobData = StageJobData | TaskJobData;
 /** Rótulo de etapa para os eventos: etapas usam `stage`, tarefas usam o `type` (F02 §2.9-1). */
@@ -40,6 +41,8 @@ export interface StartWorkersOptions {
   ocr?: OcrDeps;
   concurrency?: Partial<Record<(typeof QUEUE_NAMES)[number], number>>;
   heartbeatMs?: number;
+  /** Intervalo do verificador de execuções presas (plano de comunicação C3); 0 desliga. */
+  sweepMs?: number;
   log?: (line: string) => void;
 }
 
@@ -118,16 +121,34 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       }).client,
   };
 
+  const seenFailures = new Set<string>();
+  const toTarget = (job: Job<JobData>): FailedJobTarget => ({
+    id: String(job.id),
+    queueName: job.queueName,
+    data: job.data,
+    attemptsMade: job.attemptsMade,
+    getState: () => job.getState(),
+  });
+
   const workers = QUEUE_NAMES.map((name) => {
     const worker = new Worker<JobData>(
       name,
       async (job) => {
         const data = job.data;
+        let lastPct = 0;
         const progress = async (pct: number, note?: string) => {
+          lastPct = pct;
           await job.updateProgress({ pct, stage: stageOf(data), note: note ?? null });
         };
-        if (isTaskJob(data)) return processTask(data, { jobId: String(job.id), progress }, deps);
-        return processStage(data, { runId: data.runId, jobId: String(job.id), progress }, deps);
+        // batimento por job durante chamadas longas ao modelo: no máximo um evento a cada 15 s (C3)
+        const beat = createBeat(() =>
+          job.updateProgress({ pct: lastPct, stage: stageOf(data), note: null, beat: true }),
+        );
+        return runWithActivity<unknown>(beat, () =>
+          isTaskJob(data)
+            ? processTask(data, { jobId: String(job.id), progress }, deps)
+            : processStage(data, { runId: data.runId, jobId: String(job.id), progress }, deps),
+        );
       },
       {
         connection,
@@ -175,28 +196,10 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
     });
     worker.on("failed", (job: Job<JobData> | undefined, err) => {
       if (!job) return;
-      const attempts = job.opts.attempts ?? 1;
-      if (job.attemptsMade < attempts) {
-        // ainda vai tentar de novo: não é falha definitiva
-        void handleQueueEvent(
-          { type: "progress", jobId: String(job.id), at: nowUtc(), stage: "retrying", progress: 0 },
-          ev,
-        );
-        return;
-      }
-      log(`[worker] falha definitiva em ${job.id}: ${err.message}`);
-      if (!isTaskJob(job.data)) void onStageFailed(job.data, err, deps);
-      else void onTaskFailed(job.data, err, deps, job.queueName);
-      void handleQueueEvent(
-        {
-          type: "failed",
-          jobId: String(job.id),
-          at: nowUtc(),
-          error: err.message,
-          attempts: job.attemptsMade,
-        },
-        ev,
-      );
+      // só é definitiva se a fila diz "failed"; com tentativa restante vira "tentando de novo" (C3)
+      void handleFinalFailure(toTarget(job), err.message, deps, seenFailures).then((final) => {
+        if (final) log(`[worker] falha definitiva em ${job.id}: ${err.message}`);
+      });
     });
     worker.on("stalled", (jobId) => {
       void handleQueueEvent({ type: "stalled", jobId, at: nowUtc() }, ev);
@@ -204,6 +207,46 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
     worker.on("error", (err) => log(`[worker:${name}] erro: ${err.message}`));
     return worker;
   });
+
+  // eventos da fila: o verificador de travados da BullMQ marca "failed" sem passar pelo worker que processava (C3)
+  const eventsConnection = new IORedis(opts.redisUrl, { maxRetriesPerRequest: null });
+  const queueEvents = QUEUE_NAMES.map((name) => {
+    const qe = new QueueEvents(name, { connection: eventsConnection, prefix });
+    qe.on("failed", ({ jobId, failedReason }) => {
+      void Job.fromId<JobData>(queues[name], jobId).then((job) => {
+        if (job) void handleFinalFailure(toTarget(job), failedReason, deps, seenFailures);
+      });
+    });
+    qe.on("error", (err) => log(`[worker:events:${name}] erro: ${err.message}`));
+    return qe;
+  });
+
+  // verificador periódico de execuções presas, com trava no Redis para dois workers não rodarem juntos (C3)
+  const sweepMs = opts.sweepMs ?? 60_000;
+  const sweep = () =>
+    runSweep(deps, {
+      acquire: async () =>
+        (await connection.set(
+          `${prefix}:sweeper`,
+          "1",
+          "EX",
+          Math.max(5, Math.floor(sweepMs / 1000) - 5),
+          "NX",
+        )) === "OK",
+      state: async (mirror) => {
+        const job = await Job.fromId(queues[mirror.queue], mirror.id);
+        if (!job) return { state: "missing" as const };
+        const raw = await job.getState();
+        const known = ["waiting", "active", "completed", "failed", "delayed"] as const;
+        const state = (known as readonly string[]).includes(raw)
+          ? (raw as (typeof known)[number])
+          : raw === "waiting-children" || raw === "prioritized"
+            ? ("waiting" as const)
+            : ("missing" as const);
+        return { state, failedReason: job.failedReason ?? null };
+      },
+    }).catch((err: Error) => log(`[worker] verificador: ${err.message}`));
+  const sweepTimer = sweepMs > 0 ? setInterval(() => void sweep(), sweepMs) : null;
 
   const ttlSeconds = Math.max(5, Math.ceil(((opts.heartbeatMs ?? 10_000) * 3) / 1000));
   const beat = async () => {
@@ -218,7 +261,10 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
     heartbeat: () => connection.get(heartbeatKey(prefix)),
     close: async () => {
       clearInterval(timer);
+      if (sweepTimer) clearInterval(sweepTimer);
       await Promise.all(workers.map((w) => w.close()));
+      await Promise.all(queueEvents.map((q) => q.close()));
+      await eventsConnection.quit();
       await Promise.all(Object.values(queues).map((q) => q.close()));
       await connection.quit();
       db.close();

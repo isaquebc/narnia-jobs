@@ -40,6 +40,7 @@ services:
 
   api:
     <<: *app
+    init: true   # tini como PID 1: recolhe processos claude mortos (plano de comunicação C3)
     command: ["/app/docker/entrypoint.sh"]
     environment:
       - NARNIA_DATA_DIR=/data
@@ -67,6 +68,7 @@ services:
 
   worker:
     <<: *app
+    init: true   # tini como PID 1: recolhe processos claude mortos (plano de comunicação C3)
     command: ["sh", "-c", "cd /app/apps/worker && exec ./node_modules/.bin/tsx src/main.ts"]
     depends_on:
       redis:
