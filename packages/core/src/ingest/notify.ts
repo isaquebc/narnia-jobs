@@ -66,7 +66,7 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
       ]);
       upsert(
         "review.pending",
-        `Revisão pendente: ${name}`,
+        `Pronta para revisão: ${name}`,
         `${pending.length} ${pending.length === 1 ? "proposta" : "propostas"} para revisar`,
         "info",
       );

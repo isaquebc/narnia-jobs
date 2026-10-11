@@ -15,33 +15,55 @@ export interface ProfileNotificationEvent {
   created: boolean;
 }
 
-/** Uma notificação por sugestão `new`; resolve as de sugestões já aceitas, dispensadas ou apagadas. */
+/** Assunto da notificação agrupada de sugestões (CM-3): uma só para todas as sugestões novas. */
+export const SUGGESTIONS_GROUP_ID = "all";
+
+/**
+ * Sugestões de perfil numa notificação única (CM-3): "Sugestão de perfil: X" com uma, "N sugestões de perfil" com
+ * várias; diminui conforme o dono decide e resolve em zero. Sugestão nova volta a acender o sino (não vista).
+ * Notificações antigas, uma por sugestão, são resolvidas (fundidas na agrupada) sem migration.
+ */
 export function syncSuggestionNotifications(repos: Repos): ProfileNotificationEvent[] {
   const events: ProfileNotificationEvent[] = [];
   const fresh = repos.suggestions.list({ status: "new" });
-  const freshIds = new Set(fresh.map((s) => s.id));
-  for (const s of fresh) {
-    const ev = repos.notifications.upsert({
-      kind: "profile.suggestion",
-      subjectKind: SUGGESTION_SUBJECT,
-      subjectId: s.id,
-      title: `Sugestão de perfil: ${s.payload.title}`,
-      body: s.payload.rationale || null,
-      actionUrl: PROFILES_URL,
-      severity: "info",
-    });
-    if (ev.created) events.push(ev);
-  }
-  const stale = repos.notifications
+  const openNow = repos.notifications
     .list({ status: "open" })
-    .filter((n) => n.kind === "profile.suggestion" && !freshIds.has(n.subjectId));
-  for (const n of stale) {
-    for (const r of repos.notifications.resolveSubject(SUGGESTION_SUBJECT, n.subjectId, [
+    .filter((n) => n.kind === "profile.suggestion");
+  for (const legacy of openNow.filter((n) => n.subjectId !== SUGGESTIONS_GROUP_ID)) {
+    for (const r of repos.notifications.resolveSubject(SUGGESTION_SUBJECT, legacy.subjectId, [
       "profile.suggestion",
-    ])) {
+    ]))
       events.push({ notification: r, created: false });
-    }
   }
+  const group = openNow.find((n) => n.subjectId === SUGGESTIONS_GROUP_ID) ?? null;
+  if (fresh.length === 0) {
+    if (group) {
+      for (const r of repos.notifications.resolveSubject(SUGGESTION_SUBJECT, SUGGESTIONS_GROUP_ID, [
+        "profile.suggestion",
+      ]))
+        events.push({ notification: r, created: false });
+    }
+    return events;
+  }
+  const previous = group ? Number(/^(\d+) /.exec(group.title)?.[1] ?? 1) : 0;
+  const title =
+    fresh.length === 1
+      ? `Sugestão de perfil: ${fresh[0]?.payload.title ?? ""}`
+      : `${fresh.length} sugestões de perfil`;
+  const ev = repos.notifications.upsert({
+    kind: "profile.suggestion",
+    subjectKind: SUGGESTION_SUBJECT,
+    subjectId: SUGGESTIONS_GROUP_ID,
+    title,
+    body: fresh.map((s) => s.payload.title).join("; "),
+    actionUrl: PROFILES_URL,
+    severity: "info",
+  });
+  let notification = ev.notification;
+  if (!ev.created && fresh.length > previous) {
+    notification = repos.notifications.markUnread(notification.id) ?? notification;
+  }
+  if (ev.created || fresh.length !== previous) events.push({ notification, created: ev.created });
   return events;
 }
 

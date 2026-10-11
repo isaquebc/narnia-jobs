@@ -111,6 +111,7 @@ export const confirmRun = (id: string) =>
 export interface NotificationRow {
   id: string;
   kind: string;
+  title: string;
   subjectId: string;
   actionUrl: string;
   resolvedAt: string | null;

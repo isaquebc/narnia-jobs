@@ -124,3 +124,21 @@ describe("F03/M4 · página de pendências (/pendencias)", () => {
     );
   });
 });
+
+describe("CM-3 web · ir para resolver marca a pendência como vista", () => {
+  it("clicar em 'Ir para resolver' chama a marcação de lida", async () => {
+    const readNotification = vi.fn(async () => ({ notification: notification() }));
+    renderApp({
+      api: {
+        ...shellApi,
+        listNotifications: vi.fn(async () => ({ notifications: [notification()], unresolved: 1 })),
+        readNotification,
+        dismissNotification: vi.fn(),
+      },
+      initialUrl: "/pendencias",
+    });
+    const link = await screen.findByRole("link", { name: "Ir para resolver" });
+    await userEvent.click(link);
+    expect(readNotification).toHaveBeenCalledWith("n1");
+  });
+});

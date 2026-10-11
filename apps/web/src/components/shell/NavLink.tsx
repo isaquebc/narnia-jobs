@@ -23,6 +23,7 @@ export function NavLink({
   search,
   className,
   ariaLabel,
+  onClick,
   children,
 }: {
   to: string;
@@ -33,6 +34,8 @@ export function NavLink({
   /** Query string tipada pela rota de destino (ex.: pré-preenchimento de `/perfis/novo`). */
   search?: Record<string, string | undefined>;
   className?: string;
+  /** Ação extra ao clicar (ex.: marcar a pendência como vista antes de navegar, CM-3). */
+  onClick?: () => void;
   children: ReactNode;
 }) {
   const router = useRouter({ warn: false });
@@ -42,6 +45,7 @@ export function NavLink({
         href={withSearch(withParams(to, params), search)}
         className={className}
         {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
+        {...(onClick ? { onClick } : {})}
       >
         {children}
       </a>
@@ -54,6 +58,7 @@ export function NavLink({
       {...(search ? { search: search as never } : {})}
       className={className}
       {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
+      {...(onClick ? { onClick } : {})}
       activeProps={{ className: `${className ?? ""} active` }}
     >
       {children}

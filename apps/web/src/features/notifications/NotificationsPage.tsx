@@ -44,6 +44,9 @@ function NotificationItem({
         {!n.resolvedAt ? (
           <NavLink
             to={n.actionUrl}
+            onClick={() => {
+              if (!n.readAt) onRead(n.id);
+            }}
             className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm text-primary-fg hover:opacity-90"
           >
             {t("notifications.go")}

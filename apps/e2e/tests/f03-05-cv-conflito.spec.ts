@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitFor } from "../helpers/api";
 import { fixture } from "../helpers/flows";
 import { freshStart, getRun, notifications, openIngestion, waitRun } from "../helpers/ingest";
 
@@ -14,10 +15,12 @@ test("F03/E2E-05 re-ingestão de CV com conflito: notificação, salvar bloquead
   const runId = page.url().split("/").pop() as string;
   await waitRun(runId, ["review"], 120_000);
 
-  const open = await notifications("open");
-  expect(
-    open.notifications.some((n) => n.kind === "review.conflicts" && n.subjectId === runId),
-  ).toBe(true);
+  // a notificação é gravada logo depois da mudança de status: espera curta em vez de leitura única
+  await waitFor(
+    () => notifications("open"),
+    (r) => r.notifications.some((n) => n.kind === "review.conflicts" && n.subjectId === runId),
+    { timeoutMs: 15_000, label: "notificação de conflito" },
+  );
 
   const review = page.getByRole("region", { name: "Revisão" });
   await expect(review.getByText("Conflito").first()).toBeVisible({ timeout: 30_000 });

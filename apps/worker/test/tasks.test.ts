@@ -83,7 +83,7 @@ describe("F02/M3 worker · jobs de tarefa (despacho stage | task) e profile.anal
     expect(h.progress.at(-1)).toBe(100);
   });
 
-  it("profile.analyze publica notificações: uma por sugestão nova e 'análise concluída' (F03-10)", async () => {
+  it("profile.analyze publica notificações: UMA agrupada de sugestões (CM-3) e 'análise concluída' (F03-10)", async () => {
     h = harness();
     seedFixture(h.repos, "leader");
     const events: Array<{ type: string; notification?: { kind: string; actionUrl: string } }> = [];
@@ -94,9 +94,11 @@ describe("F02/M3 worker · jobs de tarefa (despacho stage | task) e profile.anal
     const created = events
       .filter((e) => e.type === "notification.created")
       .map((e) => e.notification);
-    expect(created.filter((n) => n?.kind === "profile.suggestion").length).toBeGreaterThanOrEqual(
-      2,
-    );
+    expect(created.filter((n) => n?.kind === "profile.suggestion")).toHaveLength(1);
+    expect(
+      h.repos.notifications.list({ status: "open" }).find((n) => n.kind === "profile.suggestion")
+        ?.title,
+    ).toMatch(/^\d+ sugestões de perfil$/);
     expect(created.filter((n) => n?.kind === "profile.analysis_done")).toHaveLength(1);
     expect(created.every((n) => n?.actionUrl === "/perfis")).toBe(true);
     expect(

@@ -19,7 +19,8 @@ export function notificationsRoutes(deps: { repos: Repos; bus: EventBus }) {
       deps.bus.emit({ type: "notification.updated", notification: n });
     return c.json({
       notifications: deps.repos.notifications.list({ status: status ?? "open" }),
-      unresolved: deps.repos.notifications.countUnresolved(),
+      // contador do sino (CM-3): só as abertas que o dono ainda não viu
+      unresolved: deps.repos.notifications.countUnseen(),
     });
   });
 

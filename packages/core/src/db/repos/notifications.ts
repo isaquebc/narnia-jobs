@@ -34,11 +34,15 @@ export interface NotificationsRepo {
     kinds?: NotificationKind[],
   ): Notification[];
   markRead(id: string): Notification | null;
+  /** Volta a "não vista" (ex.: a agrupada de sugestões ganhou uma sugestão nova, CM-3). */
+  markUnread(id: string): Notification | null;
   dismiss(id: string): Notification | null;
   /** `open` (padrão): não resolvidas e não dispensadas; `resolved`; `all`. Mais novas primeiro. */
   list(filter?: { status?: "open" | "resolved" | "all" }): Notification[];
   /** Contador do sino: abertas e não dispensadas, sem as informativas (`INFORMATIONAL_KINDS`, FX-3). */
   countUnresolved(): number;
+  /** Contador do sino (CM-3): como `countUnresolved`, mas só as que o dono ainda não viu (`read_at` nulo). */
+  countUnseen(): number;
   /** Resolve as informativas abertas criadas antes de `now - INFORMATIONAL_TTL_DAYS` (FX-3); devolve as resolvidas. */
   expireInformational(now?: Date): Notification[];
 }
@@ -81,6 +85,7 @@ export function notificationsRepo(db: Db): NotificationsRepo {
   );
   const resolve = db.prepare("update notification set resolved_at = ? where id = ?");
   const read = db.prepare("update notification set read_at = coalesce(read_at, ?) where id = ?");
+  const unread = db.prepare("update notification set read_at = null where id = ?");
   const dismiss = db.prepare(
     "update notification set dismissed_at = coalesce(dismissed_at, ?) where id = ?",
   );
@@ -88,6 +93,9 @@ export function notificationsRepo(db: Db): NotificationsRepo {
   const informational = INFORMATIONAL_KINDS.map((k) => `'${k}'`).join(", ");
   const count = db.prepare(
     `select count(*) as n from notification where resolved_at is null and dismissed_at is null and kind not in (${informational})`,
+  );
+  const countUnseenStmt = db.prepare(
+    `select count(*) as n from notification where resolved_at is null and dismissed_at is null and read_at is null and kind not in (${informational})`,
   );
   const staleInformational = db.prepare(
     `select * from notification where resolved_at is null and kind in (${informational}) and created_at < ?`,
@@ -137,6 +145,10 @@ export function notificationsRepo(db: Db): NotificationsRepo {
       read.run(nowUtc(), id);
       return repo.get(id);
     },
+    markUnread(id) {
+      unread.run(id);
+      return repo.get(id);
+    },
     dismiss(id) {
       dismiss.run(nowUtc(), id);
       return repo.get(id);
@@ -151,6 +163,9 @@ export function notificationsRepo(db: Db): NotificationsRepo {
     },
     countUnresolved() {
       return Number((count.get() as { n: number }).n);
+    },
+    countUnseen() {
+      return Number((countUnseenStmt.get() as { n: number }).n);
     },
   };
   return repo;

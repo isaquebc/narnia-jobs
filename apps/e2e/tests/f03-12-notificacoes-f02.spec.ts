@@ -3,7 +3,7 @@ import { api, waitFor } from "../helpers/api";
 import { openApp } from "../helpers/flows";
 import { freshStart, notifications } from "../helpers/ingest";
 
-test("F03/E2E-12 notificações da F02: sugestão de perfil e análise concluída, resolvidas ao decidir e ao abrir Perfis", async ({
+test("F03/E2E-12 notificações da F02: sugestões agrupadas (CM-3) e análise concluída, resolvidas ao decidir e ao abrir Perfis", async ({
   page,
 }) => {
   await freshStart("leader");
@@ -29,8 +29,13 @@ test("F03/E2E-12 notificações da F02: sugestão de perfil e análise concluíd
     { timeoutMs: 60_000, label: `análise ${job.id} notificada` },
   );
 
-  // dispensar uma sugestão resolve a dela; abrir Perfis resolve a de análise concluída
-  await api(`/api/profiles/suggestions/${suggestion?.subjectId}/dismiss`, {
+  // CM-3: uma notificação agrupada para todas as sugestões; dispensar uma faz o grupo diminuir (ou resolver)
+  const { suggestions } = await api<{ suggestions: Array<{ id: string }> }>(
+    "/api/profiles/suggestions",
+  );
+  const groupBefore = open.notifications.find((n) => n.kind === "profile.suggestion");
+  expect(open.notifications.filter((n) => n.kind === "profile.suggestion")).toHaveLength(1);
+  await api(`/api/profiles/suggestions/${suggestions[0]?.id}/dismiss`, {
     method: "POST",
     body: "{}",
   });
@@ -41,7 +46,9 @@ test("F03/E2E-12 notificações da F02: sugestão de perfil e análise concluíd
     (r) => !r.notifications.some((n) => n.kind === "profile.analysis_done"),
     { timeoutMs: 15_000, label: "análise concluída resolvida" },
   );
-  expect(open.notifications.some((n) => n.subjectId === suggestion?.subjectId)).toBe(false);
+  const groupAfter = open.notifications.find((n) => n.kind === "profile.suggestion");
+  if (suggestions.length === 1) expect(groupAfter).toBeUndefined();
+  else expect(groupAfter?.title).not.toBe(groupBefore?.title);
   const resolved = await notifications("resolved");
   expect(resolved.notifications.some((n) => n.kind === "profile.analysis_done")).toBe(true);
 });

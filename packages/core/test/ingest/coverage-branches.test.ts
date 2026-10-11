@@ -548,7 +548,7 @@ describe("F03/M2 cobertura · tools, notificações e settings", () => {
     ]);
     expect(
       syncRunNotifications(repos, gh.id).map((e) => [e.notification.title, e.notification.body]),
-    ).toContainEqual(["Revisão pendente: GitHub (1 repositório)", "1 proposta para revisar"]);
+    ).toContainEqual(["Pronta para revisão: GitHub (1 repositório)", "1 proposta para revisar"]);
     const gh2 = repos.ingestionRuns.createGithub({
       provider: "mock",
       mode: "public",
