@@ -12,10 +12,13 @@ import { ingestionKey, useIngestion } from "../../hooks/useIngestion";
 import { type TKey, t } from "../../i18n";
 import type { IngestionDetail } from "../../lib/api";
 import { BudgetDecisionDialog } from "./BudgetDecisionDialog";
+import { FriendlyError } from "./FriendlyError";
 import { shortTokens } from "./format";
 import { STATUS_TONE } from "./PendingRuns";
 import { ReviewPanel } from "./ReviewPanel";
 import { RunReportView } from "./RunReportView";
+import { RunTimeline } from "./RunTimeline";
+import { runHeadline } from "./runHeadline";
 
 const ACTIVE = new Set(["estimating", "queued", "running"]);
 
@@ -44,7 +47,7 @@ function RepoProgress({ run }: { run: IngestionDetail }) {
             </li>
           ))}
         </ul>
-      ) : (
+      ) : run.timeline ? null : (
         <ul className="flex flex-col gap-1">
           {run.jobs.map((j) => (
             <li key={j.id} className="flex items-center justify-between text-sm">
@@ -91,6 +94,16 @@ export function RunPage({ runId }: { runId: string }) {
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (!run) return <p className="text-sm text-muted-fg">{t("app.loading")}</p>;
   const err = confirm.error ?? cancel.error ?? retry.error ?? decide.error;
+  const tl = run.timeline;
+  const progress = tl
+    ? {
+        current: tl.current,
+        total: tl.total,
+        stepKey: tl.current ? (tl.steps[tl.current - 1]?.key ?? null) : null,
+        stuck: tl.stuck,
+      }
+    : null;
+  const failedTask = run.failedTaskType ?? null;
 
   return (
     <div className="flex max-w-4xl flex-col gap-4">
@@ -99,11 +112,17 @@ export function RunPage({ runId }: { runId: string }) {
         <span className="text-sm text-muted-fg">
           {t(`ingestion.sources.${run.source ?? "cv"}` as TKey)}
         </span>
-        <Badge tone={STATUS_TONE[run.status] ?? "neutral"}>
-          {t(`run.status.${run.status}` as TKey)}
+        <Badge tone={progress?.stuck ? "warn" : (STATUS_TONE[run.status] ?? "neutral")}>
+          {runHeadline(run.status, progress)}
         </Badge>
       </div>
       {err ? <Alert tone="danger">{describeError(err).title}</Alert> : null}
+
+      {tl ? (
+        <Card>
+          <RunTimeline timeline={tl} />
+        </Card>
+      ) : null}
 
       {run.status === "awaiting_confirmation" ? (
         <Card className="flex flex-col gap-3">
@@ -165,12 +184,23 @@ export function RunPage({ runId }: { runId: string }) {
 
       {run.status === "error" ? (
         <Alert tone="danger" className="flex flex-col gap-2">
-          <span>{run.error ?? t("app.unknownError")}</span>
+          {run.errorFriendly ? (
+            <FriendlyError error={run.errorFriendly} />
+          ) : (
+            <span>{run.error ?? t("app.unknownError")}</span>
+          )}
           {run.source === "github" ? (
-            <div>
-              <Button size="sm" onClick={() => retry.mutate()}>
-                {t("app.retry")}
-              </Button>
+            <div className="flex flex-col gap-1">
+              <div>
+                <Button size="sm" onClick={() => retry.mutate()}>
+                  {failedTask
+                    ? t(`runPage.redo.${failedTask.replace(/\./g, "_")}` as TKey)
+                    : t("app.retry")}
+                </Button>
+              </div>
+              {failedTask && failedTask !== "ingest.github.prepare" ? (
+                <span className="text-xs">{t("runPage.redoKeeps")}</span>
+              ) : null}
             </div>
           ) : null}
         </Alert>

@@ -6,6 +6,7 @@ import { NavLink } from "../../components/shell/NavLink";
 import { Badge } from "../../components/ui/badge";
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
+import { runHeadline } from "./runHeadline";
 
 /** Estados em que a execução ainda está andando ou espera o usuário (lista de pendências, F03-3 §6). */
 export const OPEN_STATUSES: RunStatus[] = [
@@ -64,8 +65,8 @@ export function PendingRuns() {
               <span className="text-xs text-muted-fg">{formatDate(r.createdAt, tz)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Badge tone={STATUS_TONE[r.status] ?? "neutral"}>
-                {t(`run.status.${r.status}` as TKey)}
+              <Badge tone={r.progress?.stuck ? "warn" : (STATUS_TONE[r.status] ?? "neutral")}>
+                {runHeadline(r.status, r.progress)}
               </Badge>
               <NavLink
                 to={`/ingestao/${r.id}`}

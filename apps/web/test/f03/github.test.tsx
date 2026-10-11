@@ -331,7 +331,7 @@ describe("F03/M4 · execuções pendentes na página de ingestão", () => {
       "href",
       "/ingestao/r1",
     );
-    expect(within(items[1] as HTMLElement).getByText("Em revisão")).toBeInTheDocument();
+    expect(within(items[1] as HTMLElement).getByText("Pronta para revisão")).toBeInTheDocument();
   });
 });
 

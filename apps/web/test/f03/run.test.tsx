@@ -55,7 +55,7 @@ describe("F03/M4 · execução › confirmação, progresso, erro", () => {
     expect(screen.getByText("Uso: 9.2k de 15k tokens")).toBeInTheDocument();
     const rows = screen.getByRole("list", { name: "Repositórios da execução" });
     expect(within(rows).getByText("a/y")).toBeInTheDocument();
-    expect(within(rows).getByText("Analisando")).toBeInTheDocument();
+    expect(within(rows).getByText("Em análise")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cancelar execução" }));
     expect(cancelIngestion).toHaveBeenCalledWith("r1");
   });
@@ -284,6 +284,6 @@ describe("F03/M4 · execução › relatório", () => {
     expect(within(rep).getByText("Perfil forte em back-end de pagamentos.")).toBeInTheDocument();
     expect(within(rep).getByText("acme-labs/plataforma")).toBeInTheDocument();
     expect(within(rep).getByText(/Parada por orçamento/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("Concluída")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Finalizada")).toBeInTheDocument());
   });
 });

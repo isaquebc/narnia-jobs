@@ -75,6 +75,8 @@ export type GithubAuthSource = z.infer<typeof GithubAuthSourceSchema>;
 export type IngestSettings = z.infer<typeof IngestSettingsSchema>;
 export type SnapshotsList = z.infer<typeof SnapshotsListResponseSchema>;
 export interface RunSummary {
+  /** "Etapa x de y" (plano de comunicação C1). */
+  progress?: { current: number | null; total: number; stepKey: string | null; stuck: boolean };
   id: string;
   source: "cv" | "text" | "github";
   mode: IngestionMode | null;

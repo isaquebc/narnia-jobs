@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApi, useWs } from "../../app/context";
+import { runHeadline } from "../../features/ingestion/runHeadline";
 import { useJobs } from "../../hooks/useJobs";
 import { type TKey, t } from "../../i18n";
 import { Badge } from "../ui/badge";
@@ -96,27 +97,34 @@ export const STOPPED_STATUSES: RunStatus[] = [
   "paused",
 ];
 
-function useStoppedRuns() {
+/** Execuções em andamento: a bandeja mostra a mesma frase "etapa x de y" da página (plano de comunicação C1). */
+export const RUNNING_STATUSES: RunStatus[] = ["queued", "estimating", "running"];
+
+function useRunsByStatus(key: string, statuses: RunStatus[]) {
   const api = useApi();
   const ws = useWs();
   const qc = useQueryClient();
   const runs = useQuery({
-    queryKey: ["ingestions", "stopped"],
-    queryFn: () => api.listIngestions({ status: STOPPED_STATUSES }),
+    queryKey: ["ingestions", key],
+    queryFn: () => api.listIngestions({ status: statuses }),
   });
   useEffect(() => {
     ws.connect();
     return ws.subscribe((event) => {
       if (event.type === "ingestion.updated")
-        void qc.invalidateQueries({ queryKey: ["ingestions", "stopped"] });
+        void qc.invalidateQueries({ queryKey: ["ingestions", key] });
     });
-  }, [ws, qc]);
+  }, [ws, qc, key]);
   return runs.data?.runs ?? [];
 }
+
+const useStoppedRuns = () => useRunsByStatus("stopped", STOPPED_STATUSES);
+const useRunningRuns = () => useRunsByStatus("running", RUNNING_STATUSES);
 
 export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const { jobs, activeCount, cancel, retry } = useJobs();
   const stopped = useStoppedRuns();
+  const running = useRunningRuns();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="relative">
@@ -160,7 +168,28 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
               })}
             </ul>
           ) : null}
-          {jobs.length === 0 && stopped.length === 0 ? (
+          {running.length > 0 ? (
+            <ul aria-label={t("activity.runningRuns")} className="mb-2 flex flex-col gap-2">
+              {running.map((run) => {
+                const label = runHeadline(run.status, run.progress);
+                return (
+                  <li
+                    key={run.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+                  >
+                    <Badge tone={run.progress?.stuck ? "warn" : "info"}>{label}</Badge>
+                    <NavLink
+                      to={`/ingestao/${run.id}`}
+                      className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                    >
+                      {t("activity.open")}
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {jobs.length === 0 && stopped.length === 0 && running.length === 0 ? (
             <p className="text-sm text-muted-fg">{t("activity.empty")}</p>
           ) : (
             <ul className="flex max-h-96 flex-col gap-2 overflow-auto">
