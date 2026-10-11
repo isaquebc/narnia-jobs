@@ -133,14 +133,14 @@ describe("F03/M3 providers · ClaudeCodeProvider nas chamadas da ingestão", () 
   ] as const;
 
   for (const c of cases) {
-    it(`${c.name}: sem tools, 1 turno, modelo da entrada, outputFormat sem $schema, prompt próprio`, async () => {
+    it(`${c.name}: sem tools, até 3 turnos (correção da saída estruturada), modelo da entrada, outputFormat sem $schema, prompt próprio`, async () => {
       const query = fakeQuery([result(c.out)]);
       const p = new ClaudeCodeProvider({ exec, query, binaryPath: "/bin/claude" });
       const r = await c.call(p);
       expect(r.usage.inputTokens).toBe(120);
       const opts = query.captured[0]?.options as Record<string, unknown>;
       expect(opts.tools).toEqual([]);
-      expect(opts.maxTurns).toBe(1);
+      expect(opts.maxTurns).toBe(3);
       expect(opts.model).toBe(c.name === "synthesizeRun" ? "sonnet" : "haiku");
       expect(opts.outputFormat).toEqual({ type: "json_schema", schema: c.schema });
       expect(JSON.stringify(c.schema)).not.toContain("$schema");

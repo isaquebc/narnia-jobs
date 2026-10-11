@@ -63,7 +63,7 @@ describe("M4/providers ClaudeCodeProvider via Agent SDK (query injetado)", () =>
     const r = await p.extractFacts({ text: "CV TEXTO", locale: "pt-BR", model: "haiku" });
     const o = q.captured[0]?.options ?? {};
     expect(o.tools).toEqual([]);
-    expect(o.maxTurns).toBe(1);
+    expect(o.maxTurns).toBe(3);
     expect(o.model).toBe("haiku");
     expect(o.outputFormat).toEqual({
       type: "json_schema",
@@ -97,7 +97,7 @@ describe("M4/providers ClaudeCodeProvider via Agent SDK (query injetado)", () =>
     const o = q.captured[0]?.options ?? {};
     expect(o.model).toBe("sonnet");
     expect(o.tools).toEqual([]);
-    expect(o.maxTurns).toBe(1);
+    expect(o.maxTurns).toBe(3);
     expect(o.outputFormat).toEqual({
       type: "json_schema",
       schema: EXTRACTION_JSON_SCHEMAS.buildDigest,

@@ -189,6 +189,13 @@ function toUsage(result: SdkMessageLike, model: string): Usage {
 }
 
 /** Provider real (F01 §2.4): `detect` via `claude auth status`; extração via `query()` do Agent SDK com saída estruturada. */
+/**
+ * Turnos das chamadas de saída estruturada (sem tools). Com 1 turno, quando a primeira resposta não passa no schema o
+ * CLI não consegue corrigir e falha com "Reached maximum number of turns (1)" (visto na instância do dono em
+ * 2026-10-11 numa análise de repositório). Sem tools, turnos além do primeiro só existem nessa correção.
+ */
+export const STRUCTURED_MAX_TURNS = 3;
+
 export class ClaudeCodeProvider implements Provider {
   readonly id = "claude-code" as const;
   private readonly exec: Exec;
@@ -343,7 +350,7 @@ export class ClaudeCodeProvider implements Provider {
       {
         model: input.model,
         tools: [],
-        maxTurns: 1,
+        maxTurns: STRUCTURED_MAX_TURNS,
         systemPrompt: PROMPTS.extractFacts(),
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.extractFacts },
       },
@@ -361,7 +368,7 @@ export class ClaudeCodeProvider implements Provider {
       {
         model,
         tools: [],
-        maxTurns: 1,
+        maxTurns: STRUCTURED_MAX_TURNS,
         systemPrompt: PROMPTS.analyzeProfiles(),
         outputFormat: { type: "json_schema", schema: ANALYZE_PROFILES_JSON_SCHEMA },
       },
@@ -369,7 +376,7 @@ export class ClaudeCodeProvider implements Provider {
     );
   }
 
-  /** Chamada sem tools e de um turno com saída estruturada (F03 §2.5). */
+  /** Chamada sem tools com saída estruturada (F03 §2.5); turnos extras só são gastos se o JSON precisar de correção. */
   private single<T>(
     prompt: string,
     model: string,
@@ -382,7 +389,7 @@ export class ClaudeCodeProvider implements Provider {
       {
         model,
         tools: [],
-        maxTurns: 1,
+        maxTurns: STRUCTURED_MAX_TURNS,
         systemPrompt,
         outputFormat: { type: "json_schema", schema },
       },
@@ -448,7 +455,7 @@ export class ClaudeCodeProvider implements Provider {
       {
         model: input.model,
         tools: [],
-        maxTurns: 1,
+        maxTurns: STRUCTURED_MAX_TURNS,
         systemPrompt: PROMPTS.buildDigest(),
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.buildDigest },
       },

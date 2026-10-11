@@ -105,7 +105,7 @@ describe("F02/M3 providers · analyzeProfiles", () => {
     expect(r.output.suggestions).toHaveLength(2);
     expect(r.usage).toMatchObject({ inputTokens: 900, outputTokens: 120, model: "sonnet" });
     const call = query.captured[0] as Captured;
-    expect(call.options).toMatchObject({ tools: [], maxTurns: 1, model: "sonnet" });
+    expect(call.options).toMatchObject({ tools: [], maxTurns: 3, model: "sonnet" });
     expect(String(call.options.systemPrompt)).toMatch(/recrutador/i);
     expect(call.prompt).toContain("Engineering Manager");
     expect(call.prompt).toContain("exp-1");

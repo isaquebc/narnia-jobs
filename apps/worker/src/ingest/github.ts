@@ -115,6 +115,7 @@ export const githubPrepare: TaskHandler = async (data, ctx, deps) => {
 
     const sizes: Array<{ fullName: string; contextChars: number; treeChars: number }> = [];
     const failed: Array<{ fullName: string; reason: string }> = [];
+    const empty: string[] = [];
     for (const [i, fullName] of names.entries()) {
       try {
         const c = await collectRepo(gh, fullName, {
@@ -135,7 +136,8 @@ export const githubPrepare: TaskHandler = async (data, ctx, deps) => {
           treeChars: c.tree.entries.reduce((n, e) => n + e.path.length + 1, 0),
         });
       } catch (e) {
-        failed.push({ fullName, reason: githubErrorMessage(e) });
+        if (e instanceof GhError && e.code === "empty") empty.push(fullName);
+        else failed.push({ fullName, reason: githubErrorMessage(e) });
       }
       await ctx.progress(10 + Math.round((60 * (i + 1)) / Math.max(1, names.length)));
     }
@@ -177,6 +179,13 @@ export const githubPrepare: TaskHandler = async (data, ctx, deps) => {
       repos: names.map((fullName) => ({ fullName, estimatedTokens: byName.get(fullName) ?? 0 })),
     });
     if (metricsNote) report = { ...report, notes: [...(report.notes ?? []), metricsNote] };
+    for (const fullName of empty) {
+      report = markRepo(report, fullName, {
+        status: "skipped_empty",
+        usedTokens: 0,
+        stoppedReason: "repositório vazio (sem commits)",
+      });
+    }
     for (const f of failed) {
       report = markRepo(report, f.fullName, {
         status: "error",
@@ -399,10 +408,15 @@ export const githubRepo: TaskHandler = async (data, ctx, deps) => {
     deps.repos.proposals.insertMany(id, proposals, evidence);
     updateReport(deps, id, (r) => markRepo(r, fullName, { status: "done", usedTokens: spent }));
   } catch (e) {
-    const reason = githubErrorMessage(e);
+    const isEmpty = e instanceof GhError && e.code === "empty";
+    const reason = isEmpty ? "repositório vazio (sem commits)" : githubErrorMessage(e);
     if (analysisId) deps.repos.repoAnalyses.complete(analysisId, { status: "error" });
     updateReport(deps, id, (r) =>
-      markRepo(r, fullName, { status: "error", usedTokens: spent, stoppedReason: reason }),
+      markRepo(r, fullName, {
+        status: isEmpty ? "skipped_empty" : "error",
+        usedTokens: spent,
+        stoppedReason: reason,
+      }),
     );
   }
   await maybeSynthesize(deps, id);

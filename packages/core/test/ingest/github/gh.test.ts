@@ -128,3 +128,19 @@ describe("Regressão 2026-10-10 · erros transitórios do GitHub (5xx) ganham no
     expect(f.calls()).toBe(1);
   });
 });
+
+describe("Regressão 2026-10-11 · repositório vazio (HTTP 409)", () => {
+  it("409 'Git Repository is empty' vira GhError empty, sem nova tentativa", async () => {
+    let calls = 0;
+    const gh = createGhClient({
+      exec: async () => {
+        calls++;
+        return { code: 1, stdout: "", stderr: "gh: Git Repository is empty. (HTTP 409)" };
+      },
+      sleep: async () => {},
+    });
+    const err = await gh.json("repos/ana-exemplo/vazio/commits/main").catch((e) => e);
+    expect((err as GhError).code).toBe("empty");
+    expect(calls).toBe(1);
+  });
+});

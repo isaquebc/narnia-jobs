@@ -456,3 +456,24 @@ describe("Regressão 2026-10-10 · GitHub instável (HTTP 502) na preparação",
     h2.cleanup?.();
   });
 });
+
+describe("Regressão 2026-10-11 · repositório vazio é pulado, não vira erro", () => {
+  it("repositório sem commits fica como vazio no relatório e a execução segue para confirmação", async () => {
+    const empty = REPOS[0] as string;
+    const h3 = harness({
+      wrapExec: (exec) => async (args) =>
+        args.some((a) => a.includes(`${empty}/`))
+          ? { code: 1, stdout: "", stderr: "gh: Git Repository is empty. (HTTP 409)" }
+          : exec(args),
+    });
+    const run = h3.createRun();
+    await h3.drain();
+    const r = h3.repos.ingestionRuns.get(run.id);
+    expect(r?.status).toBe("awaiting_confirmation");
+    const row = r?.report?.repos.find((x) => x.fullName === empty);
+    expect(row?.status).toBe("skipped_empty");
+    expect(row?.stoppedReason).toMatch(/vazio/);
+    expect(r?.report?.repos.filter((x) => x.status === "error")).toHaveLength(0);
+    h3.cleanup();
+  });
+});

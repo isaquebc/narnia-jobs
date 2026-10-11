@@ -16,6 +16,7 @@ export type GhErrorCode =
   | "rate_limited"
   | "not_found"
   | "unavailable"
+  | "empty"
   | "failed";
 
 export class GhError extends Error {
@@ -149,6 +150,8 @@ export function createGhClient(opts: GhClientOptions): GhClient {
     }
     if (status === 404)
       return new GhError("not_found", `Não encontrado: ${stderr}`, { status, stderr });
+    if (status === 409 && /repository is empty/i.test(stderr))
+      return new GhError("empty", "Repositório vazio (sem commits)", { status, stderr });
     if (isTransient(status))
       return new GhError(
         "unavailable",

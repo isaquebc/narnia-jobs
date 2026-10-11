@@ -628,6 +628,7 @@ export const ptBR = {
       running: "Analisando",
       done: "Concluído",
       skipped_budget: "Fora do orçamento",
+      skipped_empty: "Vazio (sem commits)",
       error: "Erro",
     },
     stop: "{reason} em {date} com {used} tokens usados",

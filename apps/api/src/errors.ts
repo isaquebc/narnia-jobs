@@ -48,6 +48,7 @@ const GH_ERROR: Record<GhError["code"], { status: ContentfulStatusCode; code: st
   not_authenticated: { status: 409, code: "github_not_connected" },
   rate_limited: { status: 429, code: "github_rate_limited" },
   not_found: { status: 404, code: "github_not_found" },
+  empty: { status: 409, code: "github_repo_empty" },
   unavailable: { status: 503, code: "github_unavailable" },
   failed: { status: 502, code: "github_failed" },
 };

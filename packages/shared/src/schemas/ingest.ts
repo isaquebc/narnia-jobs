@@ -69,6 +69,8 @@ export const RepoRunStatusSchema = z.enum([
   "running",
   "done",
   "skipped_budget",
+  /** Repositório sem nenhum commit (GitHub responde 409): pulado, não é erro. */
+  "skipped_empty",
   "error",
 ]);
 
