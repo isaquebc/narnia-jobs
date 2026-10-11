@@ -477,3 +477,23 @@ describe("Regressão 2026-10-11 · repositório vazio é pulado, não vira erro"
     h3.cleanup();
   });
 });
+
+describe("Regressão 2026-10-11 · falha do modelo na síntese ou na conferência não prende a execução", () => {
+  for (const op of ["synthesizeRun", "checkProposals"] as const) {
+    it(`${op} com erro: a execução chega à revisão com as propostas dos repositórios e uma nota`, async () => {
+      const h4 = harness({
+        provider: new MockProvider({ errors: { [op]: "Reached maximum number of turns (1)" } }),
+      });
+      const run = h4.createRun();
+      await h4.drain();
+      h4.queue.push(...confirmRun(h4.repos, run.id));
+      await h4.drain();
+      const r = h4.repos.ingestionRuns.get(run.id);
+      expect(r?.status).toBe("review");
+      expect(h4.repos.proposals.listByRun(run.id).length).toBeGreaterThan(0);
+      if (op === "synthesizeRun")
+        expect(JSON.stringify(r?.report?.notes ?? [])).toMatch(/Síntese indisponível/);
+      h4.cleanup();
+    });
+  }
+});

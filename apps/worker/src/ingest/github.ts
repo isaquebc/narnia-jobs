@@ -441,36 +441,42 @@ export const githubSynthesis: TaskHandler = async (data, ctx, deps) => {
     }));
   const table = typeof run.params.metricsTable === "string" ? run.params.metricsTable : "";
   let synthesis: string | null = null;
+  let synthesisNote: string | null = null;
   let extra = 0;
-  if (reports.length > 0) {
-    saveRunSource(
-      deps.dataDir,
-      id,
-      "synthesis",
-      `${reports.map((r) => `## ${r.fullName}\n${JSON.stringify(r.report, null, 1)}`).join("\n\n")}\n\n${table}`,
-    );
-    const result = await deps.provider.synthesizeRun({
-      reports,
-      metricsTable: table,
-      model: models.synthesis,
-    });
-    extra = recordCall(
-      deps,
-      { runId: id, name: "synthesis", category: "ingest.github.synthesis", jobId: ctx.jobId },
-      result,
-    );
-    const proposals: FactProposal[] = [];
-    const evidence: Array<{ ref: string; quote: string }> = [];
-    for (const { confidence, evidence: e, ...rest } of result.output.skills) {
-      proposals.push({ kind: "skill", confidence, data: rest } as FactProposal);
-      evidence.push(e);
+  // a síntese é complemento: se o modelo falhar, a revisão segue com as propostas dos repositórios (2026-10-11)
+  if (reports.length > 0)
+    try {
+      saveRunSource(
+        deps.dataDir,
+        id,
+        "synthesis",
+        `${reports.map((r) => `## ${r.fullName}\n${JSON.stringify(r.report, null, 1)}`).join("\n\n")}\n\n${table}`,
+      );
+      const result = await deps.provider.synthesizeRun({
+        reports,
+        metricsTable: table,
+        model: models.synthesis,
+      });
+      extra = recordCall(
+        deps,
+        { runId: id, name: "synthesis", category: "ingest.github.synthesis", jobId: ctx.jobId },
+        result,
+      );
+      const proposals: FactProposal[] = [];
+      const evidence: Array<{ ref: string; quote: string }> = [];
+      for (const { confidence, evidence: e, ...rest } of result.output.skills) {
+        proposals.push({ kind: "skill", confidence, data: rest } as FactProposal);
+        evidence.push(e);
+      }
+      if (proposals.length > 0) deps.repos.proposals.insertMany(id, proposals, evidence);
+      synthesis = result.output.report.summary;
+    } catch (e) {
+      synthesisNote = `Síntese indisponível nesta execução: ${(e as Error).message}`;
     }
-    if (proposals.length > 0) deps.repos.proposals.insertMany(id, proposals, evidence);
-    synthesis = result.output.report.summary;
-  }
-  updateReport(deps, id, (r) =>
-    finishReport(r, { finishedAt: nowUtc(), synthesis, extraUsedTokens: extra }),
-  );
+  updateReport(deps, id, (r) => {
+    const done = finishReport(r, { finishedAt: nowUtc(), synthesis, extraUsedTokens: extra });
+    return synthesisNote ? { ...done, notes: [...(done.notes ?? []), synthesisNote] } : done;
+  });
 
   // a conversão % → tokens é aprendida por chamada (plan-sampling.ts), não mais por execução
   await deps.enqueueTask(reconcileTask(id));

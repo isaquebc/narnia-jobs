@@ -29,9 +29,14 @@ export async function reviewCheckRun(
   if (resolveIngestSettings(deps.repos.settings).reviewCheckModelEnabled) {
     const items = buildCheckBatch(deps.repos.proposals.listByRun(runId));
     if (items.length > 0) {
-      const result = await deps.provider.checkProposals({ items, model: CHEAPEST_MODEL });
-      recordCall(deps, { runId, name: "check", category: "ingest.review_check", jobId }, result);
-      checked = applyCheckResults(deps.repos, result.output.results);
+      // a conferência pelo modelo é complemento: se falhar, as propostas chegam à revisão como "não conferidas"
+      try {
+        const result = await deps.provider.checkProposals({ items, model: CHEAPEST_MODEL });
+        recordCall(deps, { runId, name: "check", category: "ingest.review_check", jobId }, result);
+        checked = applyCheckResults(deps.repos, result.output.results);
+      } catch {
+        checked = 0;
+      }
     }
   }
   return { ...layer1, checked };
