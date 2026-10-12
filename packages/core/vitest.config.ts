@@ -19,6 +19,8 @@ export default defineConfig({
         // F03 §6.1 M2: ingestão e orçamento com o mesmo piso, medidos em separado
         "src/ingest/**": { lines: 80, functions: 80, branches: 80, statements: 80 },
         "src/budget/**": { lines: 80, functions: 80, branches: 80, statements: 80 },
+        // F04 §6.1 M1: tools do chat, prompt e configurações com o mesmo piso
+        "src/chat/**": { lines: 80, functions: 80, branches: 80, statements: 80 },
       },
     },
     testTimeout: 30_000,
