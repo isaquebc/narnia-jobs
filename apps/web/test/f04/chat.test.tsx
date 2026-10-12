@@ -22,10 +22,14 @@ function chatApi(overrides: Record<string, unknown> = {}) {
       session: session(id, p),
     })),
     listResearch: vi.fn(async () => ({ sources: [] })),
-    getActiveProfileCard: vi.fn(async () => ({
-      profileId: "p1",
-      cardHash: "h",
+    getProfileCard: vi.fn(async (id: string) => ({
+      profileId: id,
       text: "Ana Maria Exemplo · Campinas",
+      tokensEst: 10,
+      hash: "h",
+      factsVersion: 1,
+      builtAt: "2026-10-11T12:00:00.000Z",
+      valid: true,
     })),
     ...overrides,
   };
@@ -194,5 +198,21 @@ describe("F04/M4 · chat com o recrutador", () => {
       "href",
       "/ingestao/r1",
     );
+  });
+});
+
+describe("Regressão 2026-10-11 (e2e F04/E2E-05) · painel Contexto mostra só o cartão do perfil", () => {
+  it("usa o cartão do perfil ativo (F02), nunca o prompt completo do recrutador com persona e regras", async () => {
+    const getActiveProfileCard = vi.fn(async () => ({
+      profileId: "p1",
+      cardHash: "h",
+      text: "# Recrutador narnia-jobs ... ## Regras 1. Honestidade",
+    }));
+    const api = chatApi({ getActiveProfileCard });
+    renderApp({ api, initialUrl: "/chat/s1" });
+    const aside = await screen.findByRole("complementary", { name: "Contexto" });
+    expect(await within(aside).findByText("Ana Maria Exemplo · Campinas")).toBeInTheDocument();
+    expect(aside).not.toHaveTextContent("## Regras");
+    expect(getActiveProfileCard).not.toHaveBeenCalled();
   });
 });

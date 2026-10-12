@@ -2,6 +2,8 @@ import type { ChatCategory, ChatMessage, ChatSession, TrustTag } from "@narnia-j
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useApi, useWs } from "../app/context";
+import { useProfileCard } from "./useProfileCard";
+import { useProfiles } from "./useProfiles";
 
 export const chatKeys = {
   sessions: (profileId: string | null) => ["chat", "sessions", profileId] as const,
@@ -189,9 +191,13 @@ export function useResearch(profileId: string | null) {
   return q.data?.sources ?? [];
 }
 
+/**
+ * Cartão do perfil ativo para o painel "Contexto": a rota do cartão da F02 (só o cartão). A rota `persona-card` é do
+ * hook do terminal e traz o prompt inteiro (persona e regras), que não deve aparecer na tela (regressão do e2e F04/E2E-05).
+ */
 export function useActiveCard() {
-  const api = useApi();
-  return useQuery({ queryKey: ["chat", "card"], queryFn: () => api.getActiveProfileCard() });
+  const { active } = useProfiles();
+  return useProfileCard(active?.id);
 }
 
 export function useChatSettings() {

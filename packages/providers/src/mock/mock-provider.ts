@@ -507,6 +507,21 @@ export function mockChatScript(
         ],
       },
     ];
+  if (/fora da lista|blog/i.test(text))
+    return [
+      "research_save",
+      {
+        url: "https://blog.exemplo-nao-confiavel.com/salarios-2026",
+        title: "Blog qualquer · salários",
+        excerpt: "Tabela de salários sem metodologia publicada.",
+        usedFor: "salary",
+      },
+    ];
+  const file = /^arquivo:\s*(\S+)/i.exec(text);
+  if (file) return ["ingest_file", { fileId: file[1] as string }];
+  const github = /^github:\s*(\S+)/i.exec(text);
+  if (github)
+    return ["ingest_github", { mode: "public", repos: [github[1] as string], depth: "quick" }];
   if (/sal[aá]rio|mercado|pesquis/i.test(text))
     return [
       "research_save",
@@ -532,6 +547,10 @@ function mockChatReply(tool: string, isError: boolean): string {
       "Registrei a fonte oficial do IBGE para o salário (fonte: ibge.gov.br). Confirma usar esse valor como referência?",
     ingest_text:
       "Criei uma ingestão com o seu texto; as propostas estão na revisão, nada foi gravado sem você aprovar.",
+    ingest_file:
+      "Criei uma ingestão com o arquivo anexado; as propostas vão para a revisão, nada foi gravado sem você aprovar.",
+    ingest_github:
+      "Preparei a análise do GitHub; confirme o orçamento na tela da execução para ela começar.",
     ingest_propose:
       "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",
   };

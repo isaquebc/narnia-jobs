@@ -17,6 +17,7 @@ import {
   useChatSessions,
   useResearch,
 } from "../../hooks/useChat";
+import { ingestionKey } from "../../hooks/useIngestion";
 import { useProfiles } from "../../hooks/useProfiles";
 import { useProviderStatus } from "../../hooks/useProviderStatus";
 import { type TKey, t } from "../../i18n";
@@ -356,8 +357,12 @@ function ClarifyHeader({ runId }: { runId: string }) {
   useEffect(
     () =>
       ws.subscribe((e) => {
-        if (e.type === "ingestion.updated" && e.runId === runId)
+        if (e.type === "ingestion.updated" && e.runId === runId) {
           void qc.invalidateQueries({ queryKey: ["ingestion", runId, "clarify"] });
+          // a página da execução está desmontada enquanto o usuário conversa: marca a revisão como velha para
+          // "Ir para a revisão" trazer as propostas novas (regressão do e2e F04/E2E-06)
+          void qc.invalidateQueries({ queryKey: ingestionKey(runId) });
+        }
       }),
     [ws, qc, runId],
   );

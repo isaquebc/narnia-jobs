@@ -12,12 +12,14 @@ export function renderApp(opts: {
   timezone?: string;
   /** staleTime das queries (padrão 0 nos testes; a app usa 5 s, ver main.tsx). */
   staleTime?: number;
+  /** gcTime das queries (padrão 0 nos testes; a app usa o padrão do TanStack, 5 min). */
+  gcTime?: number;
 }) {
   const ws = createFakeWs();
   const api = createFakeApi(opts.api);
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: 0, staleTime: opts.staleTime ?? 0 },
+      queries: { retry: false, gcTime: opts.gcTime ?? 0, staleTime: opts.staleTime ?? 0 },
       mutations: { retry: false },
     },
   });
