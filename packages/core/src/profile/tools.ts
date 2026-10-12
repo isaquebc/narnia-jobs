@@ -27,7 +27,24 @@ function activeOrThrow(repos: Repos) {
   return active;
 }
 
-export function createProfileTools(repos: Repos): ProfileToolHandlers {
+/**
+ * `sessionProfileId` (chat do app, auditoria A): as tools agem só no perfil da conversa; outro `profileId` é recusado
+ * e a ausência dele vale o da sessão, não o perfil ativo (que o usuário pode ter trocado em outra tela).
+ */
+export function createProfileTools(
+  repos: Repos,
+  opts: { sessionProfileId?: string | null } = {},
+): ProfileToolHandlers {
+  const bound = opts.sessionProfileId ?? null;
+  const own = (profileId: string | undefined): string => {
+    if (!bound) return profileId ?? activeOrThrow(repos).id;
+    if (profileId && profileId !== bound)
+      throw new ProfileError(
+        "profile_not_in_session",
+        "Esta conversa só pode ler ou alterar o próprio perfil. Para outro perfil, abra uma conversa nele.",
+      );
+    return bound;
+  };
   const wrap = <N extends ProfileToolName>(
     name: N,
     impl: (input: ProfileToolInput<N>) => ProfileToolOutput<N>,
@@ -50,7 +67,7 @@ export function createProfileTools(repos: Repos): ProfileToolHandlers {
         })),
     })),
     "profile.get_card": wrap("profile.get_card", (input) => {
-      const profileId = input.profileId ?? activeOrThrow(repos).id;
+      const profileId = own(input.profileId);
       const card = getCard(repos, profileId);
       return {
         profileId,
@@ -65,10 +82,10 @@ export function createProfileTools(repos: Repos): ProfileToolHandlers {
       return { ok: true as const };
     }),
     "profile.update_emphasis": wrap("profile.update_emphasis", (input) => ({
-      updated: repos.emphasis.replace(input.profileId, input.items).updated,
+      updated: repos.emphasis.replace(own(input.profileId), input.items).updated,
     })),
     "profile.update_pitch": wrap("profile.update_pitch", (input) => {
-      repos.profiles.update(input.profileId, { pitch: input.pitch });
+      repos.profiles.update(own(input.profileId), { pitch: input.pitch });
       return { ok: true as const };
     }),
     "profile.create": wrap("profile.create", (input) => {

@@ -2,6 +2,7 @@ import type { Server } from "node:http";
 import { WebSocketServer } from "ws";
 import { COOKIE_NAME, tokenMatches } from "./auth";
 import type { EventBus } from "./events";
+import { allowedHostsFromEnv, hostAllowed } from "./hosts";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -13,11 +14,18 @@ function cookieValue(header: string | undefined, name: string): string | null {
 }
 
 /** WebSocket `/ws`: autenticado por `?token=` ou cookie; retransmite os eventos do bus a todos os clientes. */
-export function attachWebSocket(opts: { server: Server; bus: EventBus; token: string }) {
+export function attachWebSocket(opts: {
+  server: Server;
+  bus: EventBus;
+  token: string;
+  /** Hosts aceitos (DNS rebinding); ausente = os do ambiente. */
+  allowedHosts?: Set<string>;
+}) {
   const wss = new WebSocketServer({ noServer: true });
+  const allowed = opts.allowedHosts ?? allowedHostsFromEnv(process.env);
   opts.server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname !== "/ws") {
+    if (url.pathname !== "/ws" || !hostAllowed(req.headers.host, allowed)) {
       socket.destroy();
       return;
     }

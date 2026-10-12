@@ -14,6 +14,7 @@ import {
   type FakeDeviceFlow,
   type GithubAuthDeps,
 } from "./github-auth";
+import { allowedHostsFromEnv, hostGuard } from "./hosts";
 import { createJsonlLogger, type JsonlLogger } from "./log";
 import { mcpRoutes } from "./mcp/server";
 import type { QueueAdapter } from "./queue";
@@ -53,6 +54,8 @@ export interface AppDeps {
   backupDir?: string | null;
   /** Sessões de chat (F04 M3); ausente = gerenciador padrão apontando para o `/mcp` deste api. */
   sessions?: SessionManager;
+  /** Hosts aceitos (DNS rebinding); ausente = padrões + NARNIA_PUBLIC_URL + NARNIA_ALLOWED_HOSTS. */
+  allowedHosts?: Set<string>;
 }
 
 /** Monta a aplicação Hono (F01 §2.6). Tudo atrás do token de boot, exceto health e a rota de entrada. */
@@ -68,6 +71,7 @@ export function createApp(deps: AppDeps) {
       log({ ts: nowUtc(), method: c.req.method, path, status: c.res.status, ms: Date.now() - t0 });
     }
   });
+  app.use("*", hostGuard(deps.allowedHosts ?? allowedHostsFromEnv(process.env)));
   app.use("*", authMiddleware(deps.token));
   app.onError((err, c) => {
     console.error("[api] erro não tratado:", err);

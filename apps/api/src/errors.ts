@@ -27,6 +27,7 @@ const PROFILE_ERROR_STATUS: Record<ProfileError["code"], ContentfulStatusCode> =
   profile_archived: 409,
   fact_foreign: 400,
   unsupported_kind: 400,
+  profile_not_in_session: 403,
 };
 
 /** Erro tipado do domínio de perfis (F02) → resposta HTTP; outros erros voltam para o `onError`. */

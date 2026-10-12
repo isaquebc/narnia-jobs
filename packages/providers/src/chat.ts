@@ -41,6 +41,11 @@ export interface ChatOpenOptions {
   ingestionRunId?: string | null;
   /** Só o mock usa: como chamar o `/mcp` (nos testes da api, o `app.request` em memória). */
   fetch?: typeof fetch;
+  /**
+   * Leitura web (WebFetch) permitida para esta URL? Lista de domínios confiáveis lida a cada chamada (auditoria
+   * pós-F04, bloco A: página com instruções escondidas não pode mandar dados do perfil para fora). Ausente = nega.
+   */
+  canFetch?: (url: string) => boolean;
 }
 
 export interface ChatHandle {
@@ -100,11 +105,48 @@ export interface ChatSdkOptions {
   includePartialMessages: true;
   tools: string[];
   allowedTools: string[];
+  /** Texto do usuário literal: sem slash commands nem `@arquivo` (auditoria A). */
+  verbatimPrompts: true;
+  canUseTool: ChatCanUseTool;
   plugins: Array<{ type: "local"; path: string }>;
   mcpServers: Record<string, { type: "http"; url: string; headers: Record<string, string> }>;
   env: Record<string, string | undefined>;
   settingSources: [];
   pathToClaudeCodeExecutable?: string;
+}
+
+export type ChatPermission =
+  | { behavior: "allow"; updatedInput?: Record<string, unknown> }
+  | { behavior: "deny"; message: string };
+
+/** Subconjunto do `canUseTool` do SDK: chamado só para o que não está em `allowedTools`. */
+export type ChatCanUseTool = (
+  toolName: string,
+  input: Record<string, unknown>,
+  options: { signal: AbortSignal },
+) => Promise<ChatPermission>;
+
+export const FETCH_DENIED_MESSAGE =
+  "Leitura bloqueada: este domínio não está na lista de domínios confiáveis. Não use esta página; se ela for " +
+  "importante, peça ao usuário que adicione o domínio em Configurações › Chat e tente de novo.";
+
+/**
+ * Permissões da sessão de chat: WebFetch só para URL http(s) aprovada por `canFetch`; qualquer outra tool que chegue
+ * aqui (fora de `allowedTools`) é negada, porque o chat não tem quem aprove na hora.
+ */
+export function chatCanUseTool(canFetch?: (url: string) => boolean): ChatCanUseTool {
+  return async (toolName, input) => {
+    if (toolName === "WebFetch") {
+      const url = typeof input.url === "string" ? input.url : "";
+      if (/^https?:\/\//i.test(url) && canFetch?.(url))
+        return { behavior: "allow", updatedInput: input };
+      return { behavior: "deny", message: FETCH_DENIED_MESSAGE };
+    }
+    return {
+      behavior: "deny",
+      message: `A ferramenta ${toolName} não está liberada nas conversas do narnia-jobs.`,
+    };
+  };
 }
 
 export type ChatQueryLike = AsyncIterable<SdkChatMessageLike> & {

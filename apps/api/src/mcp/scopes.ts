@@ -1,11 +1,20 @@
-import type { ChatCategory } from "@narnia-jobs/shared";
+import { CHAT_TOOLS, type ChatCategory, INGEST_TOOLS, PROFILE_TOOLS } from "@narnia-jobs/shared";
 
 /**
  * Escopos de tools por categoria de sessão (F04-2, lazy load real). A sessão vem do header `X-Narnia-Session` (modo
  * A); sem header (modo B, terminal) valem carreira + ingestão. `ingest.propose` só existe na clarificação.
  */
+// `profile.switch` muda o perfil ativo de todo o app: só no terminal (auditoria A); no chat as tools de perfil ficam
+// presas ao perfil da sessão (server.ts)
+const CHAT_PROFILE = [
+  "profile.list",
+  "profile.get_card",
+  "profile.update_emphasis",
+  "profile.update_pitch",
+  "profile.create",
+];
 const CAREER = [
-  "profile.",
+  ...CHAT_PROFILE,
   "evidence.",
   "fact.",
   "research.",
@@ -27,8 +36,34 @@ const BY_CATEGORY: Record<ChatCategory, string[]> = {
 const matches = (name: string, prefixes: string[]) =>
   prefixes.some((p) => (p.endsWith(".") ? name.startsWith(p) : name === p));
 
+const TERMINAL = [...CAREER, "profile.switch", ...INGEST];
+
 export function inScope(name: string, category: ChatCategory | null): boolean {
-  return matches(name, category ? BY_CATEGORY[category] : [...CAREER, ...INGEST]);
+  return matches(name, category ? BY_CATEGORY[category] : TERMINAL);
+}
+
+/** Tools nativas do CLI por categoria de sessão (F04-2): pesquisa web só onde faz sentido. */
+export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
+  career: ["WebSearch", "WebFetch"],
+  ingest: [],
+  clarify: [],
+  interview: [],
+};
+
+const ALL_TOOLS = [
+  ...Object.keys(PROFILE_TOOLS),
+  ...Object.keys(INGEST_TOOLS),
+  ...Object.keys(CHAT_TOOLS),
+];
+
+/**
+ * A troca de categoria pelo próprio agente (`session.set_category`) só pode estreitar o escopo: toda tool (do `/mcp`
+ * e nativa) da categoria nova já precisa estar liberada na atual. Ampliar (ex.: clarificação → carreira) só pela UI.
+ */
+export function narrowsScope(from: ChatCategory, to: ChatCategory): boolean {
+  if (from === to) return true;
+  const mcpOk = ALL_TOOLS.every((n) => !inScope(n, to) || inScope(n, from));
+  return mcpOk && NATIVE_TOOLS[to].every((n) => NATIVE_TOOLS[from].includes(n));
 }
 
 /**

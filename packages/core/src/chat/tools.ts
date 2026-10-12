@@ -309,6 +309,9 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
     } catch {
       throw new ChatToolError("invalid_url", `URL inválida: ${raw}`);
     }
+    // só páginas web (auditoria A): `javascript:`, `file:` e afins viravam fonte "oficial" e link na tela
+    if (u.protocol !== "http:" && u.protocol !== "https:")
+      throw new ChatToolError("invalid_url", `Só endereços http ou https: ${raw}`);
     u.hash = "";
     for (const key of [...u.searchParams.keys()])
       if (/^utm_|^(fbclid|gclid|mc_eid)$/i.test(key)) u.searchParams.delete(key);

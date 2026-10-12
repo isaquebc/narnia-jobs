@@ -5,7 +5,8 @@ export type ProfileErrorCode =
   | "fact_not_found"
   | "fact_foreign"
   | "unsupported_kind"
-  | "suggestion_not_found";
+  | "suggestion_not_found"
+  | "profile_not_in_session";
 
 /** Erros tipados do domínio de perfis (F02); a api mapeia `code` para 404/409/400. */
 export class ProfileError extends Error {

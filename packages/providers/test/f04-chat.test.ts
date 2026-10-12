@@ -180,8 +180,11 @@ describe("ClaudeCodeProvider.openChat", () => {
       maxTurns: 8,
       includePartialMessages: true,
       tools: ["WebSearch", "WebFetch"],
-      // sem permissão explícita o CLI nega as tools no modo não interativo (dono, 2026-10-12: ingest_status negada)
-      allowedTools: ["mcp__narnia-jobs", "WebSearch", "WebFetch"],
+      // sem permissão explícita o CLI nega as tools no modo não interativo (dono, 2026-10-12: ingest_status negada);
+      // WebFetch fica de fora: quem decide é o canUseTool, pela lista de domínios confiáveis (auditoria A)
+      allowedTools: ["mcp__narnia-jobs", "WebSearch"],
+      // texto do usuário literal: sem slash commands nem expansão de @arquivo (auditoria A)
+      verbatimPrompts: true,
       plugins: [{ type: "local", path: "/app/plugin" }],
       mcpServers: { "narnia-jobs": { type: "http", url: BASE.mcp.url, headers: BASE.mcp.headers } },
       settingSources: [],
@@ -190,6 +193,91 @@ describe("ClaudeCodeProvider.openChat", () => {
     const env = (captured.options?.env ?? {}) as Record<string, string>;
     expect(env.NARNIA_SESSION_HAS_CARD).toBe("1");
     expect(env.PATH).toBe(process.env.PATH);
+  });
+
+  it("canUseTool: WebFetch só para domínio confiável; o resto é negado com orientação em pt-BR (auditoria A)", async () => {
+    let options: Record<string, unknown> = {};
+    const chatQuery: ChatQueryFn = ({ options: o }) => {
+      options = o as unknown as Record<string, unknown>;
+      async function* run() {}
+      const it = run();
+      return Object.assign(it, {
+        interrupt: async () => undefined,
+        setModel: async () => undefined,
+        close: () => void it.return(undefined),
+      });
+    };
+    const p = new ClaudeCodeProvider({
+      exec: async () => ({ stdout: "", stderr: "", code: 0 }),
+      chatQuery,
+      binaryPath: "/bin/claude",
+    });
+    const fetched: string[] = [];
+    const chat = p.openChat({
+      ...BASE,
+      canFetch: (url) => {
+        fetched.push(url);
+        return url.startsWith("https://ibge.gov.br/");
+      },
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    const can = options.canUseTool as (
+      tool: string,
+      input: Record<string, unknown>,
+      o: { signal: AbortSignal },
+    ) => Promise<{ behavior: string; message?: string }>;
+    const signal = new AbortController().signal;
+    expect(
+      await can("WebFetch", { url: "https://ibge.gov.br/x", prompt: "p" }, { signal }),
+    ).toMatchObject({
+      behavior: "allow",
+    });
+    const denied = await can(
+      "WebFetch",
+      { url: "https://atacante.com/?d=1", prompt: "p" },
+      { signal },
+    );
+    expect(denied.behavior).toBe("deny");
+    expect(denied.message).toMatch(/Configurações › Chat/);
+    expect((await can("WebFetch", { prompt: "sem url" }, { signal })).behavior).toBe("deny");
+    expect((await can("Bash", { command: "ls" }, { signal })).behavior).toBe("deny");
+    expect(fetched).toEqual(["https://ibge.gov.br/x", "https://atacante.com/?d=1"]);
+    chat.close();
+  });
+
+  it("sem canFetch, WebFetch é sempre negado", async () => {
+    let options: Record<string, unknown> = {};
+    const chatQuery: ChatQueryFn = ({ options: o }) => {
+      options = o as unknown as Record<string, unknown>;
+      async function* run() {}
+      const it = run();
+      return Object.assign(it, {
+        interrupt: async () => undefined,
+        setModel: async () => undefined,
+        close: () => void it.return(undefined),
+      });
+    };
+    const p = new ClaudeCodeProvider({
+      exec: async () => ({ stdout: "", stderr: "", code: 0 }),
+      chatQuery,
+      binaryPath: "/bin/claude",
+    });
+    p.openChat(BASE).close();
+    await new Promise((r) => setTimeout(r, 0));
+    const can = options.canUseTool as (
+      tool: string,
+      input: Record<string, unknown>,
+      o: { signal: AbortSignal },
+    ) => Promise<{ behavior: string }>;
+    expect(
+      (
+        await can(
+          "WebFetch",
+          { url: "https://ibge.gov.br/" },
+          { signal: new AbortController().signal },
+        )
+      ).behavior,
+    ).toBe("deny");
   });
 
   it("falha ao abrir o processo vira evento error, sem lançar", async () => {

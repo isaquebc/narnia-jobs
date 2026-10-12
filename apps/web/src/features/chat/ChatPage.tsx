@@ -12,10 +12,10 @@ import { Card, CardTitle } from "../../components/ui/card";
 import { Input, Select, Textarea } from "../../components/ui/input";
 import {
   type LiveTool,
-  useActiveCard,
   useChatSession,
   useChatSessions,
   useResearch,
+  useSessionCard,
 } from "../../hooks/useChat";
 import { ingestionKey } from "../../hooks/useIngestion";
 import { useProfiles } from "../../hooks/useProfiles";
@@ -84,7 +84,7 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
           <p className="text-sm text-muted-fg">{t("chat.empty")}</p>
         )}
       </div>
-      {sessionId ? <ContextPanel sessionId={sessionId} profileId={active?.id ?? null} /> : null}
+      {sessionId ? <ContextPanel sessionId={sessionId} /> : null}
       <SessionLimitDialog
         limit={limit}
         onChoose={(id) => void closeAndCreate(id)}
@@ -399,9 +399,10 @@ function ClarifyHeader({ runId }: { runId: string }) {
   );
 }
 
-function ContextPanel({ sessionId, profileId }: { sessionId: string; profileId: string | null }) {
-  const card = useActiveCard();
+function ContextPanel({ sessionId }: { sessionId: string }) {
   const chat = useChatSession(sessionId);
+  const profileId = chat.session?.profileId ?? null;
+  const card = useSessionCard(profileId);
   const sources = useResearch(profileId);
   const tz = useTimezone();
   const used = Array.from(

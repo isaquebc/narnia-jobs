@@ -253,3 +253,28 @@ describe("Regressão 2026-10-11 (e2e F04/E2E-05) · painel Contexto mostra só o
     expect(getActiveProfileCard).not.toHaveBeenCalled();
   });
 });
+
+describe("Auditoria pós-F04 · bloco A · painel Contexto usa o perfil da conversa", () => {
+  it("com outro perfil ativo, o cartão e as fontes são os do perfil da sessão", async () => {
+    const getProfileCard = vi.fn(async (id: string) => ({
+      profileId: id,
+      text: id === "p2" ? "Cartão do perfil da conversa" : "Cartão do perfil ativo",
+      tokensEst: 10,
+      hash: "h",
+      factsVersion: 1,
+      builtAt: "2026-10-11T12:00:00.000Z",
+      valid: true,
+    }));
+    const listResearch = vi.fn(async () => ({ sources: [] }));
+    const api = chatApi({
+      getProfileCard,
+      listResearch,
+      getChatSession: vi.fn(async (id: string) => ({ session: session(id, { profileId: "p2" }) })),
+    });
+    renderApp({ api, initialUrl: "/chat/s1" });
+    const aside = await screen.findByRole("complementary", { name: "Contexto" });
+    expect(await within(aside).findByText("Cartão do perfil da conversa")).toBeInTheDocument();
+    expect(aside).not.toHaveTextContent("Cartão do perfil ativo");
+    await waitFor(() => expect(listResearch).toHaveBeenCalledWith("p2"));
+  });
+});

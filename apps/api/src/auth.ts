@@ -23,7 +23,10 @@ export function tokenMatches(expected: string, given: string | undefined | null)
  */
 export function authMiddleware(token: string): MiddlewareHandler {
   return async (c, next) => {
-    const path = new URL(c.req.url).pathname;
+    // o roteador do Hono decodifica o caminho (`/%61pi/x` cai em `/api/x`): a decisão usa o mesmo caminho
+    // decodificado, senão o percent-encoding escapava do token (auditoria pós-F04, 2026-10-12)
+    const path = decodedPath(new URL(c.req.url).pathname);
+    if (path === null) return apiError(c, 400, "bad_path", "Caminho com codificação inválida");
     // /api/* e o servidor MCP (/mcp, F04-7) exigem o token; o resto (SPA, assets) é público
     if (PUBLIC_PATHS.has(path) || !(path.startsWith("/api/") || path === "/mcp")) return next();
     const header = c.req.header("authorization");
@@ -32,6 +35,14 @@ export function authMiddleware(token: string): MiddlewareHandler {
       return next();
     return apiError(c, 401, "unauthorized", "Token ausente ou inválido");
   };
+}
+
+function decodedPath(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
 }
 
 export function enterHandler(token: string) {

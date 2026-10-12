@@ -64,6 +64,10 @@ export const TrustedDomainSchema = z.object({
   id: IdSchema,
   pattern: z
     .string()
+    // normaliza antes de validar (auditoria A): maiúsculas e `www.` não viram erro nem padrão que nunca casa
+    .trim()
+    .toLowerCase()
+    .overwrite((p) => p.replace(/^www\./, ""))
     .min(3)
     .max(253)
     .regex(DOMAIN_PATTERN, "Domínio como ibge.gov.br, *.gov.br ou glassdoor.*")

@@ -223,17 +223,23 @@ export function chatMessagesRepo(db: Db): ChatMessagesRepo {
 
 /* ---------- domínios confiáveis e fontes de pesquisa (F04-5) ---------- */
 
-/** `*.gov.br` casa `ibge.gov.br` e `www.dados.gov.br`; `glassdoor.*` casa `glassdoor.com` e `glassdoor.com.br`. */
+/**
+ * `*.gov.br` casa `ibge.gov.br` e `www.dados.gov.br`; `glassdoor.*` casa `glassdoor.com`, `glassdoor.com.br` e
+ * `glassdoor.co.uk`, mas não `glassdoor.atacante.com` (auditoria A): depois do nome vem só um sufixo público curto,
+ * de 1 ou 2 rótulos de até 3 letras.
+ */
 export function domainMatches(pattern: string, host: string): boolean {
   const h = host.toLowerCase().replace(/^www\./, "");
-  const p = pattern.toLowerCase();
+  const p = pattern.toLowerCase().replace(/^www\./, "");
   if (p.startsWith("*.")) {
     const suffix = p.slice(1);
     return h.endsWith(suffix) && h.length > suffix.length;
   }
   if (p.endsWith(".*")) {
     const prefix = p.slice(0, -1);
-    return h.startsWith(prefix) && h.length > prefix.length;
+    if (!h.startsWith(prefix)) return false;
+    const rest = h.slice(prefix.length).split(".");
+    return rest.length <= 2 && rest.every((l) => /^[a-z]{2,3}$/.test(l));
   }
   return h === p || h.endsWith(`.${p}`);
 }

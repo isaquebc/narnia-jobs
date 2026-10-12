@@ -52,12 +52,13 @@ logs: ## logs da stack (SVC=api|worker|web|redis para filtrar)
 status: ## estado dos containers de produção
 	./start.sh status
 
+# o túnel reescreve o Host para o local: o api recusa Host desconhecido (proteção contra DNS rebinding, auditoria pós-F04)
 tunnel: ## URL pública temporária (cloudflared) para a stack de produção, já com o token
 	@command -v cloudflared >/dev/null || { echo "cloudflared não encontrado no host (https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/)"; exit 1; }
 	@port=$$(sed -n 's/^NARNIA_PORT=//p' $(ENV_FILE) | tail -n 1); \
 	 [[ -n "$$port" ]] || { echo "stack não iniciada: rode 'make up' antes"; exit 1; }; \
 	 token=$$(cat $(DATA_DIR)/.token 2>/dev/null || true); \
-	 cloudflared tunnel --url "http://127.0.0.1:$$port" --no-autoupdate 2>&1 | \
+	 cloudflared tunnel --url "http://127.0.0.1:$$port" --http-host-header "127.0.0.1:$$port" --no-autoupdate 2>&1 | \
 	 while IFS= read -r line; do \
 	   if [[ -z "$$done" && "$$line" =~ https://[a-z0-9-]+\.trycloudflare\.com ]]; then \
 	     printf '\n  URL pública (Ctrl+C encerra o túnel):\n\n    %s/?token=%s\n\n' "$${BASH_REMATCH[0]}" "$$token"; done=1; \

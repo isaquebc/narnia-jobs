@@ -23,7 +23,7 @@ import { Hono } from "hono";
 import { apiError } from "../errors";
 import type { IngestionStartDeps } from "../routes/ingestions";
 import { createChatIngestPort } from "./ingest-port";
-import { inScope, publishedName } from "./scopes";
+import { inScope, narrowsScope, publishedName } from "./scopes";
 
 /** Erro das tools do servidor (fora do escopo, execução de outra sessão, tool inexistente). */
 class McpToolError extends Error {
@@ -59,12 +59,13 @@ function entries(
 }
 
 /** Registro único das tools (F04 §2.2): perfil (F02), arquivos e ingestão (F03) e as da conversa (F04). */
-function registry(deps: IngestionStartDeps, sessionId: string | null): Map<string, ToolEntry> {
+function registry(deps: IngestionStartDeps, session: SessionInfo): Map<string, ToolEntry> {
+  const sessionId = session.id;
   const all = [
     ...entries(
       PROFILE_TOOLS,
       PROFILE_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
-      createProfileTools(deps.repos),
+      createProfileTools(deps.repos, { sessionProfileId: session.profileId }),
     ),
     ...entries(
       INGEST_TOOLS,
@@ -98,7 +99,7 @@ export function toolErrorText(e: unknown): string {
 }
 
 function buildServer(deps: IngestionStartDeps, version: string, session: SessionInfo) {
-  const tools = registry(deps, session.id);
+  const tools = registry(deps, session);
   const visible = [...tools.entries()].filter(([, t]) => inScope(t.name, session.category));
   const server = new Server({ name: "narnia-jobs", version }, { capabilities: { tools: {} } });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -128,6 +129,16 @@ function buildServer(deps: IngestionStartDeps, version: string, session: Session
           "run_not_in_session",
           "Esta conversa de clarificação só pode propor correções para a própria ingestão.",
         );
+      if (
+        tool.name === "session.set_category" &&
+        session.category &&
+        typeof args.category === "string" &&
+        !narrowsScope(session.category, args.category as ChatCategory)
+      )
+        throw new McpToolError(
+          "category_not_allowed",
+          `A conversa não pode passar de ${session.category} para ${args.category} por conta própria: isso ampliaria as ferramentas. Peça ao usuário para abrir uma conversa nova.`,
+        );
       const out = await withSpan(
         "mcp.tool",
         {
@@ -151,6 +162,8 @@ interface SessionInfo {
   id: string | null;
   category: ChatCategory | null;
   runId: string | null;
+  /** Perfil da conversa: as tools `profile.*` ficam presas a ele (auditoria A); null no terminal. */
+  profileId: string | null;
 }
 
 /**
@@ -162,11 +175,16 @@ export function mcpRoutes(deps: IngestionStartDeps & { version: string }) {
   const app = new Hono();
   app.all("/mcp", async (c) => {
     const sid = c.req.header("x-narnia-session") ?? null;
-    let session: SessionInfo = { id: null, category: null, runId: null };
+    let session: SessionInfo = { id: null, category: null, runId: null, profileId: null };
     if (sid) {
       const s = (deps.repos as Repos).chatSessions.get(sid);
       if (!s) return apiError(c, 404, "session_not_found", "Sessão de chat não encontrada");
-      session = { id: s.id, category: s.category, runId: s.ingestionRunId ?? null };
+      session = {
+        id: s.id,
+        category: s.category,
+        runId: s.ingestionRunId ?? null,
+        profileId: s.profileId,
+      };
     }
     const server = buildServer(deps, deps.version, session);
     const transport = // sem sessionIdGenerator = modo sem estado do SDK (cada requisição tem servidor e transporte próprios)

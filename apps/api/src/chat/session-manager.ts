@@ -20,15 +20,8 @@ import {
   startSpan,
 } from "@narnia-jobs/shared";
 import type { EventBus } from "../events";
+import { NATIVE_TOOLS } from "../mcp/scopes";
 import { pluginDir, readRecruiterTemplate, stripFrontmatter } from "../plugin";
-
-/** Tools nativas do CLI por categoria de sessão (F04-2): pesquisa web só onde faz sentido. */
-const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
-  career: ["WebSearch", "WebFetch"],
-  ingest: [],
-  clarify: [],
-  interview: [],
-};
 
 export class SessionLimitError extends Error {
   constructor(
@@ -156,6 +149,7 @@ export class SessionManager {
       },
       pluginDir: plugin,
       tools: NATIVE_TOOLS[session.category],
+      canFetch: (url) => this.canFetch(url),
       env: { NARNIA_SESSION_HAS_CARD: "1" },
       category: session.category,
       ingestionRunId: session.ingestionRunId,
@@ -365,6 +359,23 @@ export class SessionManager {
       this.emitState(id, "error");
     }
     this.deps.bus.emit({ type: "chat.error", sessionId: id, error: message, errorKey: f.key });
+  }
+
+  /**
+   * Leitura web (WebFetch) da conversa: só http(s) de domínio confiável, com a lista e a preferência lidas na hora
+   * (auditoria A). Com `research.require_trusted` desligado pelo usuário, qualquer http(s).
+   */
+  private canFetch(url: string): boolean {
+    let host: string;
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+      host = u.hostname;
+    } catch {
+      return false;
+    }
+    if (!resolveChatSettings(this.repos.settings).requireTrustedResearch) return true;
+    return this.repos.trustedDomains.match(host) !== null;
   }
 
   private emitState(id: string, state: ChatSession["state"]) {

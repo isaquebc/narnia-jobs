@@ -37,6 +37,7 @@ import {
   type ChatQueryFn,
   type ChatQueryLike,
   type ChatSdkOptions,
+  chatCanUseTool,
   createAsyncQueue,
   normalizeSdkChatMessage,
   type SdkUserMessageLike,
@@ -295,8 +296,10 @@ export class ClaudeCodeProvider implements Provider {
       includePartialMessages: true,
       tools: opts.tools,
       // o chat roda sem terminal: tool sem permissão explícita é negada (dono, 2026-10-12). O /mcp já limita as tools
-      // pela categoria da sessão; a pesquisa só grava fonte de domínio confiável (research_save)
-      allowedTools: [`mcp__${CHAT_MCP_SERVER}`, ...opts.tools],
+      // pela categoria da sessão. WebFetch fica fora: o canUseTool só libera domínio confiável (auditoria A)
+      allowedTools: [`mcp__${CHAT_MCP_SERVER}`, ...opts.tools.filter((t) => t !== "WebFetch")],
+      canUseTool: chatCanUseTool(opts.canFetch),
+      verbatimPrompts: true,
       plugins: opts.pluginDir ? [{ type: "local", path: opts.pluginDir }] : [],
       mcpServers: {
         [CHAT_MCP_SERVER]: { type: "http", url: opts.mcp.url, headers: opts.mcp.headers },
