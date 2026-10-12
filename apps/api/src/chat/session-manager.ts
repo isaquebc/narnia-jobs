@@ -10,7 +10,15 @@ import {
   resolveChatSettings,
 } from "@narnia-jobs/core";
 import type { ChatEvent, ChatHandle, Provider } from "@narnia-jobs/providers";
-import { type ChatCategory, type ChatSession, nowUtc } from "@narnia-jobs/shared";
+import {
+  type ChatCategory,
+  type ChatSession,
+  clip,
+  contentTracingEnabled,
+  nowUtc,
+  type SpanHandle,
+  startSpan,
+} from "@narnia-jobs/shared";
 import type { EventBus } from "../events";
 import { pluginDir, readRecruiterTemplate, stripFrontmatter } from "../plugin";
 
@@ -59,6 +67,8 @@ interface Live {
   text: string;
   toolCalls: Array<{ name: string; args: string; durationMs: number | null; isError: boolean }>;
   toolStarts: Map<string, { name: string; args: string; t0: number }>;
+  /** F04/M5: span do turno em andamento (no-op sem NARNIA_OTEL_ENDPOINT). */
+  span?: SpanHandle | undefined;
 }
 
 /**
@@ -213,7 +223,23 @@ export class SessionManager {
       usage: null,
     });
     this.repos.chatSessions.touch(id);
-    Object.assign(entry, { busy: true, turnIndex, text: "", toolCalls: [], toolStarts: new Map() });
+    const span = startSpan("chat.turn", {
+      "openinference.span.kind": "CHAIN",
+      "narnia.session_id": id,
+      "narnia.profile_id": session.profileId,
+      "narnia.category": session.category,
+      "narnia.turn_index": turnIndex,
+      "llm.model_name": current?.model ?? session.model,
+      ...(contentTracingEnabled() ? { "input.value": clip(text) } : {}),
+    });
+    Object.assign(entry, {
+      busy: true,
+      turnIndex,
+      text: "",
+      toolCalls: [],
+      toolStarts: new Map(),
+      span,
+    });
     entry.handle.send([...notes, text].join("\n\n"));
     return { turnIndex };
   }
@@ -300,6 +326,16 @@ export class SessionManager {
           outputTokens: e.usage.outputTokens,
           costUsd: e.costUsd,
         });
+        entry.span?.setAttributes({
+          "llm.token_count.prompt": e.usage.inputTokens,
+          "llm.token_count.completion": e.usage.outputTokens,
+          "narnia.cost_usd": e.costUsd,
+          "narnia.tool_calls": entry.toolCalls.length,
+          ...(e.type === "limit" ? { "narnia.limit": e.reason } : {}),
+          ...(contentTracingEnabled() ? { "output.value": clip(text) } : {}),
+        });
+        entry.span?.end();
+        entry.span = undefined;
         entry.busy = false;
         if (e.type === "limit") bus.emit({ type: "chat.limit", sessionId: id, reason: e.reason });
         bus.emit({
@@ -318,6 +354,9 @@ export class SessionManager {
 
   private fail(id: string, entry: Live, message: string) {
     const f = friendlyError(message);
+    entry.span?.recordError(new Error(message));
+    entry.span?.end();
+    entry.span = undefined;
     entry.busy = false;
     entry.handle.close();
     this.live.delete(id);

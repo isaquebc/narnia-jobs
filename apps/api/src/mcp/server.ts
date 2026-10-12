@@ -11,10 +11,13 @@ import {
   CHAT_TOOL_JSON_SCHEMAS,
   CHAT_TOOLS,
   type ChatCategory,
+  clip,
+  contentTracingEnabled,
   INGEST_TOOL_JSON_SCHEMAS,
   INGEST_TOOLS,
   PROFILE_TOOL_JSON_SCHEMAS,
   PROFILE_TOOLS,
+  withSpan,
 } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
@@ -125,7 +128,17 @@ function buildServer(deps: IngestionStartDeps, version: string, session: Session
           "run_not_in_session",
           "Esta conversa de clarificação só pode propor correções para a própria ingestão.",
         );
-      const out = await tool.call(args);
+      const out = await withSpan(
+        "mcp.tool",
+        {
+          "openinference.span.kind": "TOOL",
+          "tool.name": tool.name,
+          "narnia.session_id": session.id ?? "terminal",
+          "narnia.category": session.category ?? "terminal",
+          ...(contentTracingEnabled() ? { "input.value": clip(JSON.stringify(args)) } : {}),
+        },
+        async () => tool.call(args),
+      );
       return { content: [{ type: "text" as const, text: JSON.stringify(out) }] };
     } catch (e) {
       return { isError: true, content: [{ type: "text" as const, text: toolErrorText(e) }] };

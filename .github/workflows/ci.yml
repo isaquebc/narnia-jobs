@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:   # F04/M5: dispara o smoke opcional do modo B (E2E-09)
 
 # Tudo roda dentro de containers (docker compose); o runner só precisa de Docker.
 jobs:
@@ -109,3 +110,26 @@ jobs:
           if git ls-files | grep -E '^(data/|\.env$|.*\.sqlite)'; then
             echo "Arquivos de dados ou .env versionados"; exit 1
           fi
+
+  # F04/M5 · E2E-09 (opcional): Claude Code real com o plugin por --plugin-dir contra a instância de testes.
+  # Só por disparo manual e só com o segredo CLAUDE_CODE_OAUTH_TOKEN configurado; gasta poucos tokens da assinatura.
+  plugin-smoke:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sem credencial, pula
+        id: cred
+        run: if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then echo "skip=1" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.cred.outputs.skip != '1'
+        run: npm install -g @anthropic-ai/claude-code
+      - if: steps.cred.outputs.skip != '1'
+        run: |
+          NARNIA_PROVIDER=mock scripts/claude-env.sh up
+          scripts/claude-env.sh seed engineer
+          scripts/smoke-plugin.sh --yes
+      - if: always() && steps.cred.outputs.skip != '1'
+        run: scripts/claude-env.sh wipe
+

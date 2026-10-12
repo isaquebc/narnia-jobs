@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { initTelemetry, shutdownTelemetry } from "@narnia-jobs/core";
 import { createProviderFromEnv } from "@narnia-jobs/providers";
 import { drainThenClose, WORKER_DRAIN_MS_DEFAULT } from "./shutdown";
 import { startWorkers } from "./worker";
@@ -16,6 +17,10 @@ console.log(
   `[worker] filas: ${Object.keys(started.queues).join(", ")} · provider: ${process.env.NARNIA_PROVIDER ?? "claude-code"} · dados: ${dataDir}`,
 );
 
+// F04/M5: rastros das chamadas estruturadas (F01–F03) só com NARNIA_OTEL_ENDPOINT
+if (await initTelemetry(process.env, "narnia-worker"))
+  console.log(`[worker] rastros OpenTelemetry → ${process.env.NARNIA_OTEL_ENDPOINT}`);
+
 const drainMs = Number(process.env.NARNIA_WORKER_DRAIN_MS ?? WORKER_DRAIN_MS_DEFAULT);
 let stopping = false;
 const shutdown = async () => {
@@ -27,6 +32,7 @@ const shutdown = async () => {
     timeoutMs: Number.isFinite(drainMs) ? drainMs : WORKER_DRAIN_MS_DEFAULT,
     log: (l) => console.log(l),
   });
+  await shutdownTelemetry();
   process.exit(0);
 };
 process.on("SIGTERM", () => void shutdown());

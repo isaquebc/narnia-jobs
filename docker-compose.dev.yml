@@ -51,6 +51,8 @@ services:
       - NARNIA_TOKEN=${NARNIA_TOKEN:-dev-token}         # token de boot previsível em dev; em produção é aleatório
       - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_DEV_API_PORT:-3100}
       - PORT=3100
+      - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}   # 1 inclui perguntas/respostas nos rastros
     depends_on: [redis]
 
   worker:
@@ -65,6 +67,8 @@ services:
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - TESSDATA_PATH=/usr/share/tessdata
+      - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}   # 1 inclui perguntas/respostas nos rastros
     depends_on: [redis]
 
   web:
@@ -79,8 +83,33 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
 
+  # a imagem do Phoenix roda sem root (uid 65532) e é distroless: o volume novo nasce com dono root, então um passo de
+  # preparo (imagem do redis, já presente) ajusta o dono antes do Phoenix subir
+  phoenix-init:
+    image: redis:7-alpine
+    user: "0"
+    entrypoint: ["sh", "-c", "chown -R 65532:65532 /mnt/data"]
+    volumes:
+      - phoenix-data:/mnt/data
+
+  # F04-15: Arize Phoenix local (rastros e avaliações do chat), ligado por padrão no dev, só em 127.0.0.1; cada instância
+  # tem as suas portas (dono 6006/4317; Claude no .env.claude) e os seus dados (volume do projeto)
+  phoenix:
+    image: arizephoenix/phoenix:version-20.21.0-nonroot
+    depends_on:
+      phoenix-init:
+        condition: service_completed_successfully
+    environment:
+      - PHOENIX_WORKING_DIR=/mnt/data
+    ports:
+      - "127.0.0.1:${NARNIA_PHOENIX_PORT:-6006}:6006"        # interface + OTLP/HTTP (/v1/traces)
+      - "127.0.0.1:${NARNIA_PHOENIX_GRPC_PORT:-4317}:4317"   # OTLP/gRPC
+    volumes:
+      - phoenix-data:/mnt/data
+
 volumes:
   node_modules:
   pnpm-store:
   claude-auth:   # mesmo nome que no docker-compose.yml: o login vale para dev e produção
+  phoenix-data:  # F04-15: dados do Phoenix da instância
   gh-auth:       # F03-1: por projeto Docker (cada instância tem o seu); o lançador grava o token do gh do host

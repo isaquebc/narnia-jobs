@@ -18,6 +18,7 @@ services:
       - NARNIA_PROVIDER=mock
       - NARNIA_BACKUP_DIR=off
       - NARNIA_TOKEN=e2e-token
+      - NARNIA_OTEL_ENDPOINT=
   worker:
     restart: "no"
     volumes:
@@ -26,6 +27,7 @@ services:
     environment:
       - NARNIA_PROVIDER=mock
       - NARNIA_BACKUP_DIR=off
+      - NARNIA_OTEL_ENDPOINT=
   redis:
     restart: "no"
   playwright:

@@ -10,7 +10,7 @@ Idioma: responder e documentar em pt-BR. Plano em `plans/plan-v0/` (tasks em `pl
 | Como sobe | `make dev` / `./start.sh dev` | `scripts/claude-env.sh up` (skill `test-env`) |
 | Projeto Docker | `narnia-jobs-helpper` | `narnia-claude` (dev), `narnia-claude-prod` (up), `narnia-e2e` (e2e) |
 | Dados | `./data` | `./.claude-data/` |
-| Portas | web 5173, api 3100 | web 5174, api 3200 (prod 3250–3299, OAuth 8189) |
+| Portas | web 5173, api 3100, Phoenix 6006 | web 5174, api 3200, Phoenix 6106 (prod 3250–3299, OAuth 8189) |
 | Token | `dev-token` | `claude-token` |
 | Provider | Claude Code real | mock (real só com `NARNIA_PROVIDER=claude-code`) |
 
@@ -37,3 +37,9 @@ rodar `./start.sh promote` e, se mudaram dependências, composes ou a imagem, `m
 - Qualidade: `scripts/claude-env.sh lint|typecheck|test|build`; e2e: `scripts/claude-env.sh e2e` (`--ui-only --grep X`).
 - Lançadores: `scripts/test/*.bats` e `scripts/test/start.Tests.ps1` (`./start.sh test:sh`).
 - Commits só quando o dono pedir; push só quando o dono pedir.
+
+## Modo B, Phoenix e avaliações (F04)
+
+- **Nunca** rodar `install-plugin` contra o Claude Code real do dono: nos testes, `HOME` temporário e `NARNIA_CLAUDE_BIN` falso (a instância `claude` usa os nomes `narnia-jobs-claude`/`narnia-jobs-claude-local`).
+- `scripts/smoke-plugin.sh --yes` (E2E-09) usa a assinatura de quem roda: só a pedido do dono.
+- Avaliações do chat: `scripts/claude-env.sh evals [--strict] [id…]` (casos em `evals/chat/*.jsonl`; resultados no Phoenix da instância, `http://127.0.0.1:6106`, projeto `narnia-evals`). Com o mock é smoke; com `NARNIA_PROVIDER=claude-code`, avaliação real (custa tokens: só a pedido).

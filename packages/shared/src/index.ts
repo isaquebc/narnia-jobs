@@ -6,4 +6,5 @@ export * from "./mcp/chat";
 export * from "./mcp/ingest";
 export * from "./mcp/profile";
 export * from "./schemas";
+export * from "./telemetry";
 export * from "./time";

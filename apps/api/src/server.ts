@@ -4,10 +4,12 @@ import { serve } from "@hono/node-server";
 import {
   createRepos,
   DEFAULT_JOB_OPTIONS,
+  initTelemetry,
   migrate,
   openDatabase,
   resolveBackupDir,
   type StageJobData,
+  shutdownTelemetry,
 } from "@narnia-jobs/core";
 import { createProviderFromEnv } from "@narnia-jobs/providers";
 import { Queue } from "bullmq";
@@ -79,6 +81,10 @@ const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => 
 });
 attachWebSocket({ server: server as unknown as import("node:http").Server, bus, token });
 
+// F04/M5: rastros para o Phoenix local só com NARNIA_OTEL_ENDPOINT (ligado por padrão no compose de dev)
+if (await initTelemetry(process.env, "narnia-api"))
+  console.log(`[api] rastros OpenTelemetry → ${process.env.NARNIA_OTEL_ENDPOINT}`);
+
 const shutdown = async () => {
   console.log("[api] encerrando…");
   sessions.closeAll();
@@ -86,6 +92,7 @@ const shutdown = async () => {
   await Promise.all(Object.values(queues).map((q) => q.close()));
   await connection.quit();
   db.close();
+  await shutdownTelemetry();
   process.exit(0);
 };
 process.on("SIGTERM", () => void shutdown());

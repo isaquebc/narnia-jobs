@@ -113,6 +113,7 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   test|lint|typecheck|build|e2e|test:sh [args]   comandos do start.sh dentro da instância
   doctor | restore ARQ | dev-down                diagnóstico, restauração de backup e derrubar a stack (só desta instância)
   exec CMD [ARGS…] roda um comando no container de dev da instância (ex.: exec pnpm --filter @narnia-jobs/core exec vitest run x)
+  evals [--strict] [id…]  conversas de referência do chat (evals/chat) contra esta instância; resultados no Phoenix :${NARNIA_PHOENIX_PORT:-6106}
   wipe             remove containers, volumes e ./.claude-data da instância
 USAGE
 }
@@ -132,6 +133,10 @@ main() {
     logs) "${DEV_COMPOSE[@]}" --profile app logs -f --tail=100 "$@" ;;
     test | lint | typecheck | build | e2e | shell | cli | install | test:sh | doctor | restore | dev-down) "$ROOT/start.sh" "$cmd" "$@" ;;
     exec) require_docker; ensure_installed; dev_run "$@" ;;
+    evals)
+      wait_api
+      is_mock && cmd_env_seed engineer >/dev/null
+      "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx scripts/evals-chat.ts "$@" ;;
     wipe) cmd_env_wipe ;;
     help | -h | --help) usage ;;
     *) usage; die "comando desconhecido: $cmd" ;;

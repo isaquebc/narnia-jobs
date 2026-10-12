@@ -60,6 +60,26 @@ Em **Ingestão** você adiciona dados depois do primeiro uso: **GitHub**, **Curr
 - **Pendências.** O sino no topo e a página **Pendências** reúnem revisões, conflitos, execuções esperando decisão, sugestões de perfil e análises concluídas; cada item some sozinho quando você resolve.
 - **Evidências.** Repositórios analisados com relatório, métricas, resumo editável e **Reanalisar** (atualizar com commits novos, aprofundar ou cobrir o que ficou de fora).
 
+### Recrutador no terminal (Claude Code, modo B)
+
+O mesmo recrutador do chat roda no Claude Code do seu computador, com o mesmo cartão do perfil e as mesmas tools:
+
+```bash
+make dev            # ou ./start.sh up; a instância precisa estar no ar
+./start.sh install-plugin   # Windows: .\start.ps1 install-plugin  (com a produção no ar: --prod)
+```
+
+O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (`claude mcp add`, escopo do usuário) e instala o plugin (persona, skills e o hook que traz o cartão) por um marketplace local. Reinicie o Claude Code e use `/narnia-jobs:recrutador` ou `/narnia-jobs:perfil`. Se a porta mudar, rode o `install-plugin` de novo; o `./start.sh doctor` avisa quando o MCP ou o plugin estão desatualizados.
+
+### Rastros e avaliações (Arize Phoenix local)
+
+No `make dev` o Phoenix sobe junto e recebe os rastros de cada conversa, chamada de tool e chamada ao modelo: abra `http://127.0.0.1:6006` (projeto `narnia-jobs`). Por padrão vão só metadados (modelo, tokens, custo, tempo); para incluir perguntas e respostas, defina `NARNIA_OTEL_CONTENT=1` no `.env`. Nada sai do seu computador. Na produção (`./start.sh up`) ele fica desligado; para ligar, ponha no `.env`:
+
+```
+COMPOSE_PROFILES=observability
+NARNIA_OTEL_ENDPOINT=http://phoenix:6006/v1/traces
+```
+
 ### Onde ficam os dados e como fazer backup
 
 Tudo que é seu fica em `./data` (ou na pasta apontada por `NARNIA_DATA_DIR` no `.env`): banco SQLite, currículos enviados, textos extraídos, documentos gerados e logs de uso. Essa pasta nunca entra no repositório (`.gitignore`). O login da assinatura fica no volume Docker `claude-auth`, e a fila no volume `redis-data`.
@@ -78,6 +98,7 @@ Para restaurar: `./start.sh restore backups/<arquivo>.sqlite` (para a stack, gua
 | `./start.sh login` | login da assinatura dentro do container |
 | `./start.sh doctor` | diagnóstico: login, Redis, worker, caminho e tamanho do banco e do WAL, processo com o banco apagado ainda aberto, último backup e última requisição |
 | `./start.sh restore <arquivo>` | restaura um backup de `./backups` (guarda o banco atual antes) |
+| `./start.sh install-plugin` | instala o recrutador no Claude Code deste computador (MCP + plugin) |
 | `./start.sh logs [api\|worker\|web\|redis]` | acompanha os logs |
 | `./start.sh status` | estado dos containers |
 

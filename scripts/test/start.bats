@@ -402,3 +402,36 @@ SH
   [ "$status" -ne 0 ]
   [[ "$output" == *"porta mudou"* && "$output" == *"install-plugin"* && "$output" == *"não instalado"* ]]
 }
+
+# --- F04/M5 · Arize Phoenix (F04-15): ligado no dev, perfil opcional na produção, portas por instância, e2e sem ---
+
+@test "Phoenix no dev: imagem fixada, ligado por padrão, só em 127.0.0.1 e api/worker exportando para ele" {
+  run awk '/^  phoenix:/{f=1;next} f&&/^  [a-z-]+:$/{f=0} f' docker-compose.dev.yml
+  [[ "$output" == *"arizephoenix/phoenix:version-20.21.0-nonroot"* ]]
+  [[ "$output" != *"profiles:"* ]]
+  [[ "$output" == *'127.0.0.1:${NARNIA_PHOENIX_PORT:-6006}:6006'* ]]
+  [[ "$output" == *'127.0.0.1:${NARNIA_PHOENIX_GRPC_PORT:-4317}:4317'* ]]
+  grep -q 'NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}' docker-compose.dev.yml
+  grep -q '^  phoenix-data:' docker-compose.dev.yml
+}
+
+@test "Phoenix na produção: só com o perfil observability e exportador desligado por padrão" {
+  run awk '/^  phoenix:/{f=1;next} f&&/^[a-z]/{f=0} f' docker-compose.yml
+  [[ "$output" == *'profiles: ["observability"]'* ]]
+  [[ "$output" == *"arizephoenix/phoenix:version-20.21.0-nonroot"* ]]
+  grep -q 'NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}' docker-compose.yml
+}
+
+@test "e2e nunca exporta rastros e a instância claude usa portas próprias do Phoenix" {
+  grep -q 'NARNIA_OTEL_ENDPOINT=$' docker-compose.e2e.yml
+  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; printf "%s|%s" "$NARNIA_PHOENIX_PORT" "$NARNIA_PHOENIX_GRPC_PORT"'
+  [[ "$output" == "6106|4417" ]]
+}
+
+@test "smoke do modo B (E2E-09): recusa sem --yes e monta a cópia com .mcp.json da instância claude" {
+  run bash scripts/smoke-plugin.sh
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--yes"* ]]
+  run bash -c 'source scripts/smoke-plugin.sh; smoke_stage "$1"; cat "$1/plugin/.mcp.json"' _ "$TMP/smoke"
+  [[ "$output" == *'"url": "http://127.0.0.1:3200/mcp"'* && "$output" == *"claude-token"* ]]
+}

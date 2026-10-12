@@ -23,6 +23,8 @@ x-app: &app
     - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
     - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
     - TESSDATA_PATH=/usr/share/tessdata
+    - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}   # F04-15: vazio = sem rastros; com o perfil observability use http://phoenix:6006/v1/traces
+    - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}
 
 services:
   web:
@@ -54,6 +56,8 @@ services:
       - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_PORT:-3100}
       - NARNIA_VERSION=${NARNIA_VERSION:-0.1.0-dev}
       - PORT=3100
+      - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}
     ports:
       - "127.0.0.1:${NARNIA_OAUTH_PORT-8089}:8089"      # callback OAuth do Google Calendar (F07); porta fixa
     healthcheck:
@@ -88,7 +92,33 @@ services:
       timeout: 3s
       retries: 10
 
+  # a imagem do Phoenix roda sem root (uid 65532) e é distroless: o volume novo nasce com dono root, então um passo de
+  # preparo (imagem do redis, já presente) ajusta o dono antes do Phoenix subir
+  phoenix-init:
+    image: redis:7-alpine
+    profiles: ["observability"]
+    user: "0"
+    entrypoint: ["sh", "-c", "chown -R 65532:65532 /mnt/data"]
+    volumes:
+      - phoenix-data:/mnt/data
+
+  # F04-15: Arize Phoenix local, desligado por padrão na produção (sobe com --profile observability)
+  phoenix:
+    image: arizephoenix/phoenix:version-20.21.0-nonroot
+    depends_on:
+      phoenix-init:
+        condition: service_completed_successfully
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      - PHOENIX_WORKING_DIR=/mnt/data
+    ports:
+      - "127.0.0.1:${NARNIA_PHOENIX_PORT:-6006}:6006"
+    volumes:
+      - phoenix-data:/mnt/data
+
 volumes:
   claude-auth:
   gh-auth:
   redis-data:
+  phoenix-data:

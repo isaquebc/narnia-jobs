@@ -11,6 +11,8 @@ import {
   BuildDigestOutputSchema,
   type CheckProposalsOutput,
   CheckProposalsOutputSchema,
+  clip,
+  contentTracingEnabled,
   EXTRACTION_JSON_SCHEMAS,
   type ExtractFactsOutput,
   ExtractFactsOutputSchema,
@@ -23,6 +25,7 @@ import {
   type SynthesizeRunOutput,
   SynthesizeRunOutputSchema,
   toJsonSchema,
+  withSpan,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
 import { reportActivity } from "../activity";
@@ -371,7 +374,36 @@ export class ClaudeCodeProvider implements Provider {
     };
   }
 
-  private async run<T>(
+  /** Chamada estruturada com span LLM (F04/M5): modelo, tokens e custo; prompt e saída só com NARNIA_OTEL_CONTENT=1. */
+  private run<T>(
+    prompt: string,
+    options: Omit<SdkQueryOptions, "pathToClaudeCodeExecutable" | "settingSources">,
+    schema: z.ZodType<T>,
+    operation: string,
+  ): Promise<ProviderResult<T>> {
+    const content = contentTracingEnabled();
+    return withSpan(
+      "llm.structured",
+      {
+        "openinference.span.kind": "LLM",
+        "llm.model_name": options.model ?? "",
+        "narnia.operation": operation,
+        ...(content ? { "input.value": clip(prompt) } : {}),
+      },
+      async (span) => {
+        const r = await this.runRaw(prompt, options, schema);
+        span.setAttributes({
+          "llm.token_count.prompt": r.usage.inputTokens,
+          "llm.token_count.completion": r.usage.outputTokens,
+          "narnia.cost_usd": r.costUsd,
+          ...(content ? { "output.value": clip(JSON.stringify(r.output)) } : {}),
+        });
+        return r;
+      },
+    );
+  }
+
+  private async runRaw<T>(
     prompt: string,
     options: Omit<SdkQueryOptions, "pathToClaudeCodeExecutable" | "settingSources">,
     schema: z.ZodType<T>,
@@ -448,6 +480,7 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.readDocument },
       },
       ReadDocumentOutputSchema,
+      "readDocument",
     );
   }
 
@@ -463,6 +496,7 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.extractFacts },
       },
       ExtractFactsOutputSchema,
+      "extractFacts",
     );
   }
 
@@ -481,6 +515,7 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema: ANALYZE_PROFILES_JSON_SCHEMA },
       },
       AnalyzeProfilesOutputSchema,
+      "analyzeProfiles",
     );
   }
 
@@ -491,6 +526,7 @@ export class ClaudeCodeProvider implements Provider {
     systemPrompt: string,
     schema: Record<string, unknown>,
     zod: z.ZodType<T>,
+    operation: string,
   ): Promise<ProviderResult<T>> {
     return this.run(
       prompt,
@@ -502,6 +538,7 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema },
       },
       zod,
+      operation,
     );
   }
 
@@ -517,6 +554,7 @@ export class ClaudeCodeProvider implements Provider {
       PROMPTS.pickFiles(),
       INGEST_OUTPUT_JSON_SCHEMAS.pickFiles,
       PickFilesOutputSchema,
+      "pickFiles",
     );
   }
 
@@ -528,6 +566,7 @@ export class ClaudeCodeProvider implements Provider {
       PROMPTS.analyzeRepo(),
       INGEST_OUTPUT_JSON_SCHEMAS.analyzeRepo,
       AnalyzeRepoOutputSchema,
+      "analyzeRepo",
     );
   }
 
@@ -542,6 +581,7 @@ export class ClaudeCodeProvider implements Provider {
       PROMPTS.synthesizeRun(),
       INGEST_OUTPUT_JSON_SCHEMAS.synthesizeRun,
       SynthesizeRunOutputSchema,
+      "synthesizeRun",
     );
   }
 
@@ -553,6 +593,7 @@ export class ClaudeCodeProvider implements Provider {
       PROMPTS.checkProposals(),
       INGEST_OUTPUT_JSON_SCHEMAS.checkProposals,
       CheckProposalsOutputSchema,
+      "checkProposals",
     );
   }
 
@@ -568,6 +609,7 @@ export class ClaudeCodeProvider implements Provider {
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.buildDigest },
       },
       BuildDigestOutputSchema,
+      "buildDigest",
     );
   }
 }
