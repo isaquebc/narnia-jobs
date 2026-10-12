@@ -174,7 +174,7 @@ Regras: só texto (F04-6); horários no fuso do usuário; textos via `t()`; erro
 | F04-12 | Manutenção do índice FTS5 | gatilhos SQL na migration · hooks nos repos (como o cartão) | **Decidida (dono, 2026-10-11): gatilhos SQL.** O índice fica consistente em qualquer escrita (inclusive migrations e reset), e o FTS5 do `node:sqlite` com `remove_diacritics` foi verificado; os hooks nos repos esqueceriam escritas feitas por SQL direto. |
 | F04-13 | Canal dos eventos de chat | o `/ws` atual com eventos `chat.*` + `sessionId` · `/ws/sessions/:id` por sessão | **Decidida (dono, 2026-10-11): o `/ws` atual.** Já autentica, reconecta e valida pelo schema; com um usuário só, mandar os deltas a todas as abas custa pouco, e evita um segundo tipo de conexão. |
 | F04-14 | Instalação persistente do plugin no host | `claude plugin` (mecanismo de plugins locais vigente) · `--plugin-dir` a cada uso · só `claude mcp add` + skills copiadas para `~/.claude` | **Decidida (dono, 2026-10-11): `claude mcp add` (garante as tools, F04-8) + plugin pelo mecanismo vigente na data da implementação**, conferido na documentação antes de codar; `--plugin-dir` só nos testes. |
-| F04-15 | Phoenix também no compose de produção | só no dev · dev e produção (perfil desligado) | **Aguarda o dono. Recomendação: nos dois, sempre desligado por padrão**; quem usa a versão de produção também pode querer inspecionar as conversas localmente, e o perfil não sobe nada sem `--profile observability`. |
+| F04-15 | Phoenix também no compose de produção | só no dev · dev e produção (perfil desligado) | **Decidida (dono, 2026-10-11): nos dois composes; ligado por padrão no dev, desligado por padrão na produção** (produção só sobe com `--profile observability`). No dev cada instância tem o seu Phoenix com portas próprias (dono: UI 6006 e OTLP 4317/4318; Claude: valores em `.env.claude`, ex. 6106/4417/4418) e dados em volume do projeto; o e2e não sobe o Phoenix. |
 
 ---
 
@@ -266,3 +266,4 @@ Compose e2e com `NARNIA_PROVIDER=mock`; os roteiros do mock chamam o `/mcp` real
 | 2026-10-11 | — | **F04-12 decidida pelo dono**: índice FTS5 mantido por gatilhos SQL na migration. |
 | 2026-10-11 | — | **F04-13 decidida pelo dono**: eventos de chat pelo `/ws` existente, com `sessionId`. |
 | 2026-10-11 | — | **F04-14 decidida pelo dono**: `claude mcp add` sempre + plugin pelo mecanismo vigente, conferido na documentação no dia da implementação; `--plugin-dir` só nos testes. |
+| 2026-10-11 | — | **F04-15 decidida pelo dono**: Phoenix nos dois composes, ligado por padrão no dev e desligado por padrão na produção; portas por instância no dev. **Todas as decisões de §5 fechadas (F04-1 a F04-15).** |
