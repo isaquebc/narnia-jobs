@@ -162,6 +162,8 @@ export function useChatSession(sessionId: string) {
           setTurnActive(false);
           setLastUsage(e.usage.inputTokens + e.usage.outputTokens);
           void qc.invalidateQueries({ queryKey: chatKeys.session(sessionId) });
+          // fontes e perfil podem ter mudado no turno (research_save/research_apply, auditoria E1)
+          void qc.invalidateQueries({ queryKey: ["chat", "research"] });
           // o histórico recarregado já tem o turno (inclusive a parcial de um turno interrompido): some o provisório
           settle();
           break;

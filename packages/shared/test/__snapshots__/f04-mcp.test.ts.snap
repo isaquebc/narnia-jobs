@@ -2,6 +2,47 @@
 
 exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável (snapshot) 1`] = `
 {
+  "evidence.education.get": {
+    "description": "Detalhe de uma formação.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "additionalProperties": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "kind",
+        "detail",
+      ],
+      "type": "object",
+    },
+  },
   "evidence.education.list": {
     "description": "Formação do usuário, uma linha cada (instituição · curso · período).",
     "input": {
@@ -281,6 +322,47 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
       "required": [
         "items",
         "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "evidence.skill.get": {
+    "description": "Detalhe de uma skill: categoria, nível, evidências e verificação.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "additionalProperties": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "kind",
+        "detail",
       ],
       "type": "object",
     },
@@ -735,6 +817,51 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
       "type": "object",
     },
   },
+  "ingest.confirm": {
+    "description": "Confirma a estimativa de uma ingestão de texto ou arquivo criada por esta conversa (needsConfirmation) depois que o usuário concordou com o custo; a execução começa.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "estimating",
+            "queued",
+            "running",
+            "awaiting_confirmation",
+            "awaiting_decision",
+            "paused",
+            "review",
+            "done",
+            "error",
+            "cancelled",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+        "status",
+      ],
+      "type": "object",
+    },
+  },
   "ingest.file": {
     "description": "Ingere um arquivo (currículo, PDF) já anexado à conversa: cria uma execução cujas propostas vão para a revisão.",
     "input": {
@@ -1076,6 +1203,149 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
       "type": "object",
     },
   },
+  "research.apply": {
+    "description": "Grava no perfil da conversa um dado de carreira pendente de pesquisa (needsResearch), com o valor que o usuário confirmou na conversa e a fonte registrada por research_save. Só chame depois da confirmação explícita do usuário.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "availableFrom": {
+          "anyOf": [
+            {
+              "const": "immediate",
+              "type": "string",
+            },
+            {
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+              "type": "string",
+            },
+          ],
+        },
+        "contractTypes": {
+          "items": {
+            "enum": [
+              "clt",
+              "pj",
+              "freelance",
+              "internship",
+              "temporary",
+            ],
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "field": {
+          "enum": [
+            "salary",
+            "contractTypes",
+            "locations",
+            "availableFrom",
+          ],
+          "type": "string",
+        },
+        "locations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "city": {
+                "type": "string",
+              },
+              "country": {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string",
+              },
+              "remote": {
+                "enum": [
+                  "remote",
+                  "hybrid",
+                  "onsite",
+                  "any",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "country",
+              "remote",
+            ],
+            "type": "object",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "salary": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string",
+            },
+            "max": {
+              "exclusiveMinimum": 0,
+              "type": "number",
+            },
+            "min": {
+              "exclusiveMinimum": 0,
+              "type": "number",
+            },
+            "period": {
+              "enum": [
+                "monthly",
+                "yearly",
+                "hourly",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "min",
+            "max",
+            "currency",
+            "period",
+          ],
+          "type": "object",
+        },
+        "sourceId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "field",
+        "sourceId",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "enum": [
+            "salary",
+            "contractTypes",
+            "locations",
+            "availableFrom",
+          ],
+          "type": "string",
+        },
+        "ok": {
+          "const": true,
+          "type": "boolean",
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "ok",
+        "field",
+        "profileId",
+      ],
+      "type": "object",
+    },
+  },
   "research.list": {
     "description": "Fontes já pesquisadas para o perfil da sessão, uma linha cada.",
     "input": {
@@ -1144,7 +1414,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
     },
   },
   "research.save": {
-    "description": "Registra uma fonte pesquisada (só domínios confiáveis); o valor só vira dado do usuário depois de confirmado.",
+    "description": "Registra uma fonte pesquisada (só domínios confiáveis); o valor só vira dado do usuário depois de confirmado. Fonte fora da lista só com \`userConfirmed: true\`, depois de o usuário aprovar aquela fonte na conversa.",
     "input": {
       "additionalProperties": false,
       "properties": {
@@ -1166,6 +1436,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
           "maxLength": 100,
           "minLength": 1,
           "type": "string",
+        },
+        "userConfirmed": {
+          "type": "boolean",
         },
       },
       "required": [

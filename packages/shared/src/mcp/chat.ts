@@ -8,6 +8,13 @@ import {
 } from "../schemas/chat";
 import { IdSchema, PartialDateSchema } from "../schemas/common";
 import { IngestionDepthSchema, IngestionModeSchema, RunStatusSchema } from "../schemas/ingest";
+import {
+  AvailableFromSchema,
+  ContractTypeSchema,
+  LocationPrefSchema,
+  ResearchableFieldSchema,
+  SalaryRangeSchema,
+} from "../schemas/profile";
 import type { ToolDefinition } from "./profile";
 
 /**
@@ -45,6 +52,28 @@ const IngestStarted = z.object({
   needsConfirmation: z.boolean(),
   url: z.string().min(1),
 });
+/**
+ * `research.apply` (auditoria E1): objeto plano (a API do Claude não aceita `anyOf` na raiz do schema de uma tool), com
+ * o valor no campo de mesmo nome que `field`.
+ */
+const ResearchApplyInputSchema = z
+  .object({
+    field: ResearchableFieldSchema,
+    sourceId: IdSchema,
+    salary: SalaryRangeSchema.optional(),
+    contractTypes: z.array(ContractTypeSchema).min(1).optional(),
+    locations: z.array(LocationPrefSchema).min(1).optional(),
+    availableFrom: AvailableFromSchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v[v.field] === undefined)
+      ctx.addIssue({
+        code: "custom",
+        path: [v.field],
+        message: `Informe o valor confirmado em "${v.field}"`,
+      });
+  });
+export type ResearchApplyInput = z.infer<typeof ResearchApplyInputSchema>;
 const FREE_TEXT_MIN = 200;
 const FREE_TEXT_MAX = 50_000;
 
@@ -70,11 +99,17 @@ export const CHAT_TOOLS = {
     Page,
     Paged,
   ),
+  "evidence.skill.get": tool(
+    "Detalhe de uma skill: categoria, nível, evidências e verificação.",
+    ById,
+    Detail,
+  ),
   "evidence.education.list": tool(
     "Formação do usuário, uma linha cada (instituição · curso · período).",
     Page,
     Paged,
   ),
+  "evidence.education.get": tool("Detalhe de uma formação.", ById, Detail),
   "fact.search": tool(
     "Busca nos fatos e resumos do usuário sem ler tudo (acentos ignorados, prefixo). Use antes de listar.",
     z.object({
@@ -136,14 +171,20 @@ export const CHAT_TOOLS = {
     z.object({ ok: z.literal(true) }),
   ),
   "research.save": tool(
-    "Registra uma fonte pesquisada (só domínios confiáveis); o valor só vira dado do usuário depois de confirmado.",
+    "Registra uma fonte pesquisada (só domínios confiáveis); o valor só vira dado do usuário depois de confirmado. Fonte fora da lista só com `userConfirmed: true`, depois de o usuário aprovar aquela fonte na conversa.",
     z.object({
       url: z.string().url(),
       title: z.string().min(1).max(300),
       excerpt: z.string().min(1).max(2_000),
       usedFor: z.string().min(1).max(100),
+      userConfirmed: z.boolean().optional(),
     }),
     z.object({ id: IdSchema, domain: z.string(), trustTag: TrustTagSchema }),
+  ),
+  "research.apply": tool(
+    "Grava no perfil da conversa um dado de carreira pendente de pesquisa (needsResearch), com o valor que o usuário confirmou na conversa e a fonte registrada por research_save. Só chame depois da confirmação explícita do usuário.",
+    ResearchApplyInputSchema,
+    z.object({ ok: z.literal(true), field: ResearchableFieldSchema, profileId: IdSchema }),
   ),
   "research.list": tool(
     "Fontes já pesquisadas para o perfil da sessão, uma linha cada.",
@@ -203,6 +244,11 @@ export const CHAT_TOOLS = {
     "Ingere um arquivo (currículo, PDF) já anexado à conversa: cria uma execução cujas propostas vão para a revisão.",
     z.object({ fileId: IdSchema }),
     IngestStarted.extend({ alreadyRead: z.boolean() }),
+  ),
+  "ingest.confirm": tool(
+    "Confirma a estimativa de uma ingestão de texto ou arquivo criada por esta conversa (needsConfirmation) depois que o usuário concordou com o custo; a execução começa.",
+    z.object({ runId: IdSchema }),
+    z.object({ runId: IdSchema, status: RunStatusSchema }),
   ),
   "ingest.github": tool(
     "Prepara a análise de repositórios do GitHub; sempre espera o usuário confirmar o orçamento na tela da execução.",

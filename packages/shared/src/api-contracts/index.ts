@@ -678,6 +678,16 @@ export type ChatSettingsDto = z.infer<typeof ChatSettingsSchema>;
 export const ChatSettingsResponseSchema = z.object({ settings: ChatSettingsSchema });
 export const ChatSettingsPutRequestSchema = ChatSettingsSchema.partial();
 export const TrustedDomainsResponseSchema = z.object({ domains: z.array(TrustedDomainSchema) });
+
+// GET /api/plugin/status — Configurações › Modo plugin (F04 §4, auditoria E1)
+export const PluginStatusResponseSchema = z.object({
+  mcpUrl: z.string(),
+  mcp: z.object({ ok: z.boolean(), tools: z.number().int().min(0) }),
+  command: z.string(),
+  doctorCommand: z.string(),
+  lastSeenAt: z.string().nullable(),
+});
+export type PluginStatusResponse = z.infer<typeof PluginStatusResponseSchema>;
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
   pattern: true,
   trustTag: true,

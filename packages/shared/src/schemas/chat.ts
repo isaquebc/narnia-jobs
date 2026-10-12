@@ -97,6 +97,8 @@ export const ResearchSourceSchema = z.object({
   excerpt: z.string(),
   usedFor: z.string().min(1),
   trustTag: TrustTagSchema,
+  /** Fonte fora da lista de domínios confiáveis, usada porque o usuário confirmou na conversa (F04-5). */
+  userConfirmed: z.boolean().default(false),
   accepted: z.boolean().nullable(),
   accessedAt: IsoDateTimeSchema,
 });

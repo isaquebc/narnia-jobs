@@ -7,7 +7,7 @@ import { cn } from "../../../lib/cn";
 import { formatBytes } from "../../../lib/format";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const ACCEPT = ".pdf,.docx,.md,.markdown,.txt";
+export const ACCEPT = ".pdf,.docx,.md,.markdown,.txt";
 const ALLOWED_EXT = /\.(pdf|docx|md|markdown|txt)$/i;
 
 export function validateFile(file: File): string | null {

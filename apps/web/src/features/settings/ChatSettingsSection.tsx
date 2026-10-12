@@ -26,6 +26,18 @@ export function ChatSettingsSection() {
   }, [settings, form]);
   const num = (k: keyof ChatSettingsDto) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => (f ? { ...f, [k]: Number(e.target.value) } : f));
+  // teto de custo por conversa (§4): texto livre para aceitar vazio (= sem teto) e decimais
+  const [budget, setBudget] = useState<string | null>(null);
+  useEffect(() => {
+    if (settings && budget === null)
+      setBudget(settings.maxBudgetUsd === null ? "" : String(settings.maxBudgetUsd));
+  }, [settings, budget]);
+  const budgetValue = (): number | null => {
+    const v = (budget ?? "").trim().replace(",", ".");
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
 
   return (
     <Card className="flex flex-col gap-4">
@@ -72,6 +84,20 @@ export function ChatSettingsSection() {
               ))}
             </Select>
           </Field>
+          <Field
+            label={t("chat.settings.maxBudget")}
+            htmlFor="chat-max-budget"
+            hint={t("chat.settings.maxBudgetHint")}
+          >
+            <Input
+              id="chat-max-budget"
+              type="number"
+              min={0}
+              step="0.01"
+              value={budget ?? ""}
+              onChange={(e) => setBudget(e.target.value)}
+            />
+          </Field>
         </div>
       ) : null}
       {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}
@@ -86,6 +112,7 @@ export function ChatSettingsSection() {
               hibernateAfterMin: form.hibernateAfterMin,
               maxTurns: form.maxTurns,
               defaultModel: form.defaultModel,
+              maxBudgetUsd: budgetValue(),
             })
           }
         >

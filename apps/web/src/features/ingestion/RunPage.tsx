@@ -178,6 +178,17 @@ export function RunPage({ runId }: { runId: string }) {
                 perRepo: shortTokens(run.budget.perRepo),
               })}
             </span>
+          ) : run.estimate ? (
+            // texto/arquivo aberto pela conversa acima do limite de custo (auditoria E1)
+            <span className="text-sm">
+              {t("runPage.estimateFile", {
+                tokens: shortTokens(
+                  run.estimate.documentTokens +
+                    run.estimate.factsTokens +
+                    run.estimate.digestTokens,
+                ),
+              })}
+            </span>
           ) : null}
           <div className="flex gap-2">
             <Button disabled={confirm.isPending} onClick={() => confirm.mutate()}>

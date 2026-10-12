@@ -15,6 +15,7 @@ import { formatDate } from "../../lib/format";
 import { GithubConnectCard } from "../ingestion/github/GithubConnectCard";
 import { bytesLabel } from "../ingestion/units";
 import { ChatSettingsSection } from "./ChatSettingsSection";
+import { PluginSettingsSection } from "./PluginSettingsSection";
 
 const GB = 1024 ** 3;
 const DEPTHS = ["quick", "balanced", "deep"] as const;
@@ -201,6 +202,7 @@ export function SettingsPage() {
       <h2 className="text-base font-semibold">{t("settings.integrations")}</h2>
       <GithubConnectCard />
       <ChatSettingsSection />
+      <PluginSettingsSection />
       {form ? (
         <Card className="flex flex-col gap-4">
           <h3 className="text-sm font-semibold">{t("settings.ingest")}</h3>

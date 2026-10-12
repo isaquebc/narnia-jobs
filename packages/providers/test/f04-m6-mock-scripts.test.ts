@@ -32,4 +32,22 @@ describe("F04/M6 · roteiros do chat do mock", () => {
     expect(mockChatScript("texto: minha história", career)[0]).toBe("ingest_text");
     expect(mockChatScript("o que está fraco?", career)[0]).toBe("evidence_experience_list");
   });
+
+  it("auditoria E1 · anexo do composer → ingest_file; confirmação → ingest_confirm; 'pode usar' → research_apply", () => {
+    expect(
+      mockChatScript(
+        "[anexo: cv final.pdf · fileId 0199d3c2-7a10-7c3e-9f00-1234abcd5678]\nlê isso pra mim",
+        career,
+      ),
+    ).toEqual(["ingest_file", { fileId: "0199d3c2-7a10-7c3e-9f00-1234abcd5678" }]);
+    expect(
+      mockChatScript("confirmo a ingestão 0199d3c2-7a10-7c3e-9f00-1234abcd5678", career)[0],
+    ).toBe("ingest_confirm");
+    const [tool, args] = mockChatScript("pode usar esse valor de 12 a 16 mil por mês", career);
+    expect(tool).toBe("research_apply");
+    expect(args).toMatchObject({
+      field: "salary",
+      salary: { min: 12000, max: 16000, currency: "BRL", period: "monthly" },
+    });
+  });
 });

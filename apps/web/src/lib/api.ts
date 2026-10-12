@@ -32,6 +32,7 @@ import type {
   PersonaOverrides,
   PersonaResponse,
   PlanUsage,
+  PluginStatusResponse,
   Profile,
   ProfileCardResponse,
   ProfileCreateRequest,
@@ -66,6 +67,8 @@ export type ProfileSuggestion = z.infer<typeof ProfileSuggestionResponseSchema> 
 };
 export type IngestionDetail = IngestionResponse & {
   options?: { ocr: boolean; modelRead: boolean };
+  /** Estimativa por chamada (texto/arquivo); a conversa e a tela mostram o total antes de confirmar (auditoria E1). */
+  estimate?: { documentTokens: number; factsTokens: number; digestTokens: number } | null;
   proposals: Array<IngestionResponse["proposals"][number] & { editedData?: unknown }>;
   readings?: Array<{ id: string; kind: string; quality: number | null }>;
   // F03: execução do GitHub (orçamento, relatório, repositórios e análises)
@@ -231,6 +234,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         "/api/profiles/active/persona-card",
       ),
     getChatSettings: () => request<{ settings: ChatSettingsDto }>("/api/settings/chat"),
+    getPluginStatus: () => request<PluginStatusResponse>("/api/plugin/status"),
     putChatSettings: (patch: Partial<ChatSettingsDto>) =>
       request<{ settings: ChatSettingsDto }>("/api/settings/chat", {
         method: "PUT",

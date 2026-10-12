@@ -23,7 +23,15 @@ const CAREER = [
   "session.",
   "usage.log",
 ];
-const INGEST = ["ingest.text", "ingest.file", "ingest.github", "ingest.status", "job.", "session."];
+const INGEST = [
+  "ingest.text",
+  "ingest.file",
+  "ingest.confirm",
+  "ingest.github",
+  "ingest.status",
+  "job.",
+  "session.",
+];
 const CLARIFY = ["ingest.status", "ingest.propose", "file.", "fact.", "session."];
 
 const BY_CATEGORY: Record<ChatCategory, string[]> = {

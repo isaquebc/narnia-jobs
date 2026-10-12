@@ -388,7 +388,8 @@ export class MockProvider implements Provider {
    * Chat com roteiros (F04 M3): o "modelo" é falso, mas as tools são reais: cada turno chama uma tool do `/mcp` do app
    * pelo JSON-RPC com os headers da sessão (token e `X-Narnia-Session`) e responde em fragmentos. Roteiro pela mensagem:
    * clarificação → `ingest_propose`; salário/mercado/pesquisa → `research_save`; "texto:"/história → `ingest_text`;
-   * o resto → `evidence_experience_list`.
+   * anexo do composer → `ingest_file`; "pode usar" → `research_apply` com a fonte mais recente; "confirmo <runId>" →
+   * `ingest_confirm`; o resto → `evidence_experience_list`.
    */
   openChat(opts: ChatOpenOptions): ChatHandle {
     const out = createAsyncQueue<ChatEvent>();
@@ -441,6 +442,18 @@ export class MockProvider implements Provider {
         await this.gate("openChat");
         if (aborted) return interrupted("");
         const [tool, args] = mockChatScript(text, opts);
+        // a fonte que o usuário aprovou é a última registrada (o modelo real leria de research_list)
+        if (args.sourceId === LATEST_RESEARCH) {
+          const listed = await callTool("research_list", { limit: 1 });
+          const first = (() => {
+            try {
+              return (JSON.parse(listed.text) as { items?: Array<{ id: string }> }).items?.[0]?.id;
+            } catch {
+              return undefined;
+            }
+          })();
+          args.sourceId = first ?? "sem-fonte";
+        }
         const id = `mock-tool-${++rpcId}`;
         out.push({ type: "tool_start", id, name: tool, args: JSON.stringify(args).slice(0, 500) });
         const r = await callTool(tool, args);
@@ -542,6 +555,32 @@ export function mockChatScript(
         usedFor: "salary",
       },
     ];
+  const attached = /\[anexo: [^\]]* · fileId ([0-9A-Za-z-]+)\]/.exec(text);
+  if (attached) return ["ingest_file", { fileId: attached[1] as string }];
+  const confirm =
+    /confirm\w*\b.*?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i.exec(text);
+  if (confirm) return ["ingest_confirm", { runId: confirm[1] as string }];
+  if (/pode usar|usar esse valor|usar este valor/i.test(text)) {
+    // "12 a 16 mil": o "mil" vale para os dois números
+    const thousands = /\d\s*(mil|k)\b/i.test(text);
+    const [min, max] = [...text.matchAll(/\d+(?:[.,]\d+)?/g)].map((m) => {
+      const n = Number(m[0].replace(",", "."));
+      return thousands && n < 1000 ? n * 1000 : n;
+    });
+    return [
+      "research_apply",
+      {
+        field: "salary",
+        sourceId: LATEST_RESEARCH,
+        salary: {
+          min: min ?? 12000,
+          max: max ?? min ?? 16000,
+          currency: "BRL",
+          period: "monthly",
+        },
+      },
+    ];
+  }
   const file = /^arquivo:\s*(\S+)/i.exec(text);
   if (file) return ["ingest_file", { fileId: file[1] as string }];
   const github = /^github:\s*(\S+)/i.exec(text);
@@ -562,6 +601,9 @@ export function mockChatScript(
   return ["evidence_experience_list", {}];
 }
 
+/** Marcador do roteiro: troca pelo id da fonte mais recente antes de chamar `research_apply`. */
+const LATEST_RESEARCH = "__fonte_mais_recente__";
+
 function emptyUsage(model: string) {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, model };
 }
@@ -580,6 +622,9 @@ function mockChatReply(tool: string, isError: boolean): string {
       "Criei uma ingestão com o arquivo anexado; as propostas vão para a revisão, nada foi gravado sem você aprovar.",
     ingest_github:
       "Preparei a análise do GitHub; confirme o orçamento na tela da execução para ela começar.",
+    research_apply:
+      "Gravei a faixa no seu perfil com a fonte pesquisada (fonte: research_save); o campo saiu da lista de pendências.",
+    ingest_confirm: "Confirmei a estimativa; a ingestão começou e as propostas vão para a revisão.",
     ingest_propose:
       "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",
   };

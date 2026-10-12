@@ -338,7 +338,11 @@ export function trustedDomainsRepo(db: Db): TrustedDomainsRepo {
 }
 
 export interface ResearchSourcesRepo {
-  add(input: Omit<ResearchSource, "id" | "accessedAt" | "accepted">): ResearchSource;
+  add(
+    input: Omit<ResearchSource, "id" | "accessedAt" | "accepted" | "userConfirmed"> & {
+      userConfirmed?: boolean;
+    },
+  ): ResearchSource;
   get(id: string): ResearchSource | null;
   list(filter?: { profileId?: string; limit?: number }): ResearchSource[];
   setAccepted(id: string, accepted: boolean): void;
@@ -355,6 +359,7 @@ function mapSource(r: Row): ResearchSource {
     excerpt: r.excerpt,
     usedFor: r.used_for,
     trustTag: r.trust_tag,
+    userConfirmed: Number(r.user_confirmed ?? 0) === 1,
     accepted: r.accepted === null || r.accepted === undefined ? null : Number(r.accepted) === 1,
     accessedAt: r.accessed_at,
   });
@@ -366,13 +371,15 @@ export function researchSourcesRepo(db: Db): ResearchSourcesRepo {
     add(i) {
       const s = ResearchSourceSchema.parse({
         ...i,
+        userConfirmed: i.userConfirmed ?? false,
         id: newId(),
         accepted: null,
         accessedAt: nowUtc(),
       });
       q(
-        `insert into research_source (id, profile_id, session_id, url, domain, title, excerpt, used_for, trust_tag, accessed_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `insert into research_source (id, profile_id, session_id, url, domain, title, excerpt, used_for, trust_tag,
+           user_confirmed, accessed_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         s.id,
         s.profileId,
@@ -383,6 +390,7 @@ export function researchSourcesRepo(db: Db): ResearchSourcesRepo {
         s.excerpt,
         s.usedFor,
         s.trustTag,
+        s.userConfirmed ? 1 : 0,
         s.accessedAt,
       );
       return s;

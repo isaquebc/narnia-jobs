@@ -2,6 +2,7 @@ import { newId, type Repos } from "@narnia-jobs/core";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
+import { PLUGIN_LAST_SEEN_KEY } from "./plugin-status";
 
 export function usageSummary(repos: Repos) {
   const byCategory = Object.fromEntries(
@@ -75,6 +76,7 @@ export function usageRoutes(deps: { repos: Repos }) {
     }
     let recorded = 0;
     const ts = nowUtc();
+    deps.repos.settings.set(PLUGIN_LAST_SEEN_KEY, ts); // sinal de plugin em uso (Configurações › Modo plugin)
     order.forEach((id, turnIndex) => {
       const l = byId.get(id) as TerminalUsageLine;
       const inserted = deps.repos.usageEvents.insertTurn(

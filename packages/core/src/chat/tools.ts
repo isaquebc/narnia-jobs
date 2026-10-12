@@ -9,6 +9,7 @@ import {
 import type { z } from "zod";
 import type { Repos } from "../db";
 import { newId } from "../ids";
+import { isBelowReference } from "../salary";
 import { resolveChatSettings } from "./settings";
 
 /**
@@ -28,7 +29,10 @@ export type ChatToolErrorCode =
   | "no_session"
   | "no_profile"
   | "untrusted_domain"
-  | "invalid_url";
+  | "invalid_url"
+  | "source_not_found"
+  | "source_not_in_profile"
+  | "field_not_pending";
 
 /** Erro tipado das tools; o servidor MCP (M2) devolve como `isError` com o texto em pt-BR. */
 export class ChatToolError extends Error {
@@ -57,6 +61,8 @@ export interface ChatIngestPort {
   startText(text: string): Promise<IngestStart & { alreadyRead: boolean }>;
   startFile(fileId: string): Promise<IngestStart & { alreadyRead: boolean }>;
   startGithub(req: In<"ingest.github">): Promise<IngestStart>;
+  /** Confirma a estimativa de uma execução de texto/arquivo criada por esta conversa (auditoria E1). */
+  confirm(runId: string): Promise<{ runId: string; status: RunStatus }>;
 }
 
 export interface ChatToolsContext {
@@ -356,6 +362,11 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
         input,
       ),
     ),
+    "evidence.skill.get": wrap("evidence.skill.get", (input) => ({
+      id: input.id,
+      kind: "skill",
+      detail: detail("skill", input.id),
+    })),
     "evidence.education.list": wrap("evidence.education.list", (input) =>
       page(
         evidenceList(
@@ -365,6 +376,11 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
         input,
       ),
     ),
+    "evidence.education.get": wrap("evidence.education.get", (input) => ({
+      id: input.id,
+      kind: "education",
+      detail: detail("education", input.id),
+    })),
 
     "fact.search": wrap("fact.search", (input) => {
       const rel = relevance();
@@ -471,10 +487,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
       const url = normalizeUrl(input.url);
       const domain = url.hostname.replace(/^www\./, "");
       const match = repos.trustedDomains.match(url.hostname);
-      if (!match && resolveChatSettings(repos.settings).requireTrustedResearch) {
+      // fora da lista só com a confirmação do usuário (F04-5), que fica registrada na fonte (auditoria E1)
+      const userConfirmed = !match && input.userConfirmed === true;
+      if (!match && !userConfirmed && resolveChatSettings(repos.settings).requireTrustedResearch) {
         throw new ChatToolError(
           "untrusted_domain",
-          `${domain} não está na lista de fontes confiáveis; peça confirmação ao usuário ou cadastre o domínio em Configurações › Pesquisa`,
+          `${domain} não está na lista de fontes confiáveis; pergunte ao usuário se pode usar esta fonte (se ele concordar, chame de novo com userConfirmed: true) ou peça para cadastrar o domínio em Configurações › Chat`,
         );
       }
       const saved = repos.researchSources.add({
@@ -487,8 +505,46 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
         excerpt: input.excerpt,
         usedFor: input.usedFor,
         trustTag: match?.trustTag ?? "other",
+        userConfirmed,
       });
       return { id: saved.id, domain: saved.domain, trustTag: saved.trustTag };
+    }),
+    "research.apply": wrap("research.apply", (input) => {
+      const pid = profileId();
+      if (!pid) throw new ChatToolError("no_profile", "Nenhum perfil ativo");
+      const profile = repos.profiles.get(pid);
+      if (!profile) throw new ChatToolError("no_profile", "Perfil não encontrado");
+      const source = repos.researchSources.get(input.sourceId);
+      if (!source)
+        throw new ChatToolError("source_not_found", `Fonte não encontrada: ${input.sourceId}`);
+      if (source.profileId !== pid)
+        throw new ChatToolError(
+          "source_not_in_profile",
+          "A fonte não foi pesquisada para este perfil; registre a fonte com research_save nesta conversa.",
+        );
+      if (!profile.needsResearch.includes(input.field))
+        throw new ChatToolError(
+          "field_not_pending",
+          `${input.field} não está pendente de pesquisa neste perfil; para mudar um dado já preenchido, o usuário edita o perfil.`,
+        );
+      const patch: Record<string, unknown> = {
+        [input.field]: input[input.field],
+        needsResearch: profile.needsResearch.filter((f) => f !== input.field),
+      };
+      if (input.field === "salary" && input.salary) {
+        const country = repos.users.get()?.country ?? "BR";
+        patch.salaryBelowReference =
+          isBelowReference(
+            input.salary.min,
+            input.salary.currency,
+            input.salary.period,
+            repos.salaryReferences.current(country),
+          ) === true;
+      }
+      repos.profiles.update(pid, patch as Parameters<Repos["profiles"]["update"]>[1]);
+      // o valor veio desta pesquisa (`source.kind = pesquisa`, §3): a fonte fica marcada como aceita
+      repos.researchSources.setAccepted(source.id, true);
+      return { ok: true as const, field: input.field, profileId: pid };
     }),
     "research.list": wrap("research.list", (input) => {
       const pid = profileId();
@@ -577,6 +633,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
       const r = await ctx.ingest.startFile(input.fileId);
       return { ...r, url: runUrl(r.runId) };
     }),
+    "ingest.confirm": wrap("ingest.confirm", (input) => ctx.ingest.confirm(input.runId)),
     "ingest.github": wrap("ingest.github", async (input) => {
       const r = await ctx.ingest.startGithub(input);
       // F03-13: o GitHub sempre espera o usuário confirmar o orçamento na tela da execução

@@ -1,7 +1,9 @@
 import { buildPersona, getCard, type Repos, renderRecruiterPrompt } from "@narnia-jobs/core";
+import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
 import { readPluginFile, readRecruiterTemplate, splitFrontmatter } from "../plugin";
+import { PLUGIN_LAST_SEEN_KEY } from "./plugin-status";
 
 /** Nome do servidor MCP no Claude Code do usuário (vira `mcp__<nome>__*` no frontmatter do agente). */
 const SERVER_NAME = /^[A-Za-z0-9_-]{1,64}$/;
@@ -40,6 +42,8 @@ export function personaCardRoutes(deps: { repos: Repos }) {
     }
     const text = render(card.text);
     if (format === "text") {
+      // só o hook SessionStart do terminal pede o texto: sinal de plugin em uso (Configurações › Modo plugin)
+      deps.repos.settings.set(PLUGIN_LAST_SEEN_KEY, nowUtc());
       c.header("x-narnia-card-hash", card.hash);
       return c.text(text);
     }

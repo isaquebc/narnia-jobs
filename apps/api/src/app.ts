@@ -16,6 +16,7 @@ import {
 } from "./github-auth";
 import { allowedHostsFromEnv, hostGuard } from "./hosts";
 import { createJsonlLogger, type JsonlLogger } from "./log";
+import { probeMcp } from "./mcp/probe";
 import { mcpRoutes } from "./mcp/server";
 import type { QueueAdapter } from "./queue";
 import { backupsRoutes } from "./routes/backups";
@@ -29,6 +30,7 @@ import { jobsRoutes } from "./routes/jobs";
 import { notificationsRoutes } from "./routes/notifications";
 import { onboardingRoutes } from "./routes/onboarding";
 import { personaCardRoutes } from "./routes/persona-card";
+import { pluginStatusRoutes } from "./routes/plugin-status";
 import { profilesRoutes } from "./routes/profiles";
 import { providerRoutes } from "./routes/provider";
 import { reposRoutes } from "./routes/repos";
@@ -54,6 +56,8 @@ export interface AppDeps {
   backupDir?: string | null;
   /** Sessões de chat (F04 M3); ausente = gerenciador padrão apontando para o `/mcp` deste api. */
   sessions?: SessionManager;
+  /** Sonda do `/mcp` para Configurações › Modo plugin; padrão: a própria app, em memória, com o token de boot. */
+  mcpProbe?: () => Promise<number>;
   /** Hosts aceitos (DNS rebinding); ausente = padrões + NARNIA_PUBLIC_URL + NARNIA_ALLOWED_HOSTS. */
   allowedHosts?: Set<string>;
 }
@@ -128,6 +132,20 @@ export function createApp(deps: AppDeps) {
   );
   app.route("/", personaCardRoutes({ repos: deps.repos }));
   app.route("/", chatSettingsRoutes({ repos: deps.repos }));
+  app.route(
+    "/",
+    pluginStatusRoutes({
+      repos: deps.repos,
+      publicUrl: process.env.NARNIA_PUBLIC_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3100}`,
+      // a mesma conversa do Claude Code (initialize + tools/list), sem rede: pela própria app com o token de boot
+      mcpProbe:
+        deps.mcpProbe ??
+        (() =>
+          probeMcp("http://127.0.0.1", deps.token, (url, init) =>
+            Promise.resolve(app.fetch(new Request(url, init))),
+          )),
+    }),
+  );
   const sessions =
     deps.sessions ??
     new SessionManager({

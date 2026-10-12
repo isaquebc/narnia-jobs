@@ -77,7 +77,7 @@ function registry(deps: IngestionStartDeps, session: SessionInfo): Map<string, T
     ...entries(
       CHAT_TOOLS,
       CHAT_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
-      createChatTools(deps.repos, { ingest: createChatIngestPort(deps), sessionId }),
+      createChatTools(deps.repos, { ingest: createChatIngestPort(deps, sessionId), sessionId }),
     ),
   ];
   return new Map(all.map((t) => [publishedName(t.name), t]));

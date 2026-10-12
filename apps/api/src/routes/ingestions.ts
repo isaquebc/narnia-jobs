@@ -5,6 +5,7 @@ import {
   estimateExtraction,
   estimateRun,
   healStuckRun,
+  IngestError,
   type IngestionRunRecord,
   ingestModelsForDepth,
   markRunOpened,
@@ -31,6 +32,7 @@ import {
   IngestionEstimateRequestSchema,
   IngestionSourceSchema,
   ReviewRequestSchema,
+  type RunStatus,
   RunStatusSchema,
 } from "@narnia-jobs/shared";
 import { type Context, Hono } from "hono";
@@ -145,6 +147,11 @@ export async function startFileRun(
   deps: IngestionStartDeps,
   fileId: string,
   requested: { ocr?: boolean; modelRead?: boolean } = {},
+  /**
+   * Conversa (auditoria E1): mesma regra da tela (`ingest.auto_confirm_below`). Com `confirmByThreshold`, acima do
+   * limite a execução fica `awaiting_confirmation` sem enfileirar; `params` marca a origem para o `ingest.confirm`.
+   */
+  chat: { confirmByThreshold?: boolean; params?: Record<string, unknown> } = {},
 ) {
   const file = deps.repos.sourceFiles.get(fileId);
   if (!file) return null;
@@ -160,6 +167,7 @@ export async function startFileRun(
     models,
     options,
   });
+  if (chat.params) deps.repos.ingestionRuns.setParams(run.id, { ...run.params, ...chat.params });
   const est = estimateExtraction({
     textChars: meta?.chars ?? 0,
     ...(meta?.pages ? { pdfPages: meta.pages } : {}),
@@ -171,12 +179,43 @@ export async function startFileRun(
     factsTokens: est.calls.facts.tokens,
     digestTokens: est.calls.digest.tokens,
   });
-  deps.repos.ingestionRuns.setStatus(run.id, "queued");
-  await deps.queue.enqueue(run.id, "ingest.read_text");
+  const threshold = resolveIngestSettings(deps.repos.settings).autoConfirmBelow;
+  const awaiting =
+    chat.confirmByThreshold === true && !(threshold > 0 && est.totalTokens < threshold);
+  if (awaiting) {
+    deps.repos.ingestionRuns.setStatus(run.id, "awaiting_confirmation");
+    emitRun(deps.bus, deps.repos, run.id);
+  } else {
+    deps.repos.ingestionRuns.setStatus(run.id, "queued");
+    await deps.queue.enqueue(run.id, "ingest.read_text");
+  }
   return {
     run: deps.repos.ingestionRuns.get(run.id) as IngestionRunRecord,
     file,
     estimatedTokens: est.totalTokens,
+  };
+}
+
+/**
+ * Confirma a estimativa (F03 §2.4 e auditoria E1): GitHub enfileira os repositórios pendentes (`confirmRun`); texto e
+ * arquivo criados pela conversa acima do limite começam a cadeia do F01. Usada pela rota e pelo `ingest.confirm`.
+ */
+export async function confirmIngestion(deps: IngestionStartDeps, runId: string) {
+  const run = deps.repos.ingestionRuns.get(runId);
+  if (run?.fileId) {
+    if (run.status !== "awaiting_confirmation")
+      throw new IngestError("invalid_state", `A execução não espera confirmação (${run.status})`);
+    deps.repos.ingestionRuns.setStatus(runId, "queued");
+    await deps.queue.enqueue(runId, "ingest.read_text");
+    emitRun(deps.bus, deps.repos, runId);
+    return { status: "queued" as const, enqueued: 1 };
+  }
+  const tasks = confirmRun(deps.repos, runId);
+  await enqueueAll(deps.queue, tasks);
+  emitRun(deps.bus, deps.repos, runId);
+  return {
+    status: (deps.repos.ingestionRuns.get(runId)?.status ?? "queued") as RunStatus,
+    enqueued: tasks.length,
   };
 }
 
@@ -282,10 +321,7 @@ export function ingestionsRoutes(deps: IngestionStartDeps) {
 
   app.post("/api/ingestions/:id/confirm", async (c) => {
     try {
-      const tasks = confirmRun(deps.repos, c.req.param("id"));
-      await enqueueAll(deps.queue, tasks);
-      emitRun(deps.bus, deps.repos, c.req.param("id"));
-      return c.json({ status: find(c.req.param("id"))?.status, enqueued: tasks.length });
+      return c.json(await confirmIngestion(deps, c.req.param("id")));
     } catch (e) {
       return ingestErrorResponse(c, e);
     }

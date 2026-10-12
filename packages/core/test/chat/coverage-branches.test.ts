@@ -26,6 +26,7 @@ const noIngest: ChatIngestPort = {
     estimatedTokens: 0,
     needsConfirmation: true,
   }),
+  confirm: async (runId) => ({ runId, status: "queued" }),
 };
 
 function seeded() {

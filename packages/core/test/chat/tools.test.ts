@@ -35,6 +35,10 @@ function port(o: { githubConfirm?: boolean } = {}): ChatIngestPort {
         alreadyRead: true,
       };
     },
+    async confirm(runId) {
+      calls.push({ op: "confirm", arg: runId });
+      return { runId, status: "queued" };
+    },
     async startGithub(req) {
       calls.push({ op: "github", arg: req });
       return {

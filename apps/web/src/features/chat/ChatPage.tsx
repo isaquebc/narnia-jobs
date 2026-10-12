@@ -1,7 +1,7 @@
 import type { ChatSession } from "@narnia-jobs/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Archive, Pencil, Square, Wrench } from "lucide-react";
+import { Archive, Paperclip, Pencil, Square, Wrench } from "lucide-react";
 import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useApi, useTimezone, useWs } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
@@ -15,6 +15,7 @@ import {
   type LiveTool,
   useChatSession,
   useChatSessions,
+  useChatSettings,
   useResearch,
   useSessionCard,
 } from "../../hooks/useChat";
@@ -24,10 +25,41 @@ import { useProviderStatus } from "../../hooks/useProviderStatus";
 import { type TKey, t } from "../../i18n";
 import { formatDate, formatTokens } from "../../lib/format";
 import { FriendlyError } from "../ingestion/FriendlyError";
+import { ACCEPT, validateFile } from "../onboarding/components/FileDropzone";
 import { Markdown } from "./Markdown";
 import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "./SessionLimitDialog";
 
 const MODELS = ["sonnet", "haiku", "opus"];
+
+/**
+ * Anexo do composer (auditoria E1, §1.4): o arquivo sobe por `/api/files` e a mensagem leva este marcador para o
+ * recrutador chamar `ingest_file`; a bolha mostra o anexo como chip.
+ */
+const ATTACHMENT = /^\[anexo: (.+?) · fileId ([^\]\s]+)\]\n?/;
+export const attachmentMarker = (name: string, fileId: string) =>
+  `[anexo: ${name.replace(/[[\]]/g, "")} · fileId ${fileId}]`;
+
+const usd = (v: number) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(v);
+
+function UserContent({ text }: { text: string }) {
+  const m = ATTACHMENT.exec(text);
+  if (!m) return <Markdown text={text} />;
+  const rest = text.slice(m[0].length).trim();
+  return (
+    <>
+      <span className="mb-1 inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs">
+        <Paperclip size={12} />
+        <span>{m[1]}</span>
+      </span>
+      {rest ? <Markdown text={rest} /> : null}
+    </>
+  );
+}
 
 /** Chat com o recrutador (F04 §4): conversas do perfil ativo, mensagens em stream, contexto e teto de conversas. */
 export function ChatPage({ sessionId }: { sessionId?: string }) {
@@ -239,6 +271,27 @@ function ChatView({ sessionId }: { sessionId: string }) {
     sendText(pending);
   };
   const sessionTokens = (s?.tokensIn ?? 0) + (s?.tokensOut ?? 0);
+  const budget = useChatSettings().settings?.maxBudgetUsd ?? null;
+  // anexo (auditoria E1): mesmos tipos da ingestão; sobe e manda a mensagem com o marcador para o `ingest_file`
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const attach = async (f: File) => {
+    const invalid = validateFile(f);
+    setAttachError(invalid);
+    if (invalid) return;
+    setUploading(f.name);
+    try {
+      const up = await api.uploadFile(f);
+      const note = text.trim() || t("chat.attachDefault");
+      setText("");
+      sendText(`${attachmentMarker(f.name, up.id)}\n${note}`);
+    } catch (e) {
+      setAttachError((e as Error).message);
+    } finally {
+      setUploading(null);
+    }
+  };
   // desce sozinho a cada mensagem nova, a menos que o usuário tenha subido para ler o histórico
   const scroller = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -333,7 +386,11 @@ function ChatView({ sessionId }: { sessionId: string }) {
                       ))}
                     </div>
                   ) : null}
-                  <Markdown text={m.contentMd} />
+                  {m.role === "user" ? (
+                    <UserContent text={m.contentMd} />
+                  ) : (
+                    <Markdown text={m.contentMd} />
+                  )}
                 </Card>
               )}
             </li>
@@ -342,7 +399,7 @@ function ChatView({ sessionId }: { sessionId: string }) {
             <li className="self-end max-w-[80%]">
               <Card className="bg-muted p-3">
                 <span className="mb-1 block text-xs text-muted-fg">{t("chat.you")}</span>
-                <Markdown text={chat.pendingUser} />
+                <UserContent text={chat.pendingUser} />
               </Card>
             </li>
           ) : null}
@@ -375,9 +432,7 @@ function ChatView({ sessionId }: { sessionId: string }) {
         </ol>
       </div>
       {chat.createdRuns.map((runId) => (
-        <NavLink key={runId} to={`/ingestao/${runId}`} className="text-sm underline">
-          {t("chat.ingestionCreated")}
-        </NavLink>
+        <CreatedRun key={runId} runId={runId} />
       ))}
       {chat.error ? (
         <Alert tone="danger">
@@ -391,11 +446,35 @@ function ChatView({ sessionId }: { sessionId: string }) {
         </Alert>
       ) : null}
       {chat.limit ? (
-        <Alert tone="warn">
-          {chat.limit === "max_turns" ? t("chat.limitTurns") : t("chat.limitBudget")}
+        <Alert tone="warn" className="flex flex-wrap items-center justify-between gap-2">
+          <span>{chat.limit === "max_turns" ? t("chat.limitTurns") : t("chat.limitBudget")}</span>
+          {chat.limit === "max_turns" ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={chat.turnActive}
+              onClick={() => sendText(t("chat.continueText"))}
+            >
+              {t("chat.continue")}
+            </Button>
+          ) : null}
         </Alert>
       ) : null}
+      {attachError ? <Alert tone="danger">{attachError}</Alert> : null}
       <form onSubmit={submit} className="flex flex-col gap-2">
+        <input
+          ref={fileInput}
+          type="file"
+          accept={ACCEPT}
+          aria-label={t("chat.attach")}
+          className="sr-only"
+          tabIndex={-1}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void attach(f);
+          }}
+        />
         <Textarea
           aria-label={t("chat.inputLabel")}
           value={text}
@@ -411,8 +490,23 @@ function ChatView({ sessionId }: { sessionId: string }) {
               turn: formatTokens(chat.lastUsage ?? 0),
               session: formatTokens(sessionTokens),
             })}
+            {` · ${t("chat.usageCost", { cost: usd(s?.costUsdEst ?? 0) })}`}
+            {typeof budget === "number"
+              ? ` · ${t("chat.usageBudget", { budget: usd(budget) })}`
+              : ""}
           </span>
           <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              aria-label={t("chat.attachPick")}
+              title={t("chat.attach")}
+              disabled={chat.turnActive || uploading !== null}
+              onClick={() => fileInput.current?.click()}
+            >
+              <Paperclip size={14} />
+              {uploading ? t("chat.attachUploading", { name: uploading }) : null}
+            </Button>
             {chat.turnActive ? (
               <Button type="button" variant="outline" onClick={() => chat.interrupt.mutate()}>
                 <Square size={14} /> {t("chat.stop")}
@@ -430,6 +524,54 @@ function ChatView({ sessionId }: { sessionId: string }) {
         onCancel={() => setLimit(null)}
       />
     </section>
+  );
+}
+
+/**
+ * Execução aberta pela conversa (auditoria E1): link para a tela e, se ficou acima do limite de custo, a estimativa com
+ * "Confirmar ingestão" (o recrutador também confirma por `ingest_confirm` quando o usuário concorda na conversa).
+ */
+function CreatedRun({ runId }: { runId: string }) {
+  const api = useApi();
+  const ws = useWs();
+  const qc = useQueryClient();
+  const key = ["ingestion", runId, "chat"] as const;
+  const run = useQuery({ queryKey: key, queryFn: () => api.getIngestion(runId) });
+  useEffect(
+    () =>
+      ws.subscribe((e) => {
+        if (e.type === "ingestion.updated" && e.runId === runId)
+          void qc.invalidateQueries({ queryKey: ["ingestion", runId, "chat"] });
+      }),
+    [ws, qc, runId],
+  );
+  const confirm = useMutation({
+    mutationFn: () => api.confirmIngestion(runId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+  });
+  const r = run.data;
+  const est = r?.estimate
+    ? r.estimate.documentTokens + r.estimate.factsTokens + r.estimate.digestTokens
+    : null;
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-sm">
+      <NavLink to={`/ingestao/${runId}`} className="underline">
+        {t("chat.ingestionCreated")}
+      </NavLink>
+      {r?.status === "awaiting_confirmation" && r.fileId !== null ? (
+        <>
+          <span className="text-muted-fg">
+            {t("chat.runAwaiting", { tokens: formatTokens(est ?? 0) })}
+          </span>
+          <Button size="sm" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
+            {t("chat.runConfirm")}
+          </Button>
+        </>
+      ) : null}
+      {confirm.isError ? (
+        <span className="text-danger">{(confirm.error as Error).message}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -507,10 +649,24 @@ function ContextPanel({ sessionId }: { sessionId: string }) {
         ) : (
           <ul className="flex flex-col gap-2 text-xs">
             {mine.map((src) => (
-              <li key={src.id} className="flex flex-col">
+              <li key={src.id} className="flex flex-col gap-1">
                 <a href={src.url} target="_blank" rel="noopener noreferrer" className="underline">
                   {src.title}
                 </a>
+                <span className="flex flex-wrap gap-1">
+                  <Badge tone={src.trustTag === "other" ? "neutral" : "info"}>
+                    {t(`chat.settings.tag.${src.trustTag}` as TKey)}
+                  </Badge>
+                  {src.userConfirmed ? (
+                    <Badge tone="warn">{t("chat.sourceUserConfirmed")}</Badge>
+                  ) : null}
+                  {src.accepted === true ? (
+                    <Badge tone="ok">{t("chat.sourceAccepted")}</Badge>
+                  ) : src.accepted === false ? (
+                    <Badge tone="neutral">{t("chat.sourceIgnored")}</Badge>
+                  ) : null}
+                </span>
+                <span className="text-muted-fg">{src.excerpt}</span>
                 <span className="text-muted-fg">
                   {t("chat.sourceMeta", {
                     domain: src.domain,

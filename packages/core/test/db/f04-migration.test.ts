@@ -79,7 +79,7 @@ describe("F04/M1 migration 0004_chat", () => {
       notif: count(db, "select count(*) n from notification"),
       profiles: count(db, "select count(*) n from profile"),
     };
-    expect(migrate(db).applied).toEqual(["0004_chat"]);
+    expect(migrate(db, { until: "0004_chat" }).applied).toEqual(["0004_chat"]);
     expect(count(db, "select count(*) n from experience")).toBe(before.exp);
     expect(count(db, "select count(*) n from skill")).toBe(before.skills);
     expect(count(db, "select count(*) n from notification")).toBe(before.notif);
