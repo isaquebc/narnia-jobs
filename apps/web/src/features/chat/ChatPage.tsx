@@ -2,7 +2,7 @@ import type { ChatSession } from "@narnia-jobs/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Archive, Pencil, Square, Wrench } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useApi, useTimezone, useWs } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
@@ -11,6 +11,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Input, Select, Textarea } from "../../components/ui/input";
 import {
+  chatKeys,
   type LiveTool,
   useChatSession,
   useChatSessions,
@@ -41,6 +42,23 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   useEffect(() => {
     if (!sessionId && visible[0]) void navigate({ to: `/chat/${visible[0].id}` as string });
   }, [sessionId, visible, navigate]);
+  // trocou o perfil ativo com uma conversa de outro perfil aberta: vai para as conversas do perfil novo (auditoria D)
+  const api = useApi();
+  const open = useQuery({
+    queryKey: chatKeys.session(sessionId ?? ""),
+    queryFn: () => api.getChatSession(sessionId as string),
+    enabled: Boolean(sessionId),
+  });
+  const openProfile = open.data?.session.profileId;
+  const activeId = active?.id ?? null;
+  const prevActive = useRef(activeId);
+  useEffect(() => {
+    const switched = prevActive.current !== null && prevActive.current !== activeId;
+    prevActive.current = activeId;
+    // só na troca: abrir pela URL uma conversa de outro perfil continua possível (o painel mostra o perfil dela)
+    if (switched && sessionId && activeId && openProfile && openProfile !== activeId)
+      void navigate({ to: "/chat" });
+  }, [sessionId, activeId, openProfile, navigate]);
 
   const startNew = async () => {
     try {
@@ -84,7 +102,7 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
           <p className="text-sm text-muted-fg">{t("chat.empty")}</p>
         )}
       </div>
-      {sessionId ? <ContextPanel sessionId={sessionId} /> : null}
+      {sessionId ? <ContextPanel key={sessionId} sessionId={sessionId} /> : null}
       <SessionLimitDialog
         limit={limit}
         onChoose={(id) => void closeAndCreate(id)}
@@ -193,14 +211,32 @@ function ToolChip({
 
 function ChatView({ sessionId }: { sessionId: string }) {
   const chat = useChatSession(sessionId);
+  const api = useApi();
   const [text, setText] = useState("");
+  // teto de conversas ao enviar numa conversa hibernada (F04-3): pergunta qual encerrar e reenvia a mensagem
+  const [limit, setLimit] = useState<(SessionLimit & { text: string }) | null>(null);
   const s = chat.session;
+  const sendText = (v: string) =>
+    chat.send.mutate(v, {
+      onError: (e) => {
+        setText(v); // a mensagem não foi: volta para o campo
+        const l = sessionLimitOf(e);
+        if (l) setLimit({ ...l, text: v });
+      },
+    });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const v = text.trim();
     if (!v || chat.turnActive) return;
-    chat.send.mutate(v);
+    sendText(v);
     setText("");
+  };
+  const closeAndResend = async (id: string) => {
+    const pending = limit?.text ?? "";
+    setLimit(null);
+    await api.hibernateChat(id);
+    setText("");
+    sendText(pending);
   };
   const sessionTokens = (s?.tokensIn ?? 0) + (s?.tokensOut ?? 0);
   // desce sozinho a cada mensagem nova, a menos que o usuário tenha subido para ler o histórico
@@ -208,10 +244,23 @@ function ChatView({ sessionId }: { sessionId: string }) {
   const stuck = useRef(true);
   const historyLength = chat.history.length;
   const toolsLength = chat.tools.length;
+  // "Carregar anteriores": mantém na tela a mensagem que estava no topo (compensa a altura acrescentada em cima)
+  const prevHeight = useRef<number | null>(null);
+  const loadOlder = () => {
+    stuck.current = false;
+    prevHeight.current = scroller.current?.scrollHeight ?? null;
+    chat.loadOlder.mutate();
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: as dependências são os gatilhos de rolagem, não lidas no efeito
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = scroller.current;
-    if (el && stuck.current) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (prevHeight.current !== null) {
+      el.scrollTop += el.scrollHeight - prevHeight.current;
+      prevHeight.current = null;
+      return;
+    }
+    if (stuck.current) el.scrollTop = el.scrollHeight;
   }, [historyLength, toolsLength, chat.streamed, chat.pendingUser, chat.turnActive]);
   return (
     <section
@@ -219,11 +268,12 @@ function ChatView({ sessionId }: { sessionId: string }) {
       aria-label={s?.title ?? t("chat.title")}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {s?.category === "clarify" && s.ingestionRunId ? (
-          <ClarifyHeader runId={s.ingestionRunId} />
-        ) : (
-          <span />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {s ? <Badge tone="neutral">{t(`chat.category.${s.category}` as TKey)}</Badge> : null}
+          {s?.category === "clarify" && s.ingestionRunId ? (
+            <ClarifyHeader runId={s.ingestionRunId} />
+          ) : null}
+        </div>
         <div className="flex items-center gap-2 text-sm">
           <label htmlFor={`chat-model-${sessionId}`}>{t("chat.model")}</label>
           <Select
@@ -250,6 +300,18 @@ function ChatView({ sessionId }: { sessionId: string }) {
           stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
+        {chat.hasOlder ? (
+          <div className="mb-3 flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={chat.loadOlder.isPending}
+              onClick={loadOlder}
+            >
+              {t("chat.loadOlder")}
+            </Button>
+          </div>
+        ) : null}
         <ol className="flex flex-col gap-3" aria-label={t("chat.messages")}>
           {chat.history.length === 0 && !chat.pendingUser ? (
             <li className="text-sm text-muted-fg">{t("chat.emptySession")}</li>
@@ -362,6 +424,11 @@ function ChatView({ sessionId }: { sessionId: string }) {
           </div>
         </div>
       </form>
+      <SessionLimitDialog
+        limit={limit}
+        onChoose={(id) => void closeAndResend(id)}
+        onCancel={() => setLimit(null)}
+      />
     </section>
   );
 }

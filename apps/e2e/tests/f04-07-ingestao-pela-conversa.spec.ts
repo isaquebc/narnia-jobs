@@ -24,6 +24,11 @@ test("F04/E2E-07 ingestão pela conversa: texto pela tela com link para a execu�
   const textRun = (await listRuns()).runs.find((r) => r.source === "text");
   if (!textRun) throw new Error("execução de texto não criada pela conversa");
   await waitRun(textRun.id, ["review"]);
+  // auditoria D: o link aponta para a execução criada pela própria conversa e sobrevive ao reload (runId na tool call)
+  await page.reload();
+  const link = page.getByRole("link", { name: "Abrir a ingestão criada" });
+  await expect(link).toHaveCount(1);
+  await expect(link).toHaveAttribute("href", `/ingestao/${textRun.id}`);
 
   // arquivo: upload pela api (o chat recebe o id) → ingest_file
   const form = new FormData();

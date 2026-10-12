@@ -48,3 +48,13 @@ describe("i18n · nenhuma string em pt-BR fora do dicionário", () => {
     expect(ptBR.app.name).toBe("narnia-jobs");
   });
 });
+
+describe("i18n · erros amigáveis iguais aos do shared (auditoria D)", () => {
+  it("cada chave error.* do mapa tem o mesmo texto no dicionário da web", async () => {
+    const { FRIENDLY_MESSAGES } = await import("@narnia-jobs/shared");
+    for (const [key, text] of Object.entries(FRIENDLY_MESSAGES)) {
+      const short = key.replace(/^error\./, "") as keyof typeof ptBR.error;
+      expect(ptBR.error[short], key).toBe(text);
+    }
+  });
+});

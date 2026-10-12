@@ -5,6 +5,8 @@ import {
   createChatTools,
   createIngestTools,
   createProfileTools,
+  friendlyError,
+  friendlyText,
   type Repos,
 } from "@narnia-jobs/core";
 import {
@@ -84,7 +86,13 @@ function registry(deps: IngestionStartDeps, session: SessionInfo): Map<string, T
 const isZodError = (e: unknown): e is { issues: Array<{ path: PropertyKey[]; message: string }> } =>
   typeof e === "object" && e !== null && Array.isArray((e as { issues?: unknown }).issues);
 
-/** Erro como `isError`: `[código] mensagem` em pt-BR (tools tipadas) ou `invalid_input` / `internal`. */
+/** Tools da conversa que criam uma execução de ingestão (o link "Abrir a ingestão criada" vem delas). */
+const CREATES_RUN = new Set(["ingest.text", "ingest.file", "ingest.github"]);
+
+/**
+ * Erro como `isError`: `[código] mensagem` em pt-BR (tools tipadas) ou `invalid_input`; os demais passam pelo mapa de
+ * erros amigáveis (auditoria D): `[<chave>] texto em pt-BR. Detalhe técnico: <original>` (`internal` quando não casa).
+ */
 export function toolErrorText(e: unknown): string {
   if (isZodError(e)) {
     const detail = e.issues
@@ -95,7 +103,9 @@ export function toolErrorText(e: unknown): string {
   const code = (e as { code?: unknown }).code;
   const message = (e as Error).message ?? String(e);
   if (typeof code === "string") return `[${code}] ${message}`;
-  return `[internal] Falha ao executar a ferramenta: ${message}`;
+  const f = friendlyError(message);
+  const tag = f.key === "error.unknown" ? "internal" : f.key.replace(/^error\./, "");
+  return `[${tag}] ${friendlyText(f).text} Detalhe técnico: ${message}`;
 }
 
 function buildServer(deps: IngestionStartDeps, version: string, session: SessionInfo) {
@@ -161,6 +171,10 @@ function buildServer(deps: IngestionStartDeps, version: string, session: Session
         },
         async () => tool.call(args),
       );
+      // a execução criada por esta conversa: a web mostra o link e o SessionManager grava o runId na tool call
+      const created = (out as { runId?: unknown } | null)?.runId;
+      if (session.id && CREATES_RUN.has(tool.name) && typeof created === "string")
+        deps.bus.emit({ type: "chat.ingestion_created", sessionId: session.id, runId: created });
       return { content: [{ type: "text" as const, text: JSON.stringify(out) }] };
     } catch (e) {
       return { isError: true, content: [{ type: "text" as const, text: toolErrorText(e) }] };

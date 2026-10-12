@@ -260,6 +260,8 @@ export function createAppRouter(opts: {
     context: { services: opts.services, queryClient: opts.queryClient },
     ...(opts.history ? { history: opts.history } : {}),
     defaultPreload: false,
+    // a janela não rola (Shell h-screen): quem rola é o <main>, então trocar de página volta ele ao topo (auditoria D)
+    scrollToTopSelectors: ["window", "main"],
   });
 }
 

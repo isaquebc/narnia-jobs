@@ -143,7 +143,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
       {open ? (
         <section
           aria-label={t("activity.title")}
-          className="absolute right-0 z-30 mt-2 w-96 rounded-lg border border-border bg-card p-3 shadow-lg"
+          className="absolute right-0 z-30 mt-2 max-h-[calc(100vh-5rem)] w-96 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-lg"
         >
           <h3 className="mb-2 text-sm font-semibold">{t("activity.title")}</h3>
           {stopped.length > 0 ? (

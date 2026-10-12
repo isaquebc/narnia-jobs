@@ -140,4 +140,25 @@ describe("Regressão 2026-10-11 (e2e F04/E2E-06) · revisão mostra a proposta c
     const review = await screen.findByRole("region", { name: "Revisão" });
     expect(await within(review).findByText(/Comunicação com stakeholders/)).toBeInTheDocument();
   });
+
+  it("auditoria D: erro que não é o teto de conversas aparece como mensagem amigável", async () => {
+    renderApp({
+      api: {
+        ...shellApi,
+        listNotifications: async () => ({ notifications: [], unresolved: 0 }),
+        listIngestions: async () => ({ runs: [] }),
+        getIngestion: async () => run({ status: "review" }),
+        clarifyIngestion: vi.fn(async () => {
+          throw new ApiError(500, "internal", "Failed to authenticate: OAuth session expired");
+        }),
+      },
+      initialUrl: "/ingestao/r1",
+    });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Clarificar com o recrutador" }),
+    );
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/login da assinatura expirou/i);
+    expect(within(alert).getByText("Detalhes técnicos")).toBeInTheDocument();
+  });
 });

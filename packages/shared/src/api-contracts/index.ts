@@ -620,6 +620,12 @@ export const ChatLimitEventSchema = z.object({
   sessionId: IdSchema,
   reason: z.enum(["max_turns", "max_budget"]),
 });
+/** Execução criada por uma tool de ingestão desta conversa (auditoria D): a web mostra o link só para ela. */
+export const ChatIngestionCreatedEventSchema = z.object({
+  type: z.literal("chat.ingestion_created"),
+  sessionId: IdSchema,
+  runId: IdSchema,
+});
 export const ChatSessionUpdatedEventSchema = z.object({
   type: z.literal("chat.session_updated"),
   sessionId: IdSchema,
@@ -701,6 +707,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   ChatErrorEventSchema,
   ChatLimitEventSchema,
   ChatSessionUpdatedEventSchema,
+  ChatIngestionCreatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

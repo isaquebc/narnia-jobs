@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendlyError } from "../../src/errors/friendly";
+import { friendlyError } from "../src/errors/friendly";
 
 /** Plano de comunicação C5: mensagens em pt-BR com o que fazer; o texto técnico vai junto, recolhido na UI. */
 describe("friendlyError · mapa único de erros", () => {

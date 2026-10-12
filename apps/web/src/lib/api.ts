@@ -192,7 +192,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       }),
     deleteChatSession: (id: string) =>
       request<void>(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    listChatMessages: (id: string, opts: { before?: string; limit?: number } = {}) =>
+    listChatMessages: (
+      id: string,
+      opts: { before?: string; since?: string; limit?: number } = {},
+    ) =>
       request<{ messages: ChatMessage[] }>(
         `/api/sessions/${encodeURIComponent(id)}/messages?${new URLSearchParams(
           Object.entries(opts)

@@ -40,7 +40,10 @@ export const ChatToolCallSchema = z.object({
   args: z.string().max(500),
   durationMs: z.number().int().min(0).nullable(),
   isError: z.boolean(),
+  /** Execução criada por esta tool (ingest_text/file/github): o link "Abrir a ingestão criada" sobrevive ao reload. */
+  runId: IdSchema.optional(),
 });
+export type ChatToolCall = z.infer<typeof ChatToolCallSchema>;
 
 export const ChatMessageSchema = z.object({
   id: IdSchema,

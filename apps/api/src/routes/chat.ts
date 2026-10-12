@@ -90,6 +90,7 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
       "query",
       z.object({
         before: z.string().optional(),
+        since: z.string().optional(),
         limit: z.coerce.number().int().min(1).max(200).optional(),
       }),
     ),
@@ -101,6 +102,7 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
         return c.json({
           messages: repos.chatMessages.list(id, {
             ...(q.before ? { before: q.before } : {}),
+            ...(q.since ? { since: q.since } : {}),
             ...(q.limit ? { limit: q.limit } : {}),
           }),
         });

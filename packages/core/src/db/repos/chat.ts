@@ -162,8 +162,14 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
 
 export interface ChatMessagesRepo {
   add(input: Omit<ChatMessage, "id" | "createdAt">): ChatMessage;
-  /** Em ordem de conversa; `before` pagina para trás (cursor = id da mais antiga já carregada). */
-  list(sessionId: string, opts?: { limit?: number; before?: string }): ChatMessage[];
+  /**
+   * Em ordem de conversa; `before` pagina para trás (cursor = id da mais antiga já carregada); `since` traz da mensagem
+   * indicada (inclusive) em diante, até `limit` (a web usa depois de carregar as anteriores, para não abrir buraco).
+   */
+  list(
+    sessionId: string,
+    opts?: { limit?: number; before?: string; since?: string },
+  ): ChatMessage[];
   nextTurnIndex(sessionId: string): number;
 }
 
@@ -202,6 +208,13 @@ export function chatMessagesRepo(db: Db): ChatMessagesRepo {
     },
     list(sessionId, o = {}) {
       const limit = o.limit ?? 50;
+      if (o.since)
+        return (
+          q(
+            `select * from chat_message where session_id = ? and rowid >= (select rowid from chat_message where id = ?)
+             order by rowid asc limit ?`,
+          ).all(sessionId, o.since, limit) as Row[]
+        ).map(mapMessage);
       const rows = o.before
         ? (q(
             `select * from chat_message where session_id = ? and rowid < (select rowid from chat_message where id = ?)

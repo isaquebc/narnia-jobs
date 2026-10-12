@@ -230,7 +230,8 @@ describe("F04/M4 · chat com o recrutador", () => {
       "segue meu texto",
     );
     await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
-    act(() => ws.emit({ type: "ingestion.updated", runId: "r1", status: "review" }));
+    // auditoria D: o link vem da tool de ingestão desta conversa (`chat.ingestion_created`), não de qualquer execução
+    act(() => ws.emit({ type: "chat.ingestion_created", sessionId: "s1", runId: "r1" }));
     expect(await screen.findByRole("link", { name: "Abrir a ingestão criada" })).toHaveAttribute(
       "href",
       "/ingestao/r1",

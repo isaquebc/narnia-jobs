@@ -64,6 +64,10 @@ export const ptBR = {
     auth_expired: "O login da assinatura expirou e não pôde ser renovado.",
     auth_expired_hint:
       "Refaça com ./start.sh login. Para não expirar de novo, gere um token com claude setup-token, defina CLAUDE_CODE_OAUTH_TOKEN no .env e reinicie.",
+    turn_in_progress: "O recrutador ainda está respondendo a mensagem anterior.",
+    turn_in_progress_hint: "Espere a resposta terminar ou clique em Parar.",
+    budget_exhausted: "Esta conversa atingiu o teto de custo.",
+    budget_exhausted_hint: "Abra uma conversa nova ou aumente o teto em Configurações › Chat.",
     unknown: "Algo deu errado nesta etapa.",
     unknown_hint: "Tente de novo.",
   },
@@ -895,6 +899,7 @@ export const ptBR = {
     toolDuration: "{ms} ms",
     toolError: "erro",
     ingestionCreated: "Abrir a ingestão criada",
+    loadOlder: "Carregar anteriores",
     limitDialog: "Você tem {max} conversas abertas. Qual encerrar?",
     limitClose: "Encerrar {title}",
     close: "Encerrar",

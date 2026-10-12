@@ -14,6 +14,7 @@ import type { ChatEvent, ChatHandle, Provider, Usage } from "@narnia-jobs/provid
 import {
   type ChatCategory,
   type ChatSession,
+  type ChatToolCall,
   clip,
   contentTracingEnabled,
   nowUtc,
@@ -61,6 +62,9 @@ export interface SessionManagerDeps {
   interruptTimeoutMs?: number;
 }
 
+/** Tools (nome publicado) que criam uma execução de ingestão: o runId vai para a tool call gravada. */
+const CREATES_RUN_TOOLS = new Set(["ingest_text", "ingest_file", "ingest_github"]);
+
 /** Texto acrescentado à resposta parcial guardada de um turno cortado. */
 const INTERRUPTED_MARK = "_(resposta interrompida)_";
 /** Mensagens do banco antepostas quando a retomada se perde. */
@@ -73,7 +77,9 @@ interface Live {
   busy: boolean;
   turnIndex: number;
   text: string;
-  toolCalls: Array<{ name: string; args: string; durationMs: number | null; isError: boolean }>;
+  toolCalls: ChatToolCall[];
+  /** Execuções criadas pelas tools de ingestão do turno (evento do `/mcp`), na ordem: vão para a tool call. */
+  pendingRuns: string[];
   toolStarts: Map<string, { name: string; args: string; t0: number }>;
   /** F04/M5: span do turno em andamento (no-op sem NARNIA_OTEL_ENDPOINT). */
   span?: SpanHandle | undefined;
@@ -107,7 +113,13 @@ export class SessionManager {
   private readonly live = new Map<string, Live>();
   private sweeper: NodeJS.Timeout | null = null;
 
-  constructor(private readonly deps: SessionManagerDeps) {}
+  constructor(private readonly deps: SessionManagerDeps) {
+    // o `/mcp` avisa qual execução a tool de ingestão desta conversa criou; o fim da tool grava o runId (auditoria D)
+    deps.bus.on((e) => {
+      if (e.type === "chat.ingestion_created")
+        this.live.get(e.sessionId)?.pendingRuns.push(e.runId);
+    });
+  }
 
   private get repos() {
     return this.deps.repos;
@@ -206,6 +218,7 @@ export class SessionManager {
       turnIndex: 0,
       text: "",
       toolCalls: [],
+      pendingRuns: [],
       toolStarts: new Map(),
       closed: false,
       interrupting: false,
@@ -295,6 +308,7 @@ export class SessionManager {
       turnIndex,
       text: "",
       toolCalls: [],
+      pendingRuns: [],
       toolStarts: new Map(),
       span,
       interrupting: false,
@@ -359,7 +373,15 @@ export class SessionManager {
         const start = entry.toolStarts.get(e.id);
         const durationMs = start ? Date.now() - start.t0 : null;
         const name = start?.name ?? "tool";
-        entry.toolCalls.push({ name, args: start?.args ?? "{}", durationMs, isError: e.isError });
+        const runId =
+          CREATES_RUN_TOOLS.has(name) && !e.isError ? entry.pendingRuns.shift() : undefined;
+        entry.toolCalls.push({
+          name,
+          args: start?.args ?? "{}",
+          durationMs,
+          isError: e.isError,
+          ...(runId ? { runId } : {}),
+        });
         bus.emit({
           type: "chat.tool",
           sessionId: id,

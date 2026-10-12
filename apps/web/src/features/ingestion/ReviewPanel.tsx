@@ -8,12 +8,14 @@ import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { liveErrorOf } from "../../hooks/useChat";
 import { ingestionKey } from "../../hooks/useIngestion";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import type { IngestionDetail } from "../../lib/api";
 import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "../chat/SessionLimitDialog";
 import { proposalSummary } from "../onboarding/components/ProposalList";
+import { FriendlyError } from "./FriendlyError";
 
 type Proposal = IngestionDetail["proposals"][number];
 type Choice = "keep" | "use_new" | "edit";
@@ -135,6 +137,7 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
   const clarify = useMutation({
     mutationFn: () => api.clarifyIngestion(run.id),
     onSuccess: (r) => void navigate({ to: `/chat/${r.session.id}` as string }),
+    // teto de conversas = diálogo; qualquer outro erro aparece em linguagem simples (auditoria D)
     onError: (e) => setLimit(sessionLimitOf(e)),
   });
   const closeAndClarify = async (id: string) => {
@@ -389,6 +392,17 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
           onCancel={() => setLimit(null)}
         />
       </div>
+      {clarify.isError && !sessionLimitOf(clarify.error) ? (
+        <Alert tone="danger">
+          <FriendlyError error={toFriendly(clarify.error)} />
+        </Alert>
+      ) : null}
     </section>
   );
+}
+
+function toFriendly(e: unknown) {
+  const { key, technical } = liveErrorOf(e);
+  const k = key ?? "error.unknown";
+  return { key: k as never, hint: `${k}_hint` as never, technical };
 }

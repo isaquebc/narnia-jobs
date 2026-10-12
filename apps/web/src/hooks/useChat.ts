@@ -1,7 +1,15 @@
-import type { ChatCategory, ChatMessage, ChatSession, TrustTag } from "@narnia-jobs/shared";
+import {
+  type ChatCategory,
+  type ChatMessage,
+  type ChatSession,
+  friendlyError,
+  type TrustTag,
+} from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi, useWs } from "../app/context";
+import { sessionLimitOf } from "../features/chat/SessionLimitDialog";
+import { ApiError } from "../lib/api";
 import { useProfileCard } from "./useProfileCard";
 
 export const chatKeys = {
@@ -60,10 +68,25 @@ export interface LiveError {
   technical: string;
 }
 
+/** Página do histórico (a rota aceita até 200; 50 cobre ~25 turnos). */
+export const HISTORY_PAGE = 50;
+
+/** Erro de uma rota em linguagem simples: o mapa do `shared` classifica pelo código e pelo texto (auditoria D). */
+export function liveErrorOf(e: unknown): LiveError {
+  const code = e instanceof ApiError ? e.code : null;
+  const message = e instanceof Error ? e.message : String(e);
+  return { key: friendlyError({ code, message }).key, technical: message };
+}
+
 /**
  * Estado ao vivo de uma conversa (F04-13): os eventos `chat.*` do `/ws` da sessão aberta (os de outras sessões são
  * ignorados) montam o texto em stream, as ferramentas do turno, erro e limite; o histórico vem da API e, ao fim do
- * turno, é recarregado. A mensagem do usuário e a resposta em andamento ficam visíveis até o histórico as conter.
+ * turno, é recarregado e só então o que era provisório (mensagem do usuário, stream) some, sem duplicar.
+ *
+ * Auditoria D: o "pensando" também vem da sessão (`busy`, para recarregar a página no meio de um turno) e acaba com
+ * a sessão saindo de "ativa"; o link da ingestão vem só das tools de ingestão desta conversa
+ * (`chat.ingestion_created` ao vivo, `runId` da tool call no histórico); "Carregar anteriores" pagina com `before` e,
+ * a partir daí, a página recente vem por `since` (da âncora em diante), para mensagens novas não abrirem buraco.
  */
 export function useChatSession(sessionId: string) {
   const api = useApi();
@@ -73,9 +96,17 @@ export function useChatSession(sessionId: string) {
     queryKey: chatKeys.session(sessionId),
     queryFn: () => api.getChatSession(sessionId),
   });
+  const [older, setOlder] = useState<ChatMessage[]>([]);
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const [moreOlder, setMoreOlder] = useState(true);
   const messages = useQuery({
-    queryKey: chatKeys.messages(sessionId),
-    queryFn: () => api.listChatMessages(sessionId),
+    queryKey: [...chatKeys.messages(sessionId), anchor] as const,
+    queryFn: () =>
+      api.listChatMessages(
+        sessionId,
+        anchor ? { since: anchor, limit: 200 } : { limit: HISTORY_PAGE },
+      ),
+    placeholderData: (prev) => prev,
   });
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [streamed, setStreamed] = useState("");
@@ -84,23 +115,39 @@ export function useChatSession(sessionId: string) {
   const [error, setError] = useState<LiveError | null>(null);
   const [limit, setLimit] = useState<"max_turns" | "max_budget" | null>(null);
   const [lastUsage, setLastUsage] = useState<number | null>(null);
-  const [createdRuns, setCreatedRuns] = useState<string[]>([]);
-  const [listening, setListening] = useState(false);
+  const [liveRuns, setLiveRuns] = useState<string[]>([]);
   const [sentTurn, setSentTurn] = useState<number | null>(null);
+  const sentAt = useRef(0);
+  const sentOkAt = useRef(0);
+  const sending = useRef(false);
+
+  // recarregou a página no meio de um turno: a sessão diz que está ocupada (bloco B). O turno acabou sem aviso (api
+  // reiniciou, evento perdido na reconexão): a sessão relida depois do envio diz que não está mais, e o "pensando" sai
+  const busy = session.data?.session.busy;
+  const fetchedAt = session.dataUpdatedAt;
+  useEffect(() => {
+    if (busy === undefined) return;
+    if (busy && fetchedAt >= sentAt.current) setTurnActive(true);
+    if (!busy && !sending.current && fetchedAt > sentOkAt.current) setTurnActive(false);
+  }, [busy, fetchedAt]);
 
   useEffect(() => {
     ws.connect();
+    const settle = () =>
+      void qc.invalidateQueries({ queryKey: chatKeys.messages(sessionId) }).then(() => {
+        setStreamed("");
+        setTools([]);
+        setPendingUser(null);
+      });
     return ws.subscribe((e) => {
-      if (e.type === "ingestion.updated") {
-        if (listening) setCreatedRuns((r) => (r.includes(e.runId) ? r : [...r, e.runId]));
-        return;
-      }
       if (!e.type.startsWith("chat.") || !("sessionId" in e) || e.sessionId !== sessionId) return;
       switch (e.type) {
         case "chat.delta":
+          setTurnActive(true);
           setStreamed((s) => s + e.text);
           break;
         case "chat.tool":
+          setTurnActive(true);
           setTools((list) => {
             const i = list.findIndex((t) => t.name === e.name && t.phase === "start");
             const item: LiveTool = { name: e.name, phase: e.phase, durationMs: e.durationMs };
@@ -108,11 +155,15 @@ export function useChatSession(sessionId: string) {
             return [...list, item];
           });
           break;
+        case "chat.ingestion_created":
+          setLiveRuns((r) => (r.includes(e.runId) ? r : [...r, e.runId]));
+          break;
         case "chat.turn_end":
           setTurnActive(false);
           setLastUsage(e.usage.inputTokens + e.usage.outputTokens);
-          void qc.invalidateQueries({ queryKey: chatKeys.messages(sessionId) });
           void qc.invalidateQueries({ queryKey: chatKeys.session(sessionId) });
+          // o histórico recarregado já tem o turno (inclusive a parcial de um turno interrompido): some o provisório
+          settle();
           break;
         case "chat.error":
           setTurnActive(false);
@@ -123,36 +174,63 @@ export function useChatSession(sessionId: string) {
           setLimit(e.reason);
           break;
         case "chat.session_updated":
+          // hibernada, arquivada ou com erro no meio de um turno: o "pensando" acaba (auditoria D)
+          if (e.state !== "live") setTurnActive(false);
           void qc.invalidateQueries({ queryKey: chatKeys.session(sessionId) });
           break;
       }
     });
-  }, [ws, qc, sessionId, listening]);
+  }, [ws, qc, sessionId]);
 
-  // o histórico recarregado já contém o turno enviado: some o que era provisório (mensagem do usuário e stream)
-  const history = messages.data?.messages ?? [];
-  const persistedUser =
-    sentTurn !== null && history.some((m) => m.role === "user" && m.turnIndex === sentTurn);
-  const persistedReply =
-    sentTurn !== null &&
-    !turnActive &&
-    history.some((m) => m.role === "assistant" && m.turnIndex === sentTurn);
+  const latest = messages.data?.messages ?? [];
+  const latestIds = new Set(latest.map((m) => m.id));
+  const history = [...older.filter((m) => !latestIds.has(m.id)), ...latest];
+  const hasOlder = anchor === null ? latest.length >= HISTORY_PAGE : moreOlder;
+  const loadOlder = useMutation({
+    mutationFn: () => {
+      const first = history[0];
+      if (!first) return Promise.resolve({ messages: [] as ChatMessage[] });
+      return api.listChatMessages(sessionId, { before: first.id, limit: HISTORY_PAGE });
+    },
+    onSuccess: (r) => {
+      const first = history[0];
+      if (anchor === null && first) setAnchor(latest[0]?.id ?? first.id);
+      setOlder((cur) => [...r.messages, ...cur]);
+      setMoreOlder(r.messages.length >= HISTORY_PAGE);
+    },
+  });
+
+  const runIds = Array.from(
+    new Set([
+      ...history.flatMap((m) => m.toolCalls.flatMap((tc) => (tc.runId ? [tc.runId] : []))),
+      ...liveRuns,
+    ]),
+  );
 
   const send = useMutation({
     mutationFn: (text: string) => api.sendChatMessage(sessionId, text),
     onMutate: (text) => {
+      sentAt.current = Date.now();
+      sending.current = true;
       setPendingUser(text);
       setStreamed("");
       setTools([]);
       setError(null);
       setLimit(null);
       setTurnActive(true);
-      setListening(true);
     },
-    onSuccess: (r) => setSentTurn(r.turnIndex),
+    onSuccess: (r) => {
+      sentOkAt.current = Date.now();
+      setSentTurn(r.turnIndex);
+    },
+    onSettled: () => {
+      sending.current = false;
+    },
     onError: (e) => {
+      // a mensagem não foi: some a bolha provisória (quem chamou devolve o texto ao campo)
       setTurnActive(false);
-      setError({ key: null, technical: e instanceof Error ? e.message : String(e) });
+      setPendingUser(null);
+      if (!sessionLimitOf(e)) setError(liveErrorOf(e));
     },
   });
   const interrupt = useMutation({ mutationFn: () => api.interruptChat(sessionId) });
@@ -162,18 +240,24 @@ export function useChatSession(sessionId: string) {
   });
   const clearError = useCallback(() => setError(null), []);
 
+  // a mensagem do usuário já está no histórico: não mostra a bolha provisória duas vezes
+  const persistedUser =
+    sentTurn !== null && history.some((m) => m.role === "user" && m.turnIndex === sentTurn);
+
   return {
     session: session.data?.session ?? null,
     history: history as ChatMessage[],
     pendingUser: persistedUser ? null : pendingUser,
-    streamed: persistedReply ? "" : streamed,
+    streamed,
     tools,
     turnActive,
     error,
     clearError,
     limit,
     lastUsage,
-    createdRuns,
+    createdRuns: runIds,
+    hasOlder,
+    loadOlder,
     send,
     interrupt,
     setModel,

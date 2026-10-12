@@ -47,7 +47,7 @@ export function ProfileSwitcher() {
         <div
           role="menu"
           aria-label={t("profiles.switcher")}
-          className="absolute left-0 z-30 mt-2 w-80 rounded-lg border border-border bg-card p-2 shadow-lg"
+          className="absolute left-0 z-30 mt-2 max-h-[calc(100vh-5rem)] w-80 overflow-y-auto rounded-lg border border-border bg-card p-2 shadow-lg"
         >
           {visible.length === 0 ? (
             <p className="px-2 py-1 text-sm text-muted-fg">{t("profiles.none")}</p>
