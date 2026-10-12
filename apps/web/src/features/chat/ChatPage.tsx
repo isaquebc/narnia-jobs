@@ -9,7 +9,6 @@ import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
-import { Dialog } from "../../components/ui/dialog";
 import { Input, Select, Textarea } from "../../components/ui/input";
 import {
   type LiveTool,
@@ -21,10 +20,10 @@ import {
 import { useProfiles } from "../../hooks/useProfiles";
 import { useProviderStatus } from "../../hooks/useProviderStatus";
 import { type TKey, t } from "../../i18n";
-import { ApiError } from "../../lib/api";
 import { formatDate, formatTokens } from "../../lib/format";
 import { FriendlyError } from "../ingestion/FriendlyError";
 import { Markdown } from "./Markdown";
+import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "./SessionLimitDialog";
 
 const MODELS = ["sonnet", "haiku", "opus"];
 
@@ -35,8 +34,7 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   const loggedIn = provider.data?.loggedIn !== false;
   const { sessions, create, hibernate, patch } = useChatSessions(active?.id ?? null);
   const navigate = useNavigate();
-  const [limitLive, setLimitLive] = useState<ChatSession[] | null>(null);
-  const [limitMax, setLimitMax] = useState(5);
+  const [limit, setLimit] = useState<SessionLimit | null>(null);
 
   const visible = sessions.filter((s) => s.state !== "archived");
   useEffect(() => {
@@ -48,16 +46,13 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
       const r = await create.mutateAsync({});
       void navigate({ to: `/chat/${r.session.id}` as string });
     } catch (e) {
-      if (e instanceof ApiError && e.code === "session_limit") {
-        const d = e.details as { max: number; live: ChatSession[] } | undefined;
-        setLimitMax(d?.max ?? 5);
-        setLimitLive(d?.live ?? []);
-      }
+      const l = sessionLimitOf(e);
+      if (l) setLimit(l);
     }
   };
   const closeAndCreate = async (id: string) => {
     await hibernate.mutateAsync(id);
-    setLimitLive(null);
+    setLimit(null);
     await startNew();
   };
 
@@ -88,49 +83,12 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
         )}
       </div>
       {sessionId ? <ContextPanel sessionId={sessionId} profileId={active?.id ?? null} /> : null}
-      <Dialog
-        open={limitLive !== null}
-        onOpenChange={(o) => !o && setLimitLive(null)}
-        title={t("chat.limitDialog", { max: limitMax })}
-      >
-        <LimitList live={limitLive ?? []} onClose={(id) => void closeAndCreate(id)} />
-        <div className="mt-3 flex justify-end">
-          <Button variant="outline" onClick={() => setLimitLive(null)}>
-            {t("chat.cancel")}
-          </Button>
-        </div>
-      </Dialog>
+      <SessionLimitDialog
+        limit={limit}
+        onChoose={(id) => void closeAndCreate(id)}
+        onCancel={() => setLimit(null)}
+      />
     </div>
-  );
-}
-
-function LimitList({ live, onClose }: { live: ChatSession[]; onClose: (id: string) => void }) {
-  const tz = useTimezone();
-  return (
-    <ul className="flex flex-col gap-2">
-      {live.map((s) => (
-        <li
-          key={s.id}
-          className="flex items-center justify-between gap-2 rounded-md border border-border p-2"
-        >
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{s.title}</span>
-            <span className="text-xs text-muted-fg">
-              {t(`chat.category.${s.category}` as TKey)} ·{" "}
-              {t("chat.lastActivity", { date: formatDate(s.lastActivityAt, tz) })}
-            </span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label={t("chat.limitClose", { title: s.title })}
-            onClick={() => onClose(s.id)}
-          >
-            {t("chat.close")}
-          </Button>
-        </li>
-      ))}
-    </ul>
   );
 }
 

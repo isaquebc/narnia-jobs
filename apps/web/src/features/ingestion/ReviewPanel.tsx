@@ -12,6 +12,7 @@ import { ingestionKey } from "../../hooks/useIngestion";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import type { IngestionDetail } from "../../lib/api";
+import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "../chat/SessionLimitDialog";
 import { proposalSummary } from "../onboarding/components/ProposalList";
 
 type Proposal = IngestionDetail["proposals"][number];
@@ -130,10 +131,17 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
   const { profiles } = useProfiles();
   const navigate = useNavigate();
   // F04: a clarificação abre uma conversa ligada a esta execução; as propostas novas voltam para esta revisão
+  const [limit, setLimit] = useState<SessionLimit | null>(null);
   const clarify = useMutation({
     mutationFn: () => api.clarifyIngestion(run.id),
     onSuccess: (r) => void navigate({ to: `/chat/${r.session.id}` as string }),
+    onError: (e) => setLimit(sessionLimitOf(e)),
   });
+  const closeAndClarify = async (id: string) => {
+    await api.hibernateChat(id);
+    setLimit(null);
+    clarify.mutate();
+  };
   const proposals = run.proposals;
   const [filter, setFilter] = useState<Filter>("all");
   const [local, setLocal] = useState<Record<string, LocalDecision>>({});
@@ -375,6 +383,11 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
         <Button variant="outline" disabled={clarify.isPending} onClick={() => clarify.mutate()}>
           {t("review.clarify")}
         </Button>
+        <SessionLimitDialog
+          limit={limit}
+          onChoose={(id) => void closeAndClarify(id)}
+          onCancel={() => setLimit(null)}
+        />
       </div>
     </section>
   );
