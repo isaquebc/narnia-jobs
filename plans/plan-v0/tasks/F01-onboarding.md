@@ -32,7 +32,7 @@ Uma pessoa com Docker e assinatura do Claude consegue, sem ajuda:
 - Fundação: monorepo, `apps/web`, `apps/api`, `apps/worker`, `packages/core`, `packages/shared`, imagens e composes, SQLite + Redis, provider Claude Code via Agent SDK (`detect`, `extractFacts`, `buildDigest`, `readDocument`), setup de testes unitários e e2e, CI em containers.
 
 ### Fora do escopo (e para onde vai)
-- Passo 7, entrevista de descoberta → F04 (depende do chat).
+- Passo 7, entrevista de descoberta → F04 (depende do chat). Entregue na auditoria pós-F04 (bloco E2) como 6ª tela do wizard.
 - Ingestão GitHub/LinkedIn, profundidades, re-ingestão, passo 6 do wizard → F03.
 - Servidor MCP HTTP e `plugin/` (modo B) → F04. Em F01 o SDK é usado direto pelo `api`, sem MCP, porque a extração não precisa de tools.
 - Troca/criação de outros perfis → F02. F01 cria exatamente um.

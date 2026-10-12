@@ -64,7 +64,7 @@ Em **Ingestão** você adiciona dados depois do primeiro uso: **GitHub**, **Curr
 
 Menu › grupo do perfil atual › **Chat**. Cada conversa pertence ao perfil ativo; até 5 ficam abertas ao mesmo tempo (a sexta pergunta qual encerrar) e conversas paradas por 1 hora hibernam e retomam do ponto na próxima mensagem (Configurações › Chat ajusta os limites e o modelo padrão, Sonnet). O recrutador já começa conhecendo a persona e o cartão do seu perfil, busca detalhes nos seus dados pelas ferramentas (os chips mostram quais usou) e cita a fonte do que afirma. Você pode colar um texto da sua história, mandar um arquivo ou um link do GitHub: ele cria a ingestão e as propostas vão para a revisão (nada é gravado sem você aprovar; o GitHub sempre pede confirmação do orçamento). Pesquisas na internet usam só domínios confiáveis (lista editável em Configurações › Chat). Na revisão de uma ingestão, **Clarificar com o recrutador** abre uma conversa cujas respostas viram propostas da mesma execução.
 
-**Custo:** cada mensagem usa a sua assinatura do Claude (o uso do turno e da conversa aparece no rodapé do chat e no painel Contexto).
+**Custo:** cada mensagem usa a sua assinatura do Claude; o rodapé do chat mostra os tokens do turno e da conversa, o custo equivalente e o teto por conversa, se você definir um em Configurações › Chat.
 
 ### Recrutador no terminal (Claude Code, modo B)
 
@@ -75,7 +75,7 @@ make dev            # ou ./start.sh up; a instância precisa estar no ar
 ./start.sh install-plugin   # Windows: .\start.ps1 install-plugin  (com a produção no ar: --prod)
 ```
 
-O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (escopo do usuário; o token fica num arquivo só seu na cópia `.plugin-build/`, que precisa continuar lá) e instala o plugin (persona, skills, o hook que traz o cartão e o que registra o uso no medidor) por um marketplace local. Mudou a persona em Configurações? Rode o `install-plugin` de novo para o agente do terminal acompanhar. Reinicie o Claude Code e use `/narnia-jobs:recrutador` ou `/narnia-jobs:perfil`. Se a porta mudar, rode o `install-plugin` de novo; o `./start.sh doctor` avisa quando o MCP ou o plugin estão desatualizados.
+O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (escopo do usuário; o token fica num arquivo só seu na cópia `.plugin-build/`, que precisa continuar lá) e instala o plugin (persona, skills, o hook que traz o cartão e o que registra o uso no medidor) por um marketplace local. Mudou a persona em Configurações? Rode o `install-plugin` de novo para o agente do terminal acompanhar. Reinicie o Claude Code e use `/narnia-jobs:recrutador`, `/narnia-jobs:perfil`, `/narnia-jobs:clarificar <execução>`, `/narnia-jobs:descoberta` (pergunta só o que falta no perfil) ou `/narnia-jobs:github-publico` (revisão do seu perfil público do GitHub a partir dos relatórios da ingestão). Se a porta mudar, rode o `install-plugin` de novo; o `./start.sh doctor` avisa quando o MCP ou o plugin estão desatualizados.
 
 ### Rastros e avaliações (Arize Phoenix local)
 
@@ -85,6 +85,8 @@ No `make dev` o Phoenix sobe junto e recebe os rastros de cada conversa, chamada
 COMPOSE_PROFILES=observability
 NARNIA_OTEL_ENDPOINT=http://phoenix:6006/v1/traces
 ```
+
+As avaliações do recrutador (`evals/chat/`, conversas de referência com avaliadores determinísticos: usa as ferramentas, cita fonte, não inventa data nem empresa, só fontes de domínio confiável, dentro do teto) rodam sob demanda pela ferramenta de desenvolvimento e aparecem no Phoenix como experimento do dataset `narnia-chat`, um por rodada.
 
 ### Onde ficam os dados e como fazer backup
 
@@ -164,6 +166,6 @@ Os corpos de exemplo de `user.json` e `profile.json` estão em `apps/api/test/he
 
 ### Interface web (M5)
 
-Com `./start.sh dev` no ar, abra `http://127.0.0.1:5173/?token=dev-token`. O `?token=` vira cookie (`/api/auth/enter`) e a página volta para `/`, que redireciona ao passo salvo do onboarding ou ao dashboard. O Vite faz proxy de `/api` e `/ws` para a api. Fluxo do primeiro uso em 5 passos: provider → currículo (arquivo ou texto livre, com opções de OCR e leitura pelo modelo e estimativa por chamada) → extração (etapas da cadeia, também na bandeja de atividades do topo) → revisão (identidade com telefone obrigatório, propostas com origem por trecho) → perfil (dados de carreira obrigatórios, "não sei" marca para pesquisa, alerta informativo do piso DIEESE) → dashboard. Tema claro/escuro no ícone do topo; textos vêm todos de `apps/web/src/i18n/pt-BR.ts`.
+Com `./start.sh dev` no ar, abra `http://127.0.0.1:5173/?token=dev-token`. O `?token=` vira cookie (`/api/auth/enter`) e a página volta para `/`, que redireciona ao passo salvo do onboarding ou ao dashboard. O Vite faz proxy de `/api` e `/ws` para a api. Fluxo do primeiro uso em 6 passos: provider → currículo (arquivo ou texto livre, com opções de OCR e leitura pelo modelo e estimativa por chamada) → extração (etapas da cadeia, também na bandeja de atividades do topo) → revisão (identidade com telefone obrigatório, propostas com origem por trecho) → perfil (dados de carreira obrigatórios, "não sei" marca para pesquisa, alerta informativo do piso DIEESE) → entrevista de descoberta (opcional: o recrutador pergunta só o que ficou faltando e as respostas vão para a revisão) → dashboard. Tema claro/escuro no ícone do topo; textos vêm todos de `apps/web/src/i18n/pt-BR.ts`.
 
 Estrutura: `apps/web` (React + Vite), `apps/api` (Hono: REST, WS, enfileira jobs, CLI `narnia-jobs`), `apps/e2e` (Playwright, um arquivo por cenário: `e2e-NN-*` do F01, `f02-NN-*` do F02 e `f03-NN-*` do F03), `apps/worker` (BullMQ: cadeia de ingestão), `packages/shared` (schemas zod, contratos, tempo, i18n), `packages/core` (domínio, storage, leituras de PDF, consolidação), `packages/providers` (Claude Code via Agent SDK e mock). Metodologia: TDD, conforme `plans/plan-v0/09-metodologia-tdd.md`.

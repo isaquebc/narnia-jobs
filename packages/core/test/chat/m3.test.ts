@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardUpdatedNote, clarifyContextNote } from "../../src/chat/prompt";
+import { cardUpdatedNote, PromptTemplateError, renderNote } from "../../src/chat/prompt";
 import { createRepos, migrate, openDatabase } from "../../src/db";
 import { seedFixture } from "../../src/testing/profile-fixtures";
 
@@ -34,8 +34,12 @@ describe("F04/M3 core", () => {
     expect(cardUpdatedNote("Ana · Backend sênior")).toMatch(
       /cartão do perfil foi atualizado[\s\S]*Ana · Backend sênior/i,
     );
-    const ctx = clarifyContextNote("run-123");
-    expect(ctx).toContain("run-123");
-    expect(ctx).toMatch(/ingest_propose/);
+  });
+
+  it("renderNote preenche os placeholders do texto do plugin e recusa placeholder sem valor (auditoria E2, 19c)", () => {
+    expect(renderNote("clarifica {{run_id}} com ingest_propose\n", { run_id: "run-123" })).toBe(
+      "clarifica run-123 com ingest_propose",
+    );
+    expect(() => renderNote("sem {{valor}}", {})).toThrow(PromptTemplateError);
   });
 });

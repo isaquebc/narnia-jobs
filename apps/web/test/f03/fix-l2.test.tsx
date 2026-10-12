@@ -111,7 +111,7 @@ describe("F03 fix L2 · item 9: onboarding com autoconfirmação e 'já lido'", 
       }),
       initialUrl: "/",
     });
-    await screen.findByText("Passo 2 de 5");
+    await screen.findByText("Passo 2 de 6");
     await userEvent.upload(
       screen.getByLabelText(/escolher arquivo/i),
       new File(["%PDF"], "cv.pdf", { type: "application/pdf" }),
@@ -129,7 +129,7 @@ describe("F03 fix L2 · item 9: onboarding com autoconfirmação e 'já lido'", 
       }),
       initialUrl: "/",
     });
-    await screen.findByText("Passo 2 de 5");
+    await screen.findByText("Passo 2 de 6");
     await userEvent.upload(
       screen.getByLabelText(/escolher arquivo/i),
       new File(["%PDF"], "cv.pdf", { type: "application/pdf" }),
@@ -152,7 +152,7 @@ describe("F03 fix L2 · item 9: onboarding com autoconfirmação e 'já lido'", 
       }),
       initialUrl: "/",
     });
-    await screen.findByText("Passo 2 de 5");
+    await screen.findByText("Passo 2 de 6");
     await userEvent.upload(
       screen.getByLabelText(/escolher arquivo/i),
       new File(["%PDF"], "cv.pdf", { type: "application/pdf" }),

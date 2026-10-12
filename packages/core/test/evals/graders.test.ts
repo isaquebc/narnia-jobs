@@ -69,4 +69,71 @@ describe("F04/M5 · avaliadores do chat", () => {
       parseEvalCases('{"id":"x","messages":["a"],"graders":[{"type":"magia"}]}'),
     ).toThrow();
   });
+
+  describe("avaliadores da auditoria E2 (19b): empresas, domínios e orçamento", () => {
+    const base = {
+      tools: [],
+      card: "Ana Maria Exemplo · Backend na Acme Pagamentos 2019–2023 · Beta Bank 2021–hoje",
+    };
+
+    it("no_unknown_companies: empresa citada precisa estar no cartão ou no que o usuário disse", () => {
+      const ok = {
+        ...base,
+        replies: [
+          "Na Acme Pagamentos você liderou o checkout; no Beta Bank faltam métricas. E na Zeta, que você citou?",
+        ],
+        userText: ["também trabalhei na Zeta Labs como freelancer"],
+      };
+      const bad = { ...base, replies: ["Sua passagem pela Globex Corp foi a mais forte."] };
+      expect(gradeTranscript(ok, [{ type: "no_unknown_companies" }])[0]?.passed).toBe(true);
+      const r = gradeTranscript(bad, [{ type: "no_unknown_companies" }])[0];
+      expect(r?.passed).toBe(false);
+      expect(r?.detail).toContain("Globex Corp");
+    });
+
+    it("trusted_sources_only: fontes salvas e links citados só de domínio confiável (ou confirmados pelo usuário)", () => {
+      const trusted = ["*.gov.br", "glassdoor.*"];
+      const ok = {
+        ...base,
+        replies: [
+          "Segundo o IBGE (https://www.ibge.gov.br/salarios) e o https://glassdoor.com.br/x",
+        ],
+        sources: [
+          { url: "https://www.ibge.gov.br/salarios", userConfirmed: false },
+          { url: "https://blog.exemplo.dev/faixas", userConfirmed: true },
+        ],
+        trustedDomains: trusted,
+      };
+      const bad = {
+        ...base,
+        replies: ["Veja https://salarios-falsos.com/dev"],
+        sources: [{ url: "https://glassdoor.atacante.com/x", userConfirmed: false }],
+        trustedDomains: trusted,
+      };
+      expect(gradeTranscript(ok, [{ type: "trusted_sources_only" }])[0]?.passed).toBe(true);
+      const r = gradeTranscript(bad, [{ type: "trusted_sources_only" }])[0];
+      expect(r?.passed).toBe(false);
+      expect(r?.detail).toMatch(/glassdoor\.atacante\.com/);
+      expect(r?.detail).toMatch(/salarios-falsos\.com/);
+    });
+
+    it("within_budget: custo dentro do teto, tokens dentro do valor do caso e nenhum turno no limite de turnos", () => {
+      const t = {
+        ...base,
+        replies: ["ok"],
+        usage: { tokens: 9000, costUsd: 0.2 },
+        budgetUsd: 0.5,
+        maxTurns: 8,
+        toolsPerReply: [3],
+      };
+      expect(gradeTranscript(t, [{ type: "within_budget", value: "10000" }])[0]?.passed).toBe(true);
+      expect(gradeTranscript(t, [{ type: "within_budget", value: "5000" }])[0]?.passed).toBe(false);
+      expect(
+        gradeTranscript({ ...t, budgetUsd: 0.1 }, [{ type: "within_budget" }])[0]?.passed,
+      ).toBe(false);
+      const turns = gradeTranscript({ ...t, toolsPerReply: [8] }, [{ type: "within_budget" }])[0];
+      expect(turns?.passed).toBe(false);
+      expect(turns?.detail).toMatch(/limite de turnos/);
+    });
+  });
 });

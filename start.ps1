@@ -183,6 +183,8 @@ function Build-PluginStage([string] $Src, [string] $Stage, [string] $Url, [strin
   New-Item -ItemType Directory -Force -Path (Join-Path $Stage ".claude-plugin") | Out-Null
   Copy-Item -Recurse -Force $Src (Join-Path $Stage "plugin")
   Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Stage "plugin/.mcp.json"), (Join-Path $Stage "plugin/.mcp.json.template"), (Join-Path $Stage "plugin/.narnia-env")
+  # prompts/ são notas que a api preenche (modo A e a rota do agente); o Claude Code não as usa e elas têm `{{…}}`
+  Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $Stage "plugin/prompts")
   Set-Content -NoNewline -Path (Join-Path $Stage "plugin/agents/recrutador.md") -Value $agent
   Set-Content -Path (Join-Path $Stage "plugin/.narnia-env") -Value @("NARNIA_API_URL=$Url", "NARNIA_TOKEN=$Token")
   # cabeçalho do MCP lido pelo headersHelper: o token não vai na linha de comando nem na config do Claude Code

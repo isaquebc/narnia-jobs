@@ -6,7 +6,7 @@ import { t } from "../../../i18n";
 import { ProfileForm } from "../components/ProfileForm";
 import type { StepProps } from "../Wizard";
 
-export function StepProfile({ state, finish }: StepProps) {
+export function StepProfile({ state, go }: StepProps) {
   const api = useApi();
   const qc = useQueryClient();
   const user = useQuery({ queryKey: ["user"], queryFn: () => api.getUser() });
@@ -28,7 +28,8 @@ export function StepProfile({ state, finish }: StepProps) {
         qc.invalidateQueries({ queryKey: ["profiles"] }),
         qc.invalidateQueries({ queryKey: ["dashboard"] }),
       ]);
-      await finish();
+      // auditoria E2: depois do perfil vem a entrevista de descoberta (opcional, pulável)
+      await go({ step: 6 });
     },
   });
   if (user.isError) return <ErrorState error={user.error} onRetry={() => void user.refetch()} />;

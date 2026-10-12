@@ -204,6 +204,8 @@ stage_plugin() {
   mkdir -p "$stage/.claude-plugin"
   cp -R "$src" "$stage/plugin"
   rm -f "$stage/plugin/.mcp.json" "$stage/plugin/.mcp.json.template" "$stage/plugin/.narnia-env"
+  # prompts/ são notas que a api preenche (modo A e a rota do agente); o Claude Code não as usa e elas têm `{{…}}`
+  rm -rf "$stage/plugin/prompts"
   printf '%s\n' "$agent" > "$stage/plugin/agents/recrutador.md"
   (umask 077
     printf 'NARNIA_API_URL=%s\nNARNIA_TOKEN=%s\n' "$url" "$token" > "$stage/plugin/.narnia-env"

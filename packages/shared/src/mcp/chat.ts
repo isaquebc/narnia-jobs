@@ -165,6 +165,21 @@ export const CHAT_TOOLS = {
       nextCursor: z.string().nullable(),
     }),
   ),
+  "fact.gaps": tool(
+    "Lacunas do perfil que a extração não preencheu (data de fim, resumo, métrica, nível, datas da formação, pesquisa pendente), uma linha cada com o que falta. Base da entrevista de descoberta.",
+    Page,
+    z.object({
+      items: z.array(
+        z.object({
+          kind: z.enum(["experience", "achievement", "project", "skill", "education", "profile"]),
+          id: IdSchema,
+          line: z.string(),
+          missing: z.array(z.string()).min(1),
+        }),
+      ),
+      nextCursor: z.string().nullable(),
+    }),
+  ),
   "fact.verify": tool(
     "Marca um fato como verificado depois que o usuário confirmou na conversa.",
     z.object({ kind: FactSearchKindSchema.exclude(["file", "repo"]), id: IdSchema }),

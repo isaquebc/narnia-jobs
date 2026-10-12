@@ -4,14 +4,16 @@ import { ErrorState } from "../../components/ErrorState";
 import { useOnboardingState } from "../../hooks/useOnboarding";
 import { t } from "../../i18n";
 import { cn } from "../../lib/cn";
+import { StepDiscovery } from "./steps/StepDiscovery";
 import { StepExtraction } from "./steps/StepExtraction";
 import { StepProfile } from "./steps/StepProfile";
 import { StepProvider } from "./steps/StepProvider";
 import { StepReview } from "./steps/StepReview";
 import { StepSource } from "./steps/StepSource";
 
-export const TOTAL_STEPS = 5;
-const STEP_KEYS = ["provider", "source", "extraction", "review", "profile"] as const;
+/** Passo 6 = "Entrevista de descoberta" (passo 7 de 02-fluxos; "Mais fontes" não está no wizard). */
+export const TOTAL_STEPS = 6;
+const STEP_KEYS = ["provider", "source", "extraction", "review", "profile", "discovery"] as const;
 
 export interface StepProps {
   state: OnboardingState;
@@ -68,6 +70,7 @@ export function Wizard({ step }: { step: number }) {
       {current === 3 ? <StepExtraction {...props} /> : null}
       {current === 4 ? <StepReview {...props} /> : null}
       {current === 5 ? <StepProfile {...props} /> : null}
+      {current === 6 ? <StepDiscovery {...props} /> : null}
     </div>
   );
 }

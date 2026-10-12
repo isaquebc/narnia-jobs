@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { getTracer, setTracer, startSpan } from "@narnia-jobs/shared";
 import { afterEach, describe, expect, it } from "vitest";
-import { initTelemetry, shutdownTelemetry } from "../../src/telemetry/otel";
+import { errorForTrace, initTelemetry, shutdownTelemetry } from "../../src/telemetry/otel";
 
 /** F04/M5 · exportador OTLP só com NARNIA_OTEL_ENDPOINT; sem ele, nada é carregado nem enviado (§6.5). */
 describe("F04/M5 · OpenTelemetry", () => {
@@ -43,5 +43,32 @@ describe("F04/M5 · OpenTelemetry", () => {
     } finally {
       server.close();
     }
+  });
+
+  describe("erro no span sem conteúdo (auditoria E2, 19e)", () => {
+    const leak = new Error(
+      'Saída fora do schema: {"summary":"Ana liderou a migração do Banco X","phone":"+55 11 99999-0000"}',
+    );
+
+    it("com NARNIA_OTEL_CONTENT desligado, só o começo da mensagem (até ':') vai para o rastro, sem stack", () => {
+      const e = errorForTrace(leak, false);
+      expect(e.message).toBe("Saída fora do schema (conteúdo omitido; NARNIA_OTEL_CONTENT=0)");
+      expect(e.name).toBe("Error");
+      expect(JSON.stringify(e)).not.toMatch(/Banco X|99999/);
+      expect(e.stack).toBeUndefined();
+    });
+
+    it("mensagem longa sem ':' é cortada em 120 caracteres; texto não-Error vira mensagem genérica", () => {
+      const e = errorForTrace(new Error("x".repeat(500)), false);
+      expect(e.message.startsWith("x".repeat(120))).toBe(true);
+      expect(e.message).not.toContain("x".repeat(121));
+      expect(errorForTrace("resposta crua do modelo", false).message).toBe(
+        "erro (conteúdo omitido; NARNIA_OTEL_CONTENT=0)",
+      );
+    });
+
+    it("com NARNIA_OTEL_CONTENT=1 a mensagem segue inteira", () => {
+      expect(errorForTrace(leak, true).message).toBe(leak.message);
+    });
   });
 });

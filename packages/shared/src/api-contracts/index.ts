@@ -79,7 +79,7 @@ export type ProviderStatusResponse = z.infer<typeof ProviderStatusResponseSchema
 
 // GET /api/onboarding/state — wizard de 5 passos (F01-11: sem passo 6)
 export const OnboardingStateSchema = z.object({
-  step: z.number().int().min(1).max(5),
+  step: z.number().int().min(1).max(6),
   completed: z.boolean(),
   runId: IdSchema.optional(),
   fileId: IdSchema.optional(),

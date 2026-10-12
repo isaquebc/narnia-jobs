@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { profiles, reset, salaryReference } from "../helpers/api";
-import { expectDashboard, reachProfileStep } from "../helpers/flows";
+import { reachProfileStep, submitProfileAndSkipDiscovery } from "../helpers/flows";
 
 test.describe("F01/E2E-16 alerta DIEESE", () => {
   test("F01/E2E-16 alerta DIEESE: BRL mensal abaixo da referência mostra o alerta e salva o valor informado", async ({
@@ -18,8 +18,7 @@ test.describe("F01/E2E-16 alerta DIEESE", () => {
     await expect(alert).toBeVisible();
     await expect(page.getByRole("link", { name: "Fonte" })).toHaveAttribute("href", /dieese/);
     await page.getByLabel("CLT", { exact: true }).check();
-    await page.getByRole("button", { name: "Criar perfil e ir ao dashboard" }).click();
-    await expectDashboard(page);
+    await submitProfileAndSkipDiscovery(page);
     const [profile] = (await profiles()).profiles;
     expect(profile?.salaryBelowReference).toBe(true);
     expect(profile?.salary).toMatchObject({
@@ -38,8 +37,7 @@ test.describe("F01/E2E-16 alerta DIEESE", () => {
     await page.getByLabel("Moeda").selectOption("USD");
     await expect(page.getByText(/Abaixo do salário mínimo necessário/)).toHaveCount(0);
     await page.getByLabel("CLT", { exact: true }).check();
-    await page.getByRole("button", { name: "Criar perfil e ir ao dashboard" }).click();
-    await expectDashboard(page);
+    await submitProfileAndSkipDiscovery(page);
     const [profile] = (await profiles()).profiles;
     expect(profile?.salaryBelowReference).toBe(false);
     expect(profile?.salary).toMatchObject({ min: 6000, currency: "USD" });

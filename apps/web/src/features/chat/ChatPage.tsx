@@ -241,7 +241,8 @@ function ToolChip({
   );
 }
 
-function ChatView({ sessionId }: { sessionId: string }) {
+/** Conversa aberta (L2); também usada dentro do wizard pela entrevista de descoberta (auditoria E2). */
+export function ChatView({ sessionId }: { sessionId: string }) {
   const chat = useChatSession(sessionId);
   const api = useApi();
   const [text, setText] = useState("");

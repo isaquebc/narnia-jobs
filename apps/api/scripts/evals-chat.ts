@@ -1,11 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { initTelemetry, parseEvalCases, shutdownTelemetry } from "@narnia-jobs/core";
+import { contentTracingEnabled } from "@narnia-jobs/shared";
+import { recordPhoenixExperiment } from "../src/evals/phoenix";
 import { runEvalCases } from "../src/evals/run";
 
 /**
  * F04/M5 · `scripts/claude-env.sh evals [--strict] [id…]`: roda as conversas de referência de `evals/chat/*.jsonl`
- * contra a API desta instância e registra os resultados no Phoenix (projeto `narnia-evals`). Nunca na CI.
+ * contra a API desta instância e registra os resultados no Phoenix: spans `eval.case` (projeto `narnia-evals`) e um
+ * experimento no dataset `narnia-chat` (auditoria E2). Nunca na CI.
  */
 const args = process.argv.slice(2);
 const strict = args.includes("--strict");
@@ -22,6 +25,24 @@ const report = await runEvalCases(cases, {
   token: process.env.NARNIA_TOKEN ?? "",
 });
 await shutdownTelemetry();
+
+// Phoenix: NARNIA_PHOENIX_URL ou a origem do NARNIA_OTEL_ENDPOINT (ex. http://phoenix:6006/v1/traces)
+const otel = process.env.NARNIA_OTEL_ENDPOINT?.trim();
+const phoenixUrl = process.env.NARNIA_PHOENIX_URL?.trim() || (otel ? new URL(otel).origin : "");
+if (phoenixUrl && report.length > 0) {
+  try {
+    const exp = await recordPhoenixExperiment(cases, report, {
+      baseUrl: phoenixUrl,
+      name: `chat ${process.env.NARNIA_PROVIDER ?? "claude-code"} ${new Date().toISOString().slice(0, 16)}`,
+      content: contentTracingEnabled(),
+    });
+    console.log(
+      `Phoenix: experimento ${exp.experimentId} no dataset narnia-chat (${exp.runs} execuções)`,
+    );
+  } catch (e) {
+    console.log(`Phoenix: não registrei o experimento (${(e as Error).message})`);
+  }
+}
 
 for (const r of report) {
   console.log(`${r.passed ? "✔" : "✘"} ${r.id}${r.error ? ` · erro: ${r.error}` : ""}`);

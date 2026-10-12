@@ -7,6 +7,8 @@ export default defineConfig({
     environment: "jsdom",
     include: ["test/**/*.test.tsx", "test/**/*.test.ts"],
     setupFiles: ["./test/setup.ts"],
+    // findBy/waitFor esperam até 5 s (test/setup.ts); o teste inteiro precisa caber com folga
+    testTimeout: 20_000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],

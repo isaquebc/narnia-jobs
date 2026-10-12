@@ -1,4 +1,4 @@
-import { setTracer } from "@narnia-jobs/shared";
+import { contentTracingEnabled, setTracer } from "@narnia-jobs/shared";
 
 /**
  * F04/M5 · OpenTelemetry → Arize Phoenix local (F04-15). Só liga com `NARNIA_OTEL_ENDPOINT` (ex.
@@ -6,6 +6,26 @@ import { setTracer } from "@narnia-jobs/shared";
  * Spans agrupados no projeto `narnia-jobs` do Phoenix (`openinference.project.name`).
  */
 let shutdownFn: (() => Promise<void>) | null = null;
+
+const OMITTED = "(conteúdo omitido; NARNIA_OTEL_CONTENT=0)";
+
+/**
+ * Erro como vai para o rastro (auditoria E2, 19e): mensagens de erro carregam trechos de saída do modelo (ex.
+ * "Saída fora do schema: {…}"); sem `NARNIA_OTEL_CONTENT=1` só o começo (até o primeiro ':' ou quebra de linha,
+ * no máximo 120 caracteres) e sem stack, que repete a mensagem inteira.
+ */
+export function errorForTrace(
+  e: unknown,
+  content: boolean,
+): { name: string; message: string; stack?: string } {
+  const name = e instanceof Error ? e.name : "Error";
+  const message = e instanceof Error ? e.message : String(e);
+  if (content)
+    return { name, message, ...(e instanceof Error && e.stack ? { stack: e.stack } : {}) };
+  if (!(e instanceof Error)) return { name, message: `erro ${OMITTED}` };
+  const head = (message.split(/[:\n]/)[0] ?? "").trim().slice(0, 120);
+  return { name, message: `${head || "erro"} ${OMITTED}` };
+}
 
 export async function initTelemetry(
   env: Record<string, string | undefined>,
@@ -40,11 +60,9 @@ export async function initTelemetry(
           span.setAttributes(a);
         },
         recordError: (e) => {
-          span.recordException(e instanceof Error ? e : new Error(String(e)));
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: e instanceof Error ? e.message : String(e),
-          });
+          const safe = errorForTrace(e, contentTracingEnabled(env));
+          span.recordException(safe);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: safe.message });
         },
         end: () => span.end(),
       };

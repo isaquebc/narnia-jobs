@@ -184,8 +184,22 @@ export const ptBR = {
       extraction: "Extração",
       review: "Revisão",
       profile: "Perfil",
+      discovery: "Descoberta",
     },
     resume: "Retomando de onde você parou.",
+  },
+  discovery: {
+    title: "Entrevista de descoberta",
+    hint: "O recrutador pergunta só o que a extração não conseguiu preencher (datas, métricas, resumo do que você fez, nível) e manda as respostas para a revisão. Nada é gravado sem você aprovar.",
+    optional:
+      "É opcional: dá para pular agora e conversar com o recrutador depois, pelo Chat. Usa tokens da sua assinatura.",
+    start: "Começar entrevista",
+    skip: "Pular e ir ao dashboard",
+    finish: "Concluir e ir ao dashboard",
+    sessionTitle: "Entrevista de descoberta",
+    kickoff: "Vamos começar a entrevista de descoberta.",
+    reviewNote:
+      "As respostas viram propostas na revisão; depois do primeiro uso elas aparecem em Pendências.",
   },
   source: {
     title: "Já tem um currículo pronto? Vamos extrair tudo dele.",
@@ -367,7 +381,7 @@ export const ptBR = {
     onDate: "A partir de uma data",
     researchLater: "Marcado para pesquisar com o recrutador",
     saveError: "Não foi possível criar o perfil.",
-    create: "Criar perfil e ir ao dashboard",
+    create: "Criar perfil e continuar",
   },
   profiles: {
     title: "Perfis",
@@ -906,6 +920,7 @@ export const ptBR = {
       clarify: "Clarificação",
       ingest: "Ingestão",
       interview: "Entrevista",
+      discovery: "Descoberta",
     },
     state: { live: "ativa", hibernated: "hibernada", archived: "arquivada", error: "com erro" },
     you: "Você",

@@ -33,12 +33,25 @@ const INGEST = [
   "session.",
 ];
 const CLARIFY = ["ingest.status", "ingest.propose", "file.", "fact.", "session."];
+// entrevista de descoberta (auditoria E2, 18a): lê o perfil e as lacunas e manda as respostas para a revisão por
+// ingest.text; sem pesquisa, sem editar o perfil
+const DISCOVERY = [
+  "profile.get_card",
+  "evidence.",
+  "fact.",
+  "file.",
+  "ingest.text",
+  "ingest.status",
+  "ingest.confirm",
+  "session.",
+];
 
 const BY_CATEGORY: Record<ChatCategory, string[]> = {
   career: [...CAREER, ...INGEST],
   ingest: INGEST,
   clarify: CLARIFY,
   interview: CAREER, // F08 refina
+  discovery: DISCOVERY,
 };
 
 const matches = (name: string, prefixes: string[]) =>
@@ -58,6 +71,7 @@ export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
   ingest: [],
   clarify: [],
   interview: [],
+  discovery: [],
 };
 
 const ALL_TOOLS = [

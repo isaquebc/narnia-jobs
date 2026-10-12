@@ -74,8 +74,10 @@ describe("M2/shared · contratos de API (F01 §2.6)", () => {
     expect(EstimateResponseSchema.safeParse({ calls: [], totalTokens: 5 }).success).toBe(false);
   });
 
-  it("OnboardingState tem passo entre 1 e 5 (wizard sem passo 6)", () => {
-    expect(OnboardingStateSchema.safeParse({ step: 6, completed: false }).success).toBe(false);
+  // auditoria E2: o passo 6 é a entrevista de descoberta (passo 7 de 02-fluxos); não há passo 7
+  it("OnboardingState tem passo entre 1 e 6", () => {
+    expect(OnboardingStateSchema.safeParse({ step: 6, completed: false }).success).toBe(true);
+    expect(OnboardingStateSchema.safeParse({ step: 7, completed: false }).success).toBe(false);
     expect(
       OnboardingStateSchema.safeParse({ step: 3, completed: false, runId: "r1" }).success,
     ).toBe(true);

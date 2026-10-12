@@ -528,6 +528,12 @@ export function mockChatScript(
   text: string,
   opts: Pick<ChatOpenOptions, "category" | "ingestionRunId">,
 ): [string, Record<string, unknown>] {
+  // entrevista de descoberta (auditoria E2): o 1º turno (com a nota do sistema) e respostas curtas olham as lacunas;
+  // um relato de 200+ caracteres vai para a revisão por ingest_text, como a orientação do plugin pede
+  if (opts.category === "discovery")
+    return text.length >= 200 && !text.startsWith("(nota do sistema")
+      ? ["ingest_text", { text }]
+      : ["fact_gaps", {}];
   if (opts.category === "clarify" && opts.ingestionRunId)
     return [
       "ingest_propose",
@@ -624,6 +630,8 @@ function mockChatReply(tool: string, isError: boolean): string {
       "Preparei a análise do GitHub; confirme o orçamento na tela da execução para ela começar.",
     research_apply:
       "Gravei a faixa no seu perfil com a fonte pesquisada (fonte: research_save); o campo saiu da lista de pendências.",
+    fact_gaps:
+      "Vi o que ainda falta no seu perfil (fonte: fact_gaps). Primeira pergunta: na sua experiência mais recente, que resultado você consegue medir com um número?",
     ingest_confirm: "Confirmei a estimativa; a ingestão começou e as propostas vão para a revisão.",
     ingest_propose:
       "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",

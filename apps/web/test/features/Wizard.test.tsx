@@ -12,7 +12,7 @@ const loggedIn = {
 };
 
 describe("Wizard · 5 passos, retomada e bloqueio", () => {
-  it("retoma no passo salvo e mostra 'Passo 2 de 5'", async () => {
+  it("retoma no passo salvo e mostra 'Passo 2 de 6'", async () => {
     renderApp({
       api: {
         getOnboardingState: async () => ({ step: 2, completed: false }),
@@ -22,7 +22,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
       },
       initialUrl: "/",
     });
-    expect(await screen.findByText("Passo 2 de 5")).toBeInTheDocument();
+    expect(await screen.findByText("Passo 2 de 6")).toBeInTheDocument();
     expect(
       screen.getByText("Já tem um currículo pronto? Vamos extrair tudo dele."),
     ).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
     await waitFor(() =>
       expect(putOnboardingState).toHaveBeenCalledWith(expect.objectContaining({ step: 2 })),
     );
-    expect(await screen.findByText("Passo 2 de 5")).toBeInTheDocument();
+    expect(await screen.findByText("Passo 2 de 6")).toBeInTheDocument();
   });
 
   it("passo 4 bloqueia com obrigatórios vazios", async () => {
@@ -85,7 +85,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
       },
       initialUrl: "/onboarding/4",
     });
-    await screen.findByText("Passo 4 de 5");
+    await screen.findByText("Passo 4 de 6");
     await userEvent.click(await screen.findByRole("button", { name: "Avançar" }));
     expect(
       await screen.findByText("Preencha os campos obrigatórios para avançar."),
@@ -116,7 +116,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
       },
       initialUrl: "/onboarding/4",
     });
-    await screen.findByText("Passo 4 de 5");
+    await screen.findByText("Passo 4 de 6");
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText(/Nome de exibição/), "Bia");
     await user.type(screen.getByLabelText(/Nome completo/), "Beatriz Exemplo");
@@ -125,7 +125,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
     await user.type(screen.getByLabelText("Número"), "999990000");
     await user.type(screen.getByLabelText(/Cidade/), "Curitiba");
     await user.click(screen.getByRole("button", { name: "Avançar" }));
-    expect(await screen.findByText("Passo 5 de 5")).toBeInTheDocument();
+    expect(await screen.findByText("Passo 5 de 6")).toBeInTheDocument();
     await waitFor(() => expect(putUser).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(getUser.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
@@ -142,6 +142,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
       api: {
         getOnboardingState: async () => ({ step: 5, completed: false }),
         putOnboardingState: async (s) => s,
+        listChatSessions: async () => ({ sessions: [] }),
         getProviderStatus: async () => loggedIn,
         listJobs: async () => ({ jobs: [] }),
         listProfiles: async () => ({ profiles }) as never,
@@ -166,7 +167,7 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
       },
       initialUrl: "/onboarding/5",
     });
-    await screen.findByText("Passo 5 de 5");
+    await screen.findByText("Passo 5 de 6");
     expect(await screen.findByText("Sem perfil ainda")).toBeInTheDocument();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText(/Nome do perfil/), "Analista de dados");
@@ -175,7 +176,10 @@ describe("Wizard · 5 passos, retomada e bloqueio", () => {
     await user.type(screen.getByLabelText("Mínimo"), "9000");
     await user.type(screen.getByLabelText("Máximo"), "12000");
     await user.click(screen.getByLabelText("CLT"));
-    await user.click(screen.getByRole("button", { name: "Criar perfil e ir ao dashboard" }));
+    await user.click(screen.getByRole("button", { name: "Criar perfil e continuar" }));
+    // auditoria E2: depois do perfil vem a entrevista de descoberta (opcional)
+    expect(await screen.findByText("Passo 6 de 6")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Pular e ir ao dashboard" }));
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     await waitFor(() => expect(createProfile).toHaveBeenCalledTimes(1));
     // o nome do perfil ativo aparece no seletor do topo e como título do grupo no menu lateral

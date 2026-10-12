@@ -434,6 +434,80 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
       "type": "object",
     },
   },
+  "fact.gaps": {
+    "description": "Lacunas do perfil que a extração não preencheu (data de fim, resumo, métrica, nível, datas da formação, pesquisa pendente), uma linha cada com o que falta. Base da entrevista de descoberta.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "experience",
+                  "achievement",
+                  "project",
+                  "skill",
+                  "education",
+                  "profile",
+                ],
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "missing": {
+                "items": {
+                  "type": "string",
+                },
+                "minItems": 1,
+                "type": "array",
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+              "line",
+              "missing",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
   "fact.get": {
     "description": "Detalhe de até 10 fatos pelo tipo e id (os devolvidos pela busca).",
     "input": {
@@ -1493,6 +1567,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
             "clarify",
             "ingest",
             "interview",
+            "discovery",
           ],
           "type": "string",
         },
@@ -1550,6 +1625,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
             "clarify",
             "ingest",
             "interview",
+            "discovery",
           ],
           "type": "string",
         },

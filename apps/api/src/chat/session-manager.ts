@@ -1,11 +1,11 @@
 import {
   buildPersona,
   cardUpdatedNote,
-  clarifyContextNote,
   friendlyError,
   getCard,
   newId,
   type Repos,
+  renderNote,
   renderRecruiterPrompt,
   resolveChatSettings,
   resumeLostNote,
@@ -23,7 +23,7 @@ import {
 } from "@narnia-jobs/shared";
 import type { EventBus } from "../events";
 import { NATIVE_TOOLS } from "../mcp/scopes";
-import { pluginDir, readRecruiterTemplate, stripFrontmatter } from "../plugin";
+import { pluginDir, readPluginFile, readRecruiterTemplate, stripFrontmatter } from "../plugin";
 
 export class SessionLimitError extends Error {
   constructor(
@@ -268,8 +268,15 @@ export class SessionManager {
     }
     const turnIndex = this.repos.chatMessages.nextTurnIndex(id);
     const notes: string[] = [];
+    // entrevista de descoberta (auditoria E2, 18a): orientação do plugin no primeiro turno
+    if (session.category === "discovery" && turnIndex === 0)
+      notes.push(renderNote(readPluginFile("prompts/descoberta-contexto.md"), {}));
     if (session.category === "clarify" && session.ingestionRunId && turnIndex === 0)
-      notes.push(clarifyContextNote(session.ingestionRunId));
+      notes.push(
+        renderNote(readPluginFile("prompts/clarificar-contexto.md"), {
+          run_id: session.ingestionRunId,
+        }),
+      );
     const current = this.repos.chatSessions.get(id);
     const card = getCard(this.repos, session.profileId);
     if (current?.cardHash && current.cardHash !== card.hash) {

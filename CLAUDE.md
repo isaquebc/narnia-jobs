@@ -42,4 +42,4 @@ rodar `./start.sh promote` e, se mudaram dependências, composes ou a imagem, `m
 
 - **Nunca** rodar `install-plugin` contra o Claude Code real do dono: nos testes, `HOME` temporário e `NARNIA_CLAUDE_BIN` falso (a instância `claude` usa os nomes `narnia-jobs-claude`/`narnia-jobs-claude-local`).
 - `scripts/smoke-plugin.sh --yes` (E2E-09) usa a assinatura de quem roda: só a pedido do dono.
-- Avaliações do chat: `scripts/claude-env.sh evals [--strict] [id…]` (casos em `evals/chat/*.jsonl`; resultados no Phoenix da instância, `http://127.0.0.1:6106`, projeto `narnia-evals`). Com o mock é smoke; com `NARNIA_PROVIDER=claude-code`, avaliação real (custa tokens: só a pedido).
+- Avaliações do chat: `scripts/claude-env.sh evals [--strict] [id…]` (casos em `evals/chat/*.jsonl`; resultados no Phoenix da instância, `http://127.0.0.1:6106`: spans no projeto `narnia-evals` e um experimento por rodada no dataset `narnia-chat`). Com o mock é smoke; com `NARNIA_PROVIDER=claude-code`, avaliação real (custa tokens: só a pedido).

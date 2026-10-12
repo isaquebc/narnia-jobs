@@ -20,7 +20,19 @@ export interface EvalCaseReport {
   passed: boolean;
   results: GradeResult[];
   sessionId: string;
+  /** Início e fim do caso (ISO), para a execução do experimento no Phoenix. */
+  startedAt: string;
+  endedAt: string;
+  /** Respostas do recrutador (só vão para o Phoenix com NARNIA_OTEL_CONTENT=1). */
+  replies: string[];
   error?: string;
+}
+
+interface SessionView {
+  profileId: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsdEst: number;
 }
 
 interface Message {
@@ -45,8 +57,21 @@ export async function runEvalCases(
   const card = await call<{ text: string }>("/api/profiles/active/persona-card")
     .then((c) => c.text)
     .catch(() => "");
+  // tetos e domínios confiáveis valem para a rodada inteira (auditoria E2, 19b)
+  const settings = await call<{ settings: { maxBudgetUsd: number | null; maxTurns: number } }>(
+    "/api/settings/chat",
+  )
+    .then((r) => r.settings)
+    .catch(() => null);
+  const trustedDomains = await call<{ domains: Array<{ pattern: string; enabled: boolean }> }>(
+    "/api/settings/trusted-domains",
+  )
+    .then((r) => r.domains.filter((d) => d.enabled).map((d) => d.pattern))
+    .catch(() => []);
   const out: EvalCaseReport[] = [];
   for (const c of cases) {
+    const startedAt = new Date().toISOString();
+    let replies: string[] = [];
     const span = startSpan("eval.case", {
       "narnia.eval.case": c.id,
       "narnia.category": c.category,
@@ -69,20 +94,58 @@ export async function runEvalCases(
       const { messages } = await call<{ messages: Message[] }>(
         `/api/sessions/${sessionId}/messages?limit=200`,
       );
-      const replies = messages.filter((m) => m.role === "assistant").map((m) => m.contentMd);
+      const assistant = messages.filter((m) => m.role === "assistant");
+      replies = assistant.map((m) => m.contentMd);
       const tools = messages.flatMap((m) => m.toolCalls.map((t) => t.name));
-      const results = gradeTranscript({ replies, tools, card }, c.graders);
+      const { session } = await call<{ session: SessionView }>(`/api/sessions/${sessionId}`);
+      const { sources } = await call<{
+        sources: Array<{ url: string; sessionId: string | null; userConfirmed?: boolean }>;
+      }>(`/api/research?profile=${encodeURIComponent(session.profileId)}`);
+      const results = gradeTranscript(
+        {
+          replies,
+          tools,
+          card,
+          userText: c.messages,
+          sources: sources
+            .filter((s) => s.sessionId === sessionId)
+            .map((s) => ({ url: s.url, userConfirmed: s.userConfirmed === true })),
+          trustedDomains,
+          usage: { tokens: session.tokensIn + session.tokensOut, costUsd: session.costUsdEst },
+          budgetUsd: settings?.maxBudgetUsd ?? null,
+          ...(settings ? { maxTurns: settings.maxTurns } : {}),
+          toolsPerReply: assistant.map((m) => m.toolCalls.length),
+        },
+        c.graders,
+      );
       const passed = results.every((r) => r.passed);
       span.setAttributes({
         "narnia.eval.passed": passed,
         "narnia.session_id": sessionId,
         "narnia.eval.results": JSON.stringify(results.map((r) => ({ [r.type]: r.passed }))),
       });
-      out.push({ id: c.id, passed, results, sessionId });
+      out.push({
+        id: c.id,
+        passed,
+        results,
+        sessionId,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        replies,
+      });
     } catch (e) {
       span.recordError(e);
       span.setAttributes({ "narnia.eval.passed": false });
-      out.push({ id: c.id, passed: false, results: [], sessionId, error: (e as Error).message });
+      out.push({
+        id: c.id,
+        passed: false,
+        results: [],
+        sessionId,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        replies,
+        error: (e as Error).message,
+      });
     } finally {
       span.end();
       // libera a vaga no teto de conversas (F04-3)

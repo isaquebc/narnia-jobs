@@ -21,6 +21,7 @@ describe("F04/M1 shared · tools MCP do chat", () => {
         "evidence.project.list",
         "evidence.skill.get",
         "evidence.skill.list",
+        "fact.gaps",
         "fact.get",
         "fact.search",
         "fact.timeline",
@@ -89,7 +90,13 @@ describe("F04/M1 shared · tools MCP do chat", () => {
   });
 
   it("session.set_category aceita só as categorias de chat; usage.log exige provider_session_id e turno", () => {
-    expect(ChatCategorySchema.options).toEqual(["career", "clarify", "ingest", "interview"]);
+    expect(ChatCategorySchema.options).toEqual([
+      "career",
+      "clarify",
+      "ingest",
+      "interview",
+      "discovery",
+    ]);
     expect(CHAT_TOOLS["session.set_category"].input.safeParse({ category: "career" }).success).toBe(
       true,
     );

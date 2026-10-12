@@ -2,7 +2,8 @@ import { z } from "zod";
 import { IdSchema, IsoDateTimeSchema } from "./common";
 
 /** F04 §3: categorias de sessão (definem o escopo de tools, F04-2) e estados de uma sessão de chat. */
-export const ChatCategorySchema = z.enum(["career", "clarify", "ingest", "interview"]);
+/** `discovery` (auditoria E2): entrevista de descoberta do primeiro uso, só sobre as lacunas do perfil. */
+export const ChatCategorySchema = z.enum(["career", "clarify", "ingest", "interview", "discovery"]);
 export type ChatCategory = z.infer<typeof ChatCategorySchema>;
 
 export const ChatSessionStateSchema = z.enum(["live", "hibernated", "archived", "error"]);

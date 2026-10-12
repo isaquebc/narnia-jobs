@@ -1,0 +1,1 @@
+(nota do sistema: esta conversa clarifica a ingestão {{run_id}}; leia o resumo e as propostas pendentes com file_get_digest e ingest_status, faça uma pergunta objetiva por vez e registre cada correção com ingest_propose para essa execução)

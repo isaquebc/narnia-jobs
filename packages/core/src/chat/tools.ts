@@ -442,6 +442,57 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
         .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""));
       return { items };
     }),
+    // auditoria E2 (18a): o que a extração não preencheu; a entrevista de descoberta pergunta só isso (02 §F1, passo 7)
+    "fact.gaps": wrap("fact.gaps", (input) => {
+      type Gap = {
+        kind: "experience" | "achievement" | "project" | "skill" | "education" | "profile";
+        id: string;
+        line: string;
+        missing: string[];
+      };
+      const gaps: Gap[] = [];
+      const push = (
+        kind: Gap["kind"],
+        id: string,
+        line: string,
+        missing: Array<string | false>,
+      ) => {
+        const m = missing.filter((x): x is string => Boolean(x));
+        if (m.length > 0) gaps.push({ kind, id, line: clip(line), missing: m });
+      };
+      const pid = profileId();
+      const profile = pid ? repos.profiles.get(pid) : null;
+      if (profile) push("profile", profile.id, profile.name, [...profile.needsResearch]);
+      for (const e of repos.facts.experiences.list())
+        push("experience", e.id, experienceLine(e), [
+          !e.isCurrent && !e.endDate && "data de fim",
+          !e.summary && "resumo",
+          repos.facts.achievements.listByExperience(e.id).length === 0 && "conquistas",
+        ]);
+      for (const a of repos.facts.achievements.list())
+        push("achievement", a.id, describe("achievement", a.id)?.line ?? a.text, [
+          !a.metric && "métrica",
+        ]);
+      for (const ed of repos.facts.education.list())
+        push("education", ed.id, describe("education", ed.id)?.line ?? ed.course, [
+          !ed.startDate && !ed.endDate
+            ? "datas"
+            : ed.status === "completed" && !ed.endDate && "data de fim",
+        ]);
+      for (const s of repos.facts.skills.list())
+        push("skill", s.id, describe("skill", s.id)?.line ?? s.name, [!s.level && "nível"]);
+      for (const p of repos.facts.projects.list())
+        push("project", p.id, describe("project", p.id)?.line ?? p.name, [
+          !p.description && "descrição",
+          !p.role && "papel",
+        ]);
+      const offset = Number(input.cursor ?? 0) || 0;
+      const limit = input.limit ?? 20;
+      return {
+        items: gaps.slice(offset, offset + limit),
+        nextCursor: offset + limit < gaps.length ? String(offset + limit) : null,
+      };
+    }),
     "fact.unverified": wrap("fact.unverified", (input) => {
       const kinds: Array<Exclude<FactSearchKind, "file" | "repo">> = [
         "experience",

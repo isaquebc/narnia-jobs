@@ -17,7 +17,7 @@ abrir localhost (container já no ar)
                            └─ 6. Mais fontes (opcional; existe a partir do F03) ─ GitHub | export do LinkedIn | depois
                                 └─ 7. Entrevista de descoberta (opcional; existe a partir do F04)
                                      └─ Dashboard do perfil
-No F01 o wizard tem os passos 1–5 e vai direto ao dashboard; os passos 6 e 7 são adicionados pelas tasks F03 e F04, sem tela "em breve".
+No F01 o wizard tem os passos 1–5 e vai direto ao dashboard. O passo 7 (descoberta) entrou na auditoria pós-F04 (bloco E2) como 6ª tela do wizard ("Passo 6 de 6"), opcional, com o chat do recrutador embutido; o primeiro uso só conclui ao sair dela. O passo 6 (mais fontes) não está no wizard: a F03 entregou GitHub, outro CV e texto livre na página Ingestão, depois do primeiro uso.
 ```
 
 Regras:

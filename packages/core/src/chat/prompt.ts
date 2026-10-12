@@ -64,9 +64,22 @@ export function resumeLostNote(
 }
 
 /**
- * Contexto da sessão de clarificação (F04 §2.8): anteposto à primeira mensagem para o recrutador saber qual execução
- * está clarificando e que correções vão como propostas pela `ingest_propose` (nada é gravado direto).
+ * Nota de contexto vinda de `plugin/prompts/` (auditoria E2, 19c): o texto que orienta o recrutador mora no plugin,
+ * fonte única (F04-1); aqui só o preenchimento de `{{chave}}`, com a mesma regra do template (placeholder sem valor é
+ * erro).
  */
-export function clarifyContextNote(runId: string): string {
-  return `(nota do sistema: esta conversa clarifica a ingestão ${runId}; leia o resumo e as propostas pendentes com file_get_digest e ingest_status, faça uma pergunta objetiva por vez e registre cada correção com ingest_propose para essa execução)`;
+export function renderNote(template: string, values: Record<string, string>): string {
+  const unknown: string[] = [];
+  const out = template.replace(PLACEHOLDER, (whole, key: string) => {
+    const v = values[key];
+    if (v === undefined) {
+      unknown.push(key);
+      return whole;
+    }
+    return v;
+  });
+  if (unknown.length > 0) {
+    throw new PromptTemplateError(`Nota com placeholder sem valor: ${unknown.join(", ")}`);
+  }
+  return out.trim();
 }

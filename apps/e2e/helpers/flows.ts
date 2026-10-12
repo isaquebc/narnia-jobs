@@ -14,7 +14,7 @@ export async function openApp(page: Page, path = "/") {
 
 export async function expectStep(page: Page, step: number) {
   await expect(page).toHaveURL(new RegExp(`/onboarding/${step}$`));
-  await expect(page.getByText(`Passo ${step} de 5`)).toBeVisible();
+  await expect(page.getByText(`Passo ${step} de 6`)).toBeVisible();
 }
 
 /** Passo 1 → 2 com o mock logado. */
@@ -30,13 +30,13 @@ export async function chooseFile(page: Page, name: string) {
   // abaixo do limiar de autoconfirmação (F03-13) o passo pode seguir sozinho antes de a estimativa ficar na tela
   if (/\/onboarding\/3$/.test(page.url())) return;
   await expect(
-    page.getByText(`Arquivo selecionado: ${name}`).or(page.getByText("Passo 3 de 5")),
+    page.getByText(`Arquivo selecionado: ${name}`).or(page.getByText("Passo 3 de 6")),
   ).toBeVisible();
   await expect(
     page
       .getByText(/~.* tokens no total/)
       .or(page.getByText("Abaixo do limite de confirmação: a extração começa sozinha."))
-      .or(page.getByText("Passo 3 de 5"))
+      .or(page.getByText("Passo 3 de 6"))
       .first(),
   ).toBeVisible();
 }
@@ -113,8 +113,21 @@ export async function fillProfileAndCreate(page: Page, opts: ProfileOpts = {}) {
     if (salary.currency) await page.getByLabel("Moeda").selectOption(salary.currency);
   }
   await page.getByLabel("CLT", { exact: true }).check();
-  await page.getByRole("button", { name: "Criar perfil e ir ao dashboard" }).click();
-  if (salary !== "skip") await expectDashboard(page);
+  if (salary === "skip") {
+    await page.getByRole("button", { name: "Criar perfil e continuar" }).click();
+    return;
+  }
+  await submitProfileAndSkipDiscovery(page);
+}
+
+/**
+ * Passo 5 → 6 (auditoria E2): cria o perfil, pula a entrevista de descoberta (opcional) e espera o dashboard.
+ */
+export async function submitProfileAndSkipDiscovery(page: Page) {
+  await page.getByRole("button", { name: "Criar perfil e continuar" }).click();
+  await expectStep(page, 6);
+  await page.getByRole("button", { name: "Pular e ir ao dashboard" }).click();
+  await expectDashboard(page);
 }
 
 export async function expectDashboard(page: Page) {

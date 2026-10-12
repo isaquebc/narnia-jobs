@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { dashboard, profiles, reset, salaryReference } from "../helpers/api";
-import { expectDashboard, fillProfileAndCreate, reachProfileStep } from "../helpers/flows";
+import {
+  fillProfileAndCreate,
+  reachProfileStep,
+  submitProfileAndSkipDiscovery,
+} from "../helpers/flows";
 
 test("F01/E2E-14 dados de carreira obrigatórios: sem faixa salarial bloqueia; “não sei” avança com provisório DIEESE", async ({
   page,
@@ -16,8 +20,7 @@ test("F01/E2E-14 dados de carreira obrigatórios: sem faixa salarial bloqueia; �
   await page.getByLabel("Não sei").first().check();
   await expect(page.getByText("Marcado para pesquisar com o recrutador")).toBeVisible();
   await expect(page.getByLabel("Mínimo")).toBeDisabled();
-  await page.getByRole("button", { name: "Criar perfil e ir ao dashboard" }).click();
-  await expectDashboard(page);
+  await submitProfileAndSkipDiscovery(page);
   await expect(page.getByText("1 itens para resolver com o recrutador")).toBeVisible();
 
   const ref = (await salaryReference("BR")).reference;

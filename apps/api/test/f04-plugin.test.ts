@@ -166,14 +166,25 @@ describe("F04/M2 · hook SessionStart (session-start.sh)", () => {
 });
 
 describe("F04/M2 · nenhum texto de persona fora do plugin e dos pacotes", () => {
-  it("apps/ não contém marcadores do prompt do recrutador", () => {
-    const markers = [/Você é o recrutador/i, /Nunca invente/i, /Regras de honestidade/i];
+  // auditoria E2 (19c): a varredura cobre apps/ e packages/; os prompts das chamadas estruturadas do provider
+  // (extração, análise de repositório, síntese) não são persona do recrutador e ficam de fora
+  it("apps/ e packages/ não contêm marcadores do prompt do recrutador nem das notas do chat", () => {
+    const markers = [
+      /Você é o recrutador/i,
+      /Nunca invente/i,
+      /Regras de honestidade/i,
+      /pergunta objetiva por vez/i,
+      /esta conversa clarifica/i,
+      /entrevista de descoberta: pergunte/i,
+    ];
+    const skip = join(ROOT, "packages/providers/src/claude-code/prompts");
     const hits: string[] = [];
     const walk = (d: string) => {
       for (const name of readdirSync(d)) {
         if (["node_modules", "dist", "coverage", "test", "test-results", "report"].includes(name))
           continue;
         const p = join(d, name);
+        if (p === skip) continue;
         if (statSync(p).isDirectory()) walk(p);
         else if (/\.(ts|tsx|md|json|sh)$/.test(name)) {
           const s = readFileSync(p, "utf8");
@@ -182,6 +193,7 @@ describe("F04/M2 · nenhum texto de persona fora do plugin e dos pacotes", () =>
       }
     };
     walk(join(ROOT, "apps"));
+    walk(join(ROOT, "packages"));
     expect(hits).toEqual([]);
   });
 });

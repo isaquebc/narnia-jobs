@@ -17,7 +17,9 @@ describe("migration 0005_research_confirmed", () => {
        values ('src-1', ?, null, 'https://www.ibge.gov.br/x', 'ibge.gov.br', 'IBGE', 'x', 'salary', 'official',
                '2026-10-11T00:00:00.000Z')`,
     ).run(ids.profileId);
-    expect(migrate(db).applied).toEqual(["0005_research_confirmed"]);
+    expect(migrate(db, { until: "0005_research_confirmed" }).applied).toEqual([
+      "0005_research_confirmed",
+    ]);
     const after = createRepos(db);
     expect(after.researchSources.get("src-1")).toMatchObject({
       domain: "ibge.gov.br",
