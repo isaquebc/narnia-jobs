@@ -1,8 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { resolveBackupDir } from "@narnia-jobs/core";
 import { createProviderFromEnv, resolveClaudeBinary } from "@narnia-jobs/providers";
 import IORedis from "ioredis";
 import { runDoctor } from "./doctor";
+import { probeMcp } from "./mcp/probe";
 
 /**
  * CLI `narnia-jobs` dentro da imagem (F01 §2.6): doctor | login | install-plugin.
@@ -28,10 +31,21 @@ async function doctor(): Promise<number> {
     },
     workerHeartbeat: () => redis.get(`${prefix}:worker:heartbeat`),
     backupDir: resolveBackupDir(process.env, dataDir),
+    mcpProbe: () => probeMcp(`http://127.0.0.1:${process.env.PORT ?? "3100"}`, apiToken()),
   });
   redis.disconnect();
   console.log(JSON.stringify(report, null, 2));
   return report.ok ? 0 : 1;
+}
+
+/** Token da instância: `NARNIA_TOKEN` (dev) ou o persistido em `<dados>/.token` (produção). */
+function apiToken(): string {
+  if (process.env.NARNIA_TOKEN) return process.env.NARNIA_TOKEN;
+  try {
+    return readFileSync(join(dataDir, ".token"), "utf8").trim();
+  } catch {
+    return "";
+  }
 }
 
 function login(): number {
@@ -49,7 +63,7 @@ function usage(): void {
   console.log(`narnia-jobs <comando>
   doctor          verifica login (volume/token), Redis, pasta de dados e worker
   login           login interativo da assinatura dentro do container
-  install-plugin  instala o plugin no Claude Code do host (disponível em F04)`);
+  install-plugin  roda no host: ./start.sh install-plugin (ou .\\start.ps1 install-plugin)`);
 }
 
 let code = 0;
@@ -61,7 +75,10 @@ switch (cmd) {
     code = login();
     break;
   case "install-plugin":
-    console.log("`install-plugin` chega com o F04 (servidor MCP + plugin/).");
+    // o plugin vai para o Claude Code do computador (host), não para o container: quem instala é o lançador
+    console.log(
+      "install-plugin roda no seu computador: ./start.sh install-plugin (Windows: .\\start.ps1 install-plugin).",
+    );
     break;
   case "help":
   case "--help":

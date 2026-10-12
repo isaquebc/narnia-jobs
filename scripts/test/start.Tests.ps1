@@ -180,3 +180,43 @@ Describe "C7 / CM-4: cópia separada da instância do dono (.owner-src)" {
     $out | Should -Match "dono"
   }
 }
+
+Describe "F04/M5 · modo B (install-plugin e diagnóstico no host)" {
+  BeforeAll {
+    $script:Calls = [System.Collections.Generic.List[string]]::new()
+    $script:McpGet = ""; $script:PluginList = ""
+    $global:NarniaClaudeCliOverride = { param([string[]] $Arguments)
+      $script:Calls.Add(($Arguments -join " "))
+      $cmd = ($Arguments[0..1] -join " ")
+      if ($cmd -eq "mcp get") { if ($script:McpGet) { $global:LASTEXITCODE = 0; return $script:McpGet } else { $global:LASTEXITCODE = 1; return "" } }
+      if ($cmd -eq "plugin list") { $global:LASTEXITCODE = 0; return $script:PluginList }
+      $global:LASTEXITCODE = 0
+    }
+  }
+  AfterAll { Remove-Variable -Scope Global -Name NarniaClaudeCliOverride -ErrorAction SilentlyContinue }
+  It "nomes padrão do dono" {
+    Get-McpServerName | Should -Be "narnia-jobs"
+    Get-PluginMarketplaceName | Should -Be "narnia-jobs-local"
+    Get-PluginEndpoint "dev" | Should -Be "http://127.0.0.1:3100|dev-token"
+  }
+  It "Build-PluginStage grava .narnia-env e o marketplace local, sem .mcp.json" {
+    $stage = Join-Path $script:Tmp "stage"
+    Build-PluginStage (Join-Path $PSScriptRoot "../../plugin") $stage "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local"
+    (Get-Content (Join-Path $stage "plugin/.narnia-env")) | Should -Contain "NARNIA_API_URL=http://127.0.0.1:3100"
+    (Get-Content (Join-Path $stage ".claude-plugin/marketplace.json") -Raw) | Should -Match '"source": "./plugin"'
+    Test-Path (Join-Path $stage "plugin/.mcp.json") | Should -BeFalse
+  }
+  It "Install-PluginWith registra o MCP no escopo user e instala pelo marketplace local" {
+    $script:Calls.Clear()
+    $stage = Join-Path $script:Tmp "stage"
+    Install-PluginWith $stage "narnia-jobs" "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local" | Out-Null
+    $script:Calls | Should -Contain "mcp add --transport http -s user narnia-jobs http://127.0.0.1:3100/mcp --header Authorization: Bearer dev-token"
+    $script:Calls | Should -Contain "plugin install narnia-jobs@narnia-jobs-local --scope user"
+  }
+  It "Test-PluginInstall acusa porta mudou e plugin ausente" {
+    $script:McpGet = "URL: http://127.0.0.1:3999/mcp"; $script:PluginList = "[]"
+    $out = Test-PluginInstall "narnia-jobs" "http://127.0.0.1:3100" "narnia-jobs-local" | Out-String
+    $out | Should -Match "porta mudou"
+    $out | Should -Match "não instalado"
+  }
+}

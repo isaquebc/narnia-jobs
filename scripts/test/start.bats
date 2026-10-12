@@ -324,3 +324,81 @@ git_repo() { # git_repo DIR -> repositório git com um commit
   [ "$status" -ne 0 ]
   [[ "$output" == *"dono"* ]]
 }
+
+# --- F04/M5 · modo B: install-plugin e diagnóstico no host (claude falso, HOME temporário) ---------------------------
+
+fake_claude() { # registra cada chamada em $TMP/claude.calls; respostas configuráveis por $TMP/claude.mcpget e .pluginlist
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/claude" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "$FAKE_DIR/claude.calls"
+case "$1 $2" in
+  "mcp get") [ -f "$FAKE_DIR/claude.mcpget" ] && cat "$FAKE_DIR/claude.mcpget" && exit 0; exit 1 ;;
+  "plugin list") [ -f "$FAKE_DIR/claude.pluginlist" ] && cat "$FAKE_DIR/claude.pluginlist"; exit 0 ;;
+esac
+exit 0
+SH
+  chmod +x "$TMP/bin/claude"
+  export FAKE_DIR="$TMP" NARNIA_CLAUDE_BIN="$TMP/bin/claude"
+  : > "$TMP/claude.calls"
+}
+
+@test "plugin_endpoint dev: porta e token da instância corrente (dono 3100/dev-token; claude 3200/claude-token)" {
+  unset NARNIA_DEV_API_PORT NARNIA_TOKEN
+  [[ "$(plugin_endpoint dev)" == "http://127.0.0.1:3100|dev-token" ]]
+  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; plugin_endpoint dev'
+  [[ "$output" == "http://127.0.0.1:3200|claude-token" ]]
+}
+
+@test "nomes do modo B por instância: o Claude nunca usa o nome do servidor e do marketplace do dono" {
+  [[ "$(mcp_server_name)" == "narnia-jobs" && "$(plugin_marketplace_name)" == "narnia-jobs-local" ]]
+  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; printf "%s|%s|%s" "$(mcp_server_name)" "$(plugin_marketplace_name)" "$(plugin_stage_dir)"'
+  [[ "$output" == "narnia-jobs-claude|narnia-jobs-claude-local|./.claude-data/plugin-build" ]]
+}
+
+@test "stage_plugin copia o plugin, grava .narnia-env 0600 e o marketplace local, sem .mcp.json no plugin instalado" {
+  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3200" "claude-token" "narnia-jobs-claude-local"
+  [ -f "$TMP/stage/plugin/.claude-plugin/plugin.json" ]
+  [ -f "$TMP/stage/plugin/hooks/session-start.sh" ]
+  grep -qx "NARNIA_API_URL=http://127.0.0.1:3200" "$TMP/stage/plugin/.narnia-env"
+  grep -qx "NARNIA_TOKEN=claude-token" "$TMP/stage/plugin/.narnia-env"
+  [[ "$(stat -c %a "$TMP/stage/plugin/.narnia-env")" == "600" ]]
+  [ ! -e "$TMP/stage/plugin/.mcp.json" ]
+  grep -q '"name": "narnia-jobs-claude-local"' "$TMP/stage/.claude-plugin/marketplace.json"
+  grep -q '"source": "./plugin"' "$TMP/stage/.claude-plugin/marketplace.json"
+}
+
+@test "install_plugin_with registra o MCP no escopo user e instala o plugin pelo marketplace local, idempotente" {
+  fake_claude
+  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local"
+  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3100" dev-token narnia-jobs-local >/dev/null
+  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3100" dev-token narnia-jobs-local >/dev/null
+  grep -qx "mcp remove -s user narnia-jobs" "$TMP/claude.calls"
+  grep -qx "mcp add --transport http -s user narnia-jobs http://127.0.0.1:3100/mcp --header Authorization: Bearer dev-token" "$TMP/claude.calls"
+  grep -qx "plugin marketplace add $TMP/stage --scope user" "$TMP/claude.calls"
+  grep -qx "plugin uninstall narnia-jobs@narnia-jobs-local" "$TMP/claude.calls"
+  grep -qx "plugin install narnia-jobs@narnia-jobs-local --scope user" "$TMP/claude.calls"
+  [[ "$(grep -c '^mcp add' "$TMP/claude.calls")" == "2" ]]
+}
+
+@test "porta mudou: reinstalar grava a URL nova no MCP e no .narnia-env" {
+  fake_claude
+  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3101" "tok" "narnia-jobs-local"
+  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3101" tok narnia-jobs-local >/dev/null
+  grep -q "mcp add --transport http -s user narnia-jobs http://127.0.0.1:3101/mcp" "$TMP/claude.calls"
+  grep -qx "NARNIA_API_URL=http://127.0.0.1:3101" "$TMP/stage/plugin/.narnia-env"
+}
+
+@test "plugin_doctor: ok com MCP na porta certa e plugin instalado; acusa porta mudou e plugin ausente" {
+  fake_claude
+  printf 'narnia-jobs:\n  Type: http\n  URL: http://127.0.0.1:3100/mcp\n' > "$TMP/claude.mcpget"
+  printf '[{"id":"narnia-jobs@narnia-jobs-local","enabled":true}]\n' > "$TMP/claude.pluginlist"
+  run plugin_doctor narnia-jobs "http://127.0.0.1:3100" narnia-jobs-local
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"MCP narnia-jobs: ok"* && "$output" == *"plugin narnia-jobs@narnia-jobs-local: instalado"* ]]
+  printf 'narnia-jobs:\n  URL: http://127.0.0.1:3999/mcp\n' > "$TMP/claude.mcpget"
+  : > "$TMP/claude.pluginlist"
+  run plugin_doctor narnia-jobs "http://127.0.0.1:3100" narnia-jobs-local
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"porta mudou"* && "$output" == *"install-plugin"* && "$output" == *"não instalado"* ]]
+}

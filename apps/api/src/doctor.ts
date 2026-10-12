@@ -21,6 +21,8 @@ export interface DoctorDeps {
   backupDir?: string | null;
   procRoot?: string;
   logsDir?: string;
+  /** F04/M5: confere o `/mcp` da instância (devolve o nº de tools); ausente = não verificar. */
+  mcpProbe?: () => Promise<number>;
 }
 
 export interface DoctorReport {
@@ -37,6 +39,8 @@ export interface DoctorReport {
     deletedOpen: Array<{ pid: number; fd: string }>;
     lastBackup: { file: string; at: string } | null;
     lastRequest: string | null;
+    /** F04/M5: servidor MCP da instância (null quando não verificado). */
+    mcp: { ok: boolean; tools: number } | null;
   };
   hints: string[];
 }
@@ -109,6 +113,17 @@ export async function runDoctor(deps: DoctorDeps): Promise<DoctorReport> {
         : `Nenhum backup em ${deps.backupDir}: o primeiro é feito no boot do api, quando já houver dados.`,
     );
   const lastRequest = lastLoggedRequest(deps.logsDir ?? join(deps.dataDir, "logs"));
+  let mcp: { ok: boolean; tools: number } | null = null;
+  if (deps.mcpProbe) {
+    try {
+      mcp = { ok: true, tools: await deps.mcpProbe() };
+    } catch {
+      mcp = { ok: false, tools: 0 };
+      hints.push(
+        "Servidor MCP (/mcp) não respondeu com o token desta instância: o chat e o modo B ficam sem tools.",
+      );
+    }
+  }
 
   const checks = {
     auth,
@@ -121,9 +136,16 @@ export async function runDoctor(deps: DoctorDeps): Promise<DoctorReport> {
     deletedOpen,
     lastBackup,
     lastRequest,
+    mcp,
   };
   return {
-    ok: auth !== "none" && redis && dataDirWritable && workerAlive && deletedOpen.length === 0,
+    ok:
+      auth !== "none" &&
+      redis &&
+      dataDirWritable &&
+      workerAlive &&
+      deletedOpen.length === 0 &&
+      (mcp?.ok ?? true),
     checks,
     hints,
   };

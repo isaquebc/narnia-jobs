@@ -168,6 +168,91 @@ restore_files() {
   fi
 }
 
+# --- F04 · modo B: plugin no Claude Code do host --------------------------------------------------------------------
+# Mecanismo vigente (Claude Code 2.1.296, `claude plugin --help`, 2026-10-11): plugin local via marketplace local
+# (`claude plugin marketplace add <dir com .claude-plugin/marketplace.json>` + `claude plugin install p@mkt --scope user`)
+# e as tools por `claude mcp add --transport http` no escopo user (F04-8, F04-14). Nomes por instância: o Claude nunca
+# usa o servidor nem o marketplace do dono.
+mcp_server_name() { printf '%s\n' "${NARNIA_MCP_NAME:-narnia-jobs}"; }
+plugin_marketplace_name() { printf '%s\n' "${NARNIA_PLUGIN_MARKETPLACE:-narnia-jobs-local}"; }
+plugin_stage_dir() { printf '%s\n' "${NARNIA_PLUGIN_STAGE:-./.plugin-build}"; }
+
+# plugin_endpoint dev|prod -> "URL_BASE|TOKEN" da API da instância corrente (dev: api publicada; prod: via nginx)
+plugin_endpoint() {
+  if [[ "${1:-dev}" == prod ]]; then
+    printf 'http://127.0.0.1:%s|%s\n' "$(env_value "$ENV_FILE" NARNIA_PORT)" "$(read_token)"
+  else
+    printf 'http://127.0.0.1:%s|%s\n' "${NARNIA_DEV_API_PORT:-3100}" "${NARNIA_TOKEN:-dev-token}"
+  fi
+}
+
+# stage_plugin SRC STAGE URL TOKEN MARKETPLACE -> cópia instalável do plugin com .narnia-env (0600) e marketplace local.
+# O .mcp.json não vai no plugin instalado: as tools vêm do `claude mcp add` (evita servidor duplicado).
+stage_plugin() {
+  local src=$1 stage=$2 url=$3 token=$4 mkt=$5
+  rm -rf "$stage"
+  mkdir -p "$stage/.claude-plugin"
+  cp -R "$src" "$stage/plugin"
+  rm -f "$stage/plugin/.mcp.json" "$stage/plugin/.narnia-env"
+  (umask 077; printf 'NARNIA_API_URL=%s\nNARNIA_TOKEN=%s\n' "$url" "$token" > "$stage/plugin/.narnia-env")
+  chmod 600 "$stage/plugin/.narnia-env"
+  cat > "$stage/.claude-plugin/marketplace.json" <<JSON
+{
+  "name": "$mkt",
+  "owner": { "name": "narnia-jobs" },
+  "description": "Instalação local do recrutador do narnia-jobs (gerada pelo install-plugin)",
+  "plugins": [
+    { "name": "narnia-jobs", "source": "./plugin", "description": "Recrutador sênior do narnia-jobs (instalação local)" }
+  ]
+}
+JSON
+}
+
+# install_plugin_with STAGE NAME URL TOKEN MARKETPLACE -> registra MCP e instala o plugin (idempotente: remove e refaz)
+install_plugin_with() {
+  local stage=$1 name=$2 url=$3 token=$4 mkt=$5 bin=${NARNIA_CLAUDE_BIN:-claude} abs
+  abs=$(cd "$stage" && pwd)
+  "$bin" mcp remove -s user "$name" >/dev/null 2>&1 || true
+  "$bin" mcp add --transport http -s user "$name" "$url/mcp" --header "Authorization: Bearer $token" >/dev/null \
+    || die "não consegui registrar o servidor MCP $name no Claude Code."
+  "$bin" plugin marketplace add "$abs" --scope user >/dev/null 2>&1 \
+    || "$bin" plugin marketplace update "$mkt" >/dev/null 2>&1 || true
+  "$bin" plugin uninstall "narnia-jobs@$mkt" >/dev/null 2>&1 || true
+  "$bin" plugin install "narnia-jobs@$mkt" --scope user >/dev/null \
+    || die "não consegui instalar o plugin narnia-jobs@$mkt no Claude Code."
+  info "Claude Code: servidor MCP '$name' → $url/mcp e plugin narnia-jobs@$mkt instalados. Reinicie o Claude Code."
+}
+
+# plugin_doctor NAME URL MARKETPLACE -> confere no Claude Code do host: MCP registrado na porta certa e plugin instalado
+plugin_doctor() {
+  local name=$1 url=$2 mkt=$3 bin=${NARNIA_CLAUDE_BIN:-claude} out rc=0
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    printf 'modo B: Claude Code não encontrado neste computador (opcional)\n'; return 0
+  fi
+  if out=$("$bin" mcp get "$name" 2>/dev/null); then
+    if grep -q "$url/mcp" <<<"$out"; then printf 'MCP %s: ok (%s/mcp)\n' "$name" "$url"
+    else printf 'MCP %s: porta mudou; rode ./start.sh install-plugin\n' "$name"; rc=1; fi
+  else
+    printf 'MCP %s: não registrado; rode ./start.sh install-plugin\n' "$name"; rc=1
+  fi
+  if "$bin" plugin list --json 2>/dev/null | grep -q "narnia-jobs@$mkt"; then
+    printf 'plugin narnia-jobs@%s: instalado\n' "$mkt"
+  else
+    printf 'plugin narnia-jobs@%s: não instalado; rode ./start.sh install-plugin\n' "$mkt"; rc=1
+  fi
+  return $rc
+}
+
+cmd_install_plugin() {
+  local mode=dev ep url token
+  [[ "${1:-}" == --prod ]] && mode=prod
+  if [[ $mode == dev ]] && stack_running && [[ -z "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then mode=prod; fi
+  ep=$(plugin_endpoint "$mode"); url=${ep%%|*}; token=${ep#*|}
+  [[ -n "$token" && "$url" != *: ]] || die "instância fora do ar: suba com make dev ou ./start.sh up antes de instalar o plugin."
+  stage_plugin ./plugin "$(plugin_stage_dir)" "$url" "$token" "$(plugin_marketplace_name)"
+  install_plugin_with "$(plugin_stage_dir)" "$(mcp_server_name)" "$url" "$token" "$(plugin_marketplace_name)"
+}
+
 # app_url PORT TOKEN -> URL de abertura da interface
 app_url() { printf 'http://127.0.0.1:%s/?token=%s\n' "$1" "$2"; }
 
@@ -449,7 +534,8 @@ Uso (produção, só Docker no host):
   promote [c]   leva a instância do dono (.owner-src) para um commit verde (padrão HEAD)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
-  doctor        diagnóstico: login, Redis, pasta de dados, worker
+  doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
+  install-plugin [--prod]  instala o recrutador no Claude Code deste computador (MCP + plugin, modo B)
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 
@@ -481,8 +567,11 @@ main() {
       if [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then
         "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts doctor
       elif stack_running; then "${PROD_COMPOSE[@]}" exec -T api narnia-jobs doctor
-      else "${PROD_COMPOSE[@]}" run --rm api narnia-jobs doctor; fi ;;
+      else "${PROD_COMPOSE[@]}" run --rm api narnia-jobs doctor; fi
+      local ep; ep=$(plugin_endpoint dev)
+      plugin_doctor "$(mcp_server_name)" "${ep%%|*}" "$(plugin_marketplace_name)" || true ;;
     restore) cmd_restore "$@" ;;
+    install-plugin) cmd_install_plugin "$@" ;;
     promote) cmd_promote "$@" ;;
     dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;

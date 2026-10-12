@@ -147,6 +147,71 @@ function Invoke-Restore {
   Info "pronto. Recarregue a página."
 }
 
+# --- F04 · modo B: plugin no Claude Code do host (mesmo desenho do start.sh) ----------------------------------------
+function Get-McpServerName { if ($env:NARNIA_MCP_NAME) { $env:NARNIA_MCP_NAME } else { "narnia-jobs" } }
+function Get-PluginMarketplaceName { if ($env:NARNIA_PLUGIN_MARKETPLACE) { $env:NARNIA_PLUGIN_MARKETPLACE } else { "narnia-jobs-local" } }
+function Get-PluginStageDir { if ($env:NARNIA_PLUGIN_STAGE) { $env:NARNIA_PLUGIN_STAGE } else { "./.plugin-build" } }
+function Get-PluginEndpoint([string] $Mode = "dev") {
+  if ($Mode -eq "prod") {
+    $token = ((& docker @script:ProdCompose exec -T api cat /data/.token 2>$null) -join "").Trim()
+    return "http://127.0.0.1:$(Get-EnvValue $script:EnvFile 'NARNIA_PORT')|$token"
+  }
+  $port = if ($env:NARNIA_DEV_API_PORT) { $env:NARNIA_DEV_API_PORT } else { "3100" }
+  $token = if ($env:NARNIA_TOKEN) { $env:NARNIA_TOKEN } else { "dev-token" }
+  return "http://127.0.0.1:$port|$token"
+}
+function Invoke-ClaudeCli { param([string[]] $Arguments)
+  if ($global:NarniaClaudeCliOverride) { return (& $global:NarniaClaudeCliOverride $Arguments) }   # só nos testes
+  $bin = if ($env:NARNIA_CLAUDE_BIN) { $env:NARNIA_CLAUDE_BIN } else { "claude" }
+  & $bin @Arguments 2>$null
+}
+function Build-PluginStage([string] $Src, [string] $Stage, [string] $Url, [string] $Token, [string] $Mkt) {
+  if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
+  New-Item -ItemType Directory -Force -Path (Join-Path $Stage ".claude-plugin") | Out-Null
+  Copy-Item -Recurse -Force $Src (Join-Path $Stage "plugin")
+  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Stage "plugin/.mcp.json"), (Join-Path $Stage "plugin/.narnia-env")
+  Set-Content -Path (Join-Path $Stage "plugin/.narnia-env") -Value @("NARNIA_API_URL=$Url", "NARNIA_TOKEN=$Token")
+  $json = @"
+{
+  "name": "$Mkt",
+  "owner": { "name": "narnia-jobs" },
+  "description": "Instalação local do recrutador do narnia-jobs (gerada pelo install-plugin)",
+  "plugins": [
+    { "name": "narnia-jobs", "source": "./plugin", "description": "Recrutador sênior do narnia-jobs (instalação local)" }
+  ]
+}
+"@
+  Set-Content -Path (Join-Path $Stage ".claude-plugin/marketplace.json") -Value $json
+}
+function Install-PluginWith([string] $Stage, [string] $Name, [string] $Url, [string] $Token, [string] $Mkt) {
+  $abs = (Resolve-Path $Stage).Path
+  Invoke-ClaudeCli @("mcp", "remove", "-s", "user", $Name) | Out-Null
+  Invoke-ClaudeCli @("mcp", "add", "--transport", "http", "-s", "user", $Name, "$Url/mcp", "--header", "Authorization: Bearer $Token") | Out-Null
+  if ($LASTEXITCODE -ne 0) { Fail "não consegui registrar o servidor MCP $Name no Claude Code." }
+  Invoke-ClaudeCli @("plugin", "marketplace", "add", $abs, "--scope", "user") | Out-Null
+  if ($LASTEXITCODE -ne 0) { Invoke-ClaudeCli @("plugin", "marketplace", "update", $Mkt) | Out-Null }
+  Invoke-ClaudeCli @("plugin", "uninstall", "narnia-jobs@$Mkt") | Out-Null
+  Invoke-ClaudeCli @("plugin", "install", "narnia-jobs@$Mkt", "--scope", "user") | Out-Null
+  if ($LASTEXITCODE -ne 0) { Fail "não consegui instalar o plugin narnia-jobs@$Mkt no Claude Code." }
+  Info "Claude Code: servidor MCP '$Name' -> $Url/mcp e plugin narnia-jobs@$Mkt instalados. Reinicie o Claude Code."
+}
+function Test-PluginInstall([string] $Name, [string] $Url, [string] $Mkt) {
+  $out = (Invoke-ClaudeCli @("mcp", "get", $Name)) -join "`n"
+  if ($LASTEXITCODE -ne 0 -or -not $out) { "MCP ${Name}: não registrado; rode .\start.ps1 install-plugin" }
+  elseif ($out -match [regex]::Escape("$Url/mcp")) { "MCP ${Name}: ok ($Url/mcp)" }
+  else { "MCP ${Name}: porta mudou; rode .\start.ps1 install-plugin" }
+  $list = (Invoke-ClaudeCli @("plugin", "list", "--json")) -join "`n"
+  if ($list -match [regex]::Escape("narnia-jobs@$Mkt")) { "plugin narnia-jobs@${Mkt}: instalado" }
+  else { "plugin narnia-jobs@${Mkt}: não instalado; rode .\start.ps1 install-plugin" }
+}
+function Invoke-InstallPlugin {
+  $mode = if ($Rest -contains "--prod") { "prod" } else { "dev" }
+  $ep = Get-PluginEndpoint $mode; $url, $token = $ep -split '\|', 2
+  if (-not $token) { Fail "instância fora do ar: suba com make dev ou .\start.ps1 up antes de instalar o plugin." }
+  Build-PluginStage "./plugin" (Get-PluginStageDir) $url $token (Get-PluginMarketplaceName)
+  Install-PluginWith (Get-PluginStageDir) (Get-McpServerName) $url $token (Get-PluginMarketplaceName)
+}
+
 # Token do `gh` logado no computador (F03-1); $null sem gh ou sem login. Entregue ao container pela entrada padrão.
 function Get-HostGhToken {
   $bin = if ($env:NARNIA_GH_BIN) { $env:NARNIA_GH_BIN } else { "gh" }
@@ -324,7 +389,11 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       if ($devApi) { & docker @script:DevCompose exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts doctor }
       elseif (Test-StackRunning) { Invoke-Prod @("exec", "-T", "api", "narnia-jobs", "doctor") }
       else { Invoke-Prod @("run", "--rm", "api", "narnia-jobs", "doctor") }
+      if (Get-Command ($(if ($env:NARNIA_CLAUDE_BIN) { $env:NARNIA_CLAUDE_BIN } else { "claude" })) -ErrorAction SilentlyContinue) {
+        $ep = Get-PluginEndpoint "dev"; Test-PluginInstall (Get-McpServerName) ($ep -split '\|', 2)[0] (Get-PluginMarketplaceName)
+      }
     }
+    "install-plugin" { Invoke-InstallPlugin }
     "restore"   { Invoke-Restore }
     "promote"   { Invoke-Promote @Rest }
     "dev-down"  { Assert-Docker; $a = Get-DevDownArgs; & docker @a }
