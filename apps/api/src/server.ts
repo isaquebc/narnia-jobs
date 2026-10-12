@@ -15,6 +15,7 @@ import IORedis from "ioredis";
 import { createApp } from "./app";
 import { generateBootToken } from "./auth";
 import { bootData } from "./boot";
+import { SessionManager } from "./chat/session-manager";
 import { EventBus } from "./events";
 import { BullQueueAdapter } from "./queue";
 import { startRedisRelay } from "./relay";
@@ -45,6 +46,19 @@ const queues = {
 const bus = new EventBus();
 const relay = startRedisRelay({ redisUrl, prefix, bus });
 
+// sessões de chat no processo do api (F04-10): o CLI chama o /mcp deste api pela rede interna do container
+const sessions = new SessionManager({
+  repos,
+  provider,
+  bus,
+  token,
+  mcpUrl: `http://127.0.0.1:${port}/mcp`,
+});
+const hibernated = sessions.hibernateAllOnBoot();
+if (hibernated > 0)
+  console.log(`[api] ${hibernated} conversa(s) hibernada(s) no boot (retomam com resume)`);
+sessions.startSweep();
+
 const app = createApp({
   version: process.env.NARNIA_VERSION ?? "0.0.0",
   repos,
@@ -54,6 +68,7 @@ const app = createApp({
   bus,
   token,
   backupDir,
+  sessions,
 });
 
 const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => {
@@ -66,6 +81,7 @@ attachWebSocket({ server: server as unknown as import("node:http").Server, bus, 
 
 const shutdown = async () => {
   console.log("[api] encerrando…");
+  sessions.closeAll();
   await relay.close();
   await Promise.all(Object.values(queues).map((q) => q.close()));
   await connection.quit();

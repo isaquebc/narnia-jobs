@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { ChatSessionStateSchema } from "../schemas/chat";
+import {
+  ChatCategorySchema,
+  ChatMessageSchema,
+  ChatSessionSchema,
+  ChatSessionStateSchema,
+  ResearchSourceSchema,
+} from "../schemas/chat";
 import { IdSchema, IsoDateTimeSchema } from "../schemas/common";
 import {
   EmphasisFactKindSchema,
@@ -601,6 +607,8 @@ export const ChatErrorEventSchema = z.object({
   type: z.literal("chat.error"),
   sessionId: IdSchema,
   error: z.string(),
+  /** Chave do mapa de erros amigáveis (`error.*`, C5); a web mostra a mensagem e o texto técnico recolhido. */
+  errorKey: z.string().optional(),
 });
 export const ChatLimitEventSchema = z.object({
   type: z.literal("chat.limit"),
@@ -612,6 +620,33 @@ export const ChatSessionUpdatedEventSchema = z.object({
   sessionId: IdSchema,
   state: ChatSessionStateSchema,
 });
+
+// Rotas do chat (F04 §2.5, M3)
+export const ChatSessionCreateRequestSchema = z.object({
+  /** Perfil da sessão; ausente = perfil ativo. */
+  profileId: IdSchema.optional(),
+  category: ChatCategorySchema.default("career"),
+  /** Modelo da sessão (F04-9); ausente = `chat.default_model`. */
+  model: z.string().min(1).max(100).optional(),
+  title: z.string().min(1).max(200).optional(),
+});
+export type ChatSessionCreateRequest = z.infer<typeof ChatSessionCreateRequestSchema>;
+export const ChatSessionPatchRequestSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  category: ChatCategorySchema.optional(),
+  model: z.string().min(1).max(100).optional(),
+  archived: z.boolean().optional(),
+});
+export const ChatSendRequestSchema = z.object({ text: z.string().min(1).max(50_000) });
+export const ChatSessionResponseSchema = z.object({ session: ChatSessionSchema });
+export const ChatSessionListResponseSchema = z.object({ sessions: z.array(ChatSessionSchema) });
+export const ChatMessagesResponseSchema = z.object({ messages: z.array(ChatMessageSchema) });
+/** 409 `session_limit` (F04-3): `details.live` lista as sessões vivas para a UI perguntar qual encerrar. */
+export const ChatSessionLimitDetailsSchema = z.object({
+  max: z.number().int().min(1),
+  live: z.array(ChatSessionSchema),
+});
+export const ResearchListResponseSchema = z.object({ sources: z.array(ResearchSourceSchema) });
 
 // WS /ws — jobs/provider (F01) + perfil (F02). Quem lê `jobId` discrimina por `type` antes.
 export const WsEventSchema = z.discriminatedUnion("type", [

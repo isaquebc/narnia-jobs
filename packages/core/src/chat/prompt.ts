@@ -40,3 +40,19 @@ export function renderRecruiterPrompt(template: string, input: RecruiterPromptIn
   }
   return out;
 }
+
+/**
+ * Nota anteposta à mensagem do usuário quando o cartão do perfil mudou desde a abertura da sessão (F04-1): o system
+ * prompt é fixo, então o cartão novo entra como contexto do turno.
+ */
+export function cardUpdatedNote(cardText: string): string {
+  return `(nota do sistema: o cartão do perfil foi atualizado desde o início desta conversa; versão atual abaixo)\n${cardText}\n(fim da nota)`;
+}
+
+/**
+ * Contexto da sessão de clarificação (F04 §2.8): anteposto à primeira mensagem para o recrutador saber qual execução
+ * está clarificando e que correções vão como propostas pela `ingest_propose` (nada é gravado direto).
+ */
+export function clarifyContextNote(runId: string): string {
+  return `(nota do sistema: esta conversa clarifica a ingestão ${runId}; leia o resumo e as propostas pendentes com file_get_digest e ingest_status, faça uma pergunta objetiva por vez e registre cada correção com ingest_propose para essa execução)`;
+}

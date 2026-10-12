@@ -4,6 +4,7 @@ import type { Provider } from "@narnia-jobs/providers";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { authMiddleware, enterHandler } from "./auth";
+import { SessionManager } from "./chat/session-manager";
 import { apiError } from "./errors";
 import type { EventBus } from "./events";
 import {
@@ -17,6 +18,7 @@ import { createJsonlLogger, type JsonlLogger } from "./log";
 import { mcpRoutes } from "./mcp/server";
 import type { QueueAdapter } from "./queue";
 import { backupsRoutes } from "./routes/backups";
+import { chatRoutes } from "./routes/chat";
 import { dashboardRoutes } from "./routes/dashboard";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
@@ -48,6 +50,8 @@ export interface AppDeps {
   deviceFlow?: DeviceFlowRunner;
   /** Pasta de backups (F03-fix L1); `null` = desligado; ausente = `<dados>/backups`. */
   backupDir?: string | null;
+  /** Sessões de chat (F04 M3); ausente = gerenciador padrão apontando para o `/mcp` deste api. */
+  sessions?: SessionManager;
 }
 
 /** Monta a aplicação Hono (F01 §2.6). Tudo atrás do token de boot, exceto health e a rota de entrada. */
@@ -118,6 +122,16 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", personaCardRoutes({ repos: deps.repos }));
+  const sessions =
+    deps.sessions ??
+    new SessionManager({
+      repos: deps.repos,
+      provider: deps.provider,
+      bus: deps.bus,
+      token: deps.token,
+      mcpUrl: `http://127.0.0.1:${process.env.PORT ?? 3100}/mcp`,
+    });
+  app.route("/", chatRoutes({ repos: deps.repos, sessions }));
   app.route("/", onboardingRoutes({ repos: deps.repos }));
   app.route("/", filesRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
   app.route(

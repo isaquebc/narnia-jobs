@@ -67,6 +67,8 @@ export interface ChatSessionsRepo {
   ): void;
   touch(id: string): void;
   countLive(): number;
+  /** Apaga a sessão; mensagens saem em cascata (o uso registrado continua, com `session_id` solto). */
+  remove(id: string): void;
 }
 
 function mapSession(r: Row): ChatSession {
@@ -149,6 +151,9 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
       return Number(
         (q("select count(*) as n from chat_session where state = 'live'").get() as { n: number }).n,
       );
+    },
+    remove(id) {
+      q("delete from chat_session where id = ?").run(id);
     },
   };
   return repo;

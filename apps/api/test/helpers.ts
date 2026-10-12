@@ -14,6 +14,7 @@ import {
 import { MOCK_DIGEST, MOCK_EXTRACT_FACTS, MockProvider } from "@narnia-jobs/providers";
 import { type AnyWsEvent, extractFactsOutputToProposals } from "@narnia-jobs/shared";
 import { type App, createApp } from "../src/app";
+import { SessionManager } from "../src/chat/session-manager";
 import { EventBus } from "../src/events";
 import type { EnqueueTaskRequest, QueueAdapter } from "../src/queue";
 
@@ -90,6 +91,8 @@ export interface TestApp {
   cleanup: () => void;
   /** fetch autenticado */
   api: (path: string, init?: RequestInit) => Promise<Response>;
+  /** Sessões de chat (F04 M3): o mock chama o `/mcp` desta app em memória. */
+  sessions: SessionManager;
 }
 
 export function makeTestApp(opts: { provider?: MockProvider; token?: string } = {}): TestApp {
@@ -104,6 +107,18 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
   bus.on((e) => events.push(e));
   const token = opts.token ?? TOKEN;
   const ghConfigDir = mkdtempSync(join(tmpdir(), "narnia-gh-"));
+  // o mock do chat chama o /mcp desta mesma app (em memória), como o CLI chamaria o api pela rede
+  let appRef: App | null = null;
+  const sessions = new SessionManager({
+    repos,
+    provider,
+    bus,
+    token,
+    mcpUrl: "http://127.0.0.1:3100/mcp",
+    pluginDir: null,
+    mcpFetch: ((url: string | URL | Request, init?: RequestInit) =>
+      (appRef as App).request(url as string, init)) as typeof fetch,
+  });
   const app = createApp({
     version: "0.0.0-test",
     repos,
@@ -113,7 +128,9 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
     bus,
     token,
     ghConfigDir,
+    sessions,
   });
+  appRef = app;
   const api = async (path: string, init: RequestInit = {}) =>
     app.request(path, {
       ...init,
@@ -129,6 +146,7 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
     events,
     api,
     ghConfigDir,
+    sessions,
     cleanup: () => {
       rmSync(dataDir, { recursive: true, force: true });
       rmSync(ghConfigDir, { recursive: true, force: true });
