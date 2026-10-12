@@ -1,0 +1,198 @@
+import { act, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../src/lib/api";
+import { shellApi } from "../f03/shell-api";
+import { renderApp } from "../router-helpers";
+import { message, session } from "./fixtures";
+
+function chatApi(overrides: Record<string, unknown> = {}) {
+  return {
+    ...shellApi,
+    listNotifications: async () => ({ notifications: [], unresolved: 0 }),
+    listIngestions: async () => ({ runs: [] }),
+    listChatSessions: vi.fn(async () => ({ sessions: [session("s1", { title: "Carreira" })] })),
+    getChatSession: vi.fn(async (id: string) => ({ session: session(id, { title: "Carreira" }) })),
+    listChatMessages: vi.fn(async () => ({ messages: [] })),
+    sendChatMessage: vi.fn(async () => ({ turnIndex: 0 })),
+    interruptChat: vi.fn(async () => ({ ok: true })),
+    hibernateChat: vi.fn(async (id: string) => ({ session: session(id, { state: "hibernated" }) })),
+    createChatSession: vi.fn(async () => ({ session: session("s9", { title: "Nova conversa" }) })),
+    patchChatSession: vi.fn(async (id: string, p: Record<string, unknown>) => ({
+      session: session(id, p),
+    })),
+    listResearch: vi.fn(async () => ({ sources: [] })),
+    getActiveProfileCard: vi.fn(async () => ({
+      profileId: "p1",
+      cardHash: "h",
+      text: "Ana Maria Exemplo · Campinas",
+    })),
+    ...overrides,
+  };
+}
+
+describe("F04/M4 · chat com o recrutador", () => {
+  it("o menu tem Chat no grupo do perfil atual", async () => {
+    renderApp({ api: chatApi(), initialUrl: "/dashboard" });
+    const group = await screen.findByRole("group", { name: "Eng" });
+    expect(await within(group).findByRole("link", { name: "Chat" })).toHaveAttribute(
+      "href",
+      "/chat",
+    );
+  });
+
+  it("envia, mostra a resposta em stream, o chip da ferramenta, o uso do turno, e bloqueia o envio durante o turno", async () => {
+    const api = chatApi();
+    const { ws } = renderApp({ api, initialUrl: "/chat/s1" });
+    const box = await screen.findByRole("textbox", { name: "Mensagem para o recrutador" });
+    await userEvent.type(box, "o que está fraco?");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(api.sendChatMessage).toHaveBeenCalledWith("s1", "o que está fraco?");
+    expect(screen.getByRole("button", { name: "Enviar" })).toBeDisabled();
+    act(() => {
+      ws.emit({
+        type: "chat.tool",
+        sessionId: "s1",
+        name: "evidence_experience_list",
+        phase: "start",
+      });
+      ws.emit({
+        type: "chat.tool",
+        sessionId: "s1",
+        name: "evidence_experience_list",
+        phase: "end",
+        durationMs: 120,
+      });
+      ws.emit({ type: "chat.delta", sessionId: "s1", text: "Sua liderança " });
+      ws.emit({ type: "chat.delta", sessionId: "s1", text: "**não tem métrica**." });
+      ws.emit({ type: "chat.delta", sessionId: "other", text: "não é desta conversa" });
+    });
+    const list = screen.getByRole("list", { name: "Mensagens" });
+    expect(await within(list).findByText("evidence_experience_list")).toBeInTheDocument();
+    expect(screen.getByText("não tem métrica")).toBeInTheDocument();
+    expect(screen.queryByText("não é desta conversa")).toBeNull();
+    act(() =>
+      ws.emit({
+        type: "chat.turn_end",
+        sessionId: "s1",
+        turnIndex: 0,
+        usage: { inputTokens: 1290, outputTokens: 41 },
+      }),
+    );
+    await userEvent.type(box, "e agora?");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Enviar" })).not.toBeDisabled());
+    expect(screen.getByTestId("session-usage")).toHaveTextContent("1.3k");
+  });
+
+  it("parar durante o turno chama interrupt", async () => {
+    const api = chatApi();
+    renderApp({ api, initialUrl: "/chat/s1" });
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: "Mensagem para o recrutador" }),
+      "oi",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Parar" }));
+    expect(api.interruptChat).toHaveBeenCalledWith("s1");
+  });
+
+  it("histórico mostra mensagens, chips de ferramenta e a nota de cartão atualizado", async () => {
+    renderApp({
+      api: chatApi({
+        listChatMessages: async () => ({
+          messages: [
+            message("m1", { role: "user", contentMd: "oi" }),
+            message("m2", { role: "system_note", contentMd: "Cartão do perfil atualizado" }),
+            message("m3", {
+              contentMd: "Olá!",
+              toolCalls: [{ name: "profile_get_card", args: "{}", durationMs: 30, isError: false }],
+            }),
+          ],
+        }),
+      }),
+      initialUrl: "/chat/s1",
+    });
+    expect(await screen.findByText("Olá!")).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Mensagens" });
+    expect(within(list).getByText("Cartão do perfil atualizado")).toBeInTheDocument();
+    expect(within(list).getByText("profile_get_card")).toBeInTheDocument();
+  });
+
+  it("teto de 5 conversas: pergunta qual encerrar, hiberna a escolhida e cria a nova", async () => {
+    const live = [1, 2, 3, 4, 5].map((i) => session(`s${i}`, { title: `Conversa ${i}` }));
+    let first = true;
+    const api = chatApi({
+      listChatSessions: async () => ({ sessions: live }),
+      createChatSession: vi.fn(async () => {
+        if (first) {
+          first = false;
+          throw new ApiError(409, "session_limit", "Limite de conversas", { max: 5, live });
+        }
+        return { session: session("s6", { title: "Nova conversa" }) };
+      }),
+    });
+    renderApp({ api, initialUrl: "/chat/s1" });
+    await userEvent.click(await screen.findByRole("button", { name: "Nova conversa" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Você tem 5 conversas abertas. Qual encerrar?",
+    });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Encerrar Conversa 3" }));
+    await waitFor(() => expect(api.hibernateChat).toHaveBeenCalledWith("s3"));
+    await waitFor(() => expect(api.createChatSession).toHaveBeenCalledTimes(2));
+  });
+
+  it("sessão hibernada avisa que acorda na próxima mensagem", async () => {
+    renderApp({
+      api: chatApi({
+        getChatSession: async (id: string) => ({ session: session(id, { state: "hibernated" }) }),
+      }),
+      initialUrl: "/chat/s1",
+    });
+    expect(await screen.findByText(/hibernada/i)).toBeInTheDocument();
+  });
+
+  it("erro do provider aparece com mensagem amigável e detalhes técnicos recolhidos", async () => {
+    const { ws } = renderApp({ api: chatApi(), initialUrl: "/chat/s1" });
+    await screen.findByRole("textbox", { name: "Mensagem para o recrutador" });
+    act(() =>
+      ws.emit({
+        type: "chat.error",
+        sessionId: "s1",
+        error: "Reached maximum number of turns (8)",
+        errorKey: "error.model_format",
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/modelo/i);
+    expect(screen.getByText("Detalhes técnicos")).toBeInTheDocument();
+  });
+
+  it("provider deslogado: mostra como entrar e não cria conversa", async () => {
+    const api = chatApi({
+      listChatSessions: async () => ({ sessions: [] }),
+      getProviderStatus: async () => ({
+        installed: true,
+        loggedIn: false,
+        authMethod: null,
+        version: "1",
+        loginHint: "rode ./start.sh login",
+      }),
+    });
+    renderApp({ api, initialUrl: "/chat" });
+    expect(await screen.findByText(/start\.sh login/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nova conversa" })).toBeDisabled();
+  });
+
+  it("execução criada pela conversa aparece como link para a revisão", async () => {
+    const { ws } = renderApp({ api: chatApi(), initialUrl: "/chat/s1" });
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: "Mensagem para o recrutador" }),
+      "segue meu texto",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    act(() => ws.emit({ type: "ingestion.updated", runId: "r1", status: "review" }));
+    expect(await screen.findByRole("link", { name: "Abrir a ingestão criada" })).toHaveAttribute(
+      "href",
+      "/ingestao/r1",
+    );
+  });
+});

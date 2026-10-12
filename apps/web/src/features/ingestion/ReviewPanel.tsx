@@ -1,5 +1,6 @@
 import type { CheckStatus, Conflict, Resolution, ReviewRequest } from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useApi } from "../../app/context";
 import { describeError } from "../../components/ErrorState";
@@ -7,7 +8,6 @@ import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Tooltip } from "../../components/ui/tooltip";
 import { ingestionKey } from "../../hooks/useIngestion";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
@@ -122,12 +122,18 @@ function ConflictResolver({
 /**
  * Revisão estendida (F03 §4): filtros novo/existente/conflito/pendente/sem suporte, selo da revisão anti-alucinação
  * com o trecho de evidência, resolução de conflito campo a campo (salvar fica bloqueado até resolver os aceitos) e
- * tags por perfil por linha e em lote. "Clarificar com o recrutador" fica desabilitado até o chat (F04).
+ * tags por perfil por linha e em lote. "Clarificar com o recrutador" abre uma conversa de clarificação (F04).
  */
 export function ReviewPanel({ run }: { run: IngestionDetail }) {
   const api = useApi();
   const qc = useQueryClient();
   const { profiles } = useProfiles();
+  const navigate = useNavigate();
+  // F04: a clarificação abre uma conversa ligada a esta execução; as propostas novas voltam para esta revisão
+  const clarify = useMutation({
+    mutationFn: () => api.clarifyIngestion(run.id),
+    onSuccess: (r) => void navigate({ to: `/chat/${r.session.id}` as string }),
+  });
   const proposals = run.proposals;
   const [filter, setFilter] = useState<Filter>("all");
   const [local, setLocal] = useState<Record<string, LocalDecision>>({});
@@ -366,13 +372,9 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
         >
           {t("review3.save")}
         </Button>
-        <Tooltip content={t("review.clarifySoon")}>
-          <span className="inline-block">
-            <Button variant="outline" disabled>
-              {t("review.clarify")}
-            </Button>
-          </span>
-        </Tooltip>
+        <Button variant="outline" disabled={clarify.isPending} onClick={() => clarify.mutate()}>
+          {t("review.clarify")}
+        </Button>
       </div>
     </section>
   );

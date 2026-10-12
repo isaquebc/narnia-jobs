@@ -205,6 +205,23 @@ const notificationsRoute = createRoute({
   path: "/pendencias",
   component: NotificationsPage,
 });
+// F04 · chat com o recrutador (sob demanda, fora do bundle inicial)
+const ChatPage = lazyRouteComponent(() => import("../features/chat/ChatPage"), "ChatPage");
+const chatRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/chat",
+  component: function ChatIndexRoute() {
+    return <ChatPage />;
+  },
+});
+const chatSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/chat/$sessionId",
+  component: function ChatSessionRoute() {
+    const { sessionId } = chatSessionRoute.useParams();
+    return <ChatPage sessionId={sessionId} />;
+  },
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/configuracoes",
@@ -229,6 +246,8 @@ const routeTree = rootRoute.addChildren([
   repoDetailRoute,
   notificationsRoute,
   settingsRoute,
+  chatRoute,
+  chatSessionRoute,
 ]);
 
 export function createAppRouter(opts: {

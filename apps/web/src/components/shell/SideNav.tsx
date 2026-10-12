@@ -1,4 +1,13 @@
-import { Bell, Download, FolderGit2, LayoutDashboard, Rocket, Settings, Users } from "lucide-react";
+import {
+  Bell,
+  Download,
+  FolderGit2,
+  LayoutDashboard,
+  MessageSquare,
+  Rocket,
+  Settings,
+  Users,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useOnboardingState } from "../../hooks/useOnboarding";
 import { useProfiles } from "../../hooks/useProfiles";
@@ -53,6 +62,11 @@ export function SideNav({ className }: { className?: string }) {
             <li>
               <NavLink to="/dashboard" className={item}>
                 <LayoutDashboard size={16} /> {t("nav.dashboard")}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/chat" className={item}>
+                <MessageSquare size={16} /> {t("nav.chat")}
               </NavLink>
             </li>
           </Group>

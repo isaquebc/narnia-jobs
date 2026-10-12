@@ -25,5 +25,6 @@ test("F03/E2E-07 revisão anti-alucinação: trecho inexistente vira 'Sem suport
   await row.getByText("Ver trecho").click();
   await row.getByRole("button", { name: "Aceitar" }).click();
   await expect(row.getByRole("button", { name: "Desfazer" })).toBeVisible();
-  await expect(review.getByRole("button", { name: "Clarificar com o recrutador" })).toBeDisabled();
+  // F04: a clarificação funciona; o cenário próprio está nos e2e da F04
+  await expect(review.getByRole("button", { name: "Clarificar com o recrutador" })).toBeEnabled();
 });

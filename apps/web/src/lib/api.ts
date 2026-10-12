@@ -3,6 +3,10 @@ import type {
   AnalyzeRequest,
   BackupSettingsResponse,
   Budget,
+  ChatCategory,
+  ChatMessage,
+  ChatSession,
+  ChatSettingsDto,
   DashboardResponseSchema,
   EmphasisListResponse,
   EmphasisPutRequest,
@@ -37,12 +41,15 @@ import type {
   Repo,
   RepoAnalysis,
   RepoDigest,
+  ResearchSource,
   ReviewRequest,
   RunReport,
   RunStatus,
   SalaryReference,
   SnapshotsListResponseSchema,
   SuggestionsListResponse,
+  TrustedDomain,
+  TrustTag,
   User,
   UserUpsertRequest,
 } from "@narnia-jobs/shared";
@@ -159,6 +166,91 @@ export function createApiClient(opts: ApiClientOptions = {}) {
   const json = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
 
   return {
+    // F04 · chat com o recrutador
+    listChatSessions: (profileId?: string | null, archived = false) =>
+      request<{ sessions: ChatSession[] }>(
+        `/api/sessions?${new URLSearchParams({
+          ...(profileId ? { profile: profileId } : {}),
+          ...(archived ? { archived: "1" } : {}),
+        }).toString()}`,
+      ),
+    getChatSession: (id: string) =>
+      request<{ session: ChatSession }>(`/api/sessions/${encodeURIComponent(id)}`),
+    createChatSession: (req: {
+      profileId?: string;
+      category?: ChatCategory;
+      model?: string;
+      title?: string;
+    }) => request<{ session: ChatSession }>("/api/sessions", json(req)),
+    patchChatSession: (
+      id: string,
+      patch: { title?: string; category?: ChatCategory; model?: string; archived?: boolean },
+    ) =>
+      request<{ session: ChatSession }>(`/api/sessions/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+    deleteChatSession: (id: string) =>
+      request<void>(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    listChatMessages: (id: string, opts: { before?: string; limit?: number } = {}) =>
+      request<{ messages: ChatMessage[] }>(
+        `/api/sessions/${encodeURIComponent(id)}/messages?${new URLSearchParams(
+          Object.entries(opts)
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()}`,
+      ),
+    sendChatMessage: (id: string, text: string) =>
+      request<{ turnIndex: number }>(
+        `/api/sessions/${encodeURIComponent(id)}/messages`,
+        json({ text }),
+      ),
+    interruptChat: (id: string) =>
+      request<unknown>(`/api/sessions/${encodeURIComponent(id)}/interrupt`, json({})),
+    hibernateChat: (id: string) =>
+      request<{ session: ChatSession }>(
+        `/api/sessions/${encodeURIComponent(id)}/hibernate`,
+        json({}),
+      ),
+    wakeChat: (id: string) =>
+      request<{ session: ChatSession }>(`/api/sessions/${encodeURIComponent(id)}/wake`, json({})),
+    clarifyIngestion: (runId: string) =>
+      request<{ session: ChatSession }>(
+        `/api/ingestions/${encodeURIComponent(runId)}/clarify`,
+        json({}),
+      ),
+    listResearch: (profileId?: string | null) =>
+      request<{ sources: ResearchSource[] }>(
+        `/api/research${profileId ? `?profile=${encodeURIComponent(profileId)}` : ""}`,
+      ),
+    getActiveProfileCard: () =>
+      request<{ profileId: string; cardHash: string; text: string }>(
+        "/api/profiles/active/persona-card",
+      ),
+    getChatSettings: () => request<{ settings: ChatSettingsDto }>("/api/settings/chat"),
+    putChatSettings: (patch: Partial<ChatSettingsDto>) =>
+      request<{ settings: ChatSettingsDto }>("/api/settings/chat", {
+        method: "PUT",
+        body: JSON.stringify(patch),
+      }),
+    listTrustedDomains: () =>
+      request<{ domains: TrustedDomain[] }>("/api/settings/trusted-domains"),
+    addTrustedDomain: (d: { pattern: string; trustTag: TrustTag }) =>
+      request<{ domain: TrustedDomain }>("/api/settings/trusted-domains", json(d)),
+    patchTrustedDomain: (id: string, enabled: boolean) =>
+      request<{ domains: TrustedDomain[] }>(
+        `/api/settings/trusted-domains/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ enabled }),
+        },
+      ),
+    deleteTrustedDomain: (id: string) =>
+      request<void>(`/api/settings/trusted-domains/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }),
+    restoreTrustedDomains: () =>
+      request<{ domains: TrustedDomain[] }>("/api/settings/trusted-domains/restore", json({})),
     getHealth: () => request<{ ok: true; version: string }>("/api/health"),
     getProviderStatus: () => request<ProviderStatusResponse>("/api/provider/status"),
     setMockMode: (mode: Record<string, unknown>) =>

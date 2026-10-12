@@ -198,8 +198,8 @@ describe("F03/M4 · execução › revisão estendida", () => {
       }),
     );
     expect(screen.getByRole("button", { name: "Salvar revisão" })).toBeEnabled();
-    const clarify = screen.getByRole("button", { name: "Clarificar com o recrutador" });
-    expect(clarify).toBeDisabled();
+    // F04: a clarificação passou a funcionar (era desabilitada até o chat existir)
+    expect(screen.getByRole("button", { name: "Clarificar com o recrutador" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Salvar revisão" }));
     expect(reviewIngestion).toHaveBeenCalledWith("r1", {
       decisions: [
