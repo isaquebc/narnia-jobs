@@ -422,14 +422,30 @@ export class MockProvider implements Provider {
         isError: !res.ok || result?.isError === true || body?.error !== undefined,
       };
     };
+    // "Parar" (auditoria B): como o CLI, o turno cortado termina com um result de interrupção, nunca com erro
+    let running = false;
+    let aborted = false;
+    const interrupted = (text: string) =>
+      out.push({
+        type: "turn_end",
+        text,
+        providerSessionId,
+        costUsd: 0,
+        usage: emptyUsage(opts.model),
+        interrupted: true,
+      });
     const turn = async (text: string) => {
+      running = true;
+      aborted = false;
       try {
         await this.gate("openChat");
+        if (aborted) return interrupted("");
         const [tool, args] = mockChatScript(text, opts);
         const id = `mock-tool-${++rpcId}`;
         out.push({ type: "tool_start", id, name: tool, args: JSON.stringify(args).slice(0, 500) });
         const r = await callTool(tool, args);
         out.push({ type: "tool_end", id, isError: r.isError });
+        if (aborted) return interrupted("");
         const reply = mockChatReply(tool, r.isError);
         for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
           out.push({ type: "delta", text: piece });
@@ -449,6 +465,8 @@ export class MockProvider implements Provider {
         });
       } catch (e) {
         out.push({ type: "error", message: (e as Error).message });
+      } finally {
+        running = false;
       }
     };
     return {
@@ -456,7 +474,9 @@ export class MockProvider implements Provider {
         chain = chain.then(() => turn(text));
       },
       events: out.iterable,
-      async interrupt() {},
+      async interrupt() {
+        if (running) aborted = true;
+      },
       async setModel() {},
       close() {
         out.end();
@@ -540,6 +560,10 @@ export function mockChatScript(
   if (/^texto:|minha hist[oó]ria|ingira|ingest/i.test(text))
     return ["ingest_text", { text: text.replace(/^texto:\s*/i, "") }];
   return ["evidence_experience_list", {}];
+}
+
+function emptyUsage(model: string) {
+  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, model };
 }
 
 function mockChatReply(tool: string, isError: boolean): string {

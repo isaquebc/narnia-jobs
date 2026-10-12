@@ -95,7 +95,9 @@ export interface TestApp {
   sessions: SessionManager;
 }
 
-export function makeTestApp(opts: { provider?: MockProvider; token?: string } = {}): TestApp {
+export function makeTestApp(
+  opts: { provider?: MockProvider; token?: string; interruptTimeoutMs?: number } = {},
+): TestApp {
   const db = openDatabase(":memory:");
   migrate(db);
   const repos = createRepos(db);
@@ -116,6 +118,9 @@ export function makeTestApp(opts: { provider?: MockProvider; token?: string } = 
     token,
     mcpUrl: "http://127.0.0.1:3100/mcp",
     pluginDir: null,
+    ...(opts.interruptTimeoutMs !== undefined
+      ? { interruptTimeoutMs: opts.interruptTimeoutMs }
+      : {}),
     mcpFetch: ((url: string | URL | Request, init?: RequestInit) =>
       (appRef as App).request(url as string, init)) as typeof fetch,
   });

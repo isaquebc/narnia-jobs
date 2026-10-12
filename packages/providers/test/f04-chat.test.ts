@@ -116,7 +116,7 @@ describe("normalizeSdkChatMessage", () => {
         { type: "result", subtype: "error_during_execution", usage, errors: ["processo caiu"] },
         "s",
       )[0],
-    ).toEqual({ type: "error", message: "processo caiu" });
+    ).toMatchObject({ type: "error", message: "processo caiu" });
   });
 
   it("argumentos longos da tool são resumidos em até 500 caracteres", () => {
@@ -175,7 +175,7 @@ describe("ClaudeCodeProvider.openChat", () => {
     expect(captured.inputs).toEqual(["o que está fraco?"]);
     expect(captured.options).toMatchObject({
       model: "sonnet",
-      systemPrompt: "persona + cartão",
+      systemPrompt: { type: "custom", prompt: "persona + cartão", snapshot: false },
       resume: "sdk-old",
       maxTurns: 8,
       includePartialMessages: true,
@@ -185,8 +185,15 @@ describe("ClaudeCodeProvider.openChat", () => {
       allowedTools: ["mcp__narnia-jobs", "WebSearch"],
       // texto do usuário literal: sem slash commands nem expansão de @arquivo (auditoria A)
       verbatimPrompts: true,
-      plugins: [{ type: "local", path: "/app/plugin" }],
-      mcpServers: { "narnia-jobs": { type: "http", url: BASE.mcp.url, headers: BASE.mcp.headers } },
+      plugins: [{ type: "local", path: "/app/plugin", skipMcpDiscovery: true }],
+      mcpServers: {
+        "narnia-jobs": {
+          type: "http",
+          url: BASE.mcp.url,
+          headers: BASE.mcp.headers,
+          alwaysLoad: true,
+        },
+      },
       settingSources: [],
       pathToClaudeCodeExecutable: "/bin/claude",
     });

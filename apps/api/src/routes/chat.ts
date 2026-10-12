@@ -15,6 +15,7 @@ const STATUS: Record<SessionStateError["code"], 404 | 409> = {
   turn_in_progress: 409,
   session_archived: 409,
   no_profile: 409,
+  budget_exhausted: 409,
 };
 
 function sessionError(c: Context, e: unknown) {
@@ -52,7 +53,9 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
     const profileId = c.req.query("profile");
     const includeArchived = c.req.query("archived") === "1";
     return c.json({
-      sessions: repos.chatSessions.list({ ...(profileId ? { profileId } : {}), includeArchived }),
+      sessions: repos.chatSessions
+        .list({ ...(profileId ? { profileId } : {}), includeArchived })
+        .map((s) => sessions.withBusy(s)),
     });
   });
 

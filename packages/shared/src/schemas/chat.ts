@@ -24,6 +24,11 @@ export const ChatSessionSchema = z.object({
   costUsdEst: z.number().min(0),
   createdAt: IsoDateTimeSchema,
   lastActivityAt: IsoDateTimeSchema,
+  /**
+   * Turno em andamento no processo do api (auditoria B): a web deriva o "pensando" daqui depois de recarregar ou
+   * reconectar. Só nas respostas da api; ausente no banco.
+   */
+  busy: z.boolean().optional(),
 });
 export type ChatSession = z.infer<typeof ChatSessionSchema>;
 

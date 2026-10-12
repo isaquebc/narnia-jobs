@@ -173,6 +173,16 @@ interface SessionInfo {
  */
 export function mcpRoutes(deps: IngestionStartDeps & { version: string }) {
   const app = new Hono();
+  // sem estado não há stream de notificações (GET) nem sessão a encerrar (DELETE): 405 em vez de um SSE que nunca fecha
+  app.on(["GET", "DELETE"], "/mcp", (c) => {
+    c.header("Allow", "POST");
+    return apiError(
+      c,
+      405,
+      "method_not_allowed",
+      "O /mcp deste app só aceita POST (modo sem estado).",
+    );
+  });
   app.all("/mcp", async (c) => {
     const sid = c.req.header("x-narnia-session") ?? null;
     let session: SessionInfo = { id: null, category: null, runId: null, profileId: null };

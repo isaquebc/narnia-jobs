@@ -256,6 +256,9 @@ function toUsage(result: SdkMessageLike, model: string): Usage {
  */
 export const STRUCTURED_MAX_TURNS = 3;
 
+/** Turnos da leitura de documento (leitura 3): até ~5 chamadas ao Read (100 páginas) + a saída estruturada. */
+const READ_DOCUMENT_MAX_TURNS = 6;
+
 /** Nome do servidor MCP no chat (mesmo do plugin: as tools viram `mcp__narnia-jobs__<nome>`). */
 const CHAT_MCP_SERVER = "narnia-jobs";
 
@@ -291,7 +294,7 @@ export class ClaudeCodeProvider implements Provider {
     let providerSessionId = opts.resume ?? null;
     const options: ChatSdkOptions = {
       model,
-      systemPrompt: opts.systemPrompt,
+      systemPrompt: { type: "custom", prompt: opts.systemPrompt, snapshot: false },
       maxTurns: opts.maxTurns,
       includePartialMessages: true,
       tools: opts.tools,
@@ -300,9 +303,16 @@ export class ClaudeCodeProvider implements Provider {
       allowedTools: [`mcp__${CHAT_MCP_SERVER}`, ...opts.tools.filter((t) => t !== "WebFetch")],
       canUseTool: chatCanUseTool(opts.canFetch),
       verbatimPrompts: true,
-      plugins: opts.pluginDir ? [{ type: "local", path: opts.pluginDir }] : [],
+      plugins: opts.pluginDir
+        ? [{ type: "local", path: opts.pluginDir, skipMcpDiscovery: true }]
+        : [],
       mcpServers: {
-        [CHAT_MCP_SERVER]: { type: "http", url: opts.mcp.url, headers: opts.mcp.headers },
+        [CHAT_MCP_SERVER]: {
+          type: "http",
+          url: opts.mcp.url,
+          headers: opts.mcp.headers,
+          alwaysLoad: true,
+        },
       },
       // o env do SDK substitui o do processo: herda tudo (PATH, HOME, token) e acrescenta o da sessão
       env: { ...process.env, ...(opts.env ?? {}) },
@@ -528,7 +538,8 @@ export class ClaudeCodeProvider implements Provider {
         model: input.model,
         tools: ["Read"],
         allowedTools: ["Read"],
-        maxTurns: 3,
+        // o Read lê no máximo 20 páginas por chamada: PDF longo pede várias leituras + a saída estruturada
+        maxTurns: READ_DOCUMENT_MAX_TURNS,
         cwd: dir,
         systemPrompt: PROMPTS.readDocument(),
         outputFormat: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMAS.readDocument },

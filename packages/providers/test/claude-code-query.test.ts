@@ -106,7 +106,7 @@ describe("M4/providers ClaudeCodeProvider via Agent SDK (query injetado)", () =>
     expect(r.output.keyPoints.length).toBeGreaterThan(0);
   });
 
-  it("readDocument: tools [Read], allowedTools [Read], cwd restrito à pasta do arquivo, maxTurns 3, schema de leitura", async () => {
+  it("readDocument: tools [Read], allowedTools [Read], cwd restrito à pasta do arquivo, maxTurns 6 (PDF > 20 páginas lê em partes), schema de leitura", async () => {
     const q = fakeQuery(success(MOCK_READ_DOCUMENT));
     const p = new ClaudeCodeProvider({ exec, query: q, binaryPath: "/bin/claude" });
     const r = await p.readDocument({
@@ -119,7 +119,7 @@ describe("M4/providers ClaudeCodeProvider via Agent SDK (query injetado)", () =>
     expect(o.allowedTools).toEqual(["Read"]);
     expect(o.cwd).toBe("/data/uploads");
     expect(o.additionalDirectories).toBeUndefined();
-    expect(o.maxTurns).toBe(3);
+    expect(o.maxTurns).toBe(6);
     expect(o.outputFormat).toEqual({
       type: "json_schema",
       schema: EXTRACTION_JSON_SCHEMAS.readDocument,

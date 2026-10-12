@@ -58,7 +58,8 @@ export interface ChatSessionsRepo {
   setCategory(id: string, category: ChatCategory): void;
   setModel(id: string, model: string): void;
   setTitle(id: string, title: string): void;
-  setProviderSessionId(id: string, providerSessionId: string): void;
+  /** null = o transcript do provider se perdeu; a próxima abertura começa sem `resume` (auditoria B). */
+  setProviderSessionId(id: string, providerSessionId: string | null): void;
   setCardHash(id: string, hash: string | null): void;
   /** Soma uso do turno e marca atividade agora. */
   addUsage(

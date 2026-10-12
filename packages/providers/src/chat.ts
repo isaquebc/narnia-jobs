@@ -8,17 +8,28 @@ import type { Usage } from "./provider";
 export type ChatEvent =
   | { type: "init"; providerSessionId: string }
   | { type: "delta"; text: string }
+  /** Começo de um bloco de texto novo no turno (narração antes da tool, resposta final): a api separa com "\n\n". */
+  | { type: "text_break" }
   | { type: "tool_start"; id: string; name: string; args: string }
   | { type: "tool_end"; id: string; isError: boolean }
   | {
       type: "turn_end";
       text: string;
       providerSessionId: string | null;
+      /** Total ACUMULADO da query() até este turno (o SDK não manda o custo do turno; a api calcula o delta). */
       costUsd: number;
       usage: Usage;
+      /** Turno cortado pelo "Parar" (`terminal_reason` aborted_*). */
+      interrupted?: boolean;
     }
   | { type: "limit"; reason: "max_turns" | "max_budget"; usage: Usage; costUsd: number }
-  | { type: "error"; message: string };
+  | {
+      type: "error";
+      message: string;
+      /** Erro de API que fechou um turno (`success` com `is_error`): uso e total acumulado, quando vierem. */
+      usage?: Usage;
+      costUsd?: number;
+    };
 
 export interface ChatOpenOptions {
   systemPrompt: string;
@@ -63,7 +74,11 @@ export interface SdkChatMessageLike {
   type: string;
   subtype?: string;
   session_id?: string;
-  event?: { type?: string; delta?: { type?: string; text?: string } };
+  event?: {
+    type?: string;
+    delta?: { type?: string; text?: string };
+    content_block?: { type?: string };
+  };
   message?: {
     content?:
       | string
@@ -86,6 +101,10 @@ export interface SdkChatMessageLike {
   };
   total_cost_usd?: number;
   errors?: string[];
+  /** `success` com `is_error: true` = turno que terminou num erro de API (texto do erro em `result`). */
+  is_error?: boolean;
+  /** Por que o turno terminou (`aborted_streaming`/`aborted_tools` = interrompido). */
+  terminal_reason?: string;
 }
 
 /** Mensagem de usuário da entrada em streaming (`SDKUserMessage`). */
@@ -98,7 +117,11 @@ export interface SdkUserMessageLike {
 
 export interface ChatSdkOptions {
   model: string;
-  systemPrompt: string;
+  /**
+   * Sem snapshot: o CLI renderiza o prompt a cada requisição em vez de gravá-lo no transcript e reusá-lo no `resume`
+   * (auditoria B). Assim persona, domínios e cartão atuais valem a cada reabertura da conversa.
+   */
+  systemPrompt: { type: "custom"; prompt: string; snapshot: false };
   resume?: string;
   maxTurns: number;
   maxBudgetUsd?: number;
@@ -108,8 +131,13 @@ export interface ChatSdkOptions {
   /** Texto do usuário literal: sem slash commands nem `@arquivo` (auditoria A). */
   verbatimPrompts: true;
   canUseTool: ChatCanUseTool;
-  plugins: Array<{ type: "local"; path: string }>;
-  mcpServers: Record<string, { type: "http"; url: string; headers: Record<string, string> }>;
+  /** `skipMcpDiscovery`: o api é dono da conexão MCP; o `.mcp.json` do plugin (modo B) não sobe um 2º servidor. */
+  plugins: Array<{ type: "local"; path: string; skipMcpDiscovery: true }>;
+  /** `alwaysLoad`: tools sempre no prompt e o CLI espera o `/mcp` conectar antes do turno 1. */
+  mcpServers: Record<
+    string,
+    { type: "http"; url: string; headers: Record<string, string>; alwaysLoad: true }
+  >;
   env: Record<string, string | undefined>;
   settingSources: [];
   pathToClaudeCodeExecutable?: string;
@@ -187,6 +215,8 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
   if (m.type === "system" && m.subtype === "init" && m.session_id)
     return [{ type: "init", providerSessionId: m.session_id }];
   if (m.type === "stream_event") {
+    if (m.event?.type === "content_block_start" && m.event.content_block?.type === "text")
+      return [{ type: "text_break" }];
     const d = m.event?.delta;
     if (m.event?.type === "content_block_delta" && d?.type === "text_delta" && d.text)
       return [{ type: "delta", text: d.text }];
@@ -213,6 +243,19 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
   if (m.type === "result") {
     const usage = usageOf(m, model);
     const costUsd = m.total_cost_usd ?? 0;
+    if (m.terminal_reason?.startsWith("aborted"))
+      return [
+        {
+          type: "turn_end",
+          text: m.result ?? "",
+          providerSessionId: m.session_id ?? null,
+          costUsd,
+          usage,
+          interrupted: true,
+        },
+      ];
+    if (m.subtype === "success" && m.is_error)
+      return [{ type: "error", message: m.result || "Erro da API do Claude", usage, costUsd }];
     if (m.subtype === "success")
       return [
         {
@@ -231,6 +274,8 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
       {
         type: "error",
         message: m.errors?.join("; ") || m.result || `Falha no chat (${m.subtype})`,
+        usage,
+        costUsd,
       },
     ];
   }

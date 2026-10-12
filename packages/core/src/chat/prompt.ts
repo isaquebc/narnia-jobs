@@ -50,6 +50,20 @@ export function cardUpdatedNote(cardText: string): string {
 }
 
 /**
+ * Retomada perdida (auditoria B): o transcript do provider não existe mais (volume recriado, outra pasta de config),
+ * então a conversa reabre do zero; as mensagens recentes do banco vão antepostas para o recrutador não recomeçar cego.
+ */
+export function resumeLostNote(
+  history: Array<{ role: "user" | "assistant"; text: string }>,
+): string {
+  const lines = history.map(
+    (m) =>
+      `[${m.role === "user" ? "usuário" : "recrutador"}] ${m.text.length > 600 ? `${m.text.slice(0, 599)}…` : m.text}`,
+  );
+  return `(nota do sistema: o histórico desta conversa não pôde ser retomado; mensagens recentes abaixo, da mais antiga para a mais nova)\n${lines.join("\n")}\n(fim da nota)`;
+}
+
+/**
  * Contexto da sessão de clarificação (F04 §2.8): anteposto à primeira mensagem para o recrutador saber qual execução
  * está clarificando e que correções vão como propostas pela `ingest_propose` (nada é gravado direto).
  */

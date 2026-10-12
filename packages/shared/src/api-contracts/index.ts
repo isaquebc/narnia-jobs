@@ -605,6 +605,8 @@ export const ChatTurnEndEventSchema = z.object({
   sessionId: IdSchema,
   turnIndex: z.number().int().min(0),
   usage: ChatUsageSchema,
+  /** Turno cortado ("Parar", hibernação ou arquivamento no meio): a web encerra o "pensando" (auditoria B). */
+  interrupted: z.boolean().optional(),
 });
 export const ChatErrorEventSchema = z.object({
   type: z.literal("chat.error"),
@@ -622,6 +624,8 @@ export const ChatSessionUpdatedEventSchema = z.object({
   type: z.literal("chat.session_updated"),
   sessionId: IdSchema,
   state: ChatSessionStateSchema,
+  /** Categoria nova, quando mudou (PATCH ou `session_set_category`). */
+  category: ChatCategorySchema.optional(),
 });
 
 // Rotas do chat (F04 §2.5, M3)
