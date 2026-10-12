@@ -148,6 +148,16 @@ fato
 ## D2. Tempo
 Todo timestamp é gravado em **UTC** (ISO 8601 ou epoch). A UI converte para o fuso do usuário (`user.timezone`, IANA) com `moment-timezone`; datas sem hora (início/fim de experiência) são gravadas como `YYYY-MM` ou `YYYY-MM-DD` sem fuso.
 
+## D3. Chat e pesquisa (F04, migration 0004)
+| Tabela | Conteúdo |
+|--------|----------|
+| `chat_session` | conversa por perfil: categoria (carreira, clarificação, ingestão, entrevista), título, modelo, estado (ativa, hibernada, arquivada, erro), `provider_session_id` para retomar, execução de ingestão ligada (clarificação), hash do cartão visto, uso acumulado, última atividade (UTC) |
+| `chat_message` | mensagens em Markdown (usuário, recrutador, nota de sistema), chamadas de ferramenta resumidas (nome, argumentos resumidos, duração, erro), uso por turno |
+| `research_source` | fontes pesquisadas: URL, domínio, título, trecho, para que foi usada, `trust_tag`, data; o valor só vira dado do usuário após confirmação |
+| `trusted_domain` | lista de domínios confiáveis com máscara (`*.gov.br`, `glassdoor.*`), `trust_tag`, ativo, padrão de fábrica |
+| `fact_fts` | índice FTS5 (sem acentos) sobre experiências, conquistas, projetos, skills, formação e digests de arquivo e repositório, mantido por gatilhos |
+| `usage_event` (completada) | `session_id`, `provider_session_id`, `turn_index` |
+
 ## E. Dados explicitamente fora do escopo
 CPF/RG/passaporte, endereço completo, dados bancários, dados de saúde, histórico salarial detalhado por empresa (apenas a faixa pretendida, se o usuário quiser), credenciais de sites de emprego, gravações de áudio das entrevistas.
 

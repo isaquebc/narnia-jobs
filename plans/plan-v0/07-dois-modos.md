@@ -85,6 +85,8 @@ Regras:
 
 O modo B fica pronto na fase 1 sem nenhuma UI, o que permite validar persona, tools e economia de tokens cedo e barato. O modo A entra na fase 3 reaproveitando tudo.
 
+**Como ficou (F04, 2026-10-11):** os dois modos foram entregues juntos sobre o mesmo núcleo. **Modo A** (web): o api abre a sessão pelo Agent SDK com o system prompt montado do template do plugin, o servidor MCP do próprio api e o plugin local; o hook não reinjeta o cartão. **Modo B** (terminal): `./start.sh install-plugin` registra `claude mcp add --transport http -s user` e instala o plugin pelo marketplace local (`claude plugin marketplace add` + `claude plugin install`), com nome por instância; o hook `SessionStart` entrega persona + cartão e avisa quando a API está fora; `./start.sh doctor` confere MCP, plugin e porta. O smoke real do modo B (`scripts/smoke-plugin.sh --yes`, E2E-09) roda só sob demanda porque usa a assinatura. Única fonte de prompt: `plugin/` e `packages/{shared,core}` (teste de varredura).
+
 ## 6 · Veredito
 
 | Critério | Avaliação |

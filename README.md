@@ -2,7 +2,7 @@
 
 Projeto **open source**: clone, rode localmente e use a assinatura da IA que preferir (Claude Code primeiro; Codex planejado). Coleção de ferramentas locais para apoiar a busca de emprego: um recrutador(a) sênior como agente, perfis múltiplos (um por cargo-alvo), ingestão de dados (CV, GitHub, LinkedIn) e features isoladas (gerar CV, analisar vaga, candidaturas, simular entrevista). Roda na máquina do usuário via Docker (Linux, Windows e Mac), com dados persistidos em pasta do host fora do versionamento.
 
-**Estado:** F01 (primeiro uso), F02 (perfis) e F03 (ingestão e GitHub) implementados: instalação por Docker, extração do currículo e de texto livre com revisão, perfis múltiplos com ênfases, cartão e persona do recrutador, ingestão do GitHub com orçamento e notificações, e backups automáticos. O plano está em `plans/plan-v0/`; a próxima entrega é o chat com o recrutador (F04), na ordem de `plans/plan-v0/tasks/README.md`.
+**Estado:** F01 (primeiro uso), F02 (perfis), F03 (ingestão de CV, texto e GitHub, com notificações) e F04 (chat com o recrutador na web e no terminal, com rastros locais no Phoenix) implementados. O plano está em `plans/plan-v0/`; as próximas entregas (gerar CV, analisar vaga, candidaturas) seguem a ordem de `plans/plan-v0/tasks/README.md`.
 
 | Documento | Conteúdo |
 |-----------|----------|
@@ -59,6 +59,12 @@ Em **Ingestão** você adiciona dados depois do primeiro uso: **GitHub**, **Curr
 - **Freio.** Se o orçamento acabar, a execução para e pergunta: continuar com mais orçamento, encerrar com o que foi feito, ou deixar para depois.
 - **Pendências.** O sino no topo e a página **Pendências** reúnem revisões, conflitos, execuções esperando decisão, sugestões de perfil e análises concluídas; cada item some sozinho quando você resolve.
 - **Evidências.** Repositórios analisados com relatório, métricas, resumo editável e **Reanalisar** (atualizar com commits novos, aprofundar ou cobrir o que ficou de fora).
+
+### Chat com o recrutador
+
+Menu › grupo do perfil atual › **Chat**. Cada conversa pertence ao perfil ativo; até 5 ficam abertas ao mesmo tempo (a sexta pergunta qual encerrar) e conversas paradas por 1 hora hibernam e retomam do ponto na próxima mensagem (Configurações › Chat ajusta os limites e o modelo padrão, Sonnet). O recrutador já começa conhecendo a persona e o cartão do seu perfil, busca detalhes nos seus dados pelas ferramentas (os chips mostram quais usou) e cita a fonte do que afirma. Você pode colar um texto da sua história, mandar um arquivo ou um link do GitHub: ele cria a ingestão e as propostas vão para a revisão (nada é gravado sem você aprovar; o GitHub sempre pede confirmação do orçamento). Pesquisas na internet usam só domínios confiáveis (lista editável em Configurações › Chat). Na revisão de uma ingestão, **Clarificar com o recrutador** abre uma conversa cujas respostas viram propostas da mesma execução.
+
+**Custo:** cada mensagem usa a sua assinatura do Claude (o uso do turno e da conversa aparece no rodapé do chat e no painel Contexto).
 
 ### Recrutador no terminal (Claude Code, modo B)
 

@@ -99,6 +99,8 @@ Nada disso vive no repositório. `.gitignore` inclui `*.sqlite*`, `uploads/`, `e
 
 Desenho de persona: a especialidade do recrutador deriva do perfil (`cargo-alvo`, `área`, `senioridade`, `mercado`), montada pelo hook a partir do banco. Trocar perfil = trocar recrutador.
 
+**Como ficou (F04, 2026-10-11):** `plugin/` na raiz com `.claude-plugin/plugin.json`, `agents/recrutador.md` (template da persona com placeholders preenchidos por `renderRecruiterPrompt`: persona da F02, cartão, domínios confiáveis), `skills/{recrutador,perfil,clarificar}` e `hooks/hooks.json` (`SessionStart`: busca persona + cartão em `GET /api/profiles/active/persona-card`; não reinjeta quando a sessão já trouxe o cartão, `NARNIA_SESSION_HAS_CARD`; com a API fora imprime aviso visível). Sem `.mcp.json` no plugin instalado (F04-28): as tools vêm do `claude mcp add`. Instalação no host por `./start.sh install-plugin` (`claude mcp add --transport http -s user` + `claude plugin marketplace add` / `claude plugin install`, mecanismo vigente em 2026-10-11), com nome por instância (`narnia-jobs` do dono, `narnia-jobs-claude` da instância de testes). Teste de varredura garante que nenhum texto de persona existe fora de `plugin/` e `packages/{shared,core}`.
+
 ## 5 · Servidor MCP: tools e lazy load
 
 Regra: o modelo recebe no máximo o **cartão do perfil** sem pedir. Todo o resto vem por tool, em fatias pequenas e paginadas.
@@ -120,6 +122,8 @@ Regra: o modelo recebe no máximo o **cartão do perfil** sem pedir. Todo o rest
 | usage | `usage.log(tokens_in, tokens_out, model, feature)` | opcional; alimenta o medidor da UI |
 
 Cada skill de feature declara em seu texto exatamente quais tools usar, e o plugin pode restringir ferramentas por agente (`tools:` no frontmatter do agente). Isso é o "lazy load" na prática.
+
+**Como ficou (F04, 2026-10-11):** servidor em `/mcp` no próprio api (Hono) com o SDK oficial `@modelcontextprotocol/sdk` (versão fixada, transporte HTTP no padrão web), autenticado pelo token de boot no header e **sem estado**: o escopo de tools vem da categoria da conversa pelo header `X-Narnia-Session` (F04-21). Nomes publicados com `_` (`profile_get_card`), porque a API do Claude não aceita ponto (F04-18). Grupos entregues: `profile_*`, `evidence_*`, `fact_search/get/timeline/unverified/verify` (índice **FTS5** com `remove_diacritics` sobre experiências, conquistas, projetos, skills, formação e digests, mantido por gatilhos SQL, F04-12), `research_save/list`, `job_*`, `session_*`, `usage_log`, `file_*`, `ingest_status`, `ingest_text/file/github` (porta `ChatIngestPort` no api) e `ingest_propose` (só na clarificação). Erros chegam como `isError` com a mensagem do mapa de erros amigáveis. Calendar, applications, documents e interview continuam para F05–F08.
 
 ## 6 · Ingestão: velocidade × profundidade
 
@@ -202,6 +206,8 @@ for await (const msg of query({
 - O provider normaliza eventos (`text_delta`, `tool_use`, `tool_result`, `result` com `usage`/`total_cost_usd`) para a UI; o `CodexProvider` futuro produz os mesmos eventos a partir de `codex exec --json`.
 - Nenhum prompt ou tool é definido aqui: tudo vem de `plugin/` e `packages/mcp/`.
 
+**Como ficou (F04, 2026-10-11):** `Provider.openChat` sobre o `query` do Agent SDK com **entrada em streaming** (uma sessão longa por conversa, `streamInput`/`interrupt`/`setModel`), `systemPrompt` = persona + cartão renderizados do template do plugin, `plugins: [{ type: "local", path }]`, `mcpServers` http com token e `X-Narnia-Session`, `tools: ["WebSearch"]` só nas categorias que pesquisam, `resume` para retomar, `includePartialMessages` (deltas na tela e batimento) e `maxTurns` por mensagem. Os processos vivem no **api** (F04-10, `SessionManager`): teto de 5 com `409 session_limit` e escolha na UI, hibernação após 60 min e no boot, uso por turno em `usage_event` (`session_id`, `provider_session_id`, `turn_index`, dedupe com `usage_log`). Eventos `chat.*` com `sessionId` pelo `/ws` existente (F04-13). Rastros OpenTelemetry por conversa, turno e tool para o **Arize Phoenix local** (só metadados por padrão).
+
 ## 11 · Entrevista por voz (modo A)
 
 Provedores de STT/TTS seguem o padrão de N provedores (§16). Padrão: Whisper local + TTS local.
@@ -252,6 +258,8 @@ no boot do worker: jobs ativos órfãos são retomados pela própria BullMQ (sta
 - Toda operação que chama o modelo ou leva > 2 s é um job: ingestão (por chunk), OCR, extração, clarificação, geração de CV, análise de vaga.
 - A UI nunca bloqueia: a bandeja de atividades (shell L0) lista jobs com progresso, erro e cancelar; o usuário navega livremente.
 - Sessões de chat: várias por perfil, cada uma um processo do CLI via SDK (streaming input). Limite configurável de sessões simultâneas (padrão 3) por causa de memória; além disso, novas sessões ficam "em espera". Sessão inativa por N minutos é hibernada (processo encerrado, retomada por `resume`).
+
+**Sessões de chat (F04, 2026-10-11):** limite padrão **5** (não 3), configurável; ao atingir, a UI pergunta qual encerrar em vez de enfileirar; hibernação após **60 min** (não 10). Sessões ficam no processo do api, não no worker. **Phoenix** (F04-15): container `arizephoenix/phoenix` (versão fixada) ligado por padrão no compose de dev e desligado por padrão na produção (`--profile observability`), só em `127.0.0.1`, portas por instância (dono 6006/4317; testes em `.env.claude`), sem exportador quando `NARNIA_OTEL_ENDPOINT` não está definido.
 
 ## 14 · Geração de CV por templates (no servidor)
 

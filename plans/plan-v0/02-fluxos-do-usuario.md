@@ -98,6 +98,16 @@ Sessões: cada perfil pode ter **várias conversas ativas** (abas), cada uma com
 
 Persona: recrutador(a) sênior especialista em contratar para o cargo/área do perfil, no nível do perfil. Honestidade total: aponta lacunas, exageros e riscos; não inventa experiências; marca o que é inferência. Quando o usuário não sabe responder um dado obrigatório (ex.: faixa salarial do cargo na sua cidade), o recrutador **pesquisa na internet em fontes confiáveis** (pesquisas salariais, sites oficiais, grandes job boards), cita a fonte e propõe um valor para o usuário confirmar.
 
+**Como ficou (F04, 2026-10-11):**
+- **Chat** fica no grupo do **perfil atual** do menu (`/chat`); as conversas pertencem ao perfil ativo (abas por perfil; trocar de perfil troca o conjunto). Até **5 conversas abertas** (configurável); a sexta pergunta qual encerrar. Inatividade de **1 h** hiberna a conversa; a próxima mensagem retoma do ponto (`resume`); um reinício do api hiberna todas.
+- O recrutador recebe persona + cartão no início (system prompt montado a partir do template do plugin); se o cartão muda durante a conversa, o turno seguinte recebe a nota "Cartão do perfil atualizado". Modelo por conversa (Sonnet padrão).
+- Respostas aparecem enquanto são escritas, com chips das ferramentas usadas (nome e duração) e o uso do turno e da conversa; o painel **Contexto** mostra o cartão do perfil, as ferramentas usadas e as fontes pesquisadas.
+- **Só texto** para ações (F04-6): o recrutador pergunta e executa pelas ferramentas depois da resposta; botões ficam para a F05.
+- **Ingestão pela conversa:** texto livre, arquivo anexado ou link do GitHub viram execuções pelos mesmos pipelines da F01/F03 (GitHub sempre espera confirmação); as propostas vão para a revisão, nunca são gravadas direto.
+- **Pesquisa** só em domínios confiáveis (lista padrão editável em Configurações › Chat, com máscara como `*.gov.br`); fora da lista a ferramenta recusa e o recrutador avisa.
+- **Clarificação** a partir da revisão de uma ingestão ("Clarificar com o recrutador"): as respostas viram propostas na mesma execução.
+- **Terminal (modo B):** `./start.sh install-plugin` registra o servidor MCP e o plugin no Claude Code do computador; mesmo recrutador, mesmas ferramentas.
+
 ## F5 · Features (módulos isolados)
 
 Cada feature declara `dataScopes` (quais fatias dos dados precisa) e ganha só essas tools. Candidatas iniciais, em ordem de prioridade sugerida:
