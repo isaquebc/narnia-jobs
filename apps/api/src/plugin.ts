@@ -16,8 +16,20 @@ export function readRecruiterTemplate(dir = pluginDir()): string {
   return readFileSync(join(dir, "agents", "recrutador.md"), "utf8");
 }
 
+/** Arquivo de apoio do plugin (ex.: `prompts/…`), fora de `agents/` para o Claude Code não o tomar por agente. */
+export function readPluginFile(relative: string, dir = pluginDir()): string {
+  return readFileSync(join(dir, relative), "utf8");
+}
+
+/** Separa o frontmatter (metadado do Claude Code: nome, tools) do corpo (o prompt). */
+export function splitFrontmatter(markdown: string): { frontmatter: string; body: string } {
+  const m = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(markdown);
+  return m
+    ? { frontmatter: m[0].trimEnd(), body: markdown.slice(m[0].length).trimStart() }
+    : { frontmatter: "", body: markdown.trimStart() };
+}
+
 /** O frontmatter é metadado do Claude Code (nome, tools); o prompt é só o corpo. */
 export function stripFrontmatter(markdown: string): string {
-  const m = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(markdown);
-  return (m ? markdown.slice(m[0].length) : markdown).trimStart();
+  return splitFrontmatter(markdown).body;
 }

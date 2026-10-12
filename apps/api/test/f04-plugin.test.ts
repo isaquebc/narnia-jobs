@@ -108,11 +108,14 @@ describe("F04/M2 · hook SessionStart (session-start.sh)", () => {
   });
 
   it("com a API no ar imprime persona + cartão, autenticando pelo token", async () => {
+    // o formato da resposta real é coberto contra a rota do app em audit-c-plugin.test.ts; aqui, só a autenticação
     let auth = "";
+    let url = "";
     server = createServer((req, res) => {
       auth = String(req.headers.authorization ?? "");
-      res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ text: "PERSONA E CARTÃO DO PERFIL", cardHash: "abc" }));
+      url = String(req.url ?? "");
+      res.setHeader("content-type", "text/plain; charset=utf-8");
+      res.end("PERSONA E CARTÃO DO PERFIL");
     });
     await new Promise<void>((r) => server?.listen(0, "127.0.0.1", r));
     const port = (server.address() as AddressInfo).port;
@@ -135,6 +138,7 @@ describe("F04/M2 · hook SessionStart (session-start.sh)", () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("PERSONA E CARTÃO DO PERFIL");
     expect(auth).toBe("Bearer tok");
+    expect(url).toBe("/api/profiles/active/persona-card?format=text");
   });
 
   it("lê porta e token do .narnia-env gerado pelo install-plugin quando o ambiente não traz", () => {

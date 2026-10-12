@@ -186,16 +186,29 @@ plugin_endpoint() {
   fi
 }
 
-# stage_plugin SRC STAGE URL TOKEN MARKETPLACE -> cópia instalável do plugin com .narnia-env (0600) e marketplace local.
-# O .mcp.json não vai no plugin instalado: as tools vêm do `claude mcp add` (evita servidor duplicado).
+# plugin_agent URL TOKEN NAME -> agente `recrutador` renderizado pela api (persona e domínios atuais, tools do servidor
+# NAME, cartão via `profile_get_card`); o template do repositório tem placeholders e não pode ir cru (auditoria C)
+plugin_agent() {
+  curl -fsS -m 10 -H "Authorization: Bearer $2" \
+    "$1/api/profiles/active/persona-card?format=agent&server=$3" 2>/dev/null
+}
+
+# stage_plugin SRC STAGE URL TOKEN MARKETPLACE NAME -> cópia instalável do plugin com .narnia-env (0600), agente
+# renderizado, cabeçalho do MCP em mcp-headers.json (0600, lido pelo headersHelper) e marketplace local.
+# O .mcp.json não vai no plugin instalado: as tools vêm do `claude mcp add-json` (evita servidor duplicado).
 stage_plugin() {
-  local src=$1 stage=$2 url=$3 token=$4 mkt=$5
+  local src=$1 stage=$2 url=$3 token=$4 mkt=$5 name=$6 agent
+  agent=$(plugin_agent "$url" "$token" "$name") && [[ "$agent" == ---* ]] \
+    || die "não consegui gerar o agente do recrutador pela api ($url): suba a instância e conclua o primeiro uso antes de instalar o plugin."
   rm -rf "$stage"
   mkdir -p "$stage/.claude-plugin"
   cp -R "$src" "$stage/plugin"
-  rm -f "$stage/plugin/.mcp.json" "$stage/plugin/.narnia-env"
-  (umask 077; printf 'NARNIA_API_URL=%s\nNARNIA_TOKEN=%s\n' "$url" "$token" > "$stage/plugin/.narnia-env")
-  chmod 600 "$stage/plugin/.narnia-env"
+  rm -f "$stage/plugin/.mcp.json" "$stage/plugin/.mcp.json.template" "$stage/plugin/.narnia-env"
+  printf '%s\n' "$agent" > "$stage/plugin/agents/recrutador.md"
+  (umask 077
+    printf 'NARNIA_API_URL=%s\nNARNIA_TOKEN=%s\n' "$url" "$token" > "$stage/plugin/.narnia-env"
+    printf '{"Authorization":"Bearer %s"}' "$token" > "$stage/mcp-headers.json")
+  chmod 600 "$stage/plugin/.narnia-env" "$stage/mcp-headers.json"
   cat > "$stage/.claude-plugin/marketplace.json" <<JSON
 {
   "name": "$mkt",
@@ -208,12 +221,15 @@ stage_plugin() {
 JSON
 }
 
-# install_plugin_with STAGE NAME URL TOKEN MARKETPLACE -> registra MCP e instala o plugin (idempotente: remove e refaz)
+# install_plugin_with STAGE NAME URL MARKETPLACE -> registra MCP e instala o plugin (idempotente: remove e refaz).
+# O token não vai na linha de comando (visível em `ps`) nem na config do Claude Code: o headersHelper lê o cabeçalho do
+# arquivo 0600 da cópia (Claude Code 2.1.292: `mcp add-json` aceita `headersHelper`; `mcp add` só aceita --header).
 install_plugin_with() {
-  local stage=$1 name=$2 url=$3 token=$4 mkt=$5 bin=${NARNIA_CLAUDE_BIN:-claude} abs
+  local stage=$1 name=$2 url=$3 mkt=$4 bin=${NARNIA_CLAUDE_BIN:-claude} abs
   abs=$(cd "$stage" && pwd)
   "$bin" mcp remove -s user "$name" >/dev/null 2>&1 || true
-  "$bin" mcp add --transport http -s user "$name" "$url/mcp" --header "Authorization: Bearer $token" >/dev/null \
+  "$bin" mcp add-json -s user "$name" \
+    "{\"type\":\"http\",\"url\":\"$url/mcp\",\"headersHelper\":\"cat '$abs/mcp-headers.json'\"}" >/dev/null \
     || die "não consegui registrar o servidor MCP $name no Claude Code."
   "$bin" plugin marketplace add "$abs" --scope user >/dev/null 2>&1 \
     || "$bin" plugin marketplace update "$mkt" >/dev/null 2>&1 || true
@@ -221,6 +237,7 @@ install_plugin_with() {
   "$bin" plugin install "narnia-jobs@$mkt" --scope user >/dev/null \
     || die "não consegui instalar o plugin narnia-jobs@$mkt no Claude Code."
   info "Claude Code: servidor MCP '$name' → $url/mcp e plugin narnia-jobs@$mkt instalados. Reinicie o Claude Code."
+  info "Mantenha $abs: o Claude Code lê o token de lá. Mudou a persona? Rode install-plugin de novo."
 }
 
 # plugin_doctor NAME URL MARKETPLACE -> confere no Claude Code do host: MCP registrado na porta certa e plugin instalado
@@ -249,8 +266,8 @@ cmd_install_plugin() {
   if [[ $mode == dev ]] && stack_running && [[ -z "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then mode=prod; fi
   ep=$(plugin_endpoint "$mode"); url=${ep%%|*}; token=${ep#*|}
   [[ -n "$token" && "$url" != *: ]] || die "instância fora do ar: suba com make dev ou ./start.sh up antes de instalar o plugin."
-  stage_plugin ./plugin "$(plugin_stage_dir)" "$url" "$token" "$(plugin_marketplace_name)"
-  install_plugin_with "$(plugin_stage_dir)" "$(mcp_server_name)" "$url" "$token" "$(plugin_marketplace_name)"
+  stage_plugin ./plugin "$(plugin_stage_dir)" "$url" "$token" "$(plugin_marketplace_name)" "$(mcp_server_name)"
+  install_plugin_with "$(plugin_stage_dir)" "$(mcp_server_name)" "$url" "$(plugin_marketplace_name)"
 }
 
 # app_url PORT TOKEN -> URL de abertura da interface

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -13,7 +13,7 @@ import {
 import { MockProvider } from "@narnia-jobs/providers";
 import type { WsEvent } from "@narnia-jobs/shared";
 import { afterEach, describe, expect, it } from "vitest";
-import { createBeat, handleFinalFailure, runSweep } from "../src/liveness";
+import { createBeat, handleFinalFailure, runSweep, safely } from "../src/liveness";
 import type { WorkerDeps } from "../src/pipeline";
 
 /** Plano de comunicação C3 (2026-10-11): batimento por job, falha definitiva vinda da fila e verificador periódico. */
@@ -207,5 +207,43 @@ describe("runSweep · verificador periódico", () => {
     expect(
       h.repos.notifications.list({ status: "open" }).filter((n) => n.kind === "ingestion.stuck"),
     ).toHaveLength(0);
+  });
+});
+
+describe("auditoria C · exceção ao tratar a falha definitiva não derruba o worker", () => {
+  let h: ReturnType<typeof harness>;
+  afterEach(() => h?.cleanup());
+
+  it("safely: a promessa que rejeita vira log, nunca rejeição não tratada", async () => {
+    h = harness();
+    const job = await h.activeSynthesis(new Date().toISOString());
+    // falha ao avisar a web no meio do tratamento (ex.: Redis fora): antes virava unhandledRejection e o Node saía
+    h.deps.publish = async () => {
+      throw new Error("Redis fora");
+    };
+    const target = {
+      id: job.id,
+      queueName: "ingest",
+      data: job.payload as never,
+      attemptsMade: 2,
+      getState: async () => "failed" as const,
+    };
+    await expect(handleFinalFailure(target, "x", h.deps, new Set())).rejects.toThrow("Redis fora");
+    const logs: string[] = [];
+    const out = await safely(
+      "falha definitiva",
+      () => handleFinalFailure(target, "x", h.deps, new Set()),
+      (m) => logs.push(m),
+    );
+    expect(out).toBeUndefined();
+    expect(logs).toEqual([expect.stringMatching(/falha definitiva.*Redis fora/)]);
+  });
+
+  it("worker.ts não dispara promessas soltas sem safely (falha de evento, fila, batimento e verificador)", () => {
+    const src = readFileSync(new URL("../src/worker.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(
+      /void (handleFinalFailure|handleQueueEvent|Job\.fromId|beat\(|sweep\()/,
+    );
+    expect(src).not.toMatch(/\.then\(\(final\)/);
   });
 });

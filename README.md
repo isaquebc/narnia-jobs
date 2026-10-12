@@ -75,7 +75,7 @@ make dev            # ou ./start.sh up; a instância precisa estar no ar
 ./start.sh install-plugin   # Windows: .\start.ps1 install-plugin  (com a produção no ar: --prod)
 ```
 
-O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (`claude mcp add`, escopo do usuário) e instala o plugin (persona, skills e o hook que traz o cartão) por um marketplace local. Reinicie o Claude Code e use `/narnia-jobs:recrutador` ou `/narnia-jobs:perfil`. Se a porta mudar, rode o `install-plugin` de novo; o `./start.sh doctor` avisa quando o MCP ou o plugin estão desatualizados.
+O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (escopo do usuário; o token fica num arquivo só seu na cópia `.plugin-build/`, que precisa continuar lá) e instala o plugin (persona, skills, o hook que traz o cartão e o que registra o uso no medidor) por um marketplace local. Mudou a persona em Configurações? Rode o `install-plugin` de novo para o agente do terminal acompanhar. Reinicie o Claude Code e use `/narnia-jobs:recrutador` ou `/narnia-jobs:perfil`. Se a porta mudar, rode o `install-plugin` de novo; o `./start.sh doctor` avisa quando o MCP ou o plugin estão desatualizados.
 
 ### Rastros e avaliações (Arize Phoenix local)
 

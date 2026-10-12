@@ -277,9 +277,10 @@ docker_spy() { # substitui o docker por um registrador de chamadas em $TMP/calls
 
 @test "instância do dono usa .owner-src como código quando a pasta existe; sem ela, a raiz" {
   mkdir -p "$TMP/src"
-  run env NARNIA_OWNER_SRC_DIR="$TMP/src" bash -c 'source ./start.sh; printf "%s" "$NARNIA_SRC_DIR"'
+  # o setup já carregou o start.sh: com a .owner-src real presente (depois do 1º promote), NARNIA_SRC_DIR vem exportada
+  run env -u NARNIA_SRC_DIR NARNIA_OWNER_SRC_DIR="$TMP/src" bash -c 'source ./start.sh; printf "%s" "$NARNIA_SRC_DIR"'
   [[ "$output" == "$TMP/src" ]]
-  run env NARNIA_OWNER_SRC_DIR="$TMP/nao-existe" bash -c 'source ./start.sh; printf "%s" "${NARNIA_SRC_DIR:-.}"'
+  run env -u NARNIA_SRC_DIR NARNIA_OWNER_SRC_DIR="$TMP/nao-existe" bash -c 'source ./start.sh; printf "%s" "${NARNIA_SRC_DIR:-.}"'
   [[ "$output" == "." ]]
 }
 
@@ -343,6 +344,10 @@ SH
   : > "$TMP/claude.calls"
 }
 
+fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma resposta fixa no formato dela
+  plugin_agent() { printf -- '---\nname: recrutador\ntools: mcp__%s__*, WebSearch, WebFetch\n---\n\ncorpo renderizado\n' "$3"; }
+}
+
 @test "plugin_endpoint dev: porta e token da instância corrente (dono 3100/dev-token; claude 3200/claude-token)" {
   unset NARNIA_DEV_API_PORT NARNIA_TOKEN
   [[ "$(plugin_endpoint dev)" == "http://127.0.0.1:3100|dev-token" ]]
@@ -357,7 +362,8 @@ SH
 }
 
 @test "stage_plugin copia o plugin, grava .narnia-env 0600 e o marketplace local, sem .mcp.json no plugin instalado" {
-  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3200" "claude-token" "narnia-jobs-claude-local"
+  fake_agent
+  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3200" "claude-token" "narnia-jobs-claude-local" narnia-jobs-claude
   [ -f "$TMP/stage/plugin/.claude-plugin/plugin.json" ]
   [ -f "$TMP/stage/plugin/hooks/session-start.sh" ]
   grep -qx "NARNIA_API_URL=http://127.0.0.1:3200" "$TMP/stage/plugin/.narnia-env"
@@ -366,26 +372,41 @@ SH
   [ ! -e "$TMP/stage/plugin/.mcp.json" ]
   grep -q '"name": "narnia-jobs-claude-local"' "$TMP/stage/.claude-plugin/marketplace.json"
   grep -q '"source": "./plugin"' "$TMP/stage/.claude-plugin/marketplace.json"
+  # auditoria C: agente renderizado pela api (sem placeholder), cabeçalho do MCP em arquivo 0600, sem o template
+  grep -qx 'tools: mcp__narnia-jobs-claude__\*, WebSearch, WebFetch' "$TMP/stage/plugin/agents/recrutador.md"
+  ! grep -rq '{{' "$TMP/stage"
+  [ ! -e "$TMP/stage/plugin/.mcp.json.template" ]
+  [[ "$(cat "$TMP/stage/mcp-headers.json")" == '{"Authorization":"Bearer claude-token"}' ]]
+  [[ "$(stat -c %a "$TMP/stage/mcp-headers.json")" == "600" ]]
+}
+
+@test "stage_plugin falha sem o agente da api (instância fora do ar) e não deixa o agente cru" {
+  plugin_agent() { return 1; }
+  run stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:9" "tok" "narnia-jobs-local" narnia-jobs
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"agente do recrutador"* ]]
 }
 
 @test "install_plugin_with registra o MCP no escopo user e instala o plugin pelo marketplace local, idempotente" {
-  fake_claude
-  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local"
-  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3100" dev-token narnia-jobs-local >/dev/null
-  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3100" dev-token narnia-jobs-local >/dev/null
+  fake_claude; fake_agent
+  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local" narnia-jobs
+  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3100" narnia-jobs-local >/dev/null
+  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3100" narnia-jobs-local >/dev/null
   grep -qx "mcp remove -s user narnia-jobs" "$TMP/claude.calls"
-  grep -qx "mcp add --transport http -s user narnia-jobs http://127.0.0.1:3100/mcp --header Authorization: Bearer dev-token" "$TMP/claude.calls"
+  # auditoria C: o token não vai na linha de comando; o Claude Code lê o cabeçalho do arquivo 0600 pelo headersHelper
+  grep -qxF "mcp add-json -s user narnia-jobs {\"type\":\"http\",\"url\":\"http://127.0.0.1:3100/mcp\",\"headersHelper\":\"cat '$TMP/stage/mcp-headers.json'\"}" "$TMP/claude.calls"
+  ! grep -q "dev-token" "$TMP/claude.calls"
   grep -qx "plugin marketplace add $TMP/stage --scope user" "$TMP/claude.calls"
   grep -qx "plugin uninstall narnia-jobs@narnia-jobs-local" "$TMP/claude.calls"
   grep -qx "plugin install narnia-jobs@narnia-jobs-local --scope user" "$TMP/claude.calls"
-  [[ "$(grep -c '^mcp add' "$TMP/claude.calls")" == "2" ]]
+  [[ "$(grep -c '^mcp add-json' "$TMP/claude.calls")" == "2" ]]
 }
 
 @test "porta mudou: reinstalar grava a URL nova no MCP e no .narnia-env" {
-  fake_claude
-  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3101" "tok" "narnia-jobs-local"
-  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3101" tok narnia-jobs-local >/dev/null
-  grep -q "mcp add --transport http -s user narnia-jobs http://127.0.0.1:3101/mcp" "$TMP/claude.calls"
+  fake_claude; fake_agent
+  stage_plugin ./plugin "$TMP/stage" "http://127.0.0.1:3101" "tok" "narnia-jobs-local" narnia-jobs
+  install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3101" narnia-jobs-local >/dev/null
+  grep -q 'mcp add-json -s user narnia-jobs {"type":"http","url":"http://127.0.0.1:3101/mcp"' "$TMP/claude.calls"
   grep -qx "NARNIA_API_URL=http://127.0.0.1:3101" "$TMP/stage/plugin/.narnia-env"
 }
 
@@ -432,6 +453,12 @@ SH
   run bash scripts/smoke-plugin.sh
   [ "$status" -ne 0 ]
   [[ "$output" == *"--yes"* ]]
-  run bash -c 'source scripts/smoke-plugin.sh; smoke_stage "$1"; cat "$1/plugin/.mcp.json"' _ "$TMP/smoke"
+  run bash -c 'source scripts/smoke-plugin.sh; plugin_agent() { printf -- "---\nname: recrutador\n---\n"; }; smoke_stage "$1"; cat "$1/plugin/.mcp.json"' _ "$TMP/smoke"
   [[ "$output" == *'"url": "http://127.0.0.1:3200/mcp"'* && "$output" == *"claude-token"* ]]
+}
+
+@test "auditoria C: a cópia do plugin com token (.plugin-build) não entra no contexto de build do Docker" {
+  grep -qx '.plugin-build' .dockerignore
+  # o `!plugin/**` não pode reincluir a cópia (ela fica em .plugin-build/plugin)
+  ! grep -qx '!.plugin-build' .dockerignore
 }

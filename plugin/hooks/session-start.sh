@@ -28,10 +28,9 @@ warn() {
 [ -n "${NARNIA_API_URL:-}" ] && [ -n "${NARNIA_TOKEN:-}" ] || warn "porta e token não configurados; rode narnia-jobs install-plugin"
 command -v curl >/dev/null 2>&1 || warn "curl não encontrado"
 
-body=$(curl -fsS -m 5 -H "Authorization: Bearer ${NARNIA_TOKEN}" "${NARNIA_API_URL}/api/profiles/active/persona-card" 2>/dev/null) \
+# formato texto: o corpo é o prompt pronto (sem jq/node no computador do usuário; o JSON trazia o texto escapado)
+text=$(curl -fsS -m 5 -H "Authorization: Bearer ${NARNIA_TOKEN}" \
+  "${NARNIA_API_URL}/api/profiles/active/persona-card?format=text" 2>/dev/null) \
   || warn "${NARNIA_API_URL} não respondeu"
-
-# extrai o campo "text" do JSON sem depender de node/jq no computador do usuário
-text=$(printf '%s' "$body" | sed -n 's/.*"text":"\(.*\)","cardHash".*/\1/p')
-[ -n "$text" ] || warn "resposta inesperada de ${NARNIA_API_URL}"
-printf '%b\n' "$(printf '%s' "$text" | sed 's/\\"/"/g')"
+[ -n "$text" ] || warn "resposta vazia de ${NARNIA_API_URL}"
+printf '%s\n' "$text"

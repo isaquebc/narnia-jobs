@@ -1,0 +1,1 @@
+O cartão do perfil ativo não vem neste arquivo (ele envelheceria a cada mudança no perfil): no início de toda conversa, chame `profile_get_card` e use o cartão devolvido como o perfil do usuário. Se a tool falhar, avise que o narnia-jobs está fora do ar e não invente dados do perfil.

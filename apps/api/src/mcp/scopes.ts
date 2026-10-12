@@ -2,7 +2,7 @@ import { CHAT_TOOLS, type ChatCategory, INGEST_TOOLS, PROFILE_TOOLS } from "@nar
 
 /**
  * Escopos de tools por categoria de sessão (F04-2, lazy load real). A sessão vem do header `X-Narnia-Session` (modo
- * A); sem header (modo B, terminal) valem carreira + ingestão. `ingest.propose` só existe na clarificação.
+ * A); sem header (modo B, terminal) valem carreira + ingestão, mais `ingest.propose` para a skill `clarificar`.
  */
 // `profile.switch` muda o perfil ativo de todo o app: só no terminal (auditoria A); no chat as tools de perfil ficam
 // presas ao perfil da sessão (server.ts)
@@ -36,7 +36,9 @@ const BY_CATEGORY: Record<ChatCategory, string[]> = {
 const matches = (name: string, prefixes: string[]) =>
   prefixes.some((p) => (p.endsWith(".") ? name.startsWith(p) : name === p));
 
-const TERMINAL = [...CAREER, "profile.switch", ...INGEST];
+// `ingest.propose` no terminal: a skill `clarificar` do modo B (auditoria C); o server.ts exige uma execução pronta para
+// revisão, já que sem sessão não há execução vinculada
+const TERMINAL = [...CAREER, "profile.switch", ...INGEST, "ingest.propose"];
 
 export function inScope(name: string, category: ChatCategory | null): boolean {
   return matches(name, category ? BY_CATEGORY[category] : TERMINAL);

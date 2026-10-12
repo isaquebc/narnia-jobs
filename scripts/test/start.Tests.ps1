@@ -161,9 +161,11 @@ Describe "C7 / CM-4: cópia separada da instância do dono (.owner-src)" {
   BeforeAll { $script:Ps1 = Join-Path $PSScriptRoot "../../start.ps1" }
   It "instância do dono usa .owner-src quando existe" {
     $dir = Join-Path $script:Tmp "src"; New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    # o BeforeAll já carregou o start.ps1: com a .owner-src real presente (depois do 1º promote), NARNIA_SRC_DIR vem setada
+    $saved = $env:NARNIA_SRC_DIR; Remove-Item env:NARNIA_SRC_DIR -ErrorAction SilentlyContinue
     $env:NARNIA_OWNER_SRC_DIR = $dir
     try { $out = pwsh -NoProfile -Command ". '$($script:Ps1)'; `$env:NARNIA_SRC_DIR" }
-    finally { Remove-Item env:NARNIA_OWNER_SRC_DIR -ErrorAction SilentlyContinue }
+    finally { Remove-Item env:NARNIA_OWNER_SRC_DIR -ErrorAction SilentlyContinue; if ($saved) { $env:NARNIA_SRC_DIR = $saved } }
     $out | Should -Be $dir
   }
   It "instância claude nunca usa .owner-src e monta os próprios dados" {
@@ -199,18 +201,26 @@ Describe "F04/M5 · modo B (install-plugin e diagnóstico no host)" {
     Get-PluginMarketplaceName | Should -Be "narnia-jobs-local"
     Get-PluginEndpoint "dev" | Should -Be "http://127.0.0.1:3100|dev-token"
   }
-  It "Build-PluginStage grava .narnia-env e o marketplace local, sem .mcp.json" {
-    $stage = Join-Path $script:Tmp "stage"
-    Build-PluginStage (Join-Path $PSScriptRoot "../../plugin") $stage "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local"
-    (Get-Content (Join-Path $stage "plugin/.narnia-env")) | Should -Contain "NARNIA_API_URL=http://127.0.0.1:3100"
-    (Get-Content (Join-Path $stage ".claude-plugin/marketplace.json") -Raw) | Should -Match '"source": "./plugin"'
-    Test-Path (Join-Path $stage "plugin/.mcp.json") | Should -BeFalse
+  It "Build-PluginStage grava .narnia-env, o cabeçalho do MCP e o marketplace local, com o agente da api e sem .mcp.json" {
+    $global:NarniaPluginAgentOverride = { param($Url, $Token, $Name) "---`nname: recrutador`ntools: mcp__${Name}__*, WebSearch, WebFetch`n---`n`ncorpo renderizado`n" }
+    try {
+      $stage = Join-Path $script:Tmp "stage"
+      Build-PluginStage (Join-Path $PSScriptRoot "../../plugin") $stage "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local" "narnia-jobs"
+      (Get-Content (Join-Path $stage "plugin/.narnia-env")) | Should -Contain "NARNIA_API_URL=http://127.0.0.1:3100"
+      (Get-Content (Join-Path $stage ".claude-plugin/marketplace.json") -Raw) | Should -Match '"source": "./plugin"'
+      Test-Path (Join-Path $stage "plugin/.mcp.json") | Should -BeFalse
+      Test-Path (Join-Path $stage "plugin/.mcp.json.template") | Should -BeFalse
+      (Get-Content (Join-Path $stage "plugin/agents/recrutador.md") -Raw) | Should -Match 'tools: mcp__narnia-jobs__\*'
+      (Get-ChildItem -Recurse -File $stage | Select-String -SimpleMatch '{{') | Should -BeNullOrEmpty
+      (Get-Content (Join-Path $stage "mcp-headers.json") -Raw).Trim() | Should -Be '{"Authorization":"Bearer dev-token"}'
+    } finally { Remove-Variable -Scope Global -Name NarniaPluginAgentOverride -ErrorAction SilentlyContinue }
   }
-  It "Install-PluginWith registra o MCP no escopo user e instala pelo marketplace local" {
+  It "Install-PluginWith registra o MCP pelo headersHelper (sem token na linha de comando) e instala pelo marketplace local" {
     $script:Calls.Clear()
     $stage = Join-Path $script:Tmp "stage"
-    Install-PluginWith $stage "narnia-jobs" "http://127.0.0.1:3100" "dev-token" "narnia-jobs-local" | Out-Null
-    $script:Calls | Should -Contain "mcp add --transport http -s user narnia-jobs http://127.0.0.1:3100/mcp --header Authorization: Bearer dev-token"
+    Install-PluginWith $stage "narnia-jobs" "http://127.0.0.1:3100" "narnia-jobs-local" | Out-Null
+    ($script:Calls | Where-Object { $_ -like "mcp add-json -s user narnia-jobs *headersHelper*mcp-headers.json*" }) | Should -Not -BeNullOrEmpty
+    ($script:Calls -join "`n") | Should -Not -Match "dev-token"
     $script:Calls | Should -Contain "plugin install narnia-jobs@narnia-jobs-local --scope user"
   }
   It "Test-PluginInstall acusa porta mudou e plugin ausente" {

@@ -37,6 +37,24 @@ export function createBeat(
   };
 }
 
+/**
+ * Roda uma tarefa disparada por evento (falha da fila, batimento, verificador) sem deixar a rejeição solta: no Node,
+ * uma promessa rejeitada sem tratamento derruba o processo inteiro, e com ele todas as filas (auditoria C). O erro vira
+ * log e a tarefa devolve `undefined`.
+ */
+export async function safely<T>(
+  label: string,
+  fn: () => Promise<T>,
+  log: (message: string) => void,
+): Promise<T | undefined> {
+  try {
+    return await fn();
+  } catch (err) {
+    log(`[worker] ${label}: ${(err as Error)?.message ?? String(err)}`);
+    return undefined;
+  }
+}
+
 export interface FailedJobTarget {
   id: string;
   queueName: string;

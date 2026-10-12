@@ -46,7 +46,7 @@ describe("F04/M2 · servidor MCP: autenticação e listagem", () => {
     expect(r.status).toBe(401);
   });
 
-  it("initialize e tools/list no modo B (sem sessão): carreira + ingestão, sem ingest.propose", async () => {
+  it("initialize e tools/list no modo B (sem sessão): carreira + ingestão, com ingest.propose (skill clarificar)", async () => {
     t = makeTestApp();
     const client = await connect(t);
     expect(client.getServerVersion()?.name).toBe("narnia-jobs");
@@ -59,7 +59,8 @@ describe("F04/M2 · servidor MCP: autenticação e listagem", () => {
       "file_list",
     ])
       expect(names).toContain(n);
-    expect(names).not.toContain("ingest_propose");
+    // auditoria C: a skill clarificar do terminal precisa dela (só para execução pronta para revisão)
+    expect(names).toContain("ingest_propose");
     const card = (await client.listTools()).tools.find((x) => x.name === "fact_search");
     expect(card?.inputSchema.type).toBe("object");
     expect(JSON.stringify(card?.inputSchema)).not.toContain("$schema");

@@ -165,12 +165,28 @@ function Invoke-ClaudeCli { param([string[]] $Arguments)
   $bin = if ($env:NARNIA_CLAUDE_BIN) { $env:NARNIA_CLAUDE_BIN } else { "claude" }
   & $bin @Arguments 2>$null
 }
-function Build-PluginStage([string] $Src, [string] $Stage, [string] $Url, [string] $Token, [string] $Mkt) {
+# Agente `recrutador` renderizado pela api (persona e domínios atuais, tools do servidor $Name, cartão via
+# `profile_get_card`): o template do repositório tem placeholders e não pode ir cru (auditoria C)
+function Get-PluginAgent([string] $Url, [string] $Token, [string] $Name) {
+  if ($global:NarniaPluginAgentOverride) { return (& $global:NarniaPluginAgentOverride $Url $Token $Name) }   # só nos testes
+  try {
+    return (Invoke-WebRequest -UseBasicParsing -TimeoutSec 10 -Headers @{ Authorization = "Bearer $Token" } `
+      -Uri "$Url/api/profiles/active/persona-card?format=agent&server=$Name").Content
+  } catch { return $null }
+}
+function Build-PluginStage([string] $Src, [string] $Stage, [string] $Url, [string] $Token, [string] $Mkt, [string] $Name) {
+  $agent = Get-PluginAgent $Url $Token $Name
+  if (-not $agent -or -not $agent.StartsWith("---")) {
+    Fail "não consegui gerar o agente do recrutador pela api ($Url): suba a instância e conclua o primeiro uso antes de instalar o plugin."
+  }
   if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
   New-Item -ItemType Directory -Force -Path (Join-Path $Stage ".claude-plugin") | Out-Null
   Copy-Item -Recurse -Force $Src (Join-Path $Stage "plugin")
-  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Stage "plugin/.mcp.json"), (Join-Path $Stage "plugin/.narnia-env")
+  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Stage "plugin/.mcp.json"), (Join-Path $Stage "plugin/.mcp.json.template"), (Join-Path $Stage "plugin/.narnia-env")
+  Set-Content -NoNewline -Path (Join-Path $Stage "plugin/agents/recrutador.md") -Value $agent
   Set-Content -Path (Join-Path $Stage "plugin/.narnia-env") -Value @("NARNIA_API_URL=$Url", "NARNIA_TOKEN=$Token")
+  # cabeçalho do MCP lido pelo headersHelper: o token não vai na linha de comando nem na config do Claude Code
+  Set-Content -NoNewline -Path (Join-Path $Stage "mcp-headers.json") -Value "{`"Authorization`":`"Bearer $Token`"}"
   $json = @"
 {
   "name": "$Mkt",
@@ -183,10 +199,13 @@ function Build-PluginStage([string] $Src, [string] $Stage, [string] $Url, [strin
 "@
   Set-Content -Path (Join-Path $Stage ".claude-plugin/marketplace.json") -Value $json
 }
-function Install-PluginWith([string] $Stage, [string] $Name, [string] $Url, [string] $Token, [string] $Mkt) {
+function Install-PluginWith([string] $Stage, [string] $Name, [string] $Url, [string] $Mkt) {
   $abs = (Resolve-Path $Stage).Path
+  $headers = Join-Path $abs "mcp-headers.json"
+  # o Claude Code no Windows roda comandos pelo Git Bash, que aceita o caminho do Windows entre aspas simples
+  $config = [ordered]@{ type = "http"; url = "$Url/mcp"; headersHelper = "cat '$headers'" } | ConvertTo-Json -Compress
   Invoke-ClaudeCli @("mcp", "remove", "-s", "user", $Name) | Out-Null
-  Invoke-ClaudeCli @("mcp", "add", "--transport", "http", "-s", "user", $Name, "$Url/mcp", "--header", "Authorization: Bearer $Token") | Out-Null
+  Invoke-ClaudeCli @("mcp", "add-json", "-s", "user", $Name, $config) | Out-Null
   if ($LASTEXITCODE -ne 0) { Fail "não consegui registrar o servidor MCP $Name no Claude Code." }
   Invoke-ClaudeCli @("plugin", "marketplace", "add", $abs, "--scope", "user") | Out-Null
   if ($LASTEXITCODE -ne 0) { Invoke-ClaudeCli @("plugin", "marketplace", "update", $Mkt) | Out-Null }
@@ -194,6 +213,7 @@ function Install-PluginWith([string] $Stage, [string] $Name, [string] $Url, [str
   Invoke-ClaudeCli @("plugin", "install", "narnia-jobs@$Mkt", "--scope", "user") | Out-Null
   if ($LASTEXITCODE -ne 0) { Fail "não consegui instalar o plugin narnia-jobs@$Mkt no Claude Code." }
   Info "Claude Code: servidor MCP '$Name' -> $Url/mcp e plugin narnia-jobs@$Mkt instalados. Reinicie o Claude Code."
+  Info "Mantenha ${abs}: o Claude Code lê o token de lá. Mudou a persona? Rode install-plugin de novo."
 }
 function Test-PluginInstall([string] $Name, [string] $Url, [string] $Mkt) {
   $out = (Invoke-ClaudeCli @("mcp", "get", $Name)) -join "`n"
@@ -208,8 +228,8 @@ function Invoke-InstallPlugin {
   $mode = if ($Rest -contains "--prod") { "prod" } else { "dev" }
   $ep = Get-PluginEndpoint $mode; $url, $token = $ep -split '\|', 2
   if (-not $token) { Fail "instância fora do ar: suba com make dev ou .\start.ps1 up antes de instalar o plugin." }
-  Build-PluginStage "./plugin" (Get-PluginStageDir) $url $token (Get-PluginMarketplaceName)
-  Install-PluginWith (Get-PluginStageDir) (Get-McpServerName) $url $token (Get-PluginMarketplaceName)
+  Build-PluginStage "./plugin" (Get-PluginStageDir) $url $token (Get-PluginMarketplaceName) (Get-McpServerName)
+  Install-PluginWith (Get-PluginStageDir) (Get-McpServerName) $url (Get-PluginMarketplaceName)
 }
 
 # Token do `gh` logado no computador (F03-1); $null sem gh ou sem login. Entregue ao container pela entrada padrão.

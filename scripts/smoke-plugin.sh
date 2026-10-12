@@ -12,7 +12,7 @@ source ./start.sh
 smoke_stage() { # smoke_stage DIR -> cópia do plugin com .mcp.json (servidor da instância) para --plugin-dir
   local dir=$1 ep url token
   ep=$(plugin_endpoint dev); url=${ep%%|*}; token=${ep#*|}
-  stage_plugin ./plugin "$dir" "$url" "$token" "$(plugin_marketplace_name)"
+  stage_plugin ./plugin "$dir" "$url" "$token" "$(plugin_marketplace_name)" narnia-jobs
   cat > "$dir/plugin/.mcp.json" <<JSON
 { "mcpServers": { "narnia-jobs": { "type": "http", "url": "$url/mcp", "headers": { "Authorization": "Bearer $token" } } } }
 JSON

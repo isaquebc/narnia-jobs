@@ -23,7 +23,7 @@ import { Job, Queue, QueueEvents, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { handleQueueEvent } from "./events";
 import { withPlanSampling } from "./ingest/plan-sampling";
-import { createBeat, type FailedJobTarget, handleFinalFailure, runSweep } from "./liveness";
+import { createBeat, type FailedJobTarget, handleFinalFailure, runSweep, safely } from "./liveness";
 import { type OcrDeps, processStage, type WorkerDeps } from "./pipeline";
 import { createQueues, QUEUE_NAMES } from "./queues";
 import { isTaskJob, processTask } from "./tasks";
@@ -157,52 +157,52 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       },
     );
     const ev = { repos, publish };
+    // eventos do worker: falha ao gravar o espelho ou avisar a web vira log (auditoria C: rejeição solta derrubava o
+    // processo e todas as filas com ele)
+    const onEvent = (label: string, e: Parameters<typeof handleQueueEvent>[0]) =>
+      void safely(label, () => handleQueueEvent(e, ev), log);
     worker.on("active", (job) => {
-      void handleQueueEvent(
-        {
-          type: "active",
-          jobId: String(job.id),
-          at: nowUtc(),
-          attempts: job.attemptsMade + 1,
-          stage: stageOf(job.data),
-        },
-        ev,
-      );
+      onEvent("evento active", {
+        type: "active",
+        jobId: String(job.id),
+        at: nowUtc(),
+        attempts: job.attemptsMade + 1,
+        stage: stageOf(job.data),
+      });
     });
     worker.on("progress", (job, progress) => {
       const p = typeof progress === "number" ? progress : (progress as { pct?: number }).pct;
-      void handleQueueEvent(
-        {
-          type: "progress",
-          jobId: String(job.id),
-          at: nowUtc(),
-          progress: p ?? 0,
-          stage: stageOf(job.data),
-        },
-        ev,
-      );
+      onEvent("evento progress", {
+        type: "progress",
+        jobId: String(job.id),
+        at: nowUtc(),
+        progress: p ?? 0,
+        stage: stageOf(job.data),
+      });
     });
     worker.on("completed", (job, result) => {
-      void handleQueueEvent(
-        {
-          type: "completed",
-          jobId: String(job.id),
-          at: nowUtc(),
-          result,
-          stage: stageOf(job.data),
-        },
-        ev,
-      );
+      onEvent("evento completed", {
+        type: "completed",
+        jobId: String(job.id),
+        at: nowUtc(),
+        result,
+        stage: stageOf(job.data),
+      });
     });
     worker.on("failed", (job: Job<JobData> | undefined, err) => {
       if (!job) return;
       // só é definitiva se a fila diz "failed"; com tentativa restante vira "tentando de novo" (C3)
-      void handleFinalFailure(toTarget(job), err.message, deps, seenFailures).then((final) => {
-        if (final) log(`[worker] falha definitiva em ${job.id}: ${err.message}`);
-      });
+      void safely(
+        `falha definitiva em ${job.id}`,
+        async () => {
+          if (await handleFinalFailure(toTarget(job), err.message, deps, seenFailures))
+            log(`[worker] falha definitiva em ${job.id}: ${err.message}`);
+        },
+        log,
+      );
     });
     worker.on("stalled", (jobId) => {
-      void handleQueueEvent({ type: "stalled", jobId, at: nowUtc() }, ev);
+      onEvent("evento stalled", { type: "stalled", jobId, at: nowUtc() });
     });
     worker.on("error", (err) => log(`[worker:${name}] erro: ${err.message}`));
     return worker;
@@ -213,9 +213,14 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   const queueEvents = QUEUE_NAMES.map((name) => {
     const qe = new QueueEvents(name, { connection: eventsConnection, prefix });
     qe.on("failed", ({ jobId, failedReason }) => {
-      void Job.fromId<JobData>(queues[name], jobId).then((job) => {
-        if (job) void handleFinalFailure(toTarget(job), failedReason, deps, seenFailures);
-      });
+      void safely(
+        `falha definitiva em ${jobId} (fila)`,
+        async () => {
+          const job = await Job.fromId<JobData>(queues[name], jobId);
+          if (job) await handleFinalFailure(toTarget(job), failedReason, deps, seenFailures);
+        },
+        log,
+      );
     });
     qe.on("error", (err) => log(`[worker:events:${name}] erro: ${err.message}`));
     return qe;
@@ -246,14 +251,15 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
         return { state, failedReason: job.failedReason ?? null };
       },
     }).catch((err: Error) => log(`[worker] verificador: ${err.message}`));
-  const sweepTimer = sweepMs > 0 ? setInterval(() => void sweep(), sweepMs) : null;
+  const sweepTimer =
+    sweepMs > 0 ? setInterval(() => void safely("verificador", sweep, log), sweepMs) : null;
 
   const ttlSeconds = Math.max(5, Math.ceil(((opts.heartbeatMs ?? 10_000) * 3) / 1000));
   const beat = async () => {
     await connection.set(heartbeatKey(prefix), nowUtc(), "EX", ttlSeconds);
   };
   await beat();
-  const timer = setInterval(() => void beat(), opts.heartbeatMs ?? 10_000);
+  const timer = setInterval(() => void safely("batimento", beat, log), opts.heartbeatMs ?? 10_000);
 
   return {
     queues,

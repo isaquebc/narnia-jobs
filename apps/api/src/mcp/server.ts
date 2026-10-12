@@ -129,6 +129,17 @@ function buildServer(deps: IngestionStartDeps, version: string, session: Session
           "run_not_in_session",
           "Esta conversa de clarificação só pode propor correções para a própria ingestão.",
         );
+      if (tool.name === "ingest.propose" && session.category === null) {
+        const run =
+          typeof args.runId === "string"
+            ? (deps.repos as Repos).ingestionRuns.get(args.runId)
+            : null;
+        if (run && run.status !== "review")
+          throw new McpToolError(
+            "run_not_reviewable",
+            `No terminal só dá para propor correções a uma ingestão pronta para revisão (esta está em ${run.status}).`,
+          );
+      }
       if (
         tool.name === "session.set_category" &&
         session.category &&

@@ -16,3 +16,4 @@ scripts/test
 .claude-data
 backups
 .owner-src
+.plugin-build
