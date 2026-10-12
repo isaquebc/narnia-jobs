@@ -110,13 +110,77 @@ async function githubPlan(repos: Repos, provider: Provider, body: GithubIngestio
   return { est, rec, budget };
 }
 
-export function ingestionsRoutes(deps: {
+export interface IngestionStartDeps {
   repos: Repos;
   dataDir: string;
   provider: Provider;
   queue: QueueAdapter;
   bus: EventBus;
-}) {
+}
+
+/**
+ * Cria e enfileira uma execução do GitHub (sempre espera confirmação do orçamento, F03-13). Usada pela rota e pela
+ * conversa (`ingest.github`, F04-16), para as duas seguirem o mesmo caminho.
+ */
+export async function startGithubRun(deps: IngestionStartDeps, body: GithubIngestionCreateRequest) {
+  const { budget } = await githubPlan(deps.repos, deps.provider, body);
+  const run = deps.repos.ingestionRuns.createGithub({
+    provider: deps.provider.id,
+    mode: body.mode,
+    depth: body.depth,
+    model: body.model,
+    params: { repos: body.repos, ...(body.login ? { login: body.login } : {}) },
+    budget,
+  });
+  await deps.queue.enqueueTask(prepareTask(run.id));
+  emitRun(deps.bus, deps.repos, run.id);
+  return { run: deps.repos.ingestionRuns.get(run.id) as IngestionRunRecord, budget };
+}
+
+/**
+ * Cria e enfileira a execução de um arquivo ou texto já armazenado (cadeia do F01 + reconciliação e conferência da
+ * F03). Usada pela rota e pela conversa (`ingest.text`/`ingest.file`, F04-16). Devolve `null` se o arquivo não existe.
+ */
+export async function startFileRun(
+  deps: IngestionStartDeps,
+  fileId: string,
+  requested: { ocr?: boolean; modelRead?: boolean } = {},
+) {
+  const file = deps.repos.sourceFiles.get(fileId);
+  if (!file) return null;
+  const meta = readMeta(deps.dataDir, file);
+  const models = resolveExtractionModels(deps.repos.settings);
+  const options = {
+    ocr: file.mime === "application/pdf" && (requested.ocr ?? true),
+    modelRead: file.mime === "application/pdf" && (requested.modelRead ?? true),
+  };
+  const run = deps.repos.ingestionRuns.create({
+    fileId: file.id,
+    provider: deps.provider.id,
+    models,
+    options,
+  });
+  const est = estimateExtraction({
+    textChars: meta?.chars ?? 0,
+    ...(meta?.pages ? { pdfPages: meta.pages } : {}),
+    models,
+    options,
+  });
+  deps.repos.ingestionRuns.setEstimate(run.id, {
+    documentTokens: est.calls.document?.tokens ?? 0,
+    factsTokens: est.calls.facts.tokens,
+    digestTokens: est.calls.digest.tokens,
+  });
+  deps.repos.ingestionRuns.setStatus(run.id, "queued");
+  await deps.queue.enqueue(run.id, "ingest.read_text");
+  return {
+    run: deps.repos.ingestionRuns.get(run.id) as IngestionRunRecord,
+    file,
+    estimatedTokens: est.totalTokens,
+  };
+}
+
+export function ingestionsRoutes(deps: IngestionStartDeps) {
   const app = new Hono();
   const find = (id: string): IngestionRunRecord | null => deps.repos.ingestionRuns.get(id);
 
@@ -170,50 +234,15 @@ export function ingestionsRoutes(deps: {
     if (raw?.source === "github") {
       const parsed = GithubIngestionCreateRequestSchema.safeParse(raw);
       if (!parsed.success) return validationError(c, parsed.error.issues);
-      const body = parsed.data;
-      const { budget } = await githubPlan(deps.repos, deps.provider, body);
-      const run = deps.repos.ingestionRuns.createGithub({
-        provider: deps.provider.id,
-        mode: body.mode,
-        depth: body.depth,
-        model: body.model,
-        params: { repos: body.repos, ...(body.login ? { login: body.login } : {}) },
-        budget,
-      });
-      await deps.queue.enqueueTask(prepareTask(run.id));
-      emitRun(deps.bus, deps.repos, run.id);
-      return c.json(runSummary(find(run.id) as IngestionRunRecord), 201);
+      const { run } = await startGithubRun(deps, parsed.data);
+      return c.json(runSummary(run), 201);
     }
     const parsed = IngestionCreateRequestSchema.safeParse(raw ?? {});
     if (!parsed.success) return validationError(c, parsed.error.issues);
     const body = parsed.data;
-    const file = deps.repos.sourceFiles.get(body.fileId);
-    if (!file) return apiError(c, 404, "not_found", "Arquivo não encontrado");
-    const meta = readMeta(deps.dataDir, file);
-    const models = resolveExtractionModels(deps.repos.settings);
-    const options = {
-      ocr: file.mime === "application/pdf" && body.options.ocr,
-      modelRead: file.mime === "application/pdf" && body.options.modelRead,
-    };
-    const run = deps.repos.ingestionRuns.create({
-      fileId: file.id,
-      provider: deps.provider.id,
-      models,
-      options,
-    });
-    const est = estimateExtraction({
-      textChars: meta?.chars ?? 0,
-      ...(meta?.pages ? { pdfPages: meta.pages } : {}),
-      models,
-      options,
-    });
-    deps.repos.ingestionRuns.setEstimate(run.id, {
-      documentTokens: est.calls.document?.tokens ?? 0,
-      factsTokens: est.calls.facts.tokens,
-      digestTokens: est.calls.digest.tokens,
-    });
-    deps.repos.ingestionRuns.setStatus(run.id, "queued");
-    await deps.queue.enqueue(run.id, "ingest.read_text");
+    const started = await startFileRun(deps, body.fileId, body.options);
+    if (!started) return apiError(c, 404, "not_found", "Arquivo não encontrado");
+    const { run, file } = started;
     patchOnboarding(deps.repos, { runId: run.id, fileId: file.id });
     const fresh = find(run.id);
     if (!fresh) return apiError(c, 500, "internal", "Run não encontrado após criação");

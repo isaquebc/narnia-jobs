@@ -14,6 +14,7 @@ import {
   type GithubAuthDeps,
 } from "./github-auth";
 import { createJsonlLogger, type JsonlLogger } from "./log";
+import { mcpRoutes } from "./mcp/server";
 import type { QueueAdapter } from "./queue";
 import { backupsRoutes } from "./routes/backups";
 import { dashboardRoutes } from "./routes/dashboard";
@@ -23,6 +24,7 @@ import { ingestionsRoutes } from "./routes/ingestions";
 import { jobsRoutes } from "./routes/jobs";
 import { notificationsRoutes } from "./routes/notifications";
 import { onboardingRoutes } from "./routes/onboarding";
+import { personaCardRoutes } from "./routes/persona-card";
 import { profilesRoutes } from "./routes/profiles";
 import { providerRoutes } from "./routes/provider";
 import { reposRoutes } from "./routes/repos";
@@ -103,6 +105,19 @@ export function createApp(deps: AppDeps) {
       deviceFlow,
     }),
   );
+  // F04: servidor MCP (/mcp) e a rota do hook SessionStart (antes das rotas de perfil, que têm /:id)
+  app.route(
+    "/",
+    mcpRoutes({
+      repos: deps.repos,
+      dataDir: deps.dataDir,
+      provider: deps.provider,
+      queue: deps.queue,
+      bus: deps.bus,
+      version: deps.version,
+    }),
+  );
+  app.route("/", personaCardRoutes({ repos: deps.repos }));
   app.route("/", onboardingRoutes({ repos: deps.repos }));
   app.route("/", filesRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
   app.route(

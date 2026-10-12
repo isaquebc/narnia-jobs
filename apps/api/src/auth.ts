@@ -24,7 +24,8 @@ export function tokenMatches(expected: string, given: string | undefined | null)
 export function authMiddleware(token: string): MiddlewareHandler {
   return async (c, next) => {
     const path = new URL(c.req.url).pathname;
-    if (PUBLIC_PATHS.has(path) || !path.startsWith("/api/")) return next();
+    // /api/* e o servidor MCP (/mcp, F04-7) exigem o token; o resto (SPA, assets) é público
+    if (PUBLIC_PATHS.has(path) || !(path.startsWith("/api/") || path === "/mcp")) return next();
     const header = c.req.header("authorization");
     const bearer = header?.startsWith("Bearer ") ? header.slice(7) : null;
     if (tokenMatches(token, bearer) || tokenMatches(token, getCookie(c, COOKIE_NAME)))
