@@ -19,6 +19,7 @@ import { mcpRoutes } from "./mcp/server";
 import type { QueueAdapter } from "./queue";
 import { backupsRoutes } from "./routes/backups";
 import { chatRoutes } from "./routes/chat";
+import { chatSettingsRoutes } from "./routes/chat-settings";
 import { dashboardRoutes } from "./routes/dashboard";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
@@ -122,6 +123,7 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", personaCardRoutes({ repos: deps.repos }));
+  app.route("/", chatSettingsRoutes({ repos: deps.repos }));
   const sessions =
     deps.sessions ??
     new SessionManager({

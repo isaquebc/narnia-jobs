@@ -5,6 +5,7 @@ import {
   ChatSessionSchema,
   ChatSessionStateSchema,
   ResearchSourceSchema,
+  TrustedDomainSchema,
 } from "../schemas/chat";
 import { IdSchema, IsoDateTimeSchema } from "../schemas/common";
 import {
@@ -647,6 +648,29 @@ export const ChatSessionLimitDetailsSchema = z.object({
   live: z.array(ChatSessionSchema),
 });
 export const ResearchListResponseSchema = z.object({ sources: z.array(ResearchSourceSchema) });
+
+// Configurações › Chat (F04 M4): preferências (F04-3, F04-4, F04-9) e domínios confiáveis (F04-5)
+export const ChatSettingsSchema = z.object({
+  maxLiveSessions: z.number().int().min(1).max(20),
+  hibernateAfterMin: z
+    .number()
+    .int()
+    .min(5)
+    .max(24 * 60),
+  maxTurns: z.number().int().min(1).max(50),
+  defaultModel: z.string().min(1).max(100),
+  maxBudgetUsd: z.number().min(0).nullable(),
+  requireTrustedResearch: z.boolean(),
+});
+export type ChatSettingsDto = z.infer<typeof ChatSettingsSchema>;
+export const ChatSettingsResponseSchema = z.object({ settings: ChatSettingsSchema });
+export const ChatSettingsPutRequestSchema = ChatSettingsSchema.partial();
+export const TrustedDomainsResponseSchema = z.object({ domains: z.array(TrustedDomainSchema) });
+export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
+  pattern: true,
+  trustTag: true,
+});
+export const TrustedDomainPatchRequestSchema = z.object({ enabled: z.boolean() });
 
 // WS /ws — jobs/provider (F01) + perfil (F02). Quem lê `jobId` discrimina por `type` antes.
 export const WsEventSchema = z.discriminatedUnion("type", [
