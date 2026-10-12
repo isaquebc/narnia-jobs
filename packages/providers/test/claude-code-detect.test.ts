@@ -70,4 +70,61 @@ describe("M4/providers ClaudeCodeProvider.detect (claude auth status, zero token
     expect(s.installed).toBe(true);
     expect(s.loggedIn).toBe(false);
   });
+
+  describe("login expirado no volume (2026-10-12: chat falhou com 'OAuth session expired and could not be refreshed')", () => {
+    const loggedExec = (method = "claude.ai") =>
+      fakeExec({
+        "--version": { stdout: "2.1.292 (Claude Code)", stderr: "", code: 0 },
+        "auth status": { stdout: AUTH_OUT(true, method), stderr: "", code: 0 },
+      });
+    const creds = (o: Record<string, unknown>) => JSON.stringify({ claudeAiOauth: o });
+
+    it("credencial esvaziada (expiresAt 0, sem refreshToken) → não logado, authExpired e dica de refazer o login", async () => {
+      const s = await new ClaudeCodeProvider({
+        exec: loggedExec(),
+        binaryPath: "/bin/claude",
+        readCredentials: () => creds({ accessToken: "x", expiresAt: 0, scopes: [] }),
+      }).detect();
+      expect(s).toMatchObject({ loggedIn: false, authMethod: "none", authExpired: true });
+      expect(s.loginHint).toMatch(/expirou/);
+      expect(s.loginHint).toContain("./start.sh login");
+      expect(s.loginHint).toContain("claude setup-token");
+    });
+
+    it("acesso vencido mas com refreshToken → segue logado (o CLI renova sozinho)", async () => {
+      const s = await new ClaudeCodeProvider({
+        exec: loggedExec(),
+        binaryPath: "/bin/claude",
+        readCredentials: () => creds({ accessToken: "x", refreshToken: "r", expiresAt: 1 }),
+      }).detect();
+      expect(s.loggedIn).toBe(true);
+      expect(s.authExpired).toBeFalsy();
+    });
+
+    it("acesso ainda válido sem refreshToken → logado", async () => {
+      const s = await new ClaudeCodeProvider({
+        exec: loggedExec(),
+        binaryPath: "/bin/claude",
+        readCredentials: () => creds({ accessToken: "x", expiresAt: Date.now() + 3_600_000 }),
+      }).detect();
+      expect(s.loggedIn).toBe(true);
+    });
+
+    it("token do .env (oauth_token) ignora o arquivo; arquivo ausente ou ilegível mantém o auth status", async () => {
+      const viaEnv = await new ClaudeCodeProvider({
+        exec: loggedExec("oauth_token"),
+        binaryPath: "/bin/claude",
+        readCredentials: () => creds({ expiresAt: 0 }),
+      }).detect();
+      expect(viaEnv.loggedIn).toBe(true);
+      for (const raw of [null, "não é json"]) {
+        const s = await new ClaudeCodeProvider({
+          exec: loggedExec(),
+          binaryPath: "/bin/claude",
+          readCredentials: () => raw,
+        }).detect();
+        expect(s.loggedIn).toBe(true);
+      }
+    });
+  });
 });

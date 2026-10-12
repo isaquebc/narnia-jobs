@@ -28,7 +28,7 @@ export interface DoctorDeps {
 export interface DoctorReport {
   ok: boolean;
   checks: {
-    auth: "volume" | "token" | "other" | "none";
+    auth: "volume" | "token" | "other" | "expired" | "none";
     cliInstalled: boolean;
     cliVersion: string | null;
     redis: boolean;
@@ -57,6 +57,9 @@ export async function runDoctor(deps: DoctorDeps): Promise<DoctorReport> {
         : status.authMethod === "claude.ai"
           ? "volume"
           : "other";
+  } else if (status.authExpired) {
+    auth = "expired";
+    hints.push(status.loginHint ?? "O login da assinatura expirou: rode `./start.sh login`.");
   } else {
     hints.push(
       "Não logado: rode `narnia-jobs login` (login no volume) ou defina CLAUDE_CODE_OAUTH_TOKEN no .env (token de `claude setup-token`).",
@@ -141,6 +144,7 @@ export async function runDoctor(deps: DoctorDeps): Promise<DoctorReport> {
   return {
     ok:
       auth !== "none" &&
+      auth !== "expired" &&
       redis &&
       dataDirWritable &&
       workerAlive &&

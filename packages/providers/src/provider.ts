@@ -33,6 +33,8 @@ export interface ProviderStatus {
   version: string | null;
   /** Instruções acionáveis quando não logado (dois caminhos: volume e token). */
   loginHint: string | null;
+  /** Login do volume esvaziado pelo CLI depois de uma renovação que falhou (sem refreshToken e acesso vencido). */
+  authExpired?: boolean;
 }
 
 export interface Usage {
@@ -164,6 +166,15 @@ export class ProviderError extends Error {
 export const LOGIN_HINT =
   "Não logado. Caminho padrão: rode `./start.sh login` (ou `narnia-jobs login`) para entrar com a assinatura dentro do container. " +
   "Alternativa: gere um token com `claude setup-token` no host e defina CLAUDE_CODE_OAUTH_TOKEN no .env.";
+
+/**
+ * Login do volume que expirou (2026-10-12): o CLI esvazia a credencial quando a renovação falha. Vários processos
+ * `claude` (worker e chat da api) renovando o mesmo login podem disputar o token de renovação; o token de longa
+ * duração do `claude setup-token` não renova e evita a disputa.
+ */
+export const LOGIN_EXPIRED_HINT =
+  "O login da assinatura expirou e não pôde ser renovado. Refaça com `./start.sh login` (ou `narnia-jobs login`). " +
+  "Para não expirar de novo: gere um token com `claude setup-token` no host, defina CLAUDE_CODE_OAUTH_TOKEN no .env e reinicie.";
 
 /** ~4 caracteres por token; usado pelo mock e por estimativas locais. */
 export function approxTokens(text: string): number {

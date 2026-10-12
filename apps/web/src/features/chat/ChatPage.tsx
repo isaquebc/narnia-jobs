@@ -2,7 +2,7 @@ import type { ChatSession } from "@narnia-jobs/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Archive, Pencil, Square, Wrench } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useApi, useTimezone, useWs } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
@@ -58,8 +58,9 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   };
 
   return (
-    <div className="flex h-full gap-4">
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+    // altura fixa (a do <main>): as mensagens rolam dentro do próprio quadro e o envio fica sempre à vista
+    <div className="flex h-full min-h-0 gap-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-semibold">{t("chat.title")}</h1>
           <Button onClick={() => void startNew()} disabled={!loggedIn || create.isPending}>
@@ -202,6 +203,16 @@ function ChatView({ sessionId }: { sessionId: string }) {
     setText("");
   };
   const sessionTokens = (s?.tokensIn ?? 0) + (s?.tokensOut ?? 0);
+  // desce sozinho a cada mensagem nova, a menos que o usuário tenha subido para ler o histórico
+  const scroller = useRef<HTMLDivElement>(null);
+  const stuck = useRef(true);
+  const historyLength = chat.history.length;
+  const toolsLength = chat.tools.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: as dependências são os gatilhos de rolagem, não lidas no efeito
+  useEffect(() => {
+    const el = scroller.current;
+    if (el && stuck.current) el.scrollTop = el.scrollHeight;
+  }, [historyLength, toolsLength, chat.streamed, chat.pendingUser, chat.turnActive]);
   return (
     <section
       className="flex min-h-0 flex-1 flex-col gap-3"
@@ -231,67 +242,76 @@ function ChatView({ sessionId }: { sessionId: string }) {
       </div>
       {s?.state === "hibernated" ? <Alert tone="info">{t("chat.hibernated")}</Alert> : null}
       {s?.state === "error" ? <Alert tone="warn">{t("chat.errorState")}</Alert> : null}
-      <ol className="flex flex-col gap-3" aria-label={t("chat.messages")}>
-        {chat.history.length === 0 && !chat.pendingUser ? (
-          <li className="text-sm text-muted-fg">{t("chat.emptySession")}</li>
-        ) : null}
-        {chat.history.map((m) => (
-          <li key={m.id} className={m.role === "user" ? "self-end max-w-[80%]" : "max-w-[90%]"}>
-            {m.role === "system_note" ? (
-              <p className="text-xs italic text-muted-fg">{m.contentMd}</p>
-            ) : (
-              <Card className={m.role === "user" ? "bg-muted p-3" : "p-3"}>
-                <span className="mb-1 block text-xs text-muted-fg">
-                  {m.role === "user" ? t("chat.you") : t("chat.recruiter")}
-                </span>
-                {m.toolCalls.length > 0 ? (
+      <div
+        ref={scroller}
+        className="min-h-0 flex-1 overflow-y-auto pr-1"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+      >
+        <ol className="flex flex-col gap-3" aria-label={t("chat.messages")}>
+          {chat.history.length === 0 && !chat.pendingUser ? (
+            <li className="text-sm text-muted-fg">{t("chat.emptySession")}</li>
+          ) : null}
+          {chat.history.map((m) => (
+            <li key={m.id} className={m.role === "user" ? "self-end max-w-[80%]" : "max-w-[90%]"}>
+              {m.role === "system_note" ? (
+                <p className="text-xs italic text-muted-fg">{m.contentMd}</p>
+              ) : (
+                <Card className={m.role === "user" ? "bg-muted p-3" : "p-3"}>
+                  <span className="mb-1 block text-xs text-muted-fg">
+                    {m.role === "user" ? t("chat.you") : t("chat.recruiter")}
+                  </span>
+                  {m.toolCalls.length > 0 ? (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {m.toolCalls.map((tc, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: lista do histórico, imutável e sem reordenação
+                        <ToolChip key={`${m.id}-${i}`} tool={tc} />
+                      ))}
+                    </div>
+                  ) : null}
+                  <Markdown text={m.contentMd} />
+                </Card>
+              )}
+            </li>
+          ))}
+          {chat.pendingUser ? (
+            <li className="self-end max-w-[80%]">
+              <Card className="bg-muted p-3">
+                <span className="mb-1 block text-xs text-muted-fg">{t("chat.you")}</span>
+                <Markdown text={chat.pendingUser} />
+              </Card>
+            </li>
+          ) : null}
+          {chat.turnActive || chat.streamed || chat.tools.length > 0 ? (
+            <li className="max-w-[90%]" aria-live="polite">
+              <Card className="p-3">
+                <span className="mb-1 block text-xs text-muted-fg">{t("chat.recruiter")}</span>
+                {chat.tools.length > 0 ? (
                   <div className="mb-2 flex flex-wrap gap-1">
-                    {m.toolCalls.map((tc, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: lista do histórico, imutável e sem reordenação
-                      <ToolChip key={`${m.id}-${i}`} tool={tc} />
+                    {chat.tools.map((tl: LiveTool, i) => (
+                      <ToolChip
+                        // biome-ignore lint/suspicious/noArrayIndexKey: ferramentas do turno só são acrescentadas, nunca reordenadas
+                        key={`${tl.name}-${i}`}
+                        tool={{
+                          name: tl.name,
+                          durationMs: tl.durationMs,
+                          isError: tl.phase === "error",
+                        }}
+                      />
                     ))}
                   </div>
                 ) : null}
-                <Markdown text={m.contentMd} />
+                {chat.streamed ? <Markdown text={chat.streamed} /> : null}
+                {chat.turnActive && !chat.streamed ? (
+                  <span className="text-sm text-muted-fg">{t("chat.thinking")}</span>
+                ) : null}
               </Card>
-            )}
-          </li>
-        ))}
-        {chat.pendingUser ? (
-          <li className="self-end max-w-[80%]">
-            <Card className="bg-muted p-3">
-              <span className="mb-1 block text-xs text-muted-fg">{t("chat.you")}</span>
-              <Markdown text={chat.pendingUser} />
-            </Card>
-          </li>
-        ) : null}
-        {chat.turnActive || chat.streamed || chat.tools.length > 0 ? (
-          <li className="max-w-[90%]" aria-live="polite">
-            <Card className="p-3">
-              <span className="mb-1 block text-xs text-muted-fg">{t("chat.recruiter")}</span>
-              {chat.tools.length > 0 ? (
-                <div className="mb-2 flex flex-wrap gap-1">
-                  {chat.tools.map((tl: LiveTool, i) => (
-                    <ToolChip
-                      // biome-ignore lint/suspicious/noArrayIndexKey: ferramentas do turno só são acrescentadas, nunca reordenadas
-                      key={`${tl.name}-${i}`}
-                      tool={{
-                        name: tl.name,
-                        durationMs: tl.durationMs,
-                        isError: tl.phase === "error",
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              {chat.streamed ? <Markdown text={chat.streamed} /> : null}
-              {chat.turnActive && !chat.streamed ? (
-                <span className="text-sm text-muted-fg">{t("chat.thinking")}</span>
-              ) : null}
-            </Card>
-          </li>
-        ) : null}
-      </ol>
+            </li>
+          ) : null}
+        </ol>
+      </div>
       {chat.createdRuns.map((runId) => (
         <NavLink key={runId} to={`/ingestao/${runId}`} className="text-sm underline">
           {t("chat.ingestionCreated")}
@@ -392,7 +412,10 @@ function ContextPanel({ sessionId, profileId }: { sessionId: string; profileId: 
   );
   const mine = sources.filter((s) => s.sessionId === null || s.sessionId === sessionId);
   return (
-    <aside aria-label={t("chat.context")} className="hidden w-72 shrink-0 flex-col gap-3 lg:flex">
+    <aside
+      aria-label={t("chat.context")}
+      className="hidden min-h-0 w-72 shrink-0 flex-col gap-3 overflow-y-auto lg:flex"
+    >
       <Card className="p-3">
         <CardTitle className="mb-2 text-sm">{t("chat.card")}</CardTitle>
         <p className="whitespace-pre-wrap text-xs text-muted-fg">{card.data?.text ?? "…"}</p>

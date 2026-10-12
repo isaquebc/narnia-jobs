@@ -45,7 +45,10 @@ export function SideNav({ className }: { className?: string }) {
   const completed = onboarding.data?.completed === true;
   return (
     <nav
-      className={cn("flex w-56 flex-col gap-3 border-r border-border bg-card p-3", className)}
+      className={cn(
+        "flex w-56 shrink-0 flex-col gap-3 overflow-y-auto border-r border-border bg-card p-3",
+        className,
+      )}
       aria-label={t("app.name")}
     >
       {!onboarding.data ? null : !completed ? (

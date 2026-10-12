@@ -11,6 +11,7 @@ export type FriendlyErrorKey =
   | "error.github_rate_limited"
   | "error.repo_empty"
   | "error.gh_missing"
+  | "error.auth_expired"
   | "error.unknown";
 
 export interface FriendlyError {
@@ -37,6 +38,10 @@ const BY_TEXT: Array<[RegExp, FriendlyErrorKey]> = [
   [/não conectado|sem autenticação|not_authenticated/i, "error.github_not_connected"],
   [/limite de requisições|rate limit/i, "error.github_rate_limited"],
   [/repositório vazio|repository is empty/i, "error.repo_empty"],
+  [
+    /OAuth session expired|could not be refreshed|Failed to authenticate|authentication_error|Please run \/login/i,
+    "error.auth_expired",
+  ],
   [/cli indisponível|gh não está instalado|ENOENT/i, "error.gh_missing"],
 ];
 

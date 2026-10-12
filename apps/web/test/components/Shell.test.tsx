@@ -36,4 +36,32 @@ describe("Shell · L0 mínimo", () => {
     expect(root.classList.contains("dark")).toBe(true);
     expect(screen.getByText("conteúdo")).toBeInTheDocument();
   });
+
+  it("ocupa a altura da janela: só o <main> rola, cabeçalho e menu ficam fixos (pedido do dono, 2026-10-12)", async () => {
+    renderWithProviders(
+      <Shell>
+        <p>conteúdo</p>
+      </Shell>,
+      {
+        api: {
+          listJobs: async () => ({ jobs: [] }),
+          getProviderStatus: async () => ({
+            installed: true,
+            loggedIn: true,
+            authMethod: "claude.ai",
+            version: "1",
+            loginHint: null,
+          }),
+          listProfiles: async () => ({ profiles: [] }),
+        },
+      },
+    );
+    const main = await screen.findByRole("main");
+    expect(main.className).toMatch(/overflow-auto/);
+    expect(main.className).toMatch(/min-h-0/);
+    const root = main.closest("div.flex-col") as HTMLElement;
+    expect(root.className).toMatch(/\bh-screen\b/);
+    expect(root.className).toMatch(/overflow-hidden/);
+    expect(main.parentElement?.className).toMatch(/min-h-0/);
+  });
 });

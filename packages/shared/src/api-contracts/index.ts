@@ -72,6 +72,8 @@ export const ProviderStatusResponseSchema = z.object({
   ]),
   version: z.string().nullable(),
   loginHint: z.string().nullable(),
+  /** Login do volume expirou e não pôde ser renovado (2026-10-12). */
+  authExpired: z.boolean().optional(),
 });
 export type ProviderStatusResponse = z.infer<typeof ProviderStatusResponseSchema>;
 

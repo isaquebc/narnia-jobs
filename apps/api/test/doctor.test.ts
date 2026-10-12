@@ -59,4 +59,25 @@ describe("M4/api narnia-jobs doctor", () => {
       }
     }
   });
+
+  it("login do volume esvaziado (refresh falhou) → auth 'expired' e dica de refazer o login ou usar setup-token", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "narnia-doctor-"));
+    try {
+      const r = await runDoctor({
+        provider: new MockProvider({ loggedIn: false, authExpired: true }),
+        dataDir: dir,
+        redisPing: async () => "PONG",
+        workerHeartbeat: async () => new Date().toISOString(),
+      });
+      expect(r.checks.auth).toBe("expired");
+      expect(r.ok).toBe(false);
+      const hints = r.hints.join(" ");
+      expect(hints).toMatch(/expirou/);
+      expect(hints).toContain("./start.sh login");
+      expect(hints).toContain("claude setup-token");
+      expect(hints).not.toMatch(/^Não logado/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

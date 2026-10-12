@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname } from "node:path";
 import { promisify } from "node:util";
 import {
@@ -47,6 +48,7 @@ import {
   type BuildDigestInput,
   type CheckProposalsInput,
   type ExtractFactsInput,
+  LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
   type Provider,
@@ -137,6 +139,34 @@ export interface ClaudeCodeProviderOptions {
   usageProbe?: UsageProbe;
   /** `query` do SDK para o chat com entrada em streaming (F04 M3); injetável nos testes. */
   chatQuery?: ChatQueryFn;
+  /** Conteúdo de `.credentials.json` do CLI (null = ausente); padrão = arquivo em CLAUDE_CONFIG_DIR ou ~/.claude. */
+  readCredentials?: () => string | null;
+}
+
+export const defaultReadCredentials = (): string | null => {
+  const dir = process.env.CLAUDE_CONFIG_DIR || `${homedir()}/.claude`;
+  try {
+    return readFileSync(`${dir}/.credentials.json`, "utf8");
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Credencial do volume esvaziada: sem refreshToken e com o acesso vencido. É o que o CLI grava quando a renovação
+ * falha (visto na instância do dono em 2026-10-12); o `claude auth status` segue dizendo "logado".
+ */
+export function credentialsExpired(raw: string | null, now = Date.now()): boolean {
+  if (!raw) return false;
+  try {
+    const o = (
+      JSON.parse(raw) as { claudeAiOauth?: { refreshToken?: unknown; expiresAt?: unknown } }
+    ).claudeAiOauth;
+    if (!o || typeof o.expiresAt !== "number") return false;
+    return !o.refreshToken && o.expiresAt <= now;
+  } catch {
+    return false;
+  }
 }
 
 const AUTH_METHODS: ReadonlySet<string> = new Set([
@@ -232,6 +262,7 @@ export class ClaudeCodeProvider implements Provider {
   private readonly chatQuery: ChatQueryFn | null;
   private readonly binaryPath: string | null;
   private readonly usageProbe: UsageProbe;
+  private readonly readCredentials: () => string | null;
   /** Último `rate_limit_event` por tipo de janela, visto em qualquer `query` deste processo. */
   private readonly rateLimits = new Map<string, RateLimitInfoLike>();
 
@@ -243,6 +274,7 @@ export class ClaudeCodeProvider implements Provider {
       options.binaryPath ??
       resolveClaudeBinary({ explicit: process.env.CLAUDE_CODE_BIN || undefined });
     this.usageProbe = options.usageProbe ?? createSdkUsageProbe({ binaryPath: this.binaryPath });
+    this.readCredentials = options.readCredentials ?? defaultReadCredentials;
   }
 
   /**
@@ -364,6 +396,17 @@ export class ClaudeCodeProvider implements Provider {
       authMethod = loggedIn && AUTH_METHODS.has(method) ? (method as AuthMethod) : "none";
     } catch {
       loggedIn = false;
+    }
+    // o token do .env (oauth_token) não usa o arquivo; o login do volume pode estar esvaziado mesmo "logado"
+    if (loggedIn && authMethod === "claude.ai" && credentialsExpired(this.readCredentials())) {
+      return {
+        installed: true,
+        loggedIn: false,
+        authMethod: "none",
+        version,
+        loginHint: LOGIN_EXPIRED_HINT,
+        authExpired: true,
+      };
     }
     return {
       installed: true,

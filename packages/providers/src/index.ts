@@ -64,6 +64,7 @@ export {
   type BuildDigestInput,
   type CheckProposalsInput,
   type ExtractFactsInput,
+  LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
   type Provider,

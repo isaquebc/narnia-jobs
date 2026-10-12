@@ -170,6 +170,43 @@ describe("F04/M4 · chat com o recrutador", () => {
     expect(screen.getByText("Detalhes técnicos")).toBeInTheDocument();
   });
 
+  it("login expirado: mensagem em pt-BR com como refazer o login, não o texto cru em inglês", async () => {
+    const { ws } = renderApp({ api: chatApi(), initialUrl: "/chat/s1" });
+    await screen.findByRole("textbox", { name: "Mensagem para o recrutador" });
+    act(() =>
+      ws.emit({
+        type: "chat.error",
+        sessionId: "s1",
+        error: "Failed to authenticate: OAuth session expired and could not be refreshed",
+        errorKey: "error.auth_expired",
+      }),
+    );
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/login da assinatura expirou/i);
+    expect(alert).toHaveTextContent("./start.sh login");
+    expect(alert).toHaveTextContent("claude setup-token");
+  });
+
+  it("mensagens rolam dentro do próprio quadro e a lista desce sozinha a cada mensagem nova", async () => {
+    const { ws } = renderApp({ api: chatApi(), initialUrl: "/chat/s1" });
+    const list = await screen.findByRole("list", { name: "Mensagens" });
+    const scroller = list.parentElement as HTMLElement;
+    expect(scroller.className).toMatch(/overflow-y-auto/);
+    expect(scroller.className).toMatch(/min-h-0/);
+    expect(scroller.className).toMatch(/flex-1/);
+    let top = 0;
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 900 });
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => top,
+      set: (v: number) => {
+        top = v;
+      },
+    });
+    act(() => ws.emit({ type: "chat.delta", sessionId: "s1", text: "resposta longa" }));
+    await waitFor(() => expect(top).toBe(900));
+  });
+
   it("provider deslogado: mostra como entrar e não cria conversa", async () => {
     const api = chatApi({
       listChatSessions: async () => ({ sessions: [] }),

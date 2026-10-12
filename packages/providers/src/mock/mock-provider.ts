@@ -22,6 +22,7 @@ import {
   type BuildDigestInput,
   type CheckProposalsInput,
   type ExtractFactsInput,
+  LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
   type Provider,
@@ -57,6 +58,8 @@ export interface MockProviderOptions {
   installed?: boolean;
   loggedIn?: boolean;
   authMethod?: Exclude<AuthMethod, "none">;
+  /** Com `loggedIn: false`: o login do volume expirou (credencial esvaziada), como o real detecta. */
+  authExpired?: boolean;
   version?: string;
   /** Atraso artificial por operação (modo `slow`). */
   delayMs?: number;
@@ -112,6 +115,7 @@ const DEFAULT_MODE: MockMode = {
   installed: true,
   loggedIn: true,
   authMethod: "claude.ai",
+  authExpired: false,
   version: "2.1.292",
   delayMs: 0,
   errors: {},
@@ -198,7 +202,7 @@ export class MockProvider implements Provider {
 
   async detect(): Promise<ProviderStatus> {
     await this.gate("detect");
-    const { installed, loggedIn, authMethod, version } = this.mode;
+    const { installed, loggedIn, authMethod, authExpired, version } = this.mode;
     if (!installed) {
       return {
         installed: false,
@@ -214,7 +218,8 @@ export class MockProvider implements Provider {
         loggedIn: false,
         authMethod: "none",
         version,
-        loginHint: LOGIN_HINT,
+        loginHint: authExpired ? LOGIN_EXPIRED_HINT : LOGIN_HINT,
+        ...(authExpired ? { authExpired: true } : {}),
       };
     }
     return { installed: true, loggedIn: true, authMethod, version, loginHint: null };

@@ -61,6 +61,9 @@ export const ptBR = {
     repo_empty_hint: "Nada a fazer.",
     gh_missing: "O GitHub CLI não está disponível no serviço.",
     gh_missing_hint: "Reconstrua a stack com make dev-down && make dev.",
+    auth_expired: "O login da assinatura expirou e não pôde ser renovado.",
+    auth_expired_hint:
+      "Refaça com ./start.sh login. Para não expirar de novo, gere um token com claude setup-token, defina CLAUDE_CODE_OAUTH_TOKEN no .env e reinicie.",
     unknown: "Algo deu errado nesta etapa.",
     unknown_hint: "Tente de novo.",
   },

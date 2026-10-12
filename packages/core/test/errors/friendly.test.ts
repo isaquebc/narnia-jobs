@@ -24,6 +24,14 @@ describe("friendlyError · mapa único de erros", () => {
     ["repositório vazio (sem commits)", "error.repo_empty"],
     ["GitHub CLI indisponível no container", "error.gh_missing"],
     ["gh não está instalado", "error.gh_missing"],
+    [
+      "Failed to authenticate: OAuth session expired and could not be refreshed",
+      "error.auth_expired",
+    ],
+    [
+      "API Error: 401 authentication_error: invalid token · Please run /login",
+      "error.auth_expired",
+    ],
     ["algo totalmente inesperado", "error.unknown"],
   ];
   for (const [raw, key] of cases) {
