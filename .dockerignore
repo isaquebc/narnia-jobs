@@ -9,6 +9,7 @@ plans
 *.md
 !README.md
 !packages/providers/src/**/*.md
+!plugin/**
 .e2e-data
 apps/e2e
 scripts/test

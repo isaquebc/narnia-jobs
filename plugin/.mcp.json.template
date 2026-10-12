@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "narnia-jobs": {
+      "type": "http",
+      "url": "http://127.0.0.1:${NARNIA_API_PORT}/mcp",
+      "headers": { "Authorization": "Bearer ${NARNIA_TOKEN}" }
+    }
+  }
+}

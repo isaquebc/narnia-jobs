@@ -23,3 +23,6 @@ report/
 .claude-data/
 backups/
 .owner-src/
+# gerados pelo install-plugin (porta e token da instância): nunca versionar
+plugin/.mcp.json
+plugin/.narnia-env
