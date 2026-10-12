@@ -1,0 +1,235 @@
+import type { Usage } from "./provider";
+
+/**
+ * Sessão longa de chat (F04 M3, §2.5): o `api` abre uma `ChatHandle` por sessão viva, empurra as mensagens do usuário
+ * (entrada em streaming do SDK) e consome eventos normalizados. Os eventos do SDK do Claude Code e os roteiros do mock
+ * viram o mesmo `ChatEvent`.
+ */
+export type ChatEvent =
+  | { type: "init"; providerSessionId: string }
+  | { type: "delta"; text: string }
+  | { type: "tool_start"; id: string; name: string; args: string }
+  | { type: "tool_end"; id: string; isError: boolean }
+  | {
+      type: "turn_end";
+      text: string;
+      providerSessionId: string | null;
+      costUsd: number;
+      usage: Usage;
+    }
+  | { type: "limit"; reason: "max_turns" | "max_budget"; usage: Usage; costUsd: number }
+  | { type: "error"; message: string };
+
+export interface ChatOpenOptions {
+  systemPrompt: string;
+  model: string;
+  /** Id da sessão no provider para retomar (hibernada, reinício do api). */
+  resume?: string | null;
+  /** Turnos do agente por mensagem do usuário (`chat.max_turns`). */
+  maxTurns: number;
+  /** Teto de custo por sessão (`chat.max_budget_usd`); null = sem teto. */
+  maxBudgetUsd?: number | null;
+  /** Servidor MCP do app (`/mcp`) com o token e o header da sessão (escopo de tools, F04-2). */
+  mcp: { url: string; headers: Record<string, string> };
+  /** Pasta do plugin (persona, skills, hook); null nos testes. */
+  pluginDir?: string | null;
+  /** Tools nativas liberadas pela categoria (ex.: WebSearch). */
+  tools: string[];
+  /** Variáveis acrescentadas ao ambiente do processo do CLI (`NARNIA_SESSION_HAS_CARD`). */
+  env?: Record<string, string>;
+  category: string;
+  ingestionRunId?: string | null;
+  /** Só o mock usa: como chamar o `/mcp` (nos testes da api, o `app.request` em memória). */
+  fetch?: typeof fetch;
+}
+
+export interface ChatHandle {
+  send(text: string): void;
+  readonly events: AsyncIterable<ChatEvent>;
+  interrupt(): Promise<void>;
+  setModel(model: string): Promise<void>;
+  close(): void;
+}
+
+/* ---------- SDK ---------- */
+
+/** Subconjunto estrutural das mensagens do SDK que o chat usa. */
+export interface SdkChatMessageLike {
+  type: string;
+  subtype?: string;
+  session_id?: string;
+  event?: { type?: string; delta?: { type?: string; text?: string } };
+  message?: {
+    content?:
+      | string
+      | Array<{
+          type: string;
+          id?: string;
+          name?: string;
+          input?: unknown;
+          tool_use_id?: string;
+          is_error?: boolean;
+          text?: string;
+        }>;
+  };
+  result?: string;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
+  total_cost_usd?: number;
+  errors?: string[];
+}
+
+/** Mensagem de usuário da entrada em streaming (`SDKUserMessage`). */
+export interface SdkUserMessageLike {
+  type: "user";
+  message: { role: "user"; content: string };
+  parent_tool_use_id: null;
+  session_id: string;
+}
+
+export interface ChatSdkOptions {
+  model: string;
+  systemPrompt: string;
+  resume?: string;
+  maxTurns: number;
+  maxBudgetUsd?: number;
+  includePartialMessages: true;
+  tools: string[];
+  plugins: Array<{ type: "local"; path: string }>;
+  mcpServers: Record<string, { type: "http"; url: string; headers: Record<string, string> }>;
+  env: Record<string, string | undefined>;
+  settingSources: [];
+  pathToClaudeCodeExecutable?: string;
+}
+
+export type ChatQueryLike = AsyncIterable<SdkChatMessageLike> & {
+  interrupt(): Promise<unknown>;
+  setModel(model?: string): Promise<void>;
+  close?(): void;
+};
+
+export type ChatQueryFn = (params: {
+  prompt: AsyncIterable<SdkUserMessageLike>;
+  options: ChatSdkOptions;
+}) => ChatQueryLike;
+
+/** As tools MCP chegam prefixadas pelo SDK (`mcp__narnia-jobs__experience_list`): a UI mostra só o nome publicado. */
+export function toolDisplayName(name: string): string {
+  const m = /^mcp__[^_]+(?:-[^_]+)*__(.+)$/.exec(name);
+  return m ? (m[1] as string) : name;
+}
+
+const ARGS_MAX = 500;
+const summarizeArgs = (input: unknown) => {
+  const s = JSON.stringify(input ?? {});
+  return s.length > ARGS_MAX ? `${s.slice(0, ARGS_MAX - 1)}…` : s;
+};
+
+function usageOf(m: SdkChatMessageLike, model: string): Usage {
+  return {
+    inputTokens: m.usage?.input_tokens ?? 0,
+    outputTokens: m.usage?.output_tokens ?? 0,
+    cacheReadTokens: m.usage?.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: m.usage?.cache_creation_input_tokens ?? 0,
+    model,
+  };
+}
+
+/** Converte uma mensagem do SDK em zero ou mais eventos de chat (função pura, testada por fixture). */
+export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): ChatEvent[] {
+  if (m.type === "system" && m.subtype === "init" && m.session_id)
+    return [{ type: "init", providerSessionId: m.session_id }];
+  if (m.type === "stream_event") {
+    const d = m.event?.delta;
+    if (m.event?.type === "content_block_delta" && d?.type === "text_delta" && d.text)
+      return [{ type: "delta", text: d.text }];
+    return [];
+  }
+  const blocks = Array.isArray(m.message?.content) ? m.message.content : [];
+  if (m.type === "assistant")
+    return blocks
+      .filter((b) => b.type === "tool_use" && b.id && b.name)
+      .map((b) => ({
+        type: "tool_start" as const,
+        id: b.id as string,
+        name: toolDisplayName(b.name as string),
+        args: summarizeArgs(b.input),
+      }));
+  if (m.type === "user")
+    return blocks
+      .filter((b) => b.type === "tool_result" && b.tool_use_id)
+      .map((b) => ({
+        type: "tool_end" as const,
+        id: b.tool_use_id as string,
+        isError: b.is_error === true,
+      }));
+  if (m.type === "result") {
+    const usage = usageOf(m, model);
+    const costUsd = m.total_cost_usd ?? 0;
+    if (m.subtype === "success")
+      return [
+        {
+          type: "turn_end",
+          text: m.result ?? "",
+          providerSessionId: m.session_id ?? null,
+          costUsd,
+          usage,
+        },
+      ];
+    if (m.subtype === "error_max_turns")
+      return [{ type: "limit", reason: "max_turns", usage, costUsd }];
+    if (m.subtype === "error_max_budget_usd")
+      return [{ type: "limit", reason: "max_budget", usage, costUsd }];
+    return [
+      {
+        type: "error",
+        message: m.errors?.join("; ") || m.result || `Falha no chat (${m.subtype})`,
+      },
+    ];
+  }
+  return [];
+}
+
+/* ---------- filas ---------- */
+
+/** Fila assíncrona simples: produtores empurram, um consumidor itera; `end` encerra a iteração. */
+export function createAsyncQueue<T>() {
+  const items: T[] = [];
+  const waiters: Array<(r: IteratorResult<T>) => void> = [];
+  let ended = false;
+  return {
+    push(item: T) {
+      if (ended) return;
+      const w = waiters.shift();
+      if (w) w({ value: item, done: false });
+      else items.push(item);
+    },
+    end() {
+      ended = true;
+      for (const w of waiters.splice(0)) w({ value: undefined, done: true });
+    },
+    get ended() {
+      return ended;
+    },
+    iterable: {
+      [Symbol.asyncIterator](): AsyncIterator<T> {
+        return {
+          next: () => {
+            const item = items.shift();
+            if (item !== undefined) return Promise.resolve({ value: item, done: false });
+            if (ended) return Promise.resolve({ value: undefined, done: true });
+            return new Promise((resolve) => waiters.push(resolve));
+          },
+          return: () => {
+            ended = true;
+            return Promise.resolve({ value: undefined, done: true });
+          },
+        };
+      },
+    } as AsyncIterable<T>,
+  };
+}

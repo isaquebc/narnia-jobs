@@ -42,6 +42,7 @@ function countingProvider(inner: Provider, calls: Record<string, number>): Provi
   return {
     id: inner.id,
     detect: () => inner.detect(),
+    openChat: (o) => inner.openChat(o),
     readDocument: wrap("readDocument") as Provider["readDocument"],
     extractFacts: wrap("extractFacts") as Provider["extractFacts"],
     buildDigest: wrap("buildDigest") as Provider["buildDigest"],
@@ -265,6 +266,7 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
       ...new MockProvider(),
       id: "mock",
       detect: () => new MockProvider().detect(),
+      openChat: (o) => new MockProvider().openChat(o),
       readDocument: async (i) => {
         seen = i.filePath;
         return new MockProvider().readDocument(i);

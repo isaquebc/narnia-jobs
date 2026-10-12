@@ -12,6 +12,7 @@ import type {
   RepoReport,
   SynthesizeRunOutput,
 } from "@narnia-jobs/shared";
+import type { ChatHandle, ChatOpenOptions } from "./chat";
 
 /**
  * Contrato de provider (F01 §2.4). `detect` nunca gasta tokens; as três operações de extração chamam o modelo
@@ -132,6 +133,8 @@ export interface Provider {
    * aplica (API key, terceiros) ou não há dado.
    */
   getPlanUsage(): Promise<PlanUsage | null>;
+  /** F04 M3: sessão longa de chat com entrada em streaming e eventos normalizados (nunca lança: falha vira `error`). */
+  openChat(opts: ChatOpenOptions): ChatHandle;
   /**
    * Janela de 5 h no instante, do último evento de limite visto (sem chamada nova; correções F03, item 11).
    * `null` quando não há dado (API key, mock sem plano).

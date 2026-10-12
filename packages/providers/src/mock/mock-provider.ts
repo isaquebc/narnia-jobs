@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
@@ -12,6 +13,7 @@ import type {
   ReadDocumentOutput,
   SynthesizeRunOutput,
 } from "@narnia-jobs/shared";
+import { type ChatEvent, type ChatHandle, type ChatOpenOptions, createAsyncQueue } from "../chat";
 import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
@@ -48,7 +50,8 @@ export type MockOperation =
   | "pickFiles"
   | "analyzeRepo"
   | "synthesizeRun"
-  | "checkProposals";
+  | "checkProposals"
+  | "openChat";
 
 export interface MockProviderOptions {
   installed?: boolean;
@@ -376,6 +379,86 @@ export class MockProvider implements Provider {
     return this.result(output, JSON.stringify(rest), model);
   }
 
+  /**
+   * Chat com roteiros (F04 M3): o "modelo" é falso, mas as tools são reais: cada turno chama uma tool do `/mcp` do app
+   * pelo JSON-RPC com os headers da sessão (token e `X-Narnia-Session`) e responde em fragmentos. Roteiro pela mensagem:
+   * clarificação → `ingest_propose`; salário/mercado/pesquisa → `research_save`; "texto:"/história → `ingest_text`;
+   * o resto → `evidence_experience_list`.
+   */
+  openChat(opts: ChatOpenOptions): ChatHandle {
+    const out = createAsyncQueue<ChatEvent>();
+    const providerSessionId = opts.resume ?? `mock-${randomUUID()}`;
+    out.push({ type: "init", providerSessionId });
+    const fetchFn = opts.fetch ?? fetch;
+    let rpcId = 0;
+    let chain: Promise<void> = Promise.resolve();
+    const callTool = async (name: string, args: Record<string, unknown>) => {
+      const res = await fetchFn(opts.mcp.url, {
+        method: "POST",
+        headers: {
+          ...opts.mcp.headers,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: ++rpcId,
+          method: "tools/call",
+          params: { name, arguments: args },
+        }),
+      });
+      const raw = await res.text();
+      const body = parseRpcBody(raw);
+      const result = body?.result as
+        | { content?: Array<{ text?: string }>; isError?: boolean }
+        | undefined;
+      return {
+        text: result?.content?.[0]?.text ?? raw.slice(0, 300),
+        isError: !res.ok || result?.isError === true || body?.error !== undefined,
+      };
+    };
+    const turn = async (text: string) => {
+      try {
+        await this.gate("openChat");
+        const [tool, args] = mockChatScript(text, opts);
+        const id = `mock-tool-${++rpcId}`;
+        out.push({ type: "tool_start", id, name: tool, args: JSON.stringify(args).slice(0, 500) });
+        const r = await callTool(tool, args);
+        out.push({ type: "tool_end", id, isError: r.isError });
+        const reply = mockChatReply(tool, r.isError);
+        for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
+          out.push({ type: "delta", text: piece });
+        out.push({
+          type: "turn_end",
+          text: reply,
+          providerSessionId,
+          costUsd: 0,
+          usage: {
+            inputTokens:
+              approxTokens(opts.systemPrompt) + approxTokens(text) + approxTokens(r.text) + 400,
+            outputTokens: approxTokens(reply),
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            model: opts.model,
+          },
+        });
+      } catch (e) {
+        out.push({ type: "error", message: (e as Error).message });
+      }
+    };
+    return {
+      send(text) {
+        chain = chain.then(() => turn(text));
+      },
+      events: out.iterable,
+      async interrupt() {},
+      async setModel() {},
+      close() {
+        out.end();
+      },
+    };
+  }
+
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {
     await this.gate("buildDigest");
     return this.result(
@@ -384,4 +467,73 @@ export class MockProvider implements Provider {
       input.model,
     );
   }
+}
+
+/** Corpo da resposta do `/mcp`: JSON (modo `enableJsonResponse`) ou SSE com linhas `data:`. */
+function parseRpcBody(raw: string): { result?: unknown; error?: unknown } | null {
+  const tryJson = (t: string) => {
+    try {
+      return JSON.parse(t) as { result?: unknown; error?: unknown };
+    } catch {
+      return null;
+    }
+  };
+  const direct = tryJson(raw);
+  if (direct) return direct;
+  for (const line of raw.split("\n"))
+    if (line.startsWith("data:")) return tryJson(line.slice(5).trim());
+  return null;
+}
+
+/** Roteiro do mock: qual tool chamar para a mensagem (e com que argumentos válidos). */
+export function mockChatScript(
+  text: string,
+  opts: Pick<ChatOpenOptions, "category" | "ingestionRunId">,
+): [string, Record<string, unknown>] {
+  if (opts.category === "clarify" && opts.ingestionRunId)
+    return [
+      "ingest_propose",
+      {
+        runId: opts.ingestionRunId,
+        proposals: [
+          {
+            proposal: {
+              kind: "skill",
+              confidence: 0.7,
+              data: { name: "Comunicação com stakeholders", category: "soft" },
+            },
+            evidence: { ref: "conversa", quote: text.slice(0, 200) || "resposta do usuário" },
+          },
+        ],
+      },
+    ];
+  if (/sal[aá]rio|mercado|pesquis/i.test(text))
+    return [
+      "research_save",
+      {
+        url: "https://www.ibge.gov.br/explica/desemprego.php",
+        title: "IBGE · Rendimento médio do trabalho",
+        excerpt: "Rendimento médio real habitual das pessoas ocupadas (fonte oficial).",
+        usedFor: "salary",
+      },
+    ];
+  if (/^texto:|minha hist[oó]ria|ingira|ingest/i.test(text))
+    return ["ingest_text", { text: text.replace(/^texto:\s*/i, "") }];
+  return ["evidence_experience_list", {}];
+}
+
+function mockChatReply(tool: string, isError: boolean): string {
+  if (isError)
+    return `Tentei usar ${tool}, mas a ferramenta respondeu com erro; me conte de outro jeito ou tente de novo.`;
+  const byTool: Record<string, string> = {
+    evidence_experience_list:
+      "Olhei suas experiências (fonte: evidence_experience_list). O ponto mais fraco: conquistas sem métrica; qual resultado você consegue medir na sua última experiência?",
+    research_save:
+      "Registrei a fonte oficial do IBGE para o salário (fonte: ibge.gov.br). Confirma usar esse valor como referência?",
+    ingest_text:
+      "Criei uma ingestão com o seu texto; as propostas estão na revisão, nada foi gravado sem você aprovar.",
+    ingest_propose:
+      "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",
+  };
+  return byTool[tool] ?? `Usei ${tool}.`;
 }

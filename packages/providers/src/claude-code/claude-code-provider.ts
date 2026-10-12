@@ -27,6 +27,17 @@ import {
 import type { z } from "zod";
 import { reportActivity } from "../activity";
 import {
+  type ChatEvent,
+  type ChatHandle,
+  type ChatOpenOptions,
+  type ChatQueryFn,
+  type ChatQueryLike,
+  type ChatSdkOptions,
+  createAsyncQueue,
+  normalizeSdkChatMessage,
+  type SdkUserMessageLike,
+} from "../chat";
+import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
   type AuthMethod,
@@ -121,6 +132,8 @@ export interface ClaudeCodeProviderOptions {
   binaryPath?: string;
   /** Sonda do `/usage` estruturado (F03 §2.4); padrão = sessão do SDK sem mensagem. */
   usageProbe?: UsageProbe;
+  /** `query` do SDK para o chat com entrada em streaming (F04 M3); injetável nos testes. */
+  chatQuery?: ChatQueryFn;
 }
 
 const AUTH_METHODS: ReadonlySet<string> = new Set([
@@ -163,6 +176,16 @@ async function defaultQuery(params: {
   }) as unknown as AsyncIterable<SdkMessageLike>;
 }
 
+async function defaultChatQuery(): Promise<ChatQueryFn> {
+  const sdk = await import("@anthropic-ai/claude-agent-sdk");
+  type SdkParams = Parameters<typeof sdk.query>[0];
+  return ({ prompt, options }) =>
+    sdk.query({
+      prompt: prompt as unknown as SdkParams["prompt"],
+      options: options as unknown as NonNullable<SdkParams["options"]>,
+    }) as unknown as ChatQueryLike;
+}
+
 function extractJson(text: string): unknown | undefined {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
   const candidates = [fenced?.[1], text];
@@ -203,6 +226,7 @@ export class ClaudeCodeProvider implements Provider {
   readonly id = "claude-code" as const;
   private readonly exec: Exec;
   private readonly query: QueryFn | null;
+  private readonly chatQuery: ChatQueryFn | null;
   private readonly binaryPath: string | null;
   private readonly usageProbe: UsageProbe;
   /** Último `rate_limit_event` por tipo de janela, visto em qualquer `query` deste processo. */
@@ -211,10 +235,88 @@ export class ClaudeCodeProvider implements Provider {
   constructor(options: ClaudeCodeProviderOptions = {}) {
     this.exec = options.exec ?? defaultExec;
     this.query = options.query ?? null;
+    this.chatQuery = options.chatQuery ?? null;
     this.binaryPath =
       options.binaryPath ??
       resolveClaudeBinary({ explicit: process.env.CLAUDE_CODE_BIN || undefined });
     this.usageProbe = options.usageProbe ?? createSdkUsageProbe({ binaryPath: this.binaryPath });
+  }
+
+  /**
+   * Sessão longa de chat (F04 M3): `query` do SDK com entrada em streaming; cada `send` vira uma mensagem do usuário.
+   * Falhas ao abrir ou durante o stream viram evento `error` (nunca lançam para quem consome).
+   */
+  openChat(opts: ChatOpenOptions): ChatHandle {
+    const input = createAsyncQueue<SdkUserMessageLike>();
+    let model = opts.model;
+    let providerSessionId = opts.resume ?? null;
+    const options: ChatSdkOptions = {
+      model,
+      systemPrompt: opts.systemPrompt,
+      maxTurns: opts.maxTurns,
+      includePartialMessages: true,
+      tools: opts.tools,
+      plugins: opts.pluginDir ? [{ type: "local", path: opts.pluginDir }] : [],
+      mcpServers: { "narnia-jobs": { type: "http", url: opts.mcp.url, headers: opts.mcp.headers } },
+      // o env do SDK substitui o do processo: herda tudo (PATH, HOME, token) e acrescenta o da sessão
+      env: { ...process.env, ...(opts.env ?? {}) },
+      settingSources: [],
+      ...(opts.resume ? { resume: opts.resume } : {}),
+      ...(typeof opts.maxBudgetUsd === "number" ? { maxBudgetUsd: opts.maxBudgetUsd } : {}),
+      ...(this.binaryPath ? { pathToClaudeCodeExecutable: this.binaryPath } : {}),
+    };
+    const ready: Promise<ChatQueryLike> = (async () => {
+      const fn = this.chatQuery ?? (await defaultChatQuery());
+      return fn({ prompt: input.iterable, options });
+    })();
+    ready.catch(() => undefined);
+    const rateLimits = this.rateLimits;
+    async function* events(): AsyncGenerator<ChatEvent> {
+      let q: ChatQueryLike;
+      try {
+        q = await ready;
+      } catch (e) {
+        yield { type: "error", message: `Falha ao abrir o chat: ${(e as Error).message}` };
+        return;
+      }
+      try {
+        for await (const m of q) {
+          const info = (m as { rate_limit_info?: RateLimitInfoLike }).rate_limit_info;
+          if (m.type === "rate_limit_event" && info)
+            rateLimits.set(info.rateLimitType ?? "five_hour", info);
+          for (const e of normalizeSdkChatMessage(m, model)) {
+            if (e.type === "init") providerSessionId = e.providerSessionId;
+            yield e;
+          }
+        }
+      } catch (e) {
+        yield { type: "error", message: `Falha no chat: ${(e as Error).message}` };
+      }
+    }
+    return {
+      send(text) {
+        input.push({
+          type: "user",
+          message: { role: "user", content: text },
+          parent_tool_use_id: null,
+          session_id: providerSessionId ?? "",
+        });
+      },
+      events: events(),
+      async interrupt() {
+        const q = await ready.catch(() => null);
+        await q?.interrupt();
+      },
+      async setModel(next) {
+        model = next;
+        const q = await ready.catch(() => null);
+        await q?.setModel(next);
+      },
+      close() {
+        input.end();
+        void ready.then((q) => q.close?.()).catch(() => undefined);
+      },
+    };
   }
 
   /** Diagnóstico do plano: API experimental primeiro, depois o último evento de limite; `null` sem dado. */

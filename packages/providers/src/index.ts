@@ -1,4 +1,17 @@
 export { reportActivity, runWithActivity } from "./activity";
+export {
+  type ChatEvent,
+  type ChatHandle,
+  type ChatOpenOptions,
+  type ChatQueryFn,
+  type ChatQueryLike,
+  type ChatSdkOptions,
+  createAsyncQueue,
+  normalizeSdkChatMessage,
+  type SdkChatMessageLike,
+  type SdkUserMessageLike,
+  toolDisplayName,
+} from "./chat";
 export { type ResolveBinaryOptions, resolveClaudeBinary } from "./claude-code/binary";
 export {
   ANALYZE_PROFILES_JSON_SCHEMA,
