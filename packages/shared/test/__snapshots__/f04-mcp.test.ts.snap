@@ -1,0 +1,1369 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável (snapshot) 1`] = `
+{
+  "evidence.education.list": {
+    "description": "Formação do usuário, uma linha cada (instituição · curso · período).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "id",
+              "line",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "evidence.experience.get": {
+    "description": "Detalhe de uma experiência: resumo, tecnologias, conquistas com métrica, verificação e fontes.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "additionalProperties": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "kind",
+        "detail",
+      ],
+      "type": "object",
+    },
+  },
+  "evidence.experience.list": {
+    "description": "Experiências do usuário, uma linha cada (empresa · cargo · período), ordenadas pela relevância do perfil da sessão.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "id",
+              "line",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "evidence.project.get": {
+    "description": "Detalhe de um projeto.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "additionalProperties": {},
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "kind",
+        "detail",
+      ],
+      "type": "object",
+    },
+  },
+  "evidence.project.list": {
+    "description": "Projetos do usuário, uma linha cada (nome · papel · período), ordenados pela relevância do perfil.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "id",
+              "line",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "evidence.skill.list": {
+    "description": "Skills do usuário, uma linha cada (nome · categoria · nível), ordenadas pela relevância do perfil.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "id",
+              "line",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "fact.get": {
+    "description": "Detalhe de até 10 fatos pelo tipo e id (os devolvidos pela busca).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "experience",
+                  "achievement",
+                  "project",
+                  "skill",
+                  "education",
+                  "language",
+                  "file",
+                  "repo",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+            ],
+            "type": "object",
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "type": "array",
+        },
+      },
+      "required": [
+        "refs",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "detail": {
+                "additionalProperties": {},
+                "propertyNames": {
+                  "type": "string",
+                },
+                "type": "object",
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "id",
+              "kind",
+              "detail",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+      ],
+      "type": "object",
+    },
+  },
+  "fact.search": {
+    "description": "Busca nos fatos e resumos do usuário sem ler tudo (acentos ignorados, prefixo). Use antes de listar.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+          "type": "string",
+        },
+        "kinds": {
+          "items": {
+            "enum": [
+              "experience",
+              "achievement",
+              "project",
+              "skill",
+              "education",
+              "language",
+              "file",
+              "repo",
+            ],
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+        "q": {
+          "maxLength": 200,
+          "minLength": 2,
+          "type": "string",
+        },
+        "to": {
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "q",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "experience",
+                  "achievement",
+                  "project",
+                  "skill",
+                  "education",
+                  "language",
+                  "file",
+                  "repo",
+                ],
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "period": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+              "line",
+              "period",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "total": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "items",
+        "total",
+      ],
+      "type": "object",
+    },
+  },
+  "fact.timeline": {
+    "description": "Linha do tempo de experiências, projetos e formação num período (YYYY ou YYYY-MM).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+          "type": "string",
+        },
+        "to": {
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "from",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "end": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "experience",
+                  "achievement",
+                  "project",
+                  "skill",
+                  "education",
+                  "language",
+                  "file",
+                  "repo",
+                ],
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "start": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+              "line",
+              "start",
+              "end",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+      ],
+      "type": "object",
+    },
+  },
+  "fact.unverified": {
+    "description": "Fatos ainda não verificados pelo usuário, uma linha cada (para revisar com ele).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "experience",
+                  "achievement",
+                  "project",
+                  "skill",
+                  "education",
+                  "language",
+                  "file",
+                  "repo",
+                ],
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+              "line",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "fact.verify": {
+    "description": "Marca um fato como verificado depois que o usuário confirmou na conversa.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "experience",
+            "achievement",
+            "project",
+            "skill",
+            "education",
+            "language",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "id",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "ok",
+      ],
+      "type": "object",
+    },
+  },
+  "ingest.file": {
+    "description": "Ingere um arquivo (currículo, PDF) já anexado à conversa: cria uma execução cujas propostas vão para a revisão.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "fileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "fileId",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "alreadyRead": {
+          "type": "boolean",
+        },
+        "estimatedTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "needsConfirmation": {
+          "type": "boolean",
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "estimating",
+            "queued",
+            "running",
+            "awaiting_confirmation",
+            "awaiting_decision",
+            "paused",
+            "review",
+            "done",
+            "error",
+            "cancelled",
+          ],
+          "type": "string",
+        },
+        "url": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+        "status",
+        "estimatedTokens",
+        "needsConfirmation",
+        "url",
+        "alreadyRead",
+      ],
+      "type": "object",
+    },
+  },
+  "ingest.github": {
+    "description": "Prepara a análise de repositórios do GitHub; sempre espera o usuário confirmar o orçamento na tela da execução.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "enum": [
+            "quick",
+            "balanced",
+            "deep",
+          ],
+          "type": "string",
+        },
+        "login": {
+          "maxLength": 39,
+          "minLength": 1,
+          "type": "string",
+        },
+        "mode": {
+          "enum": [
+            "public",
+            "private",
+          ],
+          "type": "string",
+        },
+        "model": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "repos": {
+          "items": {
+            "minLength": 3,
+            "type": "string",
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array",
+        },
+      },
+      "required": [
+        "mode",
+        "repos",
+        "depth",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "estimatedTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "needsConfirmation": {
+          "type": "boolean",
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "estimating",
+            "queued",
+            "running",
+            "awaiting_confirmation",
+            "awaiting_decision",
+            "paused",
+            "review",
+            "done",
+            "error",
+            "cancelled",
+          ],
+          "type": "string",
+        },
+        "url": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+        "status",
+        "estimatedTokens",
+        "needsConfirmation",
+        "url",
+      ],
+      "type": "object",
+    },
+  },
+  "ingest.text": {
+    "description": "Ingere um texto de carreira enviado na conversa: cria uma execução cujas propostas vão para a revisão (nada é gravado direto).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 50000,
+          "minLength": 200,
+          "type": "string",
+        },
+      },
+      "required": [
+        "text",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "alreadyRead": {
+          "type": "boolean",
+        },
+        "estimatedTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "needsConfirmation": {
+          "type": "boolean",
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "estimating",
+            "queued",
+            "running",
+            "awaiting_confirmation",
+            "awaiting_decision",
+            "paused",
+            "review",
+            "done",
+            "error",
+            "cancelled",
+          ],
+          "type": "string",
+        },
+        "url": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+        "status",
+        "estimatedTokens",
+        "needsConfirmation",
+        "url",
+        "alreadyRead",
+      ],
+      "type": "object",
+    },
+  },
+  "job.list": {
+    "description": "Jobs recentes, uma linha cada (tipo · estado · progresso).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "id",
+              "line",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "job.status": {
+    "description": "Estado de um job em segundo plano (ingestão, análise).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "jobId": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "jobId",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "progress": {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "number",
+        },
+        "stage": {
+          "type": "string",
+        },
+        "status": {
+          "type": "string",
+        },
+        "type": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "type",
+        "status",
+        "stage",
+        "progress",
+        "error",
+      ],
+      "type": "object",
+    },
+  },
+  "research.list": {
+    "description": "Fontes já pesquisadas para o perfil da sessão, uma linha cada.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "line": {
+                "type": "string",
+              },
+              "relevance": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "id",
+              "line",
+              "relevance",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "items",
+        "nextCursor",
+      ],
+      "type": "object",
+    },
+  },
+  "research.save": {
+    "description": "Registra uma fonte pesquisada (só domínios confiáveis); o valor só vira dado do usuário depois de confirmado.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "excerpt": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string",
+        },
+        "title": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string",
+        },
+        "url": {
+          "format": "uri",
+          "type": "string",
+        },
+        "usedFor": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "url",
+        "title",
+        "excerpt",
+        "usedFor",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "type": "string",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "trustTag": {
+          "enum": [
+            "official",
+            "survey",
+            "jobboard",
+            "other",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "domain",
+        "trustTag",
+      ],
+      "type": "object",
+    },
+  },
+  "session.get": {
+    "description": "Dados da sessão de chat atual: categoria, perfil, modelo e execução ligada (clarificação).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "career",
+            "clarify",
+            "ingest",
+            "interview",
+          ],
+          "type": "string",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "ingestionRunId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "model": {
+          "type": "string",
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "state": {
+          "enum": [
+            "live",
+            "hibernated",
+            "archived",
+            "error",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "profileId",
+        "category",
+        "model",
+        "state",
+        "ingestionRunId",
+      ],
+      "type": "object",
+    },
+  },
+  "session.set_category": {
+    "description": "Muda a categoria da sessão atual (muda o conjunto de tools disponível).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "career",
+            "clarify",
+            "ingest",
+            "interview",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "category",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "ok",
+      ],
+      "type": "object",
+    },
+  },
+  "usage.log": {
+    "description": "Registra o uso de um turno no modo terminal; ignorado se o mesmo turno já foi registrado.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheRead": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "cacheWrite": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "costUsd": {
+          "minimum": 0,
+          "type": "number",
+        },
+        "inputTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "model": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "outputTokens": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "providerSessionId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "turnIndex": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "providerSessionId",
+        "turnIndex",
+        "model",
+        "inputTokens",
+        "outputTokens",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "recorded": {
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "recorded",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;

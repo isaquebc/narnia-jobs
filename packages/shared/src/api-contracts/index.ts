@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ChatSessionStateSchema } from "../schemas/chat";
 import { IdSchema, IsoDateTimeSchema } from "../schemas/common";
 import {
   EmphasisFactKindSchema,
@@ -573,6 +574,45 @@ export const ProfileWsEventSchema = z.discriminatedUnion("type", [
 ]);
 export type ProfileWsEvent = z.infer<typeof ProfileWsEventSchema>;
 
+// Eventos do chat (F04 §2.5, F04-13): todos no /ws existente com `sessionId`; o cliente filtra pela sessão aberta.
+const ChatUsageSchema = z.object({
+  inputTokens: z.number().int().min(0),
+  outputTokens: z.number().int().min(0),
+});
+export const ChatDeltaEventSchema = z.object({
+  type: z.literal("chat.delta"),
+  sessionId: IdSchema,
+  text: z.string(),
+});
+export const ChatToolEventSchema = z.object({
+  type: z.literal("chat.tool"),
+  sessionId: IdSchema,
+  name: z.string().min(1),
+  phase: z.enum(["start", "end", "error"]),
+  durationMs: z.number().int().min(0).optional(),
+});
+export const ChatTurnEndEventSchema = z.object({
+  type: z.literal("chat.turn_end"),
+  sessionId: IdSchema,
+  turnIndex: z.number().int().min(0),
+  usage: ChatUsageSchema,
+});
+export const ChatErrorEventSchema = z.object({
+  type: z.literal("chat.error"),
+  sessionId: IdSchema,
+  error: z.string(),
+});
+export const ChatLimitEventSchema = z.object({
+  type: z.literal("chat.limit"),
+  sessionId: IdSchema,
+  reason: z.enum(["max_turns", "max_budget"]),
+});
+export const ChatSessionUpdatedEventSchema = z.object({
+  type: z.literal("chat.session_updated"),
+  sessionId: IdSchema,
+  state: ChatSessionStateSchema,
+});
+
 // WS /ws — jobs/provider (F01) + perfil (F02). Quem lê `jobId` discrimina por `type` antes.
 export const WsEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("provider.status"), status: ProviderStatusResponseSchema }),
@@ -590,6 +630,12 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   NotificationCreatedEventSchema,
   NotificationUpdatedEventSchema,
   GithubAuthUpdatedEventSchema,
+  ChatDeltaEventSchema,
+  ChatToolEventSchema,
+  ChatTurnEndEventSchema,
+  ChatErrorEventSchema,
+  ChatLimitEventSchema,
+  ChatSessionUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */
