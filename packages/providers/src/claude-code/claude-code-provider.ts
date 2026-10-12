@@ -255,6 +255,9 @@ function toUsage(result: SdkMessageLike, model: string): Usage {
  */
 export const STRUCTURED_MAX_TURNS = 3;
 
+/** Nome do servidor MCP no chat (mesmo do plugin: as tools viram `mcp__narnia-jobs__<nome>`). */
+const CHAT_MCP_SERVER = "narnia-jobs";
+
 export class ClaudeCodeProvider implements Provider {
   readonly id = "claude-code" as const;
   private readonly exec: Exec;
@@ -291,8 +294,13 @@ export class ClaudeCodeProvider implements Provider {
       maxTurns: opts.maxTurns,
       includePartialMessages: true,
       tools: opts.tools,
+      // o chat roda sem terminal: tool sem permissão explícita é negada (dono, 2026-10-12). O /mcp já limita as tools
+      // pela categoria da sessão; a pesquisa só grava fonte de domínio confiável (research_save)
+      allowedTools: [`mcp__${CHAT_MCP_SERVER}`, ...opts.tools],
       plugins: opts.pluginDir ? [{ type: "local", path: opts.pluginDir }] : [],
-      mcpServers: { "narnia-jobs": { type: "http", url: opts.mcp.url, headers: opts.mcp.headers } },
+      mcpServers: {
+        [CHAT_MCP_SERVER]: { type: "http", url: opts.mcp.url, headers: opts.mcp.headers },
+      },
       // o env do SDK substitui o do processo: herda tudo (PATH, HOME, token) e acrescenta o da sessão
       env: { ...process.env, ...(opts.env ?? {}) },
       settingSources: [],

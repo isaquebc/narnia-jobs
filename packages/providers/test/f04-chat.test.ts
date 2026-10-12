@@ -180,6 +180,8 @@ describe("ClaudeCodeProvider.openChat", () => {
       maxTurns: 8,
       includePartialMessages: true,
       tools: ["WebSearch", "WebFetch"],
+      // sem permissão explícita o CLI nega as tools no modo não interativo (dono, 2026-10-12: ingest_status negada)
+      allowedTools: ["mcp__narnia-jobs", "WebSearch", "WebFetch"],
       plugins: [{ type: "local", path: "/app/plugin" }],
       mcpServers: { "narnia-jobs": { type: "http", url: BASE.mcp.url, headers: BASE.mcp.headers } },
       settingSources: [],

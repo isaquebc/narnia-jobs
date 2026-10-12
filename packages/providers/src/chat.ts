@@ -99,6 +99,7 @@ export interface ChatSdkOptions {
   maxBudgetUsd?: number;
   includePartialMessages: true;
   tools: string[];
+  allowedTools: string[];
   plugins: Array<{ type: "local"; path: string }>;
   mcpServers: Record<string, { type: "http"; url: string; headers: Record<string, string> }>;
   env: Record<string, string | undefined>;
