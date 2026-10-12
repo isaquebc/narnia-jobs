@@ -72,9 +72,13 @@ export function notificationsRepo(db: Db): NotificationsRepo {
   const findOpen = db.prepare(
     "select * from notification where kind = ? and subject_kind = ? and subject_id = ? and resolved_at is null",
   );
+  // atômico no banco: api e worker (processos diferentes) podem criar a mesma pendência ao mesmo tempo; "procura e
+  // insere" derrubava o worker com UNIQUE (e2e de 2026-10-12). Conflito na aberta = atualiza a existente
   const insert = db.prepare(
     `insert into notification (id, kind, subject_kind, subject_id, title, body, action_url, severity, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     on conflict (kind, subject_kind, subject_id) where resolved_at is null do update set
+       title = excluded.title, body = excluded.body, action_url = excluded.action_url, severity = excluded.severity`,
   );
   const update = db.prepare(
     "update notification set title = ?, body = ?, action_url = ?, severity = ? where id = ?",
@@ -120,7 +124,9 @@ export function notificationsRepo(db: Db): NotificationsRepo {
         severity,
         nowUtc(),
       );
-      return { notification: repo.get(id) as Notification, created: true };
+      const row = findOpen.get(i.kind, i.subjectKind, i.subjectId) as Row | undefined;
+      const saved = row ? String(row.id) : id;
+      return { notification: repo.get(saved) as Notification, created: saved === id };
     },
     get(id) {
       const row = get.get(id) as Row | undefined;
