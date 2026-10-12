@@ -48,7 +48,7 @@ describe("F03/M1 migration 0003_ingest", () => {
 
   it("upgrade de um banco do F02 preserva execução, leituras, propostas, fontes e fatos", () => {
     const db = f02Database();
-    expect(migrate(db).applied).toEqual(["0003_ingest"]);
+    expect(migrate(db, { until: "0003_ingest" }).applied).toEqual(["0003_ingest"]);
     const run = db.prepare("select * from ingestion_run where id = 'run1'").get() as Record<
       string,
       unknown

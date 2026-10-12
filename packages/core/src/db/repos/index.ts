@@ -1,4 +1,16 @@
 import type { Db } from "../open";
+import {
+  type ChatMessagesRepo,
+  type ChatSessionsRepo,
+  chatMessagesRepo,
+  chatSessionsRepo,
+  type FactSearchRepo,
+  factSearchRepo,
+  type ResearchSourcesRepo,
+  researchSourcesRepo,
+  type TrustedDomainsRepo,
+  trustedDomainsRepo,
+} from "./chat";
 import { type DigestsRepo, digestsRepo } from "./digests";
 import { type EmphasisRepo, emphasisRepo } from "./emphasis";
 import { type FactSourcesRepo, factSourcesRepo } from "./fact-sources";
@@ -53,6 +65,12 @@ export interface Repos {
   githubMetrics: GithubMetricsRepo;
   snapshots: SnapshotsRepo;
   notifications: NotificationsRepo;
+  // F04
+  chatSessions: ChatSessionsRepo;
+  chatMessages: ChatMessagesRepo;
+  researchSources: ResearchSourcesRepo;
+  trustedDomains: TrustedDomainsRepo;
+  factSearch: FactSearchRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -103,9 +121,15 @@ export function createRepos(db: Db): Repos {
     githubMetrics: githubMetricsRepo(db),
     snapshots: snapshotsRepo(db),
     notifications: notificationsRepo(db),
+    chatSessions: chatSessionsRepo(db),
+    chatMessages: chatMessagesRepo(db),
+    researchSources: researchSourcesRepo(db),
+    trustedDomains: trustedDomainsRepo(db),
+    factSearch: factSearchRepo(db),
   };
 }
 
+export * from "./chat";
 export * from "./digests";
 export * from "./emphasis";
 export * from "./fact-sources";

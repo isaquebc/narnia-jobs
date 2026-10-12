@@ -1,5 +1,6 @@
 export const CORE_PACKAGE = "@narnia-jobs/core" as const;
 export * from "./budget";
+export * from "./chat/settings";
 export * from "./db";
 export * from "./digest";
 export * from "./errors/friendly";

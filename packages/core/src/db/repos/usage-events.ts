@@ -14,6 +14,11 @@ export interface UsageSummaryRow {
 
 export interface UsageEventsRepo {
   insert(event: UsageEvent): void;
+  /**
+   * F04 §2.3 `usage.log`: grava o uso de um turno identificado pela sessão do provider; um mesmo turno conta uma vez
+   * (índice único `usage_event_turn`). Devolve false quando o turno já estava registrado (dedupe modo A × modo B).
+   */
+  insertTurn(event: UsageEvent, turn: { providerSessionId: string; turnIndex: number }): boolean;
   summarizeByCategory(): UsageSummaryRow[];
   /** Tokens (entrada + saída) por modelo. */
   summarizeByModel(): Record<string, number>;
@@ -39,7 +44,33 @@ export function usageEventsRepo(db: Db): UsageEventsRepo {
   const total = db.prepare(
     "select coalesce(sum(input_tokens + output_tokens), 0) as tokens from usage_event",
   );
+  // preparado sob demanda: as colunas de turno só existem a partir da migration 0004 (F04)
+  let insertTurnStmt: ReturnType<Db["prepare"]> | null = null;
   return {
+    insertTurn(event, turn) {
+      const e = UsageEventSchema.parse(event);
+      insertTurnStmt ??= db.prepare(
+        `insert or ignore into usage_event (id, ts, origin, category, job_id, session_id, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd_est, provider_session_id, turn_index)
+         values (@id, @ts, @origin, @category, @job_id, @session_id, @model, @input_tokens, @output_tokens, @cache_read, @cache_write, @cost_usd_est, @provider_session_id, @turn_index)`,
+      );
+      const r = insertTurnStmt.run({
+        id: e.id,
+        ts: e.ts,
+        origin: e.origin,
+        category: e.category,
+        job_id: e.jobId,
+        session_id: e.sessionId,
+        model: e.model,
+        input_tokens: e.inputTokens,
+        output_tokens: e.outputTokens,
+        cache_read: e.cacheRead,
+        cache_write: e.cacheWrite,
+        cost_usd_est: e.costUsdEst,
+        provider_session_id: turn.providerSessionId,
+        turn_index: turn.turnIndex,
+      });
+      return Number(r.changes) > 0;
+    },
     summarizeByModel() {
       return Object.fromEntries(
         (byModel.all() as Row[]).map((r) => [String(r.model), Number(r.tokens)]),

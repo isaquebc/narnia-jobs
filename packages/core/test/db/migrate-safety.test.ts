@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { migrate, openDatabase } from "../../src/db";
+import { listMigrations, migrate, openDatabase } from "../../src/db";
 
 /**
  * Regressão 2026-10-10 (instância do dono): api e worker rodam migrate no boot ao mesmo tempo; o api leu a lista de
@@ -33,7 +33,7 @@ describe("migrate · concorrência e backup", () => {
     const names = (
       a.prepare("select name from schema_migrations").all() as Array<{ name: string }>
     ).map((r) => r.name);
-    expect(names).toEqual(["0001_init", "0002_profiles", "0003_ingest"]);
+    expect(names).toEqual(listMigrations().map((m) => m.name));
     a.close();
     b.close();
   });
@@ -47,7 +47,7 @@ describe("migrate · concorrência e backup", () => {
     db.exec("insert into settings (key, value_json) values ('marcador', '\"ok\"')");
     // pré-migration só copia banco com dados de usuário (F03-fix L1: cópia vazia nunca empurra cópia boa para fora)
     db.exec("insert into user (id, created_at, updated_at) values ('u1', 'x', 'x')");
-    const r = migrate(db, { backupDir: backups });
+    const r = migrate(db, { backupDir: backups, until: "0003_ingest" });
     expect(r.applied).toEqual(["0003_ingest"]);
     const files = readdirSync(backups);
     expect(files).toHaveLength(1);

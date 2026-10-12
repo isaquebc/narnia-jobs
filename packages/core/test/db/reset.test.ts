@@ -52,3 +52,29 @@ describe("db/reset (M7: isolamento entre cenários e2e, só com provider mock)",
     expect(repos.users.ensureId()).toBeTruthy();
   });
 });
+
+describe("F04/M1 reset com o índice FTS5 e os domínios confiáveis", () => {
+  it("limpa o índice sem tocar nas tabelas internas do FTS5 e restaura os domínios padrão", async () => {
+    const { createRepos, migrate, openDatabase, resetDatabase } = await import("../../src/db");
+    const { seedFixture } = await import("../../src/testing/profile-fixtures");
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const repos = createRepos(db);
+    seedFixture(repos, "engineer");
+    repos.trustedDomains.add({ pattern: "exemplo.com", trustTag: "other" });
+    repos.trustedDomains.setEnabled("td-ibge", false);
+    const r = resetDatabase(db);
+    expect(r.tables.some((t) => /^fact_fts_/.test(t))).toBe(false);
+    const n = (sql: string) => Number((db.prepare(sql).get() as { n: number }).n);
+    expect(n("select count(*) n from fact_fts")).toBe(0);
+    // o índice continua íntegro e volta a ser alimentado pelos gatilhos
+    db.exec("insert into fact_fts(fact_fts) values('integrity-check')");
+    seedFixture(createRepos(db), "engineer");
+    expect(n("select count(*) n from fact_fts where fact_fts match 'computacao*'")).toBeGreaterThan(
+      0,
+    );
+    const domains = createRepos(db).trustedDomains.list();
+    expect(domains.some((d) => d.pattern === "exemplo.com")).toBe(false);
+    expect(domains.find((d) => d.id === "td-ibge")?.enabled).toBe(true);
+  });
+});
