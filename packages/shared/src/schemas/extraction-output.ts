@@ -5,6 +5,7 @@ import {
   EducationDataSchema,
   ExperienceDataSchema,
   type FactProposal,
+  hasIdentityData,
   IdentityDataSchema,
   LanguageDataSchema,
   SkillDataSchema,
@@ -70,7 +71,7 @@ export function extractFactsOutputWithEvidence(output: ExtractFactsOutput): {
   };
   if (output.identity) {
     const { confidence, evidence: e, ...data } = output.identity;
-    push({ kind: "identity", confidence, data }, e);
+    if (hasIdentityData(data)) push({ kind: "identity", confidence, data }, e);
   }
   output.experiences.forEach((exp, experienceIndex) => {
     const { confidence, achievements, evidence: e, ...data } = exp;

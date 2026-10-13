@@ -1,8 +1,11 @@
 import {
   CHAT_TOOLS,
   type ChatToolName,
+  CONTRACT_TYPE_LABELS,
+  type Compensation,
   type EmphasisFactKind,
   type FactSearchKind,
+  formatCompensation,
   nowUtc,
   type RunStatus,
 } from "@narnia-jobs/shared";
@@ -154,7 +157,22 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
     startDate: string;
     endDate?: string | null | undefined;
     isCurrent: boolean;
-  }) => `${e.company} · ${e.title} · ${period(e.startDate, e.endDate, e.isCurrent)}`;
+    employmentType?: keyof typeof CONTRACT_TYPE_LABELS | undefined;
+    weeklyHours?: number | undefined;
+    compensation?: Compensation | undefined;
+  }) =>
+    [
+      `${e.company} · ${e.title} · ${period(e.startDate, e.endDate, e.isCurrent)}`,
+      [
+        e.employmentType ? CONTRACT_TYPE_LABELS[e.employmentType] : null,
+        e.weeklyHours ? `${e.weeklyHours} h/semana` : null,
+      ]
+        .filter(Boolean)
+        .join(", "),
+      e.compensation ? formatCompensation(e.compensation, e.weeklyHours) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
   function describe(
     kind: FactSearchKind,

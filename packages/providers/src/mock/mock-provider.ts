@@ -247,6 +247,12 @@ export class MockProvider implements Provider {
     for (const sk of out.skills) sk.evidence = ev(sk.name);
     for (const l of out.languages) l.evidence = ev(l.name);
     for (const l of out.links) l.evidence = ev(l.url.replace(/^https?:\/\//, ""));
+    // salário, carga e contrato declarados no texto (campos de 2026-10-13) vão para a experiência mais recente
+    const pay = mockCompensation(input.text);
+    if (pay && out.experiences[0]) {
+      Object.assign(out.experiences[0], pay.fields);
+      out.experiences[0].evidence = { ref: "cv", quote: pay.quote };
+    }
     if (this.mode.unsupportedEvidence && out.experiences[0]) {
       out.experiences[0].evidence = { ref: "cv", quote: MOCK_FAKE_QUOTE };
     }
@@ -716,4 +722,34 @@ export function minimalFromSchema(schema: Record<string, unknown>): unknown {
     default:
       return null;
   }
+}
+
+/**
+ * Roteiro do mock para os campos de remuneração: "R$ 12.500 por mês", "R$ 95 por hora", "30 horas semanais", "PJ"/"CLT".
+ * Determinístico; o modelo real segue as regras do prompt de extração.
+ */
+export function mockCompensation(text: string): {
+  fields: Record<string, unknown>;
+  quote: string;
+} | null {
+  const money = /R\$\s*([\d.]+(?:,\d{1,2})?)\s*(?:por|\/|ao|a)\s*(hora|m[eê]s|ano)/i.exec(text);
+  if (!money?.[1] || !money[2]) return null;
+  const amount = Number(money[1].replace(/\./g, "").replace(",", "."));
+  const unit = money[2].toLowerCase();
+  const period = unit === "hora" ? "hourly" : unit === "ano" ? "yearly" : "monthly";
+  const hours = /(\d{1,2})\s*(?:h|horas)\s*(?:semanais|por semana|\/semana)/i.exec(text);
+  const contract = /\bPJ\b|contractor/i.test(text) ? "pj" : /\bCLT\b/.test(text) ? "clt" : null;
+  const sentence = text
+    .split(/(?<=[.!?])\s+/)
+    .find((s) => s.includes(money[0]))
+    ?.trim()
+    .slice(0, 200);
+  return {
+    fields: {
+      compensation: { amount, period, currency: "BRL" },
+      ...(hours?.[1] ? { weeklyHours: Number(hours[1]) } : {}),
+      ...(contract ? { employmentType: contract } : {}),
+    },
+    quote: sentence || money[0],
+  };
 }

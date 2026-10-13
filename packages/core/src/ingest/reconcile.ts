@@ -125,6 +125,11 @@ export interface ExistingFacts {
   projects: ProjectRecord[];
 }
 
+const sameCompensation = (
+  a: { amount: number; period: string; currency: string } | undefined,
+  b: { amount: number; period: string; currency: string },
+) => Boolean(a && a.amount === b.amount && a.period === b.period && a.currency === b.currency);
+
 export function existingFacts(repos: Repos): ExistingFacts {
   return {
     experiences: repos.facts.experiences.list(),
@@ -204,6 +209,19 @@ export function reconcileProposals(
         }
         if (target.isCurrent !== d.isCurrent) {
           fields.push(field("isCurrent", target, target.isCurrent, d.isCurrent));
+        }
+        // campos novos (2026-10-13): o que o texto traz e o fato não tem (ou tem diferente) vira campo a atualizar
+        if (d.employmentType && d.employmentType !== target.employmentType)
+          fields.push(field("employmentType", target, target.employmentType, d.employmentType));
+        if (d.weeklyHours !== undefined && d.weeklyHours !== target.weeklyHours)
+          fields.push(field("weeklyHours", target, target.weeklyHours, d.weeklyHours));
+        if (d.compensation && !sameCompensation(target.compensation, d.compensation))
+          fields.push(field("compensation", target, target.compensation, d.compensation));
+        for (const key of ["benefits", "benefitsOther"] as const) {
+          const current: string[] = target[key] ?? [];
+          const extra = (d[key] ?? []).filter((b) => !current.includes(b));
+          // soma com os que já estavam: aceitar não apaga benefício conhecido
+          if (extra.length > 0) fields.push(field(key, target, current, [...current, ...extra]));
         }
         r = result(index, target.id, fields);
       }

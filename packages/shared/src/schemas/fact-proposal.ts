@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ConfidenceSchema, IsoCountrySchema, LinkSchema, PartialDateSchema } from "./common";
+import { BenefitSchema, CompensationSchema } from "./compensation";
 import { ContractTypeSchema } from "./profile";
 
 /** Propostas de fato extraídas de uma fonte (F01 §3 `ingestion_proposal`). Nenhuma vira fato sem revisão. */
@@ -15,6 +16,13 @@ export const IdentityDataSchema = z.object({
   links: z.array(LinkSchema).optional(),
 });
 
+/** Identidade com algum dado de fato (texto livre sem identidade não deve virar proposta vazia na revisão). */
+export function hasIdentityData(data: z.infer<typeof IdentityDataSchema>): boolean {
+  return Object.values(data).some((v) =>
+    Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim() !== "" : v !== undefined,
+  );
+}
+
 export const ExperienceDataSchema = z.object({
   company: z.string().min(1),
   title: z.string().min(1),
@@ -25,6 +33,13 @@ export const ExperienceDataSchema = z.object({
   location: z.string().optional(),
   summary: z.string().optional(),
   tech: z.array(z.string().min(1)),
+  /** Carga horária semanal (h); separada do tipo de contrato (ex.: PJ com 30 h). */
+  weeklyHours: z.number().min(1).max(80).optional(),
+  /** Salário: valor, período (hora/mês/ano) e moeda. */
+  compensation: CompensationSchema.optional(),
+  benefits: z.array(BenefitSchema).optional(),
+  /** Benefícios fora da lista, em texto livre. */
+  benefitsOther: z.array(z.string().min(1)).optional(),
 });
 
 export const AchievementDataSchema = z.object({

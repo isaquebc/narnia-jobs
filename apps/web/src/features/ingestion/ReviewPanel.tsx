@@ -1,4 +1,14 @@
-import type { CheckStatus, Conflict, Resolution, ReviewRequest } from "@narnia-jobs/shared";
+import {
+  BENEFIT_LABELS,
+  type Benefit,
+  type CheckStatus,
+  CONTRACT_TYPE_LABELS,
+  type Compensation,
+  type Conflict,
+  formatCompensation,
+  type Resolution,
+  type ReviewRequest,
+} from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -45,6 +55,29 @@ const MATCH_TONE = { new: "info", existing: "neutral", conflict: "warn" } as con
 
 const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
 
+/** Campos que não são texto simples: no conflito só dá para manter ou usar o novo (sem "editar"). */
+const STRUCTURED_FIELDS = new Set(["compensation", "benefits", "benefitsOther"]);
+
+const FIELD_LABELS: Record<string, string> = {
+  employmentType: "tipo de contrato",
+  weeklyHours: "carga horária semanal",
+  compensation: "salário",
+  benefits: "benefícios",
+  benefitsOther: "outros benefícios",
+};
+
+/** Valor de um campo em conflito, legível (salário formatado, rótulos de contrato e benefícios). */
+export function conflictValue(field: string, v: unknown): string {
+  if (v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) return "—";
+  if (field === "compensation") return formatCompensation(v as Compensation);
+  if (field === "benefits") return (v as Benefit[]).map((b) => BENEFIT_LABELS[b] ?? b).join(", ");
+  if (field === "benefitsOther") return (v as string[]).join(", ");
+  if (field === "employmentType")
+    return CONTRACT_TYPE_LABELS[v as keyof typeof CONTRACT_TYPE_LABELS] ?? String(v);
+  if (field === "weeklyHours") return `${v} h/semana`;
+  return show(v);
+}
+
 function resolved(
   conflict: Conflict | null | undefined,
   local: LocalDecision | undefined,
@@ -74,11 +107,11 @@ function ConflictResolver({
         return (
           <fieldset
             key={f.field}
-            aria-label={t("review3.resolve", { field: f.field })}
+            aria-label={t("review3.resolve", { field: FIELD_LABELS[f.field] ?? f.field })}
             className="flex flex-col gap-1"
           >
             <legend className="text-xs font-medium">
-              {t("review3.resolve", { field: f.field })}
+              {t("review3.resolve", { field: FIELD_LABELS[f.field] ?? f.field })}
             </legend>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -87,7 +120,7 @@ function ConflictResolver({
                 checked={r.choice === "keep"}
                 onChange={() => onChange(f.field, { choice: "keep" })}
               />
-              {t("review3.keep", { value: show(f.current) })}
+              {t("review3.keep", { value: conflictValue(f.field, f.current) })}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -96,17 +129,19 @@ function ConflictResolver({
                 checked={r.choice === "use_new"}
                 onChange={() => onChange(f.field, { choice: "use_new" })}
               />
-              {t("review3.useNew", { value: show(f.proposed) })}
+              {t("review3.useNew", { value: conflictValue(f.field, f.proposed) })}
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name={name}
-                checked={r.choice === "edit"}
-                onChange={() => onChange(f.field, { choice: "edit", value: r.value ?? "" })}
-              />
-              {t("review3.edit")}
-            </label>
+            {STRUCTURED_FIELDS.has(f.field) ? null : (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={name}
+                  checked={r.choice === "edit"}
+                  onChange={() => onChange(f.field, { choice: "edit", value: r.value ?? "" })}
+                />
+                {t("review3.edit")}
+              </label>
+            )}
             {r.choice === "edit" ? (
               <Input
                 aria-label={t("review3.editValue", { field: f.field })}

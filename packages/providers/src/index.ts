@@ -64,6 +64,7 @@ export {
   type MockOperation,
   MockProvider,
   type MockProviderOptions,
+  mockCompensation,
   quoteFrom,
 } from "./mock/mock-provider";
 export {

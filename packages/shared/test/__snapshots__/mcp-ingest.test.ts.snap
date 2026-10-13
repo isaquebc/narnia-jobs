@@ -355,9 +355,65 @@ exports[`F03/M1 shared · tools MCP file.* e ingest.* (definição; exposição 
                       "data": {
                         "additionalProperties": false,
                         "properties": {
+                          "benefits": {
+                            "items": {
+                              "enum": [
+                                "meal_voucher",
+                                "health_plan",
+                                "dental_plan",
+                                "life_insurance",
+                                "transport_voucher",
+                                "home_office_allowance",
+                                "profit_sharing",
+                                "equity",
+                                "thirteenth_salary",
+                                "paid_vacation",
+                                "education_allowance",
+                                "private_pension",
+                                "gym",
+                                "birthday_day_off",
+                              ],
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "benefitsOther": {
+                            "items": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
                           "company": {
                             "minLength": 1,
                             "type": "string",
+                          },
+                          "compensation": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "amount": {
+                                "exclusiveMinimum": 0,
+                                "type": "number",
+                              },
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string",
+                              },
+                              "period": {
+                                "enum": [
+                                  "monthly",
+                                  "yearly",
+                                  "hourly",
+                                ],
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "amount",
+                              "period",
+                              "currency",
+                            ],
+                            "type": "object",
                           },
                           "employmentType": {
                             "enum": [
@@ -396,6 +452,11 @@ exports[`F03/M1 shared · tools MCP file.* e ingest.* (definição; exposição 
                           "title": {
                             "minLength": 1,
                             "type": "string",
+                          },
+                          "weeklyHours": {
+                            "maximum": 80,
+                            "minimum": 1,
+                            "type": "number",
                           },
                         },
                         "required": [

@@ -1,8 +1,11 @@
-import type {
-  CheckProposalsOutput,
-  CheckStatus,
-  Evidence,
-  FactProposal,
+import {
+  BENEFIT_LABELS,
+  type CheckProposalsOutput,
+  type CheckStatus,
+  CONTRACT_TYPE_LABELS,
+  type Evidence,
+  type FactProposal,
+  formatCompensation,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import type { ProposalRecord } from "../db/repos/proposals";
@@ -49,8 +52,22 @@ export function runCheckLayer1(
 /** Frase curta que o revisor confronta com o trecho. */
 export function claimOf(p: FactProposal): string {
   switch (p.kind) {
-    case "experience":
-      return `experiência: ${p.data.title} em ${p.data.company} (${p.data.startDate}–${p.data.isCurrent ? "atual" : (p.data.endDate ?? "?")})`;
+    case "experience": {
+      const d = p.data;
+      const terms = [
+        [
+          d.employmentType ? CONTRACT_TYPE_LABELS[d.employmentType] : null,
+          d.weeklyHours ? `${d.weeklyHours} h/semana` : null,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        d.compensation ? `salário ${formatCompensation(d.compensation, d.weeklyHours)}` : "",
+        [...(d.benefits ?? []).map((b) => BENEFIT_LABELS[b]), ...(d.benefitsOther ?? [])].length
+          ? `benefícios: ${[...(d.benefits ?? []).map((b) => BENEFIT_LABELS[b]), ...(d.benefitsOther ?? [])].join(", ")}`
+          : "",
+      ].filter(Boolean);
+      return `experiência: ${d.title} em ${d.company} (${d.startDate}–${d.isCurrent ? "atual" : (d.endDate ?? "?")})${terms.length ? `; ${terms.join("; ")}` : ""}`;
+    }
     case "achievement":
       return `conquista: ${p.data.text}${p.data.metric ? ` (${p.data.metric})` : ""}`;
     case "education":

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRepos, migrate, openDatabase } from "../../src/db";
-import { seedFixture } from "../../src/testing/profile-fixtures";
+import { PROFILE_FIXTURES } from "../../src/testing/profile-fixtures";
 
 /**
  * Auditoria pós-F04 · bloco E2 · migration 0006: categoria `discovery` (entrevista de descoberta, passo 7 do primeiro
@@ -12,7 +12,12 @@ describe("migration 0006_chat_discovery", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0005_research_confirmed" });
     const repos = createRepos(db);
-    const ids = seedFixture(repos, "engineer");
+    // só usuário e perfil: os repositórios de fatos gravam colunas de migrations posteriores (0007)
+    const f = PROFILE_FIXTURES.engineer;
+    const user = repos.users.upsert(f.user);
+    const ids = {
+      profileId: repos.profiles.create({ ...f.profile, userId: user.id, isActive: true }).id,
+    };
     const s = repos.chatSessions.create({
       profileId: ids.profileId,
       category: "career",
@@ -38,7 +43,7 @@ describe("migration 0006_chat_discovery", () => {
       usedFor: "salary",
       trustTag: "official",
     });
-    expect(migrate(db).applied).toEqual(["0006_chat_discovery"]);
+    expect(migrate(db, { until: "0006_chat_discovery" }).applied).toEqual(["0006_chat_discovery"]);
     const after = createRepos(db);
     expect(after.chatSessions.get(s.id)).toMatchObject({ title: "Antiga", category: "career" });
     expect(after.chatMessages.list(s.id).map((m) => m.contentMd)).toEqual(["olá"]);

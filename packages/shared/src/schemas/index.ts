@@ -1,5 +1,6 @@
 export * from "./chat";
 export * from "./common";
+export * from "./compensation";
 export * from "./emphasis";
 export * from "./extraction-output";
 export * from "./fact-proposal";

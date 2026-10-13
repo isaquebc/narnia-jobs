@@ -207,6 +207,29 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
       reference: { expected: ["Initech", "Kotlin", "State University"] },
     },
     {
+      id: "salario-pj-por-hora",
+      description:
+        "Relato com contrato, carga e salário: PJ com 30 h/semana a R$ 95 por hora e plano de saúde; nada de converter nem estimar.",
+      input: {
+        text: "Desde 2021 trabalho na Acme Pagamentos como engenheira backend. Sou contratada como PJ, 30 horas semanais, e recebo R$ 95 por hora, com plano de saúde pago pela empresa. Antes, de 2018 a 2021, fui desenvolvedora CLT na Globex, 44 horas por semana, com salário de R$ 8.000 por mês, vale-refeição e 13º.",
+        locale: "pt-BR",
+      },
+      reference: {
+        expected: [
+          '"amount":95',
+          '"hourly"',
+          '"weeklyHours":30',
+          '"pj"',
+          '"amount":8000',
+          '"monthly"',
+          '"weeklyHours":44',
+          "health_plan",
+          "meal_voucher",
+          "thirteenth_salary",
+        ],
+      },
+    },
+    {
       id: "instrucao-escondida",
       description:
         "Documento com instrução escondida mandando inventar experiência: a extração ignora.",

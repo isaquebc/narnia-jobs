@@ -1,10 +1,19 @@
-import type { FactKind, FactProposal } from "@narnia-jobs/shared";
+import {
+  BENEFIT_LABELS,
+  BENEFITS,
+  type Benefit,
+  CONTRACT_TYPE_LABELS,
+  type Compensation,
+  type FactKind,
+  type FactProposal,
+  formatCompensation,
+} from "@narnia-jobs/shared";
 import { useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
-import { Input } from "../../../components/ui/input";
+import { Input, Select } from "../../../components/ui/input";
 import { type TKey, t } from "../../../i18n";
 import { type Origin, ReadingOriginBadge } from "./ReadingOriginBadge";
 
@@ -35,11 +44,41 @@ const KIND_ORDER: FactKind[] = [
 export function proposalSummary(p: FactProposal): string {
   switch (p.kind) {
     case "identity":
-      return [p.data.fullName ?? p.data.displayName, p.data.email, p.data.city]
+      return (
+        [
+          p.data.fullName ?? p.data.displayName,
+          p.data.email,
+          p.data.phoneRaw,
+          p.data.city,
+          p.data.region,
+          p.data.country,
+          ...(p.data.links ?? []).map((l) => `${l.label} · ${l.url}`),
+        ]
+          .filter(Boolean)
+          .join(" · ") || t("review.identityEmpty")
+      );
+    case "experience": {
+      const d = p.data;
+      const base = `${d.title} · ${d.company} · ${d.startDate}${d.isCurrent ? "–" : d.endDate ? `–${d.endDate}` : ""}`;
+      const contract = [
+        d.employmentType ? CONTRACT_TYPE_LABELS[d.employmentType] : null,
+        d.weeklyHours ? `${d.weeklyHours} h/semana` : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const benefits = [
+        ...(d.benefits ?? []).map((b) => BENEFIT_LABELS[b]),
+        ...(d.benefitsOther ?? []),
+      ];
+      return [
+        base,
+        contract,
+        d.compensation ? formatCompensation(d.compensation, d.weeklyHours) : "",
+        benefits.length ? t("review.exp.summaryBenefits", { list: benefits.join(", ") }) : "",
+      ]
         .filter(Boolean)
         .join(" · ");
-    case "experience":
-      return `${p.data.title} · ${p.data.company} · ${p.data.startDate}${p.data.isCurrent ? "–" : p.data.endDate ? `–${p.data.endDate}` : ""}`;
+    }
     case "achievement":
       return p.data.metric ? `${p.data.text} (${p.data.metric})` : p.data.text;
     case "education":
@@ -57,10 +96,161 @@ export function proposalSummary(p: FactProposal): string {
   }
 }
 
-function editableFields(data: Record<string, unknown>): string[] {
+/** Campos da experiência com controle próprio na edição (contrato, carga, salário, benefícios). */
+const EXPERIENCE_OWN_FIELDS = new Set(["employmentType", "weeklyHours"]);
+
+function editableFields(kind: FactKind, data: Record<string, unknown>): string[] {
   return Object.entries(data)
-    .filter(([, v]) => typeof v === "string" || typeof v === "number")
+    .filter(
+      ([k, v]) =>
+        (typeof v === "string" || typeof v === "number") &&
+        !(kind === "experience" && EXPERIENCE_OWN_FIELDS.has(k)),
+    )
     .map(([k]) => k);
+}
+
+/** Contrato, carga horária, salário e benefícios da experiência (campos opcionais, pedido do dono 2026-10-13). */
+function ExperienceExtraFields({
+  id,
+  draft,
+  setDraft,
+}: {
+  id: string;
+  draft: Record<string, unknown>;
+  setDraft: (fn: (d: Record<string, unknown>) => Record<string, unknown>) => void;
+}) {
+  const comp = draft.compensation as Compensation | undefined;
+  const [amount, setAmount] = useState(comp ? String(comp.amount) : "");
+  const [period, setPeriod] = useState<Compensation["period"]>(comp?.period ?? "monthly");
+  const [currency, setCurrency] = useState(comp?.currency ?? "BRL");
+  const benefits = (draft.benefits as Benefit[] | undefined) ?? [];
+  const [other, setOther] = useState(
+    ((draft.benefitsOther as string[] | undefined) ?? []).join(", "),
+  );
+  const setComp = (a: string, p: Compensation["period"], c: string) =>
+    setDraft((d) => {
+      const n = Number(a.replace(",", "."));
+      const { compensation: _c, ...rest } = d;
+      return a.trim() && Number.isFinite(n) && n > 0
+        ? { ...rest, compensation: { amount: n, period: p, currency: c.trim().toUpperCase() } }
+        : rest;
+    });
+  return (
+    <>
+      <Field label={t("review.exp.employmentType")} htmlFor={`edit-${id}-employmentType`}>
+        <Select
+          id={`edit-${id}-employmentType`}
+          value={String(draft.employmentType ?? "")}
+          onChange={(e) =>
+            setDraft((d) => {
+              const { employmentType: _e, ...rest } = d;
+              return e.target.value ? { ...rest, employmentType: e.target.value } : rest;
+            })
+          }
+        >
+          <option value="">{t("review.exp.notInformed")}</option>
+          {Object.entries(CONTRACT_TYPE_LABELS).map(([v, label]) => (
+            <option key={v} value={v}>
+              {label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label={t("review.exp.weeklyHours")} htmlFor={`edit-${id}-weeklyHours`}>
+        <Input
+          id={`edit-${id}-weeklyHours`}
+          type="number"
+          min={1}
+          max={80}
+          value={draft.weeklyHours === undefined ? "" : String(draft.weeklyHours)}
+          onChange={(e) =>
+            setDraft((d) => {
+              const { weeklyHours: _w, ...rest } = d;
+              return e.target.value ? { ...rest, weeklyHours: Number(e.target.value) } : rest;
+            })
+          }
+        />
+      </Field>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label={t("review.exp.salaryAmount")} htmlFor={`edit-${id}-salary`}>
+          <Input
+            id={`edit-${id}-salary`}
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setComp(e.target.value, period, currency);
+            }}
+          />
+        </Field>
+        <Field label={t("review.exp.salaryPeriod")} htmlFor={`edit-${id}-period`}>
+          <Select
+            id={`edit-${id}-period`}
+            value={period}
+            onChange={(e) => {
+              const p = e.target.value as Compensation["period"];
+              setPeriod(p);
+              setComp(amount, p, currency);
+            }}
+          >
+            {(["hourly", "monthly", "yearly"] as const).map((p) => (
+              <option key={p} value={p}>
+                {t(`review.exp.period.${p}`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={t("review.exp.currency")} htmlFor={`edit-${id}-currency`}>
+          <Input
+            id={`edit-${id}-currency`}
+            maxLength={3}
+            value={currency}
+            onChange={(e) => {
+              setCurrency(e.target.value.toUpperCase());
+              setComp(amount, period, e.target.value);
+            }}
+          />
+        </Field>
+      </div>
+      <fieldset className="flex flex-col gap-1">
+        <legend className="text-sm font-medium">{t("review.exp.benefits")}</legend>
+        <div className="grid grid-cols-2 gap-1">
+          {BENEFITS.map((b) => (
+            <label key={b} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={benefits.includes(b)}
+                onChange={(e) =>
+                  setDraft((d) => {
+                    const cur = (d.benefits as Benefit[] | undefined) ?? [];
+                    return {
+                      ...d,
+                      benefits: e.target.checked ? [...cur, b] : cur.filter((x) => x !== b),
+                    };
+                  })
+                }
+              />
+              {BENEFIT_LABELS[b]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <Field label={t("review.exp.benefitsOther")} htmlFor={`edit-${id}-benefitsOther`}>
+        <Input
+          id={`edit-${id}-benefitsOther`}
+          value={other}
+          onChange={(e) => {
+            setOther(e.target.value);
+            const list = e.target.value
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean);
+            setDraft((d) => ({ ...d, benefitsOther: list }));
+          }}
+        />
+      </Field>
+    </>
+  );
 }
 
 export function ProposalRow({
@@ -146,7 +336,7 @@ export function ProposalRow({
             setEditing(false);
           }}
         >
-          {editableFields(data).map((key) => (
+          {editableFields(item.proposal.kind, data).map((key) => (
             <Field key={key} label={key} htmlFor={`edit-${item.id}-${key}`}>
               <Input
                 id={`edit-${item.id}-${key}`}
@@ -161,6 +351,9 @@ export function ProposalRow({
               />
             </Field>
           ))}
+          {item.proposal.kind === "experience" ? (
+            <ExperienceExtraFields id={item.id} draft={draft} setDraft={setDraft} />
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setEditing(false)}>
               {t("app.cancel")}

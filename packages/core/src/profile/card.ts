@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { PROFILE_CARD_MAX_CHARS, type Profile } from "@narnia-jobs/shared";
+import {
+  CONTRACT_TYPE_LABELS,
+  compensationTrajectory,
+  formatMoney,
+  PROFILE_CARD_MAX_CHARS,
+  type Profile,
+} from "@narnia-jobs/shared";
 import { charsToTokens } from "../estimate";
 import { byScore, type EmphasisLike, type FactSets, type ScoredFact } from "./relevance";
 import { buildObjectiveSummary } from "./summary";
@@ -173,8 +179,28 @@ function experienceLines(
       .filter((x) => x.s && !x.s.hidden)
       .sort((a, b) => byScore(a.s as ScoredFact, b.s as ScoredFact))[0]?.a;
     const achievement = best ? ` — ${best.text}${best.metric ? ` (${best.metric})` : ""}` : "";
-    return `• ${e.company} · ${e.title} · ${period(e)}${achievement}`;
+    const terms = [
+      e.employmentType ? CONTRACT_TYPE_LABELS[e.employmentType] : null,
+      e.weeklyHours ? `${e.weeklyHours} h/semana` : null,
+    ].filter(Boolean);
+    const contract = terms.length ? ` · ${terms.join(", ")}` : "";
+    return `• ${e.company} · ${e.title} · ${period(e)}${contract}${achievement}`;
   });
+}
+
+/**
+ * Trajetória do salário (pedido do dono, 2026-10-13): equivalente mensal em ordem cronológica, com a variação na mesma
+ * moeda; o recrutador vê se a pessoa está subindo ou descendo o próprio salário.
+ */
+function compensationLine(facts: FactSets): string | null {
+  const points = compensationTrajectory(facts.experiences);
+  if (points.length === 0) return null;
+  const parts = points.map((p) => {
+    const change =
+      p.change === null ? "" : ` (${p.change >= 0 ? "+" : ""}${Math.round(p.change * 100)}%)`;
+    return `${p.company} ${formatMoney(p.monthly, p.currency)}${change}`;
+  });
+  return `Remuneração (equivalente mensal): ${parts.join(" → ")}`;
 }
 
 function skillsLine(
@@ -286,6 +312,8 @@ export function buildProfileCard(
     if (p.experiences > 0) {
       const exps = experienceLines(facts, scored, p.experiences);
       if (exps.length) lines.push("Experiências:", ...exps);
+      const pay = compensationLine(facts);
+      if (pay) lines.push(pay);
     }
     if (p.skills > 0) {
       const sk = skillsLine(facts, scored, p.skills);

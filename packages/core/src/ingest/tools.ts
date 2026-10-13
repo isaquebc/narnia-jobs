@@ -1,4 +1,4 @@
-import { INGEST_TOOLS, type IngestToolName } from "@narnia-jobs/shared";
+import { hasIdentityData, INGEST_TOOLS, type IngestToolName } from "@narnia-jobs/shared";
 import type { z } from "zod";
 import type { Repos } from "../db";
 import { readDigestText } from "../digest";
@@ -109,10 +109,14 @@ export function createIngestTools(repos: Repos, o: { dataDir: string }): IngestT
       if (CLOSED.has(run.status)) {
         throw new IngestError("run_closed", `Execução encerrada (${run.status})`);
       }
+      // identidade sem nenhum dado viraria item em branco e "sem suporte" na revisão
+      const kept = input.proposals.filter(
+        (p) => p.proposal.kind !== "identity" || hasIdentityData(p.proposal.data),
+      );
       const ids = repos.proposals.insertMany(
         run.id,
-        input.proposals.map((p) => p.proposal),
-        input.proposals.map((p) => p.evidence),
+        kept.map((p) => p.proposal),
+        kept.map((p) => p.evidence),
       );
       return { added: ids.length };
     }),

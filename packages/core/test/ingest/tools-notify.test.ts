@@ -104,6 +104,27 @@ describe("F03/M2 tools file.* e ingest.* (definição na F03, exposição na F04
     ).toThrow(IngestError);
   });
 
+  it("ingest.propose ignora identidade sem nenhum dado (não vira item vazio na revisão)", () => {
+    const { repos, dataDir, run } = setup();
+    const r = run();
+    const tools = createIngestTools(repos, { dataDir });
+    const res = tools["ingest.propose"]({
+      runId: r.id,
+      proposals: [
+        {
+          proposal: { kind: "identity", confidence: 0.3, data: {} },
+          evidence: { ref: "text", quote: "meu último salário" },
+        },
+        {
+          proposal: { kind: "skill", confidence: 0.8, data: { name: "Go", category: "language" } },
+          evidence: { ref: "text", quote: "Go" },
+        },
+      ],
+    });
+    expect(res.added).toBe(1);
+    expect(repos.proposals.listByRun(r.id).map((p) => p.proposal.kind)).toEqual(["skill"]);
+  });
+
   it("ingest.propose valida por kind, grava com evidência e recusa run encerrado; ingest.status conta pendentes", () => {
     const { repos, dataDir, run } = setup();
     const r = run();

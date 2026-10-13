@@ -109,32 +109,59 @@ function makeRepo<I extends object, R extends FactRecordMeta>(
   extraOrder = "created_at, rowid",
   hooks: FactsHooks = {},
 ): BaseRepo<I, R> {
-  const allCols = [
+  // colunas que existem na tabela, lidas no primeiro uso: os repositórios também servem a bancos de migrations
+  // anteriores (testes de upgrade), em que campos novos (ex.: salário da experiência, 0007) ainda não existem
+  let present: string[] | null = null;
+  const cols = () => {
+    if (!present) {
+      const existing = new Set(
+        (db.prepare(`pragma table_info(${table})`).all() as Array<{ name: string }>).map(
+          (c) => c.name,
+        ),
+      );
+      present = columns.filter((c) => existing.has(c));
+    }
+    return present;
+  };
+  // preparados no primeiro uso, pelo mesmo motivo
+  const lazy = (sql: () => string) => {
+    let stmt: ReturnType<Db["prepare"]> | null = null;
+    return () => {
+      stmt ??= db.prepare(sql());
+      return stmt;
+    };
+  };
+  const allCols = () => [
     "id",
-    ...columns,
+    ...cols(),
     "source_id",
     "confidence",
     "verified",
     "created_at",
     "updated_at",
   ];
-  const insert = db.prepare(
-    `insert into ${table} (${allCols.join(", ")}) values (${allCols.map((c) => `@${c}`).join(", ")})`,
+  const insert = lazy(
+    () =>
+      `insert into ${table} (${allCols().join(", ")}) values (${allCols()
+        .map((c) => `@${c}`)
+        .join(", ")})`,
   );
-  const update = db.prepare(
-    `update ${table} set ${[...columns, "source_id", "confidence", "verified", "updated_at"]
-      .map((c) => `${c} = @${c}`)
-      .join(", ")} where id = @id`,
+  const update = lazy(
+    () =>
+      `update ${table} set ${[...cols(), "source_id", "confidence", "verified", "updated_at"]
+        .map((c) => `${c} = @${c}`)
+        .join(", ")} where id = @id`,
   );
-  const getStmt = db.prepare(`select * from ${table} where id = ?`);
-  const listStmt = db.prepare(`select * from ${table} order by ${extraOrder}`);
-  const delStmt = db.prepare(`delete from ${table} where id = ?`);
-  const countStmt = db.prepare(`select count(*) as n from ${table}`);
+  const getStmt = lazy(() => `select * from ${table} where id = ?`);
+  const listStmt = lazy(() => `select * from ${table} order by ${extraOrder}`);
+  const delStmt = lazy(() => `delete from ${table} where id = ?`);
+  const countStmt = lazy(() => `select count(*) as n from ${table}`);
 
   function params(input: I & FactMeta, id: string, createdAt: string, updatedAt: string) {
+    const row = toRow(input, { userId: userId() });
     return {
       id,
-      ...toRow(input, { userId: userId() }),
+      ...Object.fromEntries(cols().map((c) => [c, row[c]])),
       source_id: input.sourceId ?? null,
       confidence: input.confidence,
       verified: input.verified ? 1 : 0,
@@ -147,16 +174,16 @@ function makeRepo<I extends object, R extends FactRecordMeta>(
     insert(input) {
       const now = nowUtc();
       const id = newId();
-      insert.run(params(input, id, now, now));
+      insert().run(params(input, id, now, now));
       settings.bumpFactsVersion();
       return repo.get(id) as R;
     },
     get(id) {
-      const row = getStmt.get(id) as Row | undefined;
+      const row = getStmt().get(id) as Row | undefined;
       return row ? fromRow(row) : null;
     },
     list() {
-      return (listStmt.all() as Row[]).map(fromRow);
+      return (listStmt().all() as Row[]).map(fromRow);
     },
     update(id, patch) {
       const current = repo.get(id);
@@ -164,17 +191,17 @@ function makeRepo<I extends object, R extends FactRecordMeta>(
       const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
       const { id: _id, createdAt, updatedAt: _u, ...rest } = current;
       const merged = { ...rest, ...defined } as unknown as I & FactMeta;
-      update.run(omit(params(merged, id, createdAt, nowUtc()), ["created_at"]));
+      update().run(omit(params(merged, id, createdAt, nowUtc()), ["created_at"]));
       settings.bumpFactsVersion();
       return repo.get(id) as R;
     },
     remove(id) {
-      delStmt.run(id);
+      delStmt().run(id);
       hooks.onRemove?.(table, id);
       settings.bumpFactsVersion();
     },
     count() {
-      return (countStmt.get() as { n: number }).n;
+      return (countStmt().get() as { n: number }).n;
     },
   };
   return repo;
@@ -203,6 +230,12 @@ export function factsRepo(
       "location",
       "summary",
       "tech_json",
+      "weekly_hours",
+      "salary_amount",
+      "salary_period",
+      "salary_currency",
+      "benefits_json",
+      "benefits_other_json",
     ],
     (i, ctx) => ({
       user_id: ctx.userId,
@@ -215,6 +248,12 @@ export function factsRepo(
       location: i.location ?? null,
       summary: i.summary ?? null,
       tech_json: JSON.stringify(i.tech ?? []),
+      weekly_hours: i.weeklyHours ?? null,
+      salary_amount: i.compensation?.amount ?? null,
+      salary_period: i.compensation?.period ?? null,
+      salary_currency: i.compensation?.currency ?? null,
+      benefits_json: JSON.stringify(i.benefits ?? []),
+      benefits_other_json: JSON.stringify(i.benefitsOther ?? []),
     }),
     (r) => ({
       ...meta(r),
@@ -229,6 +268,20 @@ export function factsRepo(
       ...(str(r.location) ? { location: String(r.location) } : {}),
       ...(str(r.summary) ? { summary: String(r.summary) } : {}),
       tech: json<string[]>(r.tech_json, []),
+      ...(typeof r.weekly_hours === "number" ? { weeklyHours: r.weekly_hours } : {}),
+      ...(typeof r.salary_amount === "number" && str(r.salary_period) && str(r.salary_currency)
+        ? {
+            compensation: {
+              amount: r.salary_amount,
+              period: String(r.salary_period) as NonNullable<
+                ExperienceData["compensation"]
+              >["period"],
+              currency: String(r.salary_currency),
+            },
+          }
+        : {}),
+      benefits: json<NonNullable<ExperienceData["benefits"]>>(r.benefits_json, []),
+      benefitsOther: json<string[]>(r.benefits_other_json, []),
     }),
     uid,
     "start_date desc, rowid",
