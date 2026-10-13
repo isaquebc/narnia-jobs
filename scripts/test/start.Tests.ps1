@@ -230,3 +230,29 @@ Describe "F04/M5 · modo B (install-plugin e diagnóstico no host)" {
     $out | Should -Match "não instalado"
   }
 }
+
+Describe "Invoke-Evals (avaliações no Phoenix, M5)" {
+  BeforeEach {
+    $script:Calls = @()
+    $script:ApiUp = $true
+    function global:docker {
+      $line = $args -join " "
+      $script:Calls += $line
+      if ($line -like "*ps -q api*" -and $script:ApiUp) { "abc123" }
+    }
+  }
+  AfterEach { Remove-Item function:global:docker -ErrorAction SilentlyContinue }
+  It "sem 'prompts' explica o uso" { { Invoke-Evals @() } | Should -Throw "*evals prompts*" }
+  It "com o api de dev no ar, roda o comando dentro dele repassando os argumentos" {
+    Invoke-Evals @("prompts", "extract-facts", "--strict")
+    ($script:Calls -join "`n") | Should -Match "exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals prompts extract-facts --strict"
+  }
+  It "chat e all também valem" {
+    Invoke-Evals @("chat", "pontos-fracos")
+    ($script:Calls -join "`n") | Should -Match "src/cli.ts evals chat pontos-fracos"
+  }
+  It "sem a aplicação no ar, pede para subir" {
+    $script:ApiUp = $false
+    { Invoke-Evals @("prompts") } | Should -Throw "*suba a aplicação*"
+  }
+}

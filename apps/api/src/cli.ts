@@ -63,7 +63,11 @@ function usage(): void {
   console.log(`narnia-jobs <comando>
   doctor          verifica login (volume/token), Redis, pasta de dados e worker
   login           login interativo da assinatura dentro do container
-  install-plugin  roda no host: ./start.sh install-plugin (ou .\\start.ps1 install-plugin)`);
+  install-plugin  roda no host: ./start.sh install-plugin (ou .\\start.ps1 install-plugin)
+  evals prompts [nome…] [--strict]  prompts estruturados sobre os datasets no Phoenix (pela ponte)
+  evals chat [id…] [--strict]       conversas de referência com o recrutador, num banco temporário isolado
+  evals pdf [--strict]              leitura do PDF fictício (tool Read), num banco temporário isolado
+  evals all [--strict]              tudo acima`);
 }
 
 let code = 0;
@@ -80,6 +84,30 @@ switch (cmd) {
       "install-plugin roda no seu computador: ./start.sh install-plugin (Windows: .\\start.ps1 install-plugin).",
     );
     break;
+  case "evals": {
+    // avaliações no Phoenix: prompts (Playground pela ponte), chat e pdf (banco temporário isolado), all
+    const [, sub = "", ...rest] = process.argv.slice(2);
+    if (sub === "prompts" || sub === "all") {
+      const { runPromptEvals } = await import("./evals/cli-prompts");
+      code = await runPromptEvals(sub === "all" ? rest.filter((a) => a.startsWith("--")) : rest);
+    }
+    if (sub === "chat" || sub === "pdf" || sub === "all") {
+      const { runSandboxEvals } = await import("./evals/cli-evals");
+      const flags = rest.filter((a) => a.startsWith("--"));
+      if (sub === "all") {
+        code = Math.max(
+          code,
+          await runSandboxEvals("chat", flags),
+          await runSandboxEvals("pdf", flags),
+        );
+      } else code = await runSandboxEvals(sub, rest);
+    }
+    if (!["prompts", "chat", "pdf", "all"].includes(sub)) {
+      console.log("narnia-jobs evals prompts|chat|pdf|all [nome…] [--strict]");
+      code = 2;
+    }
+    break;
+  }
   case "help":
   case "--help":
   case "-h":

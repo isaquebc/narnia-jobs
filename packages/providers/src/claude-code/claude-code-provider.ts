@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname } from "node:path";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import {
   type AnalyzeProfilesOutput,
@@ -49,6 +49,8 @@ import {
   type AuthMethod,
   type BuildDigestInput,
   type CheckProposalsInput,
+  type CompleteInput,
+  type CompleteResult,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
@@ -70,6 +72,8 @@ import {
   type RateLimitInfoLike,
   type UsageProbe,
 } from "./plan-usage";
+import { PROMPTS } from "./prompt-files";
+import { renderStructuredPrompt } from "./prompt-specs";
 
 /* ---------- processos (detect) ---------- */
 
@@ -98,6 +102,9 @@ export const defaultExec: Exec = async (cmd, args) => {
   }
 };
 
+/** Saída estruturada na ponte: a tool interna do SDK pode pedir uma nova tentativa. */
+const COMPLETE_STRUCTURED_MAX_TURNS = 3;
+
 /* ---------- SDK (query) ---------- */
 
 /** Subconjunto estrutural das mensagens do Agent SDK que usamos (evita acoplar os testes aos tipos completos). */
@@ -111,6 +118,10 @@ export interface SdkMessageLike {
   total_cost_usd?: number;
   /** `rate_limit_event` (F03 §2.4): janela do plano com utilização e renovação. */
   rate_limit_info?: RateLimitInfoLike;
+  /** `stream_event` (fragmentos, com `includePartialMessages`). */
+  event?: { type?: string; delta?: { type?: string; text?: string } };
+  /** `assistant`: modelo exato que respondeu. */
+  message?: { model?: string };
 }
 
 export interface SdkQueryOptions {
@@ -121,7 +132,8 @@ export interface SdkQueryOptions {
   allowedTools?: string[];
   maxTurns: number;
   systemPrompt: string;
-  outputFormat: { type: "json_schema"; schema: Record<string, unknown> };
+  /** Ausente = texto livre (só a ponte da assinatura usa assim). */
+  outputFormat?: { type: "json_schema"; schema: Record<string, unknown> };
   cwd?: string;
   pathToClaudeCodeExecutable?: string;
   settingSources?: Array<"user" | "project" | "local">;
@@ -179,22 +191,6 @@ const AUTH_METHODS: ReadonlySet<string> = new Set([
   "api_key_helper",
   "third_party",
 ]);
-
-const PROMPTS_DIR = new URL("./prompts/", import.meta.url);
-function loadPrompt(name: string): string {
-  return readFileSync(new URL(`${name}.md`, PROMPTS_DIR), "utf8").trim();
-}
-/** Prompts em Markdown, lidos uma vez por processo (pacotes exportam fonte TS, decisão F01-28). */
-export const PROMPTS = {
-  readDocument: () => loadPrompt("read-document"),
-  extractFacts: () => loadPrompt("extract-facts"),
-  buildDigest: () => loadPrompt("build-digest"),
-  analyzeProfiles: () => loadPrompt("analyze-profiles"),
-  pickFiles: () => loadPrompt("pick-files"),
-  analyzeRepo: () => loadPrompt("analyze-repo"),
-  synthesizeRun: () => loadPrompt("synthesize-run"),
-  checkProposals: () => loadPrompt("check-proposals"),
-};
 
 /** JSON Schema da análise de perfis (F02), gerado uma vez por processo (sem `$schema`, fix e06eeda). */
 export const ANALYZE_PROFILES_JSON_SCHEMA = toJsonSchema(AnalyzeProfilesOutputSchema);
@@ -552,10 +548,68 @@ export class ClaudeCodeProvider implements Provider {
     };
   }
 
+  /**
+   * Ponte da assinatura (avaliações no Phoenix, M1): uma resposta do modelo, sem tools e sem configurações do
+   * usuário; com schema, a saída estruturada do SDK (o JSON vira o texto da resposta). Erro do modelo vira
+   * `ProviderError` com a mensagem dele.
+   */
+  async complete(input: CompleteInput, onText?: (text: string) => void): Promise<CompleteResult> {
+    const options: SdkQueryOptions = {
+      model: input.model,
+      tools: [],
+      // a saída estruturada usa uma tool interna do SDK: pede mais de um turno
+      maxTurns: input.jsonSchema ? COMPLETE_STRUCTURED_MAX_TURNS : 1,
+      systemPrompt: input.system,
+      includePartialMessages: true,
+      settingSources: [],
+      ...(input.jsonSchema
+        ? { outputFormat: { type: "json_schema", schema: input.jsonSchema } }
+        : {}),
+      ...(this.binaryPath ? { pathToClaudeCodeExecutable: this.binaryPath } : {}),
+    };
+    let result: SdkMessageLike | null = null;
+    let model = input.model;
+    try {
+      const stream = this.query
+        ? this.query({ prompt: input.prompt, options })
+        : await defaultQuery({ prompt: input.prompt, options });
+      for await (const m of stream) {
+        reportActivity();
+        if (m.type === "stream_event") {
+          const d = m.event?.delta;
+          if (m.event?.type === "content_block_delta" && d?.type === "text_delta" && d.text)
+            onText?.(d.text);
+        } else if (m.type === "assistant" && m.message?.model) model = m.message.model;
+        else if (m.type === "result") result = m;
+      }
+    } catch (e) {
+      throw new ProviderError(
+        "query_failed",
+        `Falha ao consultar o modelo: ${(e as Error).message}`,
+        e,
+      );
+    }
+    if (!result) throw new ProviderError("query_failed", "O modelo não devolveu resultado");
+    if (result.is_error || result.subtype !== "success")
+      throw new ProviderError(
+        "query_failed",
+        result.result || `Falha do modelo (${result.subtype ?? "sem subtipo"})`,
+      );
+    const structured = input.jsonSchema
+      ? (result.structured_output ?? extractJson(result.result ?? "") ?? null)
+      : null;
+    return {
+      text: structured !== null ? JSON.stringify(structured) : (result.result ?? ""),
+      structured,
+      model,
+      usage: toUsage(result, model),
+      costUsd: result.total_cost_usd ?? 0,
+    };
+  }
+
   async readDocument(input: ReadDocumentInput): Promise<ProviderResult<ReadDocumentOutput>> {
     const dir = dirname(input.filePath);
-    const name = basename(input.filePath);
-    const prompt = `Leia o arquivo "${name}" (nesta pasta) com a ferramenta Read e transcreva todo o texto conforme as instruções. Idioma esperado: ${input.locale}.`;
+    const prompt = renderStructuredPrompt("readDocument", input);
     return this.run(
       prompt,
       {
@@ -574,7 +628,7 @@ export class ClaudeCodeProvider implements Provider {
   }
 
   async extractFacts(input: ExtractFactsInput): Promise<ProviderResult<ExtractFactsOutput>> {
-    const prompt = `Idioma do documento: ${input.locale}.\n\n<documento>\n${input.text}\n</documento>`;
+    const prompt = renderStructuredPrompt("extractFacts", input);
     return this.run(
       prompt,
       {
@@ -592,8 +646,8 @@ export class ClaudeCodeProvider implements Provider {
   async analyzeProfiles(
     input: AnalyzeProfilesProviderInput,
   ): Promise<ProviderResult<AnalyzeProfilesOutput>> {
-    const { model, ...history } = input;
-    const prompt = `<historico>\n${JSON.stringify(history, null, 1)}\n</historico>`;
+    const { model } = input;
+    const prompt = renderStructuredPrompt("analyzeProfiles", input);
     return this.run(
       prompt,
       {
@@ -632,11 +686,7 @@ export class ClaudeCodeProvider implements Provider {
   }
 
   pickFiles(input: PickFilesInput): Promise<ProviderResult<PickFilesOutput>> {
-    const prompt = [
-      `Repositório: ${input.repo}. Escolha no máximo ${input.maxFiles} arquivos (maxFiles = ${input.maxFiles}).`,
-      `<candidatos>\n${input.candidates.join("\n")}\n</candidatos>`,
-      `<arvore>\n${input.tree.join("\n")}\n</arvore>`,
-    ].join("\n\n");
+    const prompt = renderStructuredPrompt("pickFiles", input);
     return this.single(
       prompt,
       input.model,
@@ -648,7 +698,7 @@ export class ClaudeCodeProvider implements Provider {
   }
 
   analyzeRepo(input: AnalyzeRepoInput): Promise<ProviderResult<AnalyzeRepoOutput>> {
-    const prompt = `Repositório: ${input.repo}.\n\n<contexto>\n${input.context}\n</contexto>`;
+    const prompt = renderStructuredPrompt("analyzeRepo", input);
     return this.single(
       prompt,
       input.model,
@@ -660,10 +710,7 @@ export class ClaudeCodeProvider implements Provider {
   }
 
   synthesizeRun(input: SynthesizeRunInput): Promise<ProviderResult<SynthesizeRunOutput>> {
-    const reports = input.reports
-      .map((r) => `## ${r.fullName}\n${JSON.stringify(r.report, null, 1)}`)
-      .join("\n\n");
-    const prompt = `<relatorios>\n${reports}\n</relatorios>\n\n<metricas>\n${input.metricsTable}\n</metricas>`;
+    const prompt = renderStructuredPrompt("synthesizeRun", input);
     return this.single(
       prompt,
       input.model,
@@ -675,7 +722,7 @@ export class ClaudeCodeProvider implements Provider {
   }
 
   checkProposals(input: CheckProposalsInput): Promise<ProviderResult<CheckProposalsOutput>> {
-    const prompt = `<itens>\n${JSON.stringify(input.items, null, 1)}\n</itens>`;
+    const prompt = renderStructuredPrompt("checkProposals", input);
     return this.single(
       prompt,
       input.model,
@@ -687,7 +734,7 @@ export class ClaudeCodeProvider implements Provider {
   }
 
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {
-    const prompt = `Idioma do documento: ${input.locale}.\n\n<documento>\n${input.text}\n</documento>\n\n<fatos_extraidos>\n${JSON.stringify(input.proposals)}\n</fatos_extraidos>`;
+    const prompt = renderStructuredPrompt("buildDigest", input);
     return this.run(
       prompt,
       {

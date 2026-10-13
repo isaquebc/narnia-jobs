@@ -25,6 +25,10 @@ export interface EvalCaseReport {
   endedAt: string;
   /** Respostas do recrutador (só vão para o Phoenix com NARNIA_OTEL_CONTENT=1). */
   replies: string[];
+  /** Ferramentas chamadas na conversa (nome publicado). */
+  tools: string[];
+  /** Juízes com modelo (padrão de entrega), preenchidos pelo comando de avaliações. */
+  judges?: Array<{ name: string; label: string; score: number; explanation: string }>;
   error?: string;
 }
 
@@ -72,6 +76,7 @@ export async function runEvalCases(
   for (const c of cases) {
     const startedAt = new Date().toISOString();
     let replies: string[] = [];
+    let tools: string[] = [];
     const content = contentTracingEnabled();
     const span = startSpan("eval.case", {
       "openinference.span.kind": "CHAIN",
@@ -102,7 +107,7 @@ export async function runEvalCases(
       );
       const assistant = messages.filter((m) => m.role === "assistant");
       replies = assistant.map((m) => m.contentMd);
-      const tools = messages.flatMap((m) => m.toolCalls.map((t) => t.name));
+      tools = messages.flatMap((m) => m.toolCalls.map((t) => t.name));
       const { session } = await call<{ session: SessionView }>(`/api/sessions/${sessionId}`);
       const { sources } = await call<{
         sources: Array<{ url: string; sessionId: string | null; userConfirmed?: boolean }>;
@@ -168,6 +173,7 @@ export async function runEvalCases(
         startedAt,
         endedAt: new Date().toISOString(),
         replies,
+        tools,
       });
     } catch (e) {
       span.recordError(e);
@@ -180,6 +186,7 @@ export async function runEvalCases(
         startedAt,
         endedAt: new Date().toISOString(),
         replies,
+        tools,
         error: (e as Error).message,
       });
     } finally {

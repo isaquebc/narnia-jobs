@@ -462,3 +462,42 @@ fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma
   # o `!plugin/**` não pode reincluir a cópia (ela fica em .plugin-build/plugin)
   ! grep -qx '!.plugin-build' .dockerignore
 }
+
+# --- avaliações no Phoenix (M5): ./start.sh evals prompts ---------------------------------------------------------
+
+@test "evals prompts roda no api de dev quando ele está no ar, repassando os argumentos" {
+  : > "$TMP/calls"
+  docker() {
+    printf '%s\n' "$*" >> "$TMP/calls"
+    [[ "$*" == *"ps -q api"* ]] && echo "abc123"
+    return 0
+  }
+  require_docker() { :; }
+  run cmd_evals prompts extract-facts --strict
+  [ "$status" -eq 0 ]
+  grep -q -- "exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals prompts extract-facts --strict" "$TMP/calls"
+}
+
+@test "evals sem 'prompts' mostra o uso; sem a aplicação no ar pede para subir" {
+  docker() { return 0; }
+  require_docker() { :; }
+  run cmd_evals
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"evals prompts"* ]]
+  run cmd_evals prompts
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"suba a aplicação"* ]]
+}
+
+@test "evals chat (banco temporário isolado) também passa pelo api de dev" {
+  : > "$TMP/calls"
+  docker() {
+    printf '%s\n' "$*" >> "$TMP/calls"
+    [[ "$*" == *"ps -q api"* ]] && echo "abc123"
+    return 0
+  }
+  require_docker() { :; }
+  run cmd_evals chat pontos-fracos
+  [ "$status" -eq 0 ]
+  grep -q -- "src/cli.ts evals chat pontos-fracos" "$TMP/calls"
+}

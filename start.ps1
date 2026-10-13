@@ -382,6 +382,7 @@ Uso (produção, só Docker no host):
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker
+  evals prompts|chat|pdf|all [nome…] [--strict]  avaliações no Phoenix (chat e pdf num banco temporário isolado)
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 
@@ -400,11 +401,21 @@ Desenvolvimento (tudo em containers):
 "@
 }
 
+# avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
+function Invoke-Evals([string[]] $Rest) {
+  if (-not $Rest -or $Rest[0] -notin @("prompts", "chat", "pdf", "all")) { throw "uso: .\start.ps1 evals prompts|chat|pdf|all [nome…] [--strict]" }
+  $devApi = & docker @script:DevCompose ps -q api 2>$null
+  if ($devApi) { & docker @script:DevCompose exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals @Rest; return }
+  if (Test-StackRunning) { Invoke-Prod (@("exec", "-T", "api", "narnia-jobs", "evals") + $Rest); return }
+  throw "suba a aplicação antes (make dev, ou .\start.ps1 up com o Phoenix ligado)."
+}
+
 if (-not $env:NARNIA_PS_NO_MAIN) {
   switch ($Command) {
     "up"        { Invoke-Up }
     "down"      { Invoke-Down }
     "login"     { Invoke-Login }
+    "evals"     { Assert-Docker; try { Invoke-Evals $Rest } catch { Fail $_.Exception.Message } }
     "doctor"    {
       Assert-Docker
       $devApi = & docker @script:DevCompose ps -q api 2>$null

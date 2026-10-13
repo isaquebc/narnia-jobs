@@ -21,6 +21,8 @@ import {
   approxTokens,
   type BuildDigestInput,
   type CheckProposalsInput,
+  type CompleteInput,
+  type CompleteResult,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
@@ -52,6 +54,7 @@ export type MockOperation =
   | "analyzeRepo"
   | "synthesizeRun"
   | "checkProposals"
+  | "complete"
   | "openChat";
 
 export interface MockProviderOptions {
@@ -384,6 +387,31 @@ export class MockProvider implements Provider {
     return this.result(output, JSON.stringify(rest), model);
   }
 
+  /** Ponte da assinatura (M1): eco determinístico do pedido; com schema, o menor objeto válido. */
+  async complete(input: CompleteInput, onText?: (text: string) => void): Promise<CompleteResult> {
+    await this.gate("complete");
+    const structured = input.jsonSchema ? minimalFromSchema(input.jsonSchema) : null;
+    const text =
+      structured !== null
+        ? JSON.stringify(structured)
+        : `Resposta simulada (mock) para: ${input.prompt.slice(0, 200)}`;
+    for (const piece of text.match(/.{1,40}/gs) ?? [text]) onText?.(piece);
+    const inputTokens = approxTokens(input.system) + approxTokens(input.prompt);
+    return {
+      text,
+      structured,
+      model: input.model,
+      usage: {
+        inputTokens,
+        outputTokens: approxTokens(text),
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        model: input.model,
+      },
+      costUsd: 0,
+    };
+  }
+
   /**
    * Chat com roteiros (F04 M3): o "modelo" é falso, mas as tools são reais: cada turno chama uma tool do `/mcp` do app
    * pelo JSON-RPC com os headers da sessão (token e `X-Narnia-Session`) e responde em fragmentos. Roteiro pela mensagem:
@@ -653,4 +681,39 @@ function mockChatReply(tool: string, isError: boolean): string {
       "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",
   };
   return byTool[tool] ?? `Usei ${tool}.`;
+}
+
+/** Menor valor que satisfaz um JSON Schema simples (só os campos obrigatórios; enum = 1º valor). */
+export function minimalFromSchema(schema: Record<string, unknown>): unknown {
+  const enumValues = schema.enum as unknown[] | undefined;
+  if (Array.isArray(enumValues) && enumValues.length > 0) return enumValues[0];
+  if ("const" in schema) return schema.const;
+  const variants = (schema.anyOf ?? schema.oneOf) as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(variants) && variants[0]) return minimalFromSchema(variants[0]);
+  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  switch (type) {
+    case "object": {
+      const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+      const required = (schema.required ?? []) as string[];
+      return Object.fromEntries(required.map((k) => [k, minimalFromSchema(props[k] ?? {})]));
+    }
+    case "array": {
+      const min = typeof schema.minItems === "number" ? schema.minItems : 0;
+      const items = (schema.items ?? {}) as Record<string, unknown>;
+      return Array.from({ length: min }, () => minimalFromSchema(items));
+    }
+    case "string":
+      return typeof schema.minLength === "number" && schema.minLength > 7
+        ? "x".repeat(schema.minLength)
+        : "exemplo";
+    case "number":
+    case "integer":
+      return typeof schema.minimum === "number" ? schema.minimum : 0;
+    case "boolean":
+      return false;
+    case "null":
+      return null;
+    default:
+      return null;
+  }
 }

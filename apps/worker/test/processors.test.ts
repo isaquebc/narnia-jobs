@@ -51,6 +51,7 @@ function countingProvider(inner: Provider, calls: Record<string, number>): Provi
     analyzeRepo: (i) => inner.analyzeRepo(i),
     synthesizeRun: (i) => inner.synthesizeRun(i),
     checkProposals: (i) => inner.checkProposals(i),
+    complete: (i, onText) => inner.complete(i, onText),
     getPlanUsage: () => inner.getPlanUsage(),
     planWindowSnapshot: () => inner.planWindowSnapshot(),
   };
@@ -278,6 +279,7 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
       analyzeRepo: (i) => new MockProvider().analyzeRepo(i),
       synthesizeRun: (i) => new MockProvider().synthesizeRun(i),
       checkProposals: (i) => new MockProvider().checkProposals(i),
+      complete: (i) => new MockProvider().complete(i),
       getPlanUsage: () => new MockProvider().getPlanUsage(),
       planWindowSnapshot: () => null,
     };

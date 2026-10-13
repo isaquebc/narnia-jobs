@@ -679,6 +679,51 @@ export const ChatSettingsResponseSchema = z.object({ settings: ChatSettingsSchem
 export const ChatSettingsPutRequestSchema = ChatSettingsSchema.partial();
 export const TrustedDomainsResponseSchema = z.object({ domains: z.array(TrustedDomainSchema) });
 
+// GET /api/settings/evals — Configurações › Avaliações (ponte da assinatura e Phoenix, decisão AV-2)
+export const BridgeSettingsSchema = z.object({
+  enabled: z.boolean(),
+  defaultModel: z.string().min(1).max(100),
+  concurrency: z.number().int().min(1).max(8),
+});
+export type BridgeSettingsDto = z.infer<typeof BridgeSettingsSchema>;
+export const BridgeSettingsPutRequestSchema = BridgeSettingsSchema.partial();
+export const EvalsSettingsResponseSchema = z.object({
+  bridge: z.object({
+    settings: BridgeSettingsSchema,
+    /** Chave que o Phoenix manda em `x-api-key`. */
+    key: z.string(),
+    /** Endereço da ponte visto de dentro do Phoenix (rede dos containers). */
+    url: z.string(),
+  }),
+  phoenix: z.object({
+    url: z.string().nullable(),
+    reachable: z.boolean(),
+    providerName: z.string(),
+    providerRegistered: z.boolean(),
+    anthropicKeySet: z.boolean(),
+  }),
+  /** Prompts do repositório versionados no Phoenix (M2). */
+  prompts: z.object({
+    count: z.number().int().min(0),
+    lastSync: z
+      .object({
+        at: z.string(),
+        created: z.number().int().min(0),
+        updated: z.number().int().min(0),
+        unchanged: z.number().int().min(0),
+        datasets: z.number().int().min(0),
+        evaluatorsCreated: z.number().int().min(0),
+        evaluatorsUpdated: z.number().int().min(0),
+        error: z.string().nullable(),
+      })
+      .nullable(),
+  }),
+});
+export type EvalsSettingsResponse = z.infer<typeof EvalsSettingsResponseSchema>;
+export const PhoenixAnthropicKeyRequestSchema = z.object({
+  apiKey: z.string().trim().min(1).max(500).nullable(),
+});
+
 // GET /api/plugin/status — Configurações › Modo plugin (F04 §4, auditoria E1)
 export const PluginStatusResponseSchema = z.object({
   mcpUrl: z.string(),

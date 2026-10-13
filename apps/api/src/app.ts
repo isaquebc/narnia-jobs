@@ -4,8 +4,14 @@ import type { Provider } from "@narnia-jobs/providers";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { authMiddleware, enterHandler } from "./auth";
+import { bridgeRoutes } from "./bridge/anthropic";
 import { SessionManager } from "./chat/session-manager";
 import { apiError } from "./errors";
+import { syncEvaluators } from "./evals/eval-sync";
+import { bridgeUrlForPhoenix, createPhoenixAdmin, phoenixBaseUrl } from "./evals/phoenix-admin";
+import { gitCommit } from "./evals/phoenix-setup";
+import { promptCatalog } from "./evals/prompt-catalog";
+import { syncPrompts } from "./evals/prompt-sync";
 import type { EventBus } from "./events";
 import {
   createFakeDeviceFlow,
@@ -23,6 +29,7 @@ import { backupsRoutes } from "./routes/backups";
 import { chatRoutes } from "./routes/chat";
 import { chatSettingsRoutes } from "./routes/chat-settings";
 import { dashboardRoutes } from "./routes/dashboard";
+import { evalsSettingsRoutes } from "./routes/evals-settings";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
 import { ingestionsRoutes } from "./routes/ingestions";
@@ -58,6 +65,8 @@ export interface AppDeps {
   sessions?: SessionManager;
   /** Sonda do `/mcp` para Configurações › Modo plugin; padrão: a própria app, em memória, com o token de boot. */
   mcpProbe?: () => Promise<number>;
+  /** Origem do Phoenix (Configurações › Avaliações); ausente = do ambiente, null = sem Phoenix (testes). */
+  phoenixUrl?: string | null;
   /** Hosts aceitos (DNS rebinding); ausente = padrões + NARNIA_PUBLIC_URL + NARNIA_ALLOWED_HOSTS. */
   allowedHosts?: Set<string>;
 }
@@ -131,6 +140,36 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", personaCardRoutes({ repos: deps.repos }));
+  // avaliações no Phoenix (AV-2): ponte da assinatura, com chave própria (fora do /api)
+  app.route("/", bridgeRoutes({ repos: deps.repos, provider: deps.provider }));
+  {
+    const phoenixUrl =
+      deps.phoenixUrl === undefined ? phoenixBaseUrl(process.env) : deps.phoenixUrl;
+    const admin = phoenixUrl ? createPhoenixAdmin({ baseUrl: phoenixUrl }) : null;
+    app.route(
+      "/",
+      evalsSettingsRoutes({
+        repos: deps.repos,
+        bridgeUrl: bridgeUrlForPhoenix(process.env),
+        phoenixUrl,
+        admin,
+        syncPrompts:
+          phoenixUrl && admin
+            ? async () => {
+                const customProviderId = (await admin.status()).providerId;
+                return {
+                  prompts: await syncPrompts(promptCatalog(), {
+                    baseUrl: phoenixUrl,
+                    customProviderId,
+                    commit: gitCommit(),
+                  }),
+                  evaluators: await syncEvaluators({ baseUrl: phoenixUrl, customProviderId }),
+                };
+              }
+            : null,
+      }),
+    );
+  }
   app.route("/", chatSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",

@@ -2,6 +2,7 @@ import type {
   AnalyzeEstimateResponse,
   AnalyzeRequest,
   BackupSettingsResponse,
+  BridgeSettingsDto,
   Budget,
   ChatCategory,
   ChatMessage,
@@ -11,6 +12,7 @@ import type {
   EmphasisListResponse,
   EmphasisPutRequest,
   EstimateResponse,
+  EvalsSettingsResponse,
   FileDigest,
   FileResponse,
   GithubAuthSourceSchema,
@@ -235,6 +237,24 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       ),
     getChatSettings: () => request<{ settings: ChatSettingsDto }>("/api/settings/chat"),
     getPluginStatus: () => request<PluginStatusResponse>("/api/plugin/status"),
+    // Configurações › Avaliações (ponte da assinatura e Phoenix, AV-2)
+    getEvalsSettings: () => request<EvalsSettingsResponse>("/api/settings/evals"),
+    putBridgeSettings: (patch: Partial<BridgeSettingsDto>) =>
+      request<EvalsSettingsResponse>("/api/settings/evals/bridge", {
+        method: "PUT",
+        body: JSON.stringify(patch),
+      }),
+    rotateBridgeKey: () =>
+      request<EvalsSettingsResponse>("/api/settings/evals/bridge/rotate-key", { method: "POST" }),
+    registerPhoenixBridge: () =>
+      request<EvalsSettingsResponse>("/api/settings/evals/phoenix/register", { method: "POST" }),
+    syncPhoenixPrompts: () =>
+      request<EvalsSettingsResponse>("/api/settings/evals/prompts/sync", { method: "POST" }),
+    putPhoenixAnthropicKey: (apiKey: string | null) =>
+      request<EvalsSettingsResponse>("/api/settings/evals/phoenix/anthropic-key", {
+        method: "PUT",
+        body: JSON.stringify({ apiKey }),
+      }),
     putChatSettings: (patch: Partial<ChatSettingsDto>) =>
       request<{ settings: ChatSettingsDto }>("/api/settings/chat", {
         method: "PUT",

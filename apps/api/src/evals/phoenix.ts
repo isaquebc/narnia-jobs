@@ -73,6 +73,7 @@ export async function recordPhoenixExperiment(
       output: {
         passed: r.passed,
         sessionId: r.sessionId,
+        tools: r.tools,
         ...(o.content ? { replies: r.replies } : {}),
       },
       repetition_number: 1,
@@ -93,6 +94,17 @@ export async function recordPhoenixExperiment(
           score: g.passed ? 1 : 0,
           explanation: g.detail,
         },
+      });
+    }
+    // juízes com modelo (padrão de entrega do recrutador)
+    for (const j of r.judges ?? []) {
+      await call("/v1/experiment_evaluations", {
+        experiment_run_id: run.data.id,
+        name: j.name,
+        annotator_kind: "LLM",
+        start_time: r.endedAt,
+        end_time: r.endedAt,
+        result: { label: j.label, score: j.score, explanation: j.explanation },
       });
     }
   }

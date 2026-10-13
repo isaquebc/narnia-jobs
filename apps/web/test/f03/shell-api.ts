@@ -16,4 +16,20 @@ export const shellApi = {
   listSuggestions: async () => ({ suggestions: [] }),
   getUser: async () => ({ user: null }),
   getBackupSettings: async () => ({ max: 5, enabled: true, latest: null, count: 0 }),
+  // Configurações › Avaliações (AV-2): Phoenix fora do ar por padrão nos testes
+  getEvalsSettings: async () => ({
+    bridge: {
+      settings: { enabled: true, defaultModel: "sonnet", concurrency: 2 },
+      key: "narnia-ponte-teste",
+      url: "http://api:3100/bridge/anthropic",
+    },
+    phoenix: {
+      url: null,
+      reachable: false,
+      providerName: "narnia-assinatura",
+      providerRegistered: false,
+      anthropicKeySet: false,
+    },
+    prompts: { count: 17, lastSync: null },
+  }),
 };

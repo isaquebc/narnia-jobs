@@ -163,6 +163,15 @@ describe("F04/M5 · avaliações do chat", () => {
         startedAt: at,
         endedAt: at,
         replies: ["olá?"],
+        tools: ["evidence_experience_list"],
+        judges: [
+          {
+            name: "padrao_de_entrega",
+            label: "parcial",
+            score: 0.5,
+            explanation: "sem próximo passo",
+          },
+        ],
         results: [
           { type: "asks_question" as const, passed: true, detail: "faz pergunta" },
           { type: "cites_source" as const, passed: false, detail: "nenhuma fonte citada" },
@@ -175,6 +184,7 @@ describe("F04/M5 · avaliações do chat", () => {
         startedAt: at,
         endedAt: at,
         replies: [],
+        tools: [],
         results: [],
         error: "timeout",
       },
@@ -216,7 +226,14 @@ describe("F04/M5 · avaliações do chat", () => {
         name: "cites_source",
         result: expect.objectContaining({ score: 0, label: "falhou" }),
       }),
+      // juiz do recrutador (M5): avaliação LLM na mesma execução
+      expect.objectContaining({
+        name: "padrao_de_entrega",
+        annotator_kind: "LLM",
+        result: expect.objectContaining({ score: 0.5, label: "parcial" }),
+      }),
     ]);
+    expect(runs[0]?.body).toMatchObject({ output: { tools: ["evidence_experience_list"] } });
   });
 
   it("dataset que já existe é atualizado (action update) em vez de recriado", async () => {

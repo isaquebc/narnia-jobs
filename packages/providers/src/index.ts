@@ -22,7 +22,6 @@ export {
   defaultExec,
   type Exec,
   type ExecResult,
-  PROMPTS,
   type QueryFn,
   type SdkMessageLike,
   type SdkQueryOptions,
@@ -35,6 +34,15 @@ export {
   type SdkUsageResponseLike,
   type UsageProbe,
 } from "./claude-code/plan-usage";
+export { PROMPTS } from "./claude-code/prompt-files";
+export {
+  renderStructuredPrompt,
+  renderTemplate,
+  STRUCTURED_PROMPTS,
+  type StructuredOperation,
+  type StructuredPromptSpec,
+  structuredPromptVars,
+} from "./claude-code/prompt-specs";
 export {
   createProviderFromEnv,
   MOCK_MODE_FILENAME,
@@ -65,6 +73,8 @@ export {
   approxTokens,
   type BuildDigestInput,
   type CheckProposalsInput,
+  type CompleteInput,
+  type CompleteResult,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,

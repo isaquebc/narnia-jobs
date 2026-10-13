@@ -88,6 +88,8 @@ COPY --chown=node:node apps/worker/package.json apps/worker/
 COPY --chown=node:node apps/worker/src apps/worker/src
 # F04: persona, skills e hook do recrutador; a rota do hook lê o template em runtime (fonte única, F04-1)
 COPY --chown=node:node plugin /app/plugin
+# avaliações no Phoenix: juízes (padrão de entrega) e conversas de referência do chat
+COPY --chown=node:node evals /app/evals
 COPY --chown=node:node docker/entrypoint.sh /app/docker/entrypoint.sh
 COPY --chown=node:node docker/narnia-jobs /usr/local/bin/narnia-jobs
 RUN chmod +x /app/docker/entrypoint.sh /usr/local/bin/narnia-jobs

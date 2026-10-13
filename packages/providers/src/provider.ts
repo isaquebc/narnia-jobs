@@ -111,6 +111,25 @@ export interface CheckProposalsInput {
   model: string;
 }
 
+/** Avaliações no Phoenix (M1): chamada simples, sem tools, usada pela ponte da assinatura. */
+export interface CompleteInput {
+  system: string;
+  prompt: string;
+  model: string;
+  /** Saída estruturada (JSON Schema); ausente = texto livre. */
+  jsonSchema?: Record<string, unknown> | null;
+}
+
+export interface CompleteResult {
+  text: string;
+  /** Objeto da saída estruturada; null sem schema. */
+  structured: unknown;
+  /** Modelo exato que respondeu (o pedido pode ser um apelido). */
+  model: string;
+  usage: Usage;
+  costUsd: number;
+}
+
 export interface Provider {
   readonly id: "claude-code" | "mock";
   detect(): Promise<ProviderStatus>;
@@ -135,6 +154,8 @@ export interface Provider {
    * aplica (API key, terceiros) ou não há dado.
    */
   getPlanUsage(): Promise<PlanUsage | null>;
+  /** Chamada simples ao modelo (ponte da assinatura para o Phoenix); `onText` recebe o texto em fragmentos. */
+  complete(input: CompleteInput, onText?: (text: string) => void): Promise<CompleteResult>;
   /** F04 M3: sessão longa de chat com entrada em streaming e eventos normalizados (nunca lança: falha vira `error`). */
   openChat(opts: ChatOpenOptions): ChatHandle;
   /**

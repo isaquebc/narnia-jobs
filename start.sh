@@ -542,6 +542,19 @@ cmd_promote() {
   info "o hot reload aplica o código; se mudaram dependências, composes ou a imagem: make dev-down && make dev"
 }
 
+# avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
+cmd_evals() {
+  require_docker
+  [[ ${1:-} =~ ^(prompts|chat|pdf|all)$ ]] || die "uso: ./start.sh evals prompts|chat|pdf|all [nome…] [--strict]"
+  if [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then
+    "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals "$@"
+  elif stack_running; then
+    "${PROD_COMPOSE[@]}" exec -T api narnia-jobs evals "$@"
+  else
+    die "suba a aplicação antes (make dev, ou ./start.sh up com o Phoenix ligado)."
+  fi
+}
+
 usage() {
   cat <<USAGE
 narnia-jobs · ./start.sh <comando>
@@ -555,6 +568,7 @@ Uso (produção, só Docker no host):
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
   install-plugin [--prod]  instala o recrutador no Claude Code deste computador (MCP + plugin, modo B)
+  evals prompts|chat|pdf|all [nome…] [--strict]  avaliações no Phoenix: prompts pela ponte; chat e pdf num banco temporário isolado (consome a assinatura)
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 
@@ -591,6 +605,7 @@ main() {
       plugin_doctor "$(mcp_server_name)" "${ep%%|*}" "$(plugin_marketplace_name)" || true ;;
     restore) cmd_restore "$@" ;;
     install-plugin) cmd_install_plugin "$@" ;;
+    evals) cmd_evals "$@" ;;
     promote) cmd_promote "$@" ;;
     dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;

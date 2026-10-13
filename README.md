@@ -92,7 +92,21 @@ COMPOSE_PROFILES=observability
 NARNIA_OTEL_ENDPOINT=http://phoenix:6006/v1/traces
 ```
 
-As avaliações do recrutador (`evals/chat/`, conversas de referência com avaliadores determinísticos: usa as ferramentas, cita fonte, não inventa data nem empresa, só fontes de domínio confiável, dentro do teto) rodam sob demanda pela ferramenta de desenvolvimento e aparecem no Phoenix como experimento do dataset `narnia-chat`, um por rodada, e no projeto `narnia-evals` com um rastro por caso (conversa, anotação por avaliador e nota de resumo).
+As avaliações do recrutador (`evals/chat/`, conversas de referência com regras sem tokens e o juiz `evals/judges/narnia-recrutador.md`) rodam com `./start.sh evals chat`, sempre num **banco temporário isolado**: o comando abre um banco descartável com um perfil fictício, um `/mcp` próprio em `127.0.0.1` e conversa pelo Claude de verdade com as ferramentas desse banco; no fim apaga tudo. Os seus dados nunca entram. O resultado vira experimento do dataset `narnia-chat` e os rastros das conversas vão para o projeto `narnia-evals`, separados dos seus. `./start.sh evals pdf` faz o mesmo com a leitura de um PDF fictício, e `./start.sh evals all` roda prompts, chat e PDF.
+
+#### Prompts e avaliadores no Phoenix (ponte pela assinatura)
+
+Os prompts do narnia-jobs ficam **versionados no Phoenix** (Prompts) e cada prompt estruturado tem um **dataset** com exemplos fictícios e **avaliadores presos a ele**, que são o teste de prompt e garantem o padrão de entrega das respostas:
+
+- **17 prompts**: as 8 chamadas estruturadas (leitura do PDF, fatos, registro de contexto, sugestão de perfis, escolha de arquivos, análise de repositório, síntese e revisão anti-alucinação), a persona do recrutador, as 3 notas de contexto do chat e as 5 skills do terminal. O repositório é a fonte: a sincronização cria uma versão nova quando um prompt muda (com o commit na descrição) e marca a versão em uso com a tag `production`.
+- **Avaliadores de código** (TypeScript, rodam no sandbox Deno do próprio Phoenix, sem rede): JSON no schema, citações literais da fonte, nenhum ano fora da fonte, idioma, limites (arquivos, um veredito por item), ids de apoio do histórico e cobertura dos termos esperados (com termos proibidos para pegar instrução escondida no documento). O código mora em `packages/core/src/evals/prompt-evaluators/` e é publicado como arquivo único.
+- **Juízes** (avaliador com modelo, `padrao_de_entrega`): o padrão de entrega de cada prompt em `evals/judges/<prompt>.md`, com rótulos `atende`, `parcial` e `nao_atende`.
+
+**Como rodar pelo Phoenix:** abra um prompt (`narnia-…`) no Playground, escolha o dataset de mesmo nome e rode: o modelo responde pela ponte e os avaliadores rodam sozinhos, com as notas no experimento. **Pelo terminal:** `./start.sh evals prompts [nome…] [--strict]` (Windows: `.\start.ps1 evals prompts`) roda os prompts estruturados sobre os datasets como experimentos do Phoenix e imprime as notas; `--strict` sai com erro quando alguma avaliação fica abaixo de 100%. A leitura do PDF usa a tool Read e roda por `./start.sh evals pdf` (abaixo).
+
+**Ponte pela assinatura.** O Phoenix chama o modelo pela API; como o narnia-jobs usa a sua assinatura do Claude (sem chave de API), a api oferece um endereço compatível com a API de mensagens da Anthropic (`/bridge/anthropic`) que responde pelo Claude Code com o seu login. Quando o api sobe com o Phoenix no ar, ele registra a ponte no Phoenix (AI Providers, provedor `narnia-assinatura`) e sincroniza prompts, datasets e avaliadores. Em **Configurações › Avaliações** você liga ou desliga a ponte, escolhe o modelo padrão e quantas chamadas rodam ao mesmo tempo, troca a chave, registra de novo, sincroniza e, se preferir pagar por token, guarda uma chave de API da Anthropic, que fica só no Phoenix.
+
+Limites da ponte: executa uma tool só quando ela é forçada (o formato dos juízes do Phoenix); prompts com tools de verdade rodam pelo comando; ignora temperatura, `top_p` e `stop_sequences` (avisa no header `x-narnia-ignored-params`); junta um histórico de várias mensagens numa transcrição; e consome a cota da assinatura, como o chat. Ela só aceita a própria chave (nunca o token de boot) e escuta na rede dos containers e em `127.0.0.1`.
 
 ### Onde ficam os dados e como fazer backup
 

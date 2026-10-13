@@ -849,6 +849,46 @@ export const ptBR = {
       order: "Do menos usado para o mais usado.",
     },
   },
+  evals: {
+    settings: {
+      title: "Avaliações (Phoenix)",
+      hint: "Os prompts do narnia-jobs ficam versionados no Phoenix, com avaliadores que conferem o padrão das respostas. O Phoenix chama o modelo por esta ponte, que usa a sua assinatura do Claude (sem chave de API; consome a cota da assinatura). No Phoenix, em AI Providers, dá para editar a ponte ou usar uma chave de API no lugar.",
+      enabled: "Ponte pela assinatura ligada",
+      defaultModel: "Modelo padrão da ponte",
+      concurrency: "Chamadas simultâneas",
+      concurrencyHint:
+        "Cada chamada abre um processo do Claude Code; acima disso, o Phoenix espera e tenta de novo.",
+      save: "Salvar ponte",
+      saved: "Ponte salva.",
+      url: "Endereço da ponte (visto de dentro do Phoenix)",
+      key: "Chave da ponte",
+      showKey: "Mostrar chave",
+      hideKey: "Esconder chave",
+      rotate: "Trocar chave",
+      rotateHint:
+        "A chave antiga para de valer na hora; com a ponte registrada, o Phoenix é atualizado junto.",
+      phoenixDown:
+        "O Phoenix não respondeu. Ele sobe com o make dev (http://127.0.0.1:6006); na produção, ligue o perfil observability.",
+      notRegistered: "A ponte ainda não está registrada no Phoenix.",
+      registered: "Ponte registrada no Phoenix como {name}: escolha esse provedor no Playground.",
+      register: "Registrar no Phoenix",
+      reRegister: "Registrar de novo",
+      apiKey: "Chave de API da Anthropic (opcional)",
+      apiKeyHint:
+        "Para rodar no Playground pela API paga, sem a assinatura. Fica guardada só no Phoenix.",
+      apiKeySave: "Guardar no Phoenix",
+      apiKeySet: "Chave de API guardada no Phoenix (provedor Anthropic).",
+      apiKeyDelete: "Apagar chave do Phoenix",
+      prompts:
+        "{count} prompts do repositório versionados no Phoenix (tag production na versão em uso) e 8 datasets com avaliadores de código: no Phoenix, abra um prompt no Playground, escolha o dataset dele e rode; os avaliadores rodam sozinhos.",
+      promptsNever:
+        "Ainda não sincronizados (acontece sozinho quando o api sobe com o Phoenix no ar).",
+      promptsLast:
+        "Última sincronização {date}: prompts: {created} novos, {updated} com versão nova, {unchanged} sem mudança; avaliadores: {evCreated} novos, {evUpdated} com versão nova.",
+      promptsError: "Última sincronização {date} falhou: {error}",
+      promptsSync: "Sincronizar prompts e avaliadores",
+    },
+  },
   dashboard: {
     title: "Dashboard",
     welcome: "Olá, {name}",

@@ -18,6 +18,11 @@ import { createApp } from "./app";
 import { generateBootToken } from "./auth";
 import { bootData } from "./boot";
 import { SessionManager } from "./chat/session-manager";
+import { syncEvaluators } from "./evals/eval-sync";
+import { bridgeUrlForPhoenix, createPhoenixAdmin, phoenixBaseUrl } from "./evals/phoenix-admin";
+import { gitCommit, setupPhoenix } from "./evals/phoenix-setup";
+import { promptCatalog } from "./evals/prompt-catalog";
+import { syncPrompts } from "./evals/prompt-sync";
 import { EventBus } from "./events";
 import { BullQueueAdapter } from "./queue";
 import { startRedisRelay } from "./relay";
@@ -84,6 +89,37 @@ attachWebSocket({ server: server as unknown as import("node:http").Server, bus, 
 // F04/M5: rastros para o Phoenix local só com NARNIA_OTEL_ENDPOINT (ligado por padrão no compose de dev)
 if (await initTelemetry(process.env, "narnia-api"))
   console.log(`[api] rastros OpenTelemetry → ${process.env.NARNIA_OTEL_ENDPOINT}`);
+
+// avaliações (M2): com o Phoenix no ar, registra a ponte da assinatura e sincroniza os prompts do repositório
+{
+  const phoenixUrl = phoenixBaseUrl(process.env);
+  if (phoenixUrl) {
+    const admin = createPhoenixAdmin({ baseUrl: phoenixUrl });
+    void setupPhoenix({
+      repos,
+      admin,
+      bridgeUrl: bridgeUrlForPhoenix(process.env),
+      sync: async (customProviderId) => ({
+        prompts: await syncPrompts(promptCatalog(), {
+          baseUrl: phoenixUrl,
+          customProviderId,
+          commit: gitCommit(),
+        }),
+        evaluators: await syncEvaluators({ baseUrl: phoenixUrl, customProviderId }),
+      }),
+    })
+      .then((r) => {
+        if (r.registered) console.log("[api] ponte da assinatura registrada no Phoenix");
+        if (r.synced > 0)
+          console.log(
+            `[api] Phoenix: ${r.synced} prompt(s)/avaliador(es) novos ou com versão nova`,
+          );
+      })
+      .catch((e: unknown) =>
+        console.warn(`[api] Phoenix: preparação falhou (${(e as Error).message})`),
+      );
+  }
+}
 
 const shutdown = async () => {
   console.log("[api] encerrando…");
