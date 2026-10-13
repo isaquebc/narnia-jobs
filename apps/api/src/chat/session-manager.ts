@@ -3,6 +3,7 @@ import {
   cardUpdatedNote,
   friendlyError,
   getCard,
+  gradeTranscript,
   newId,
   type Repos,
   renderNote,
@@ -12,18 +13,19 @@ import {
 } from "@narnia-jobs/core";
 import type { ChatEvent, ChatHandle, Provider, Usage } from "@narnia-jobs/providers";
 import {
+  annotateSpan,
   type ChatCategory,
   type ChatSession,
   type ChatToolCall,
-  clip,
-  contentTracingEnabled,
+  getTracer,
   nowUtc,
+  type SpanAnnotation,
   type SpanHandle,
-  startSpan,
 } from "@narnia-jobs/shared";
 import type { EventBus } from "../events";
 import { NATIVE_TOOLS } from "../mcp/scopes";
 import { pluginDir, readPluginFile, readRecruiterTemplate, stripFrontmatter } from "../plugin";
+import { TurnTrace } from "./turn-trace";
 
 export class SessionLimitError extends Error {
   constructor(
@@ -65,6 +67,14 @@ export interface SessionManagerDeps {
 /** Tools (nome publicado) que criam uma execução de ingestão: o runId vai para a tool call gravada. */
 const CREATES_RUN_TOOLS = new Set(["ingest_text", "ingest_file", "ingest_github"]);
 
+/** Avaliadores que valem para qualquer turno real (sem tokens); os demais dependem do caso de referência. */
+const ONLINE_GRADERS = [
+  { type: "no_unknown_years" },
+  { type: "no_unknown_companies" },
+  { type: "trusted_sources_only" },
+  { type: "within_budget" },
+] as const satisfies Array<{ type: string }>;
+
 /** Texto acrescentado à resposta parcial guardada de um turno cortado. */
 const INTERRUPTED_MARK = "_(resposta interrompida)_";
 /** Mensagens do banco antepostas quando a retomada se perde. */
@@ -81,8 +91,10 @@ interface Live {
   /** Execuções criadas pelas tools de ingestão do turno (evento do `/mcp`), na ordem: vão para a tool call. */
   pendingRuns: string[];
   toolStarts: Map<string, { name: string; args: string; t0: number }>;
-  /** F04/M5: span do turno em andamento (no-op sem NARNIA_OTEL_ENDPOINT). */
-  span?: SpanHandle | undefined;
+  /** F04/M5: rastro do turno em andamento (no-op sem NARNIA_OTEL_ENDPOINT). */
+  trace?: TurnTrace | undefined;
+  /** System prompt com que o processo foi aberto (entrada da 1ª chamada ao modelo no rastro). */
+  systemPrompt: string;
   /** Fechado pelo api (hibernar, arquivar, trocar): eventos tardios do processo são ignorados (auditoria B). */
   closed: boolean;
   /** "Parar" pedido: o próximo fim de turno (de qualquer tipo) fecha o turno como interrompido. */
@@ -190,12 +202,13 @@ export class SessionManager {
         ? null
         : Math.max(0, settings.maxBudgetUsd - session.costUsdEst);
     const plugin = this.deps.pluginDir === undefined ? pluginDir() : this.deps.pluginDir;
+    const systemPrompt = renderRecruiterPrompt(stripFrontmatter(readRecruiterTemplate()), {
+      persona: buildPersona(profile),
+      card: card.text,
+      trustedDomains: this.repos.trustedDomains.list(),
+    });
     const handle = this.deps.provider.openChat({
-      systemPrompt: renderRecruiterPrompt(stripFrontmatter(readRecruiterTemplate()), {
-        persona: buildPersona(profile),
-        card: card.text,
-        trustedDomains: this.repos.trustedDomains.list(),
-      }),
+      systemPrompt,
       model: session.model,
       resume: session.providerSessionId,
       maxTurns: settings.maxTurns,
@@ -230,6 +243,7 @@ export class SessionManager {
       recovered: false,
       pendingText: "",
       category: session.category,
+      systemPrompt,
     };
     this.live.set(session.id, entry);
     void this.consume(session.id, entry);
@@ -300,16 +314,17 @@ export class SessionManager {
       usage: null,
     });
     this.repos.chatSessions.touch(id);
-    const span = startSpan("chat.turn", {
-      "openinference.span.kind": "CHAIN",
-      "narnia.session_id": id,
-      "narnia.profile_id": session.profileId,
-      "narnia.category": session.category,
-      "narnia.turn_index": turnIndex,
-      "llm.model_name": current?.model ?? session.model,
-      ...(contentTracingEnabled() ? { "input.value": clip(text) } : {}),
-    });
     const full = [...notes, text].join("\n\n");
+    const trace = new TurnTrace({
+      sessionId: id,
+      profileId: session.profileId,
+      category: session.category,
+      turnIndex,
+      model: current?.model ?? session.model,
+      systemPrompt: entry.systemPrompt,
+      userText: text,
+      sentText: full,
+    });
     Object.assign(entry, {
       busy: true,
       turnIndex,
@@ -317,7 +332,7 @@ export class SessionManager {
       toolCalls: [],
       pendingRuns: [],
       toolStarts: new Map(),
-      span,
+      trace,
       interrupting: false,
       needsBreak: false,
       pendingText: full,
@@ -357,7 +372,10 @@ export class SessionManager {
 
   private handle(id: string, entry: Live, e: ChatEvent) {
     const { bus } = this.deps;
+    if (entry.busy) entry.trace?.onEvent(e);
     switch (e.type) {
+      case "llm_message":
+        return;
       case "init":
         entry.inited = true;
         this.repos.chatSessions.setProviderSessionId(id, e.providerSessionId);
@@ -434,16 +452,14 @@ export class SessionManager {
           e.costUsd,
           e.type === "turn_end" ? e.providerSessionId : null,
         );
-        entry.span?.setAttributes({
-          "llm.token_count.prompt": e.usage.inputTokens,
-          "llm.token_count.completion": e.usage.outputTokens,
-          "narnia.cost_usd": cost,
-          "narnia.tool_calls": entry.toolCalls.length,
-          ...(e.type === "limit" ? { "narnia.limit": e.reason } : {}),
-          ...(contentTracingEnabled() ? { "output.value": clip(text) } : {}),
+        const root = entry.trace?.finish({
+          text,
+          usage: e.usage,
+          costUsd: cost,
+          limit: e.type === "limit" ? e.reason : undefined,
         });
-        entry.span?.end();
-        entry.span = undefined;
+        entry.trace = undefined;
+        if (root) this.annotateTurn(id, entry, root, text, cost);
         entry.busy = false;
         if (e.type === "limit") bus.emit({ type: "chat.limit", sessionId: id, reason: e.reason });
         bus.emit({
@@ -510,6 +526,63 @@ export class SessionManager {
   }
 
   /**
+   * Avaliação contínua no Phoenix: os avaliadores sem tokens que valem para qualquer resposta (anos e empresas fora do
+   * perfil, fontes fora da lista confiável, teto de custo e de turnos) avaliam cada turno concluído e viram anotações
+   * no span do turno, com uma nota de resumo. Só roda quando há para onde mandar (tracer com anotador).
+   */
+  private annotateTurn(id: string, entry: Live, root: SpanHandle, text: string, cost: number) {
+    if (!getTracer()?.annotate) return;
+    try {
+      const s = this.repos.chatSessions.get(id);
+      if (!s) return;
+      const settings = resolveChatSettings(this.repos.settings);
+      const userText = this.repos.chatMessages
+        .list(id, { limit: 200 })
+        .filter((m) => m.role === "user")
+        .map((m) => m.contentMd);
+      const results = gradeTranscript(
+        {
+          replies: [text],
+          tools: entry.toolCalls.map((t) => t.name),
+          card: getCard(this.repos, s.profileId).text,
+          userText,
+          sources: this.repos.researchSources
+            .list({ profileId: s.profileId, limit: 200 })
+            .filter((r) => r.sessionId === id)
+            .map((r) => ({ url: r.url, userConfirmed: r.userConfirmed })),
+          trustedDomains: this.repos.trustedDomains
+            .list()
+            .filter((d) => d.enabled)
+            .map((d) => d.pattern),
+          usage: { tokens: s.tokensIn + s.tokensOut, costUsd: s.costUsdEst },
+          budgetUsd: settings.maxBudgetUsd,
+          maxTurns: settings.maxTurns,
+          toolsPerReply: [entry.toolCalls.length],
+        },
+        ONLINE_GRADERS,
+      );
+      const annotations: SpanAnnotation[] = results.map((r) => ({
+        name: r.type,
+        label: r.passed ? "passou" : "falhou",
+        score: r.passed ? 1 : 0,
+        explanation: r.detail,
+      }));
+      const tools = entry.toolCalls.map((t) => (t.isError ? `${t.name} (erro)` : t.name));
+      const failed = results.filter((r) => !r.passed).map((r) => `${r.type}: ${r.detail}`);
+      const note = [
+        `Turno ${entry.turnIndex + 1} · ${s.category} · US$ ${cost.toFixed(4)} no turno (US$ ${s.costUsdEst.toFixed(4)} na conversa)`,
+        tools.length ? `Tools: ${tools.join(", ")}` : "Sem tools",
+        failed.length
+          ? `Avaliadores que falharam: ${failed.join("; ")}`
+          : "Avaliadores: todos passaram",
+      ].join("\n");
+      annotateSpan(root, annotations, note);
+    } catch {
+      // avaliação contínua nunca derruba o turno
+    }
+  }
+
+  /**
    * Turno cortado ("Parar", hibernar, arquivar, tempo de segurança): guarda a resposta parcial marcada, registra o
    * uso quando o CLI mandou, encerra o span e avisa a web com `interrupted` (auditoria B). Nunca vai para "erro".
    */
@@ -539,9 +612,13 @@ export class SessionManager {
       });
     if (session && e?.usage && typeof e.costUsd === "number")
       this.recordUsage(id, entry, e.usage, e.costUsd, null);
-    entry.span?.setAttributes({ "narnia.interrupted": true });
-    entry.span?.end();
-    entry.span = undefined;
+    entry.trace?.finish({
+      text: partial,
+      usage: e?.usage,
+      costUsd: e?.costUsd,
+      interrupted: true,
+    });
+    entry.trace = undefined;
     this.deps.bus.emit({
       type: "chat.turn_end",
       sessionId: id,
@@ -616,7 +693,7 @@ export class SessionManager {
     Object.assign(fresh, {
       busy: true,
       turnIndex: entry.turnIndex,
-      span: entry.span,
+      trace: entry.trace,
       recovered: true,
       pendingText: entry.pendingText,
     });
@@ -633,9 +710,8 @@ export class SessionManager {
   private fail(id: string, entry: Live, message: string) {
     const f = friendlyError(message);
     if (entry.interruptTimer) clearTimeout(entry.interruptTimer);
-    entry.span?.recordError(new Error(message));
-    entry.span?.end();
-    entry.span = undefined;
+    entry.trace?.finish({ text: entry.text, error: message });
+    entry.trace = undefined;
     entry.busy = false;
     entry.closed = true;
     entry.handle.close();
@@ -686,8 +762,8 @@ export class SessionManager {
       if (persist) this.finishInterrupted(id, entry);
       else {
         if (entry.interruptTimer) clearTimeout(entry.interruptTimer);
-        entry.span?.end();
-        entry.span = undefined;
+        entry.trace?.finish({ text: entry.text, interrupted: true });
+        entry.trace = undefined;
         entry.busy = false;
       }
     }

@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
-import { getTracer, setTracer, startSpan } from "@narnia-jobs/shared";
+import { annotateSpan, getTracer, setTracer, startSpan, withSpan } from "@narnia-jobs/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { errorForTrace, initTelemetry, shutdownTelemetry } from "../../src/telemetry/otel";
 
@@ -43,6 +43,96 @@ describe("F04/M5 · OpenTelemetry", () => {
     } finally {
       server.close();
     }
+  });
+
+  it("filho no mesmo rastro, ids hex e anotações e nota no Phoenix depois do span chegar (404 = tenta de novo)", async () => {
+    const posts: Array<{ url: string; body: string }> = [];
+    let annotationTries = 0;
+    const server = createServer((req: IncomingMessage, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        const url = req.url ?? "";
+        if (url.startsWith("/v1/traces")) {
+          res.writeHead(200, { "content-type": "application/x-protobuf" });
+          res.end();
+          return;
+        }
+        posts.push({ url, body: Buffer.concat(chunks).toString("utf8") });
+        if (url.startsWith("/v1/span_annotations") && annotationTries++ === 0) {
+          res.writeHead(404);
+          res.end("Spans with IDs x do not exist.");
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end("{}");
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      await initTelemetry(
+        { NARNIA_OTEL_ENDPOINT: `http://127.0.0.1:${port}/v1/traces`, NARNIA_OTEL_RETRY_MS: "5" },
+        "narnia-api",
+      );
+      const root = startSpan("chat.turn");
+      const child = startSpan("llm", {}, { parent: root, startTime: Date.now() - 50 });
+      expect(root.spanId).toMatch(/^[0-9a-f]{16}$/);
+      expect(child.traceId).toBe(root.traceId);
+      expect(child.spanId).not.toBe(root.spanId);
+      child.end();
+      root.end();
+      annotateSpan(
+        root,
+        [{ name: "within_budget", label: "passou", score: 1, explanation: "ok" }],
+        "Turno 1 · 0 tools",
+      );
+      await shutdownTelemetry();
+      const ann = posts.filter((p) => p.url.startsWith("/v1/span_annotations"));
+      expect(ann).toHaveLength(2);
+      expect(JSON.parse(ann[1]?.body ?? "{}")).toEqual({
+        data: [
+          {
+            span_id: root.spanId,
+            name: "within_budget",
+            annotator_kind: "CODE",
+            identifier: "narnia",
+            result: { label: "passou", score: 1, explanation: "ok" },
+          },
+        ],
+      });
+      const note = posts.find((p) => p.url.startsWith("/v1/span_notes"));
+      expect(JSON.parse(note?.body ?? "{}")).toEqual({
+        data: { span_id: root.spanId, note: "Turno 1 · 0 tools", identifier: "narnia" },
+      });
+    } finally {
+      server.close();
+    }
+  });
+
+  it("span aberto dentro de withSpan herda o pai pelo contexto assíncrono (job do worker → chamada ao modelo)", async () => {
+    const server = createServer((req, res) => {
+      req.resume();
+      req.on("end", () => res.end());
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const port = (server.address() as AddressInfo).port;
+    await initTelemetry(
+      { NARNIA_OTEL_ENDPOINT: `http://127.0.0.1:${port}/v1/traces` },
+      "narnia-worker",
+    );
+    let job: { traceId?: string; spanId?: string } = {};
+    let inner: { traceId?: string } = {};
+    await withSpan("job.extract", {}, async (s) => {
+      job = s;
+      await new Promise((r) => setTimeout(r, 1));
+      inner = startSpan("llm.structured");
+    });
+    const outside = startSpan("solto");
+    expect(inner.traceId).toBe(job.traceId);
+    expect(outside.traceId).not.toBe(job.traceId);
+    await shutdownTelemetry();
+    server.close();
   });
 
   describe("erro no span sem conteúdo (auditoria E2, 19e)", () => {

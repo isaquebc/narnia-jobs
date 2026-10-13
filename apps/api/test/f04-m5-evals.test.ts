@@ -14,17 +14,28 @@ describe("F04/M5 · avaliações do chat", () => {
     setTracer(null);
   });
 
-  it("roda os casos pela API, avalia e registra um span por caso no Phoenix", async () => {
+  it("roda os casos pela API, avalia e registra um span por caso no Phoenix, com conversa e anotações", async () => {
     const spans: Array<{ name: string; attrs: Record<string, unknown> }> = [];
+    const annotations: Array<{ span: string; names: string[]; note?: string }> = [];
     const impl: TracerImpl = {
       startSpan(name, attrs = {}) {
         const s = { name, attrs: { ...attrs } };
         spans.push(s);
         return {
+          spanId: `s${spans.length}`,
           setAttributes: (a) => Object.assign(s.attrs, a),
           recordError: () => undefined,
           end: () => undefined,
         };
+      },
+      annotate(span, list, note) {
+        const owner = spans[Number(span.spanId?.slice(1)) - 1];
+        if (owner?.name === "eval.case")
+          annotations.push({
+            span: String(owner.attrs["narnia.eval.case"]),
+            names: list.map((a) => a.name),
+            ...(note ? { note } : {}),
+          });
       },
     };
     setTracer(impl);
@@ -50,8 +61,17 @@ describe("F04/M5 · avaliações do chat", () => {
     const evalSpans = spans.filter((s) => s.name === "eval.case");
     expect(evalSpans).toHaveLength(2);
     expect(evalSpans[0]?.attrs).toMatchObject({
+      "openinference.span.kind": "CHAIN",
       "narnia.eval.case": "pontos-fracos",
       "narnia.eval.passed": true,
+      "input.value": "o que está fraco no meu perfil?",
+      "session.id": report[0]?.sessionId,
+    });
+    expect(String(evalSpans[0]?.attrs["output.value"]).length).toBeGreaterThan(0);
+    expect(annotations[0]).toEqual({
+      span: "pontos-fracos",
+      names: ["passed", "uses_tool", "cites_source", "asks_question", "no_unknown_years"],
+      note: expect.stringContaining("✔ uses_tool"),
     });
   });
 

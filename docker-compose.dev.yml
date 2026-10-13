@@ -52,7 +52,7 @@ services:
       - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_DEV_API_PORT:-3100}
       - PORT=3100
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
-      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}   # 1 inclui perguntas/respostas nos rastros
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
     depends_on: [redis]
 
   worker:
@@ -68,7 +68,7 @@ services:
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - TESSDATA_PATH=/usr/share/tessdata
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
-      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}   # 1 inclui perguntas/respostas nos rastros
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
     depends_on: [redis]
 
   web:

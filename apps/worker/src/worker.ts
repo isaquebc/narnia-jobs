@@ -27,6 +27,7 @@ import { createBeat, type FailedJobTarget, handleFinalFailure, runSweep, safely 
 import { type OcrDeps, processStage, type WorkerDeps } from "./pipeline";
 import { createQueues, QUEUE_NAMES } from "./queues";
 import { isTaskJob, processTask } from "./tasks";
+import { traceJob } from "./trace-job";
 
 type JobData = StageJobData | TaskJobData;
 /** Rótulo de etapa para os eventos: etapas usam `stage`, tarefas usam o `type` (F02 §2.9-1). */
@@ -144,10 +145,12 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
         const beat = createBeat(() =>
           job.updateProgress({ pct: lastPct, stage: stageOf(data), note: null, beat: true }),
         );
-        return runWithActivity<unknown>(beat, () =>
-          isTaskJob(data)
-            ? processTask(data, { jobId: String(job.id), progress }, deps)
-            : processStage(data, { runId: data.runId, jobId: String(job.id), progress }, deps),
+        return traceJob(data, { jobId: String(job.id), queue: name }, () =>
+          runWithActivity<unknown>(beat, () =>
+            isTaskJob(data)
+              ? processTask(data, { jobId: String(job.id), progress }, deps)
+              : processStage(data, { runId: data.runId, jobId: String(job.id), progress }, deps),
+          ),
         );
       },
       {

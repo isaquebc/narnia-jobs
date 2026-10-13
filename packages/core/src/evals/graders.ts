@@ -146,7 +146,15 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
         };
       }
       case "no_unknown_companies": {
-        const known = [t.card, ...(t.userText ?? [])].join("\n").toLowerCase();
+        // fontes (registradas ou de domínio confiável) também são nomes conhecidos: "IBGE" vem de ibge.gov.br
+        const known = [
+          t.card,
+          ...(t.userText ?? []),
+          ...(t.sources ?? []).map((src) => hostOf(src.url) ?? src.url),
+          ...(t.trustedDomains ?? []),
+        ]
+          .join("\n")
+          .toLowerCase();
         const first = (c: string) => c.split(/\s+/)[0] ?? "";
         const unknown = companies(all).filter(
           (c) =>

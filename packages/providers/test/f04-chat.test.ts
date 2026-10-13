@@ -48,6 +48,9 @@ describe("normalizeSdkChatMessage", () => {
         type: "assistant",
         session_id: "sdk-1",
         message: {
+          id: "msg_1",
+          model: "claude-sonnet-4-5-20250929",
+          usage: { input_tokens: 1100, output_tokens: 40, cache_read_input_tokens: 900 },
           content: [
             { type: "text", text: "Olá" },
             {
@@ -62,7 +65,16 @@ describe("normalizeSdkChatMessage", () => {
       {
         type: "user",
         session_id: "sdk-1",
-        message: { content: [{ type: "tool_result", tool_use_id: "tu1", is_error: false }] },
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tu1",
+              is_error: false,
+              content: [{ type: "text", text: '{"items":[]}' }],
+            },
+          ],
+        },
       },
       {
         type: "result",
@@ -82,8 +94,26 @@ describe("normalizeSdkChatMessage", () => {
     expect(events).toEqual([
       { type: "init", providerSessionId: "sdk-1" },
       { type: "delta", text: "Olá" },
-      { type: "tool_start", id: "tu1", name: "evidence_experience_list", args: '{"limit":5}' },
-      { type: "tool_end", id: "tu1", isError: false },
+      {
+        type: "llm_message",
+        messageId: "msg_1",
+        model: "claude-sonnet-4-5-20250929",
+        usage: {
+          inputTokens: 1100,
+          outputTokens: 40,
+          cacheReadTokens: 900,
+          cacheWriteTokens: 0,
+          model: "claude-sonnet-4-5-20250929",
+        },
+      },
+      {
+        type: "tool_start",
+        id: "tu1",
+        name: "evidence_experience_list",
+        args: '{"limit":5}',
+        input: '{"limit":5}',
+      },
+      { type: "tool_end", id: "tu1", isError: false, output: '{"items":[]}' },
       {
         type: "turn_end",
         text: "Olá, Ana.",
@@ -132,6 +162,22 @@ describe("normalizeSdkChatMessage", () => {
       "s",
     );
     expect(e?.type === "tool_start" && e.args.length).toBeLessThanOrEqual(500);
+    // o rastro leva a entrada inteira (até o corte do clip)
+    expect(e?.type === "tool_start" && e.input.length).toBeGreaterThan(2000);
+  });
+
+  it("resultado da tool em texto puro também vai no tool_end", () => {
+    expect(
+      normalizeSdkChatMessage(
+        {
+          type: "user",
+          message: {
+            content: [{ type: "tool_result", tool_use_id: "x", is_error: true, content: "negado" }],
+          },
+        },
+        "s",
+      ),
+    ).toEqual([{ type: "tool_end", id: "x", isError: true, output: "negado" }]);
   });
 });
 
@@ -339,7 +385,12 @@ describe("MockProvider.openChat (roteiros que chamam o /mcp real)", () => {
     expect(events.find((e) => e.type === "tool_start")).toMatchObject({
       name: "evidence_experience_list",
     });
-    expect(events.find((e) => e.type === "tool_end")).toMatchObject({ isError: false });
+    expect(events.find((e) => e.type === "tool_end")).toMatchObject({
+      isError: false,
+      output: '{"items":[{"id":"e1","line":"Acme · Dev"}]}',
+    });
+    expect(events.find((e) => e.type === "tool_start")).toMatchObject({ input: "{}" });
+    expect(events.filter((e) => e.type === "llm_message").length).toBeGreaterThan(0);
     expect(events.filter((e) => e.type === "delta").length).toBeGreaterThan(1);
     const end = events.at(-1);
     expect(end?.type === "turn_end" && end.usage.inputTokens).toBeGreaterThan(0);

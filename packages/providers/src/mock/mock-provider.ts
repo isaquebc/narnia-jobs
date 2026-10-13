@@ -455,11 +455,27 @@ export class MockProvider implements Provider {
           args.sourceId = first ?? "sem-fonte";
         }
         const id = `mock-tool-${++rpcId}`;
-        out.push({ type: "tool_start", id, name: tool, args: JSON.stringify(args).slice(0, 500) });
+        const input = JSON.stringify(args);
+        // uma "chamada ao modelo" antes da tool e outra para a resposta, como o CLI (rastro por passo)
+        const step = (outputTokens: number): ChatEvent => ({
+          type: "llm_message",
+          messageId: `mock-msg-${++rpcId}`,
+          model: opts.model,
+          usage: {
+            inputTokens: approxTokens(opts.systemPrompt) + approxTokens(text),
+            outputTokens,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            model: opts.model,
+          },
+        });
+        out.push(step(approxTokens(input)));
+        out.push({ type: "tool_start", id, name: tool, args: input.slice(0, 500), input });
         const r = await callTool(tool, args);
-        out.push({ type: "tool_end", id, isError: r.isError });
+        out.push({ type: "tool_end", id, isError: r.isError, output: r.text });
         if (aborted) return interrupted("");
         const reply = mockChatReply(tool, r.isError);
+        out.push(step(approxTokens(reply)));
         for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
           out.push({ type: "delta", text: piece });
         out.push({

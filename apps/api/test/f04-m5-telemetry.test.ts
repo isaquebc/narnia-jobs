@@ -3,14 +3,28 @@ import { type AnyWsEvent, setTracer, type TracerImpl } from "@narnia-jobs/shared
 import { afterEach, describe, expect, it } from "vitest";
 import { makeTestApp, type TestApp } from "./helpers";
 
-/** F04/M5 · rastros por turno de chat e por tool MCP; sem conteúdo de mensagem por padrão. */
+/** F04/M5 · rastros por turno de chat e por tool MCP, com conteúdo por padrão (Phoenix local). */
 function fakeTracer() {
-  const spans: Array<{ name: string; attrs: Record<string, unknown>; ended: boolean }> = [];
+  const spans: Array<{
+    id: string;
+    name: string;
+    attrs: Record<string, unknown>;
+    parent: string | undefined;
+    ended: boolean;
+  }> = [];
+  const annotations: Array<{ spanId: string | undefined; names: string[]; note?: string }> = [];
   const impl: TracerImpl = {
-    startSpan(name, attrs = {}) {
-      const s = { name, attrs: { ...attrs }, ended: false };
+    startSpan(name, attrs = {}, opts) {
+      const s = {
+        id: `s${spans.length}`,
+        name,
+        attrs: { ...attrs },
+        parent: opts?.parent?.spanId,
+        ended: false,
+      };
       spans.push(s);
       return {
+        spanId: s.id,
         setAttributes: (a) => Object.assign(s.attrs, a),
         recordError: () => undefined,
         end: () => {
@@ -18,8 +32,15 @@ function fakeTracer() {
         },
       };
     },
+    annotate(span, list, note) {
+      annotations.push({
+        spanId: span.spanId,
+        names: list.map((a) => a.name),
+        ...(note ? { note } : {}),
+      });
+    },
   };
-  return { spans, impl };
+  return { spans, annotations, impl };
 }
 
 const json = (body: unknown): RequestInit => ({
@@ -50,7 +71,7 @@ describe("F04/M5 · telemetria no api", () => {
     delete process.env.NARNIA_OTEL_CONTENT;
   });
 
-  it("turno de chat e tool MCP viram spans com metadados, sem o texto das mensagens", async () => {
+  it("um rastro por turno: turno → modelo → tool → /mcp, com entrada, saída e sessão; anotações e nota no turno", async () => {
     const f = fakeTracer();
     setTracer(f.impl);
     t = makeTestApp();
@@ -60,31 +81,51 @@ describe("F04/M5 · telemetria no api", () => {
     expect(chat?.ended).toBe(true);
     expect(chat?.attrs).toMatchObject({
       "openinference.span.kind": "CHAIN",
+      "session.id": sid,
       "narnia.session_id": sid,
       "narnia.category": "career",
-      "llm.model_name": "sonnet",
+      "input.value": "o que está fraco no meu perfil?",
     });
-    expect(chat?.attrs["llm.token_count.prompt"]).toEqual(expect.any(Number));
-    expect(chat?.attrs).not.toHaveProperty("input.value");
-    expect(chat?.attrs).not.toHaveProperty("output.value");
-    const tool = f.spans.find((s) => s.name === "mcp.tool");
-    expect(tool?.attrs).toMatchObject({
+    expect(String(chat?.attrs["output.value"]).length).toBeGreaterThan(0);
+    const llm = f.spans.filter((s) => s.name === "llm");
+    expect(llm.length).toBe(2);
+    expect(llm.every((s) => s.parent === chat?.id)).toBe(true);
+    expect(String(llm[0]?.attrs["llm.input_messages.0.message.content"])).toContain("recrutador");
+    const tool = f.spans.find((s) => s.name === "evidence_experience_list");
+    expect(tool?.parent).toBe(chat?.id);
+    expect(String(tool?.attrs["output.value"])).toContain("items");
+    const mcp = f.spans.find((s) => s.name === "mcp.tool");
+    expect(mcp?.parent).toBe(tool?.id);
+    expect(mcp?.attrs).toMatchObject({
       "openinference.span.kind": "TOOL",
       "tool.name": "evidence.experience.list",
-      "narnia.session_id": sid,
+      "session.id": sid,
     });
-    expect(tool?.attrs).not.toHaveProperty("input.value");
+    expect(String(mcp?.attrs["output.value"])).toContain("items");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(f.annotations).toEqual([
+      {
+        spanId: chat?.id,
+        names: [
+          "no_unknown_years",
+          "no_unknown_companies",
+          "trusted_sources_only",
+          "within_budget",
+        ],
+        note: expect.stringContaining("Tools: evidence_experience_list"),
+      },
+    ]);
   });
 
-  it("com NARNIA_OTEL_CONTENT=1 o turno leva pergunta e resposta", async () => {
-    process.env.NARNIA_OTEL_CONTENT = "1";
+  it("com NARNIA_OTEL_CONTENT=0 só metadados: sem pergunta, resposta, argumentos nem resultados", async () => {
+    process.env.NARNIA_OTEL_CONTENT = "0";
     const f = fakeTracer();
     setTracer(f.impl);
     t = makeTestApp();
     seedFixture(t.repos, "engineer");
     await turn(t);
-    const chat = f.spans.find((s) => s.name === "chat.turn");
-    expect(String(chat?.attrs["input.value"])).toContain("o que está fraco");
-    expect(String(chat?.attrs["output.value"]).length).toBeGreaterThan(0);
+    expect(f.spans.length).toBeGreaterThan(3);
+    for (const s of f.spans)
+      expect(Object.keys(s.attrs).filter((k) => /value|messages|parameters/.test(k))).toEqual([]);
   });
 });

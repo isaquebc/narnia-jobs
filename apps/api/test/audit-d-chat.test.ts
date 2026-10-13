@@ -72,7 +72,7 @@ describe("auditoria D · ingestão criada pela conversa", () => {
     const s = t.sessions.create({ category: "career", profileId: ids.profileId });
     t.sessions.send(s.id, "registre isto");
     p.push({ type: "init", providerSessionId: "sdk-1" });
-    p.push({ type: "tool_start", id: "t1", name: "ingest_text", args: "{}" });
+    p.push({ type: "tool_start", id: "t1", name: "ingest_text", args: "{}", input: "{}" });
     const client = await connect(t, s.id);
     const r = (await client.callTool({
       name: "ingest_text",
@@ -90,7 +90,7 @@ describe("auditoria D · ingestão criada pela conversa", () => {
     );
     expect(created).toEqual([{ type: "chat.ingestion_created", sessionId: s.id, runId }]);
 
-    p.push({ type: "tool_end", id: "t1", isError: false });
+    p.push({ type: "tool_end", id: "t1", isError: false, output: "{}" });
     p.push({
       type: "turn_end",
       text: "Registrei.",

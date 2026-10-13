@@ -1,5 +1,5 @@
 import { type EvalCase, type GradeResult, gradeTranscript } from "@narnia-jobs/core";
-import { startSpan } from "@narnia-jobs/shared";
+import { annotateSpan, clip, contentTracingEnabled, startSpan } from "@narnia-jobs/shared";
 
 /**
  * F04/M5 · runner das avaliações do chat (`evals/chat/*.jsonl`): conversa pela API da instância (a do Claude por
@@ -72,9 +72,15 @@ export async function runEvalCases(
   for (const c of cases) {
     const startedAt = new Date().toISOString();
     let replies: string[] = [];
+    const content = contentTracingEnabled();
     const span = startSpan("eval.case", {
+      "openinference.span.kind": "CHAIN",
       "narnia.eval.case": c.id,
       "narnia.category": c.category,
+      ...(c.description ? { "narnia.eval.description": c.description } : {}),
+      ...(content
+        ? { "input.value": clip(c.messages.join("\n\n")), "input.mime_type": "text/plain" }
+        : {}),
     });
     let sessionId = "";
     try {
@@ -122,8 +128,38 @@ export async function runEvalCases(
       span.setAttributes({
         "narnia.eval.passed": passed,
         "narnia.session_id": sessionId,
+        "session.id": sessionId,
         "narnia.eval.results": JSON.stringify(results.map((r) => ({ [r.type]: r.passed }))),
+        ...(content
+          ? {
+              "output.value": clip(replies.join("\n\n---\n\n")),
+              "output.mime_type": "text/plain",
+            }
+          : {}),
       });
+      // no Phoenix: uma anotação por avaliador (e o resultado do caso) e uma nota com o resumo
+      annotateSpan(
+        span,
+        [
+          {
+            name: "passed",
+            label: passed ? "passou" : "falhou",
+            score: passed ? 1 : 0,
+            explanation: `${results.filter((r) => r.passed).length}/${results.length} avaliadores`,
+          },
+          ...results.map((r) => ({
+            name: r.type,
+            label: r.passed ? "passou" : "falhou",
+            score: r.passed ? 1 : 0,
+            explanation: r.detail,
+          })),
+        ],
+        [
+          `${c.id}${c.description ? `: ${c.description}` : ""}`,
+          `Tools: ${[...new Set(tools)].join(", ") || "nenhuma"}`,
+          ...results.map((r) => `${r.passed ? "✔" : "✘"} ${r.type}: ${r.detail}`),
+        ].join("\n"),
+      );
       out.push({
         id: c.id,
         passed,

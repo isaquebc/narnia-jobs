@@ -79,14 +79,20 @@ O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (escopo
 
 ### Rastros e avaliações (Arize Phoenix local)
 
-No `make dev` o Phoenix sobe junto e recebe os rastros de cada conversa, chamada de tool e chamada ao modelo: abra `http://127.0.0.1:6006` (projeto `narnia-jobs`). Por padrão vão só metadados (modelo, tokens, custo, tempo); para incluir perguntas e respostas, defina `NARNIA_OTEL_CONTENT=1` no `.env`. Nada sai do seu computador. Na produção (`./start.sh up`) ele fica desligado; para ligar, ponha no `.env`:
+No `make dev` o Phoenix sobe junto: abra `http://127.0.0.1:6006`. Nada sai do seu computador.
+
+- **Projeto `narnia-jobs`:** um rastro por mensagem do chat. O turno é a raiz (sua pergunta e a resposta), e dentro dele aparecem, em ordem, cada chamada ao modelo (system prompt, mensagens, texto e ferramentas pedidas, modelo, tokens e cache) e cada ferramenta (argumentos e resultado, com a execução no servidor MCP como filha). As conversas aparecem na aba **Sessions**. Cada job do worker (leitura do PDF, fatos, GitHub) também vira um rastro, com as chamadas ao modelo dentro, e as etapas de uma ingestão ficam agrupadas como uma sessão.
+- **Anotações em cada turno:** os avaliadores que não gastam tokens (anos e empresas fora do perfil, fontes fora da lista de domínios confiáveis, teto de custo e de turnos) avaliam cada resposta e gravam "passou/falhou" com a explicação, mais uma nota de resumo (custo, ferramentas e o que falhou).
+- **Conteúdo:** perguntas, respostas, prompts e resultados de ferramentas vão para o Phoenix por padrão. Para deixar só metadados (modelo, tokens, custo, tempo), defina `NARNIA_OTEL_CONTENT=0` no `.env`.
+
+Na produção (`./start.sh up`) o Phoenix fica desligado; para ligar, ponha no `.env`:
 
 ```
 COMPOSE_PROFILES=observability
 NARNIA_OTEL_ENDPOINT=http://phoenix:6006/v1/traces
 ```
 
-As avaliações do recrutador (`evals/chat/`, conversas de referência com avaliadores determinísticos: usa as ferramentas, cita fonte, não inventa data nem empresa, só fontes de domínio confiável, dentro do teto) rodam sob demanda pela ferramenta de desenvolvimento e aparecem no Phoenix como experimento do dataset `narnia-chat`, um por rodada.
+As avaliações do recrutador (`evals/chat/`, conversas de referência com avaliadores determinísticos: usa as ferramentas, cita fonte, não inventa data nem empresa, só fontes de domínio confiável, dentro do teto) rodam sob demanda pela ferramenta de desenvolvimento e aparecem no Phoenix como experimento do dataset `narnia-chat`, um por rodada, e no projeto `narnia-evals` com um rastro por caso (conversa, anotação por avaliador e nota de resumo).
 
 ### Onde ficam os dados e como fazer backup
 

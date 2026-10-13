@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  annotateSpan,
   contentTracingEnabled,
   getTracer,
+  messageAttrs,
   setTracer,
   startSpan,
   type TracerImpl,
@@ -61,9 +63,56 @@ describe("F04/M5 · telemetria (fachada)", () => {
     ]);
   });
 
-  it("conteúdo de mensagens só entra com NARNIA_OTEL_CONTENT=1", () => {
-    expect(contentTracingEnabled({})).toBe(false);
-    expect(contentTracingEnabled({ NARNIA_OTEL_CONTENT: "0" })).toBe(false);
+  it("conteúdo das conversas vai para o Phoenix local por padrão; NARNIA_OTEL_CONTENT=0 desliga", () => {
+    expect(contentTracingEnabled({})).toBe(true);
     expect(contentTracingEnabled({ NARNIA_OTEL_CONTENT: "1" })).toBe(true);
+    expect(contentTracingEnabled({ NARNIA_OTEL_CONTENT: "0" })).toBe(false);
+  });
+
+  it("filho, horários e anotação passam para o tracer; sem anotador, annotateSpan é no-op", () => {
+    const calls: unknown[] = [];
+    const parent = { setAttributes() {}, recordError() {}, end() {}, spanId: "p1" };
+    const impl: TracerImpl = {
+      startSpan(name, attrs, opts) {
+        calls.push({ name, attrs, parent: opts?.parent?.spanId, startTime: opts?.startTime });
+        return { ...parent, spanId: "c1", end: (t?: number) => calls.push({ end: t }) };
+      },
+    };
+    setTracer(impl);
+    const child = startSpan("filho", { a: ["x", "y"] }, { parent, startTime: 1000 });
+    child.end(2000);
+    annotateSpan(child, [{ name: "n", label: "passou", score: 1, explanation: "ok" }]);
+    expect(calls).toEqual([
+      { name: "filho", attrs: { a: ["x", "y"] }, parent: "p1", startTime: 1000 },
+      { end: 2000 },
+    ]);
+    const annotated: unknown[] = [];
+    setTracer({ ...impl, annotate: (s, list, note) => annotated.push([s.spanId, list, note]) });
+    annotateSpan(child, [{ name: "n", label: "passou", score: 1, explanation: "ok" }], "nota");
+    expect(annotated).toEqual([
+      ["c1", [{ name: "n", label: "passou", score: 1, explanation: "ok" }], "nota"],
+    ]);
+  });
+
+  it("messageAttrs achata as mensagens no formato OpenInference (papel, conteúdo e chamadas de tool)", () => {
+    expect(
+      messageAttrs("llm.output_messages", [
+        {
+          role: "assistant",
+          content: "vou ver",
+          toolCalls: [{ id: "t1", name: "fact_search", arguments: '{"q":"go"}' }],
+        },
+        { role: "tool", content: "[]", toolCallId: "t1" },
+      ]),
+    ).toEqual({
+      "llm.output_messages.0.message.role": "assistant",
+      "llm.output_messages.0.message.content": "vou ver",
+      "llm.output_messages.0.message.tool_calls.0.tool_call.id": "t1",
+      "llm.output_messages.0.message.tool_calls.0.tool_call.function.name": "fact_search",
+      "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments": '{"q":"go"}',
+      "llm.output_messages.1.message.role": "tool",
+      "llm.output_messages.1.message.content": "[]",
+      "llm.output_messages.1.message.tool_call_id": "t1",
+    });
   });
 });

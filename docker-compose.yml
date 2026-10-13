@@ -24,7 +24,7 @@ x-app: &app
     - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
     - TESSDATA_PATH=/usr/share/tessdata
     - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}   # F04-15: vazio = sem rastros; com o perfil observability use http://phoenix:6006/v1/traces
-    - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}
+    - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 deixa só metadados nos rastros
 
 services:
   web:
@@ -57,7 +57,7 @@ services:
       - NARNIA_VERSION=${NARNIA_VERSION:-0.1.0-dev}
       - PORT=3100
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
-      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-0}
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 deixa só metadados nos rastros
     ports:
       - "127.0.0.1:${NARNIA_OAUTH_PORT-8089}:8089"      # callback OAuth do Google Calendar (F07); porta fixa
     healthcheck:

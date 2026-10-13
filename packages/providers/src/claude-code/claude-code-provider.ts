@@ -18,6 +18,7 @@ import {
   type ExtractFactsOutput,
   ExtractFactsOutputSchema,
   INGEST_OUTPUT_JSON_SCHEMAS,
+  messageAttrs,
   type PickFilesOutput,
   PickFilesOutputSchema,
   type PlanUsage,
@@ -450,17 +451,40 @@ export class ClaudeCodeProvider implements Provider {
       "llm.structured",
       {
         "openinference.span.kind": "LLM",
+        "llm.provider": "anthropic",
+        "llm.system": "anthropic",
         "llm.model_name": options.model ?? "",
         "narnia.operation": operation,
-        ...(content ? { "input.value": clip(prompt) } : {}),
+        ...(content
+          ? {
+              ...messageAttrs("llm.input_messages", [
+                { role: "system", content: options.systemPrompt },
+                { role: "user", content: prompt },
+              ]),
+              "input.value": clip(prompt),
+              "input.mime_type": "text/plain",
+            }
+          : {}),
       },
       async (span) => {
         const r = await this.runRaw(prompt, options, schema);
+        const promptTokens =
+          r.usage.inputTokens + r.usage.cacheReadTokens + r.usage.cacheWriteTokens;
+        const out = content ? clip(JSON.stringify(r.output)) : "";
         span.setAttributes({
-          "llm.token_count.prompt": r.usage.inputTokens,
+          "llm.token_count.prompt": promptTokens,
+          "llm.token_count.prompt_details.cache_read": r.usage.cacheReadTokens,
+          "llm.token_count.prompt_details.cache_write": r.usage.cacheWriteTokens,
           "llm.token_count.completion": r.usage.outputTokens,
+          "llm.token_count.total": promptTokens + r.usage.outputTokens,
           "narnia.cost_usd": r.costUsd,
-          ...(content ? { "output.value": clip(JSON.stringify(r.output)) } : {}),
+          ...(content
+            ? {
+                ...messageAttrs("llm.output_messages", [{ role: "assistant", content: out }]),
+                "output.value": out,
+                "output.mime_type": "application/json",
+              }
+            : {}),
         });
         return r;
       },

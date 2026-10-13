@@ -91,6 +91,18 @@ describe("F04/M5 · avaliadores do chat", () => {
       expect(r?.detail).toContain("Globex Corp");
     });
 
+    it("no_unknown_companies: fonte citada (domínio confiável ou registrado) não conta como empresa inventada", () => {
+      const t = {
+        ...base,
+        replies: ["Segundo a pesquisa do IBGE e os dados do Glassdoor, a faixa é de 12 a 16 mil."],
+        sources: [{ url: "https://www.ibge.gov.br/explica/desemprego.php", userConfirmed: false }],
+        trustedDomains: ["*.gov.br", "glassdoor.*"],
+      };
+      expect(gradeTranscript(t, [{ type: "no_unknown_companies" }])[0]).toMatchObject({
+        passed: true,
+      });
+    });
+
     it("trusted_sources_only: fontes salvas e links citados só de domínio confiável (ou confirmados pelo usuário)", () => {
       const trusted = ["*.gov.br", "glassdoor.*"];
       const ok = {

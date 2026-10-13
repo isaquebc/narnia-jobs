@@ -22,6 +22,7 @@ import {
   withSpan,
 } from "@narnia-jobs/shared";
 import { Hono } from "hono";
+import { activeToolSpan } from "../chat/turn-trace";
 import { apiError } from "../errors";
 import type { IngestionStartDeps } from "../routes/ingestions";
 import { createChatIngestPort } from "./ingest-port";
@@ -160,6 +161,9 @@ function buildServer(deps: IngestionStartDeps, version: string, session: Session
           "category_not_allowed",
           `A conversa não pode passar de ${session.category} para ${args.category} por conta própria: isso ampliaria as ferramentas. Peça ao usuário para abrir uma conversa nova.`,
         );
+      // no chat, o span fica dentro da tool do turno (mesmo rastro); no terminal (modo B) é um rastro próprio
+      const parent = session.id ? activeToolSpan(session.id, req.params.name) : undefined;
+      const content = contentTracingEnabled();
       const out = await withSpan(
         "mcp.tool",
         {
@@ -167,9 +171,21 @@ function buildServer(deps: IngestionStartDeps, version: string, session: Session
           "tool.name": tool.name,
           "narnia.session_id": session.id ?? "terminal",
           "narnia.category": session.category ?? "terminal",
-          ...(contentTracingEnabled() ? { "input.value": clip(JSON.stringify(args)) } : {}),
+          ...(session.id ? { "session.id": session.id } : {}),
+          ...(content
+            ? { "input.value": clip(JSON.stringify(args)), "input.mime_type": "application/json" }
+            : {}),
         },
-        async () => tool.call(args),
+        async (span) => {
+          const r = await tool.call(args);
+          if (content)
+            span.setAttributes({
+              "output.value": clip(JSON.stringify(r) ?? "null"),
+              "output.mime_type": "application/json",
+            });
+          return r;
+        },
+        { parent },
       );
       // a execução criada por esta conversa: a web mostra o link e o SessionManager grava o runId na tool call
       const created = (out as { runId?: unknown } | null)?.runId;

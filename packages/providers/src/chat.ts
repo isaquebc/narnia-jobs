@@ -10,8 +10,15 @@ export type ChatEvent =
   | { type: "delta"; text: string }
   /** Começo de um bloco de texto novo no turno (narração antes da tool, resposta final): a api separa com "\n\n". */
   | { type: "text_break" }
-  | { type: "tool_start"; id: string; name: string; args: string }
-  | { type: "tool_end"; id: string; isError: boolean }
+  /** `args`: resumo (até 500) para o histórico; `input`: o JSON inteiro, para o rastro. */
+  | { type: "tool_start"; id: string; name: string; args: string; input: string }
+  /** `output`: o que a tool devolveu ao modelo (texto), para o rastro. */
+  | { type: "tool_end"; id: string; isError: boolean; output: string }
+  /**
+   * Uma resposta do modelo dentro do turno (mensagem `assistant` do SDK): modelo exato e uso daquela chamada. O CLI
+   * repete a mesma mensagem por bloco de conteúdo, com o mesmo `messageId` (o rastro fica com o último uso).
+   */
+  | { type: "llm_message"; messageId: string; model: string; usage: Usage }
   | {
       type: "turn_end";
       text: string;
@@ -69,6 +76,13 @@ export interface ChatHandle {
 
 /* ---------- SDK ---------- */
 
+interface SdkUsageLike {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+
 /** Subconjunto estrutural das mensagens do SDK que o chat usa. */
 export interface SdkChatMessageLike {
   type: string;
@@ -80,6 +94,9 @@ export interface SdkChatMessageLike {
     content_block?: { type?: string };
   };
   message?: {
+    id?: string;
+    model?: string;
+    usage?: SdkUsageLike;
     content?:
       | string
       | Array<{
@@ -90,15 +107,12 @@ export interface SdkChatMessageLike {
           tool_use_id?: string;
           is_error?: boolean;
           text?: string;
+          /** Resultado da tool (bloco `tool_result`): texto ou blocos de texto. */
+          content?: string | Array<{ type: string; text?: string }>;
         }>;
   };
   result?: string;
-  usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-    cache_read_input_tokens?: number;
-    cache_creation_input_tokens?: number;
-  };
+  usage?: SdkUsageLike;
   total_cost_usd?: number;
   errors?: string[];
   /** `success` com `is_error: true` = turno que terminou num erro de API (texto do erro em `result`). */
@@ -200,14 +214,23 @@ const summarizeArgs = (input: unknown) => {
   return s.length > ARGS_MAX ? `${s.slice(0, ARGS_MAX - 1)}…` : s;
 };
 
-function usageOf(m: SdkChatMessageLike, model: string): Usage {
+function usageOf(u: SdkUsageLike | undefined, model: string): Usage {
   return {
-    inputTokens: m.usage?.input_tokens ?? 0,
-    outputTokens: m.usage?.output_tokens ?? 0,
-    cacheReadTokens: m.usage?.cache_read_input_tokens ?? 0,
-    cacheWriteTokens: m.usage?.cache_creation_input_tokens ?? 0,
+    inputTokens: u?.input_tokens ?? 0,
+    outputTokens: u?.output_tokens ?? 0,
+    cacheReadTokens: u?.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: u?.cache_creation_input_tokens ?? 0,
     model,
   };
+}
+
+/** Texto devolvido pela tool ao modelo (string ou blocos de texto). */
+function toolResultText(c: string | Array<{ type: string; text?: string }> | undefined): string {
+  if (typeof c === "string") return c;
+  return (c ?? [])
+    .filter((b) => b.type === "text" && b.text)
+    .map((b) => b.text)
+    .join("\n");
 }
 
 /** Converte uma mensagem do SDK em zero ou mais eventos de chat (função pura, testada por fixture). */
@@ -223,15 +246,31 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
     return [];
   }
   const blocks = Array.isArray(m.message?.content) ? m.message.content : [];
-  if (m.type === "assistant")
-    return blocks
-      .filter((b) => b.type === "tool_use" && b.id && b.name)
-      .map((b) => ({
-        type: "tool_start" as const,
-        id: b.id as string,
-        name: toolDisplayName(b.name as string),
-        args: summarizeArgs(b.input),
-      }));
+  if (m.type === "assistant") {
+    const step: ChatEvent[] =
+      m.message?.id && m.message.usage
+        ? [
+            {
+              type: "llm_message",
+              messageId: m.message.id,
+              model: m.message.model ?? model,
+              usage: usageOf(m.message.usage, m.message.model ?? model),
+            },
+          ]
+        : [];
+    return [
+      ...step,
+      ...blocks
+        .filter((b) => b.type === "tool_use" && b.id && b.name)
+        .map((b) => ({
+          type: "tool_start" as const,
+          id: b.id as string,
+          name: toolDisplayName(b.name as string),
+          args: summarizeArgs(b.input),
+          input: JSON.stringify(b.input ?? {}),
+        })),
+    ];
+  }
   if (m.type === "user")
     return blocks
       .filter((b) => b.type === "tool_result" && b.tool_use_id)
@@ -239,9 +278,10 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
         type: "tool_end" as const,
         id: b.tool_use_id as string,
         isError: b.is_error === true,
+        output: toolResultText(b.content),
       }));
   if (m.type === "result") {
-    const usage = usageOf(m, model);
+    const usage = usageOf(m.usage, model);
     const costUsd = m.total_cost_usd ?? 0;
     if (m.terminal_reason?.startsWith("aborted"))
       return [
