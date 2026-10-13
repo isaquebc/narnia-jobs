@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   ExtractError,
   estimateExtraction,
   previousRunsForFile,
   type Repos,
+  readDigestText,
   resolveExtractionModels,
   type SourceFileRecord,
 } from "@narnia-jobs/core";
@@ -54,6 +57,49 @@ export function filesRoutes(deps: { repos: Repos; dataDir: string }) {
       if (e instanceof ExtractError) return apiError(c, extractErrorStatus(e), e.code, e.message);
       throw e;
     }
+  });
+
+  /** Evidências › Arquivos e textos (L3 "cartão de arquivo"): registro de contexto, execuções e fatos gerados. */
+  app.get("/api/files", (c) => {
+    const files = deps.repos.sourceFiles.list().map((file) => {
+      const runs = previousRunsForFile(deps.repos, file.id);
+      const facts = { total: 0, accepted: 0, rejected: 0, pending: 0 };
+      for (const r of runs)
+        for (const p of deps.repos.proposals.listByRun(r.runId)) {
+          facts.total++;
+          if (p.decision === "accepted" || p.decision === "edited") facts.accepted++;
+          else if (p.decision === "rejected") facts.rejected++;
+          else if (p.decision === "pending") facts.pending++;
+        }
+      const digest = deps.repos.digests.get(file.id);
+      return {
+        ...toFileResponse(file, readMeta(deps.dataDir, file)),
+        digest: digest
+          ? {
+              fileId: digest.fileId,
+              summary: digest.summary,
+              keyPoints: digest.keyPoints,
+              sections: digest.sections,
+              meta: digest.meta,
+              editedByUser: digest.editedByUser,
+            }
+          : null,
+        runs,
+        facts,
+      };
+    });
+    return c.json({ files });
+  });
+
+  /** Texto lido do arquivo (o extraído pela ingestão; texto livre é o próprio texto enviado); null se ainda não lido. */
+  app.get("/api/files/:id/text", (c) => {
+    const file = deps.repos.sourceFiles.get(c.req.param("id"));
+    if (!file) return apiError(c, 404, "not_found", "Arquivo não encontrado");
+    const digest = deps.repos.digests.get(file.id);
+    if (digest?.textPath) return c.json({ text: readDigestText(deps.dataDir, digest) });
+    if (file.kind === "text")
+      return c.json({ text: readFileSync(join(deps.dataDir, file.path), "utf8") });
+    return c.json({ text: null });
   });
 
   app.get("/api/files/:id", (c) => {

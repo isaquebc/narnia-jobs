@@ -13,6 +13,7 @@ import type {
   EmphasisPutRequest,
   EstimateResponse,
   EvalsSettingsResponse,
+  EvidenceFile,
   FileDigest,
   FileResponse,
   GithubAuthSourceSchema,
@@ -463,6 +464,9 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ removed: number; totalBytes: number; maxBytes: number }>("/api/snapshots/prune", {
         method: "POST",
       }),
+    listFiles: () => request<{ files: EvidenceFile[] }>("/api/files"),
+    getFileText: (id: string) =>
+      request<{ text: string | null }>(`/api/files/${encodeURIComponent(id)}/text`),
     getFileDigest: (id: string) =>
       request<{ digest: FileDigest | null }>(`/api/files/${encodeURIComponent(id)}/digest`),
   };

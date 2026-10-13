@@ -166,6 +166,7 @@ const IngestionPage = lazyRouteComponent(
 );
 const RunPage = lazyRouteComponent(() => import("../features/ingestion/RunPage"), "RunPage");
 const ReposPage = lazyRouteComponent(() => import("../features/evidence/ReposPage"), "ReposPage");
+const FilesPage = lazyRouteComponent(() => import("../features/evidence/FilesPage"), "FilesPage");
 const RepoDetailPage = lazyRouteComponent(
   () => import("../features/evidence/RepoDetailPage"),
   "RepoDetailPage",
@@ -186,6 +187,11 @@ const runRoute = createRoute({
     const { runId } = runRoute.useParams();
     return <RunPage key={runId} runId={runId} />;
   },
+});
+const filesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/evidencias/arquivos",
+  component: FilesPage,
 });
 const reposRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -242,6 +248,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   ingestionRoute,
   runRoute,
+  filesRoute,
   reposRoute,
   repoDetailRoute,
   notificationsRoute,

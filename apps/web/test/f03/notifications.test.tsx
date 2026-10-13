@@ -116,7 +116,7 @@ describe("F03/M4 · página de pendências (/pendencias)", () => {
     );
     expect(await within(nav).findByRole("link", { name: "Evidências" })).toHaveAttribute(
       "href",
-      "/evidencias/repositorios",
+      "/evidencias/arquivos",
     );
     expect(await within(nav).findByRole("link", { name: "Configurações" })).toHaveAttribute(
       "href",

@@ -86,7 +86,7 @@ export function SideNav({ className }: { className?: string }) {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/evidencias/repositorios" className={item}>
+              <NavLink to="/evidencias/arquivos" className={item}>
                 <FolderGit2 size={16} /> {t("nav.evidence")}
               </NavLink>
             </li>

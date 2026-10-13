@@ -3,6 +3,23 @@ import { useApi } from "../app/context";
 import type { RepoDigestInput } from "../lib/api";
 
 export const reposKey = ["repos"] as const;
+export const evidenceFilesKey = ["evidence-files"] as const;
+
+/** CVs e textos ingeridos (Evidências › Arquivos e textos). */
+export function useEvidenceFiles() {
+  const api = useApi();
+  return useQuery({ queryKey: evidenceFilesKey, queryFn: () => api.listFiles() });
+}
+
+/** Texto lido de um arquivo, só quando pedido (pode ser longo). */
+export function useFileText(id: string, enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["evidence-files", id, "text"],
+    queryFn: () => api.getFileText(id),
+    enabled,
+  });
+}
 export const repoKey = (id: string) => ["repos", id] as const;
 
 /** Repositórios analisados (F03 §4 Evidências). */

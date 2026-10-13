@@ -106,6 +106,19 @@ export const FileResponseSchema = z.object({
 });
 export type FileResponse = z.infer<typeof FileResponseSchema>;
 
+// GET /api/files (Evidências › Arquivos e textos)
+export const EvidenceFileSchema = FileResponseSchema.omit({ previousRuns: true }).extend({
+  digest: FileDigestSchema.nullable(),
+  runs: z.array(PreviousRunSchema),
+  facts: z.object({
+    total: z.number().int().min(0),
+    accepted: z.number().int().min(0),
+    rejected: z.number().int().min(0),
+    pending: z.number().int().min(0),
+  }),
+});
+export type EvidenceFile = z.infer<typeof EvidenceFileSchema>;
+
 // GET /api/files/:id/estimate
 export const EstimateCallSchema = z.object({
   name: z.enum(["readDocument", "extractFacts", "buildDigest"]),

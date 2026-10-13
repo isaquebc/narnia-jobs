@@ -2,6 +2,7 @@ import { NavLink } from "../../components/shell/NavLink";
 import { Badge } from "../../components/ui/badge";
 import { useRepos } from "../../hooks/useRepos";
 import { t } from "../../i18n";
+import { EvidenceTabs } from "./EvidenceTabs";
 
 /** Evidências › Repositórios (F03 §4): relevância, último commit analisado e acesso ao detalhe. */
 export function ReposPage() {
@@ -10,6 +11,7 @@ export function ReposPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-4">
       <h1 className="text-xl font-semibold">{t("evidence.title")}</h1>
+      <EvidenceTabs />
       {repos.isLoading ? <p className="text-sm text-muted-fg">{t("app.loading")}</p> : null}
       {!repos.isLoading && list.length === 0 ? (
         <div className="flex flex-col gap-2">

@@ -757,6 +757,23 @@ export const ptBR = {
     },
   },
   evidence: {
+    tabs: { label: "Seções de evidências", files: "Arquivos e textos", repos: "Repositórios" },
+    files: {
+      title: "Evidências › Arquivos e textos",
+      list: "Arquivos e textos ingeridos",
+      empty: "Nenhum currículo ou texto ingerido ainda.",
+      goIngest: "Enviar currículo ou texto",
+      freeText: "Texto livre",
+      cv: "Currículo",
+      pages: "{count} págs",
+      noDigest: "Ainda sem registro de contexto.",
+      facts:
+        "Fatos gerados: {total} ({accepted} aceitos, {rejected} rejeitados, {pending} pendentes)",
+      lastRun: "Ver execução",
+      showText: "Ver texto",
+      hideText: "Ocultar texto",
+      noText: "Texto ainda não lido.",
+    },
     title: "Evidências › Repositórios",
     list: "Repositórios analisados",
     empty: "Nenhum repositório analisado ainda.",

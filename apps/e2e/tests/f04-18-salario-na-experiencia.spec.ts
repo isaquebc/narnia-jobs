@@ -55,4 +55,14 @@ test("F04/E2E-18 experiência com salário: o texto livre traz contrato, carga e
   const card = await api<{ text: string }>("/api/profiles/active/persona-card");
   expect(card.text).toMatch(/Remuneração \(equivalente mensal\): .*R\$ 12\.350,00/);
   expect(card.text).toContain("PJ, 30 h/semana");
+
+  // o texto ingerido aparece em Evidências › Arquivos e textos, com os fatos gerados e o texto lido
+  await page.goto("/evidencias/arquivos");
+  const item = page
+    .getByRole("list", { name: "Arquivos e textos ingeridos" })
+    .getByRole("listitem", { name: "Texto livre" })
+    .first();
+  await expect(item.getByText(/Fatos gerados: \d+/)).toBeVisible();
+  await item.getByRole("button", { name: "Ver texto" }).click();
+  await expect(item.getByText(/R\$ 95/)).toBeVisible();
 });
