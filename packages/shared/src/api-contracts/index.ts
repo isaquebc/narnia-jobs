@@ -26,6 +26,7 @@ import {
   BudgetRequestSchema,
   BudgetSchema,
   BudgetUnitSchema,
+  CheckReasonSchema,
   CheckStatusSchema,
   ConflictSchema,
   EvidenceSchema,
@@ -157,6 +158,7 @@ export const ProposalWithIdSchema = z.object({
   conflict: ConflictSchema.nullable().optional(),
   evidence: EvidenceSchema.nullable().optional(),
   checkStatus: CheckStatusSchema.optional(),
+  checkReason: CheckReasonSchema.nullable().optional(),
   suggestedProfiles: z.array(IdSchema).optional(),
 });
 export const FriendlyErrorSchema = z.object({

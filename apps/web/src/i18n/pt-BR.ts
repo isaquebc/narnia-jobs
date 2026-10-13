@@ -707,6 +707,13 @@ export const ptBR = {
       unsupported: "Sem suporte",
       unchecked: "Não conferida",
     },
+    reason: {
+      no_evidence: "Motivo: o modelo não indicou o trecho de onde tirou este item.",
+      quote_too_short: "Motivo: o trecho citado é curto demais para conferir.",
+      quote_not_found: "Motivo: o trecho citado não foi encontrado no texto lido.",
+      reviewer: "Motivo (revisor): {note}",
+      reviewerDefault: "o trecho não sustenta o item por inteiro.",
+    },
     evidence: "Ver trecho",
     resolve: "Resolver: {field}",
     keep: "Manter atual: {value}",

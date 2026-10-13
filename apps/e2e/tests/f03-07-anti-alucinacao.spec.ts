@@ -22,6 +22,9 @@ test("F03/E2E-07 revisão anti-alucinação: trecho inexistente vira 'Sem suport
   await review.getByRole("radio", { name: "Sem suporte (1)" }).check();
   const row = review.getByRole("listitem").filter({ hasText: "Sem suporte" });
   await expect(row).toHaveCount(1);
+  await expect(
+    row.getByText("Motivo: o trecho citado não foi encontrado no texto lido."),
+  ).toBeVisible();
   await row.getByText("Ver trecho").click();
   await row.getByRole("button", { name: "Aceitar" }).click();
   await expect(row.getByRole("button", { name: "Desfazer" })).toBeVisible();

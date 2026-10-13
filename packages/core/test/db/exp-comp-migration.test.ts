@@ -16,7 +16,9 @@ describe("migration 0007_experience_compensation", () => {
       `insert into experience (id, user_id, company, title, employment_type, start_date, is_current, tech_json, created_at, updated_at)
        values ('e1', 'u1', 'Acme', 'Engenheira', 'clt', '2021', 0, '["Go"]', '2026-01-01', '2026-01-01')`,
     );
-    expect(migrate(db).applied).toEqual(["0007_experience_compensation"]);
+    expect(migrate(db, { until: "0007_experience_compensation" }).applied).toEqual([
+      "0007_experience_compensation",
+    ]);
     const repos = createRepos(db);
     const old = repos.facts.experiences.get("e1");
     expect(old).toMatchObject({ company: "Acme", employmentType: "clt", tech: ["Go"] });

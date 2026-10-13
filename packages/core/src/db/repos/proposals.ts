@@ -1,4 +1,5 @@
 import {
+  type CheckReason,
   type CheckStatus,
   type Conflict,
   type Evidence,
@@ -40,6 +41,7 @@ export interface ProposalRecord {
   resolution: Resolution | null;
   evidence: Evidence | null;
   checkStatus: CheckStatus;
+  checkReason: CheckReason | null;
   suggestedProfiles: string[];
 }
 
@@ -82,7 +84,8 @@ export interface ProposalsRepo {
     input: { match: ProposalMatch; targetId?: string | null; conflict?: Conflict | null },
   ): void;
   setResolution(id: string, resolution: Resolution | null): void;
-  setCheckStatus(id: string, status: CheckStatus): void;
+  /** Selo e motivo juntos: sem motivo (supported/unchecked) o anterior é apagado. */
+  setCheckStatus(id: string, status: CheckStatus, reason?: CheckReason | null): void;
   setSuggestedProfiles(id: string, profileIds: string[]): void;
   listByRun(runId: string): ProposalRecord[];
   /**
@@ -111,6 +114,7 @@ function map(r: Row): ProposalRecord {
     resolution: json<Resolution | null>(r.resolution_json, null),
     evidence: json<Evidence | null>(r.evidence_json, null),
     checkStatus: (str(r.check_status) ?? "unchecked") as CheckStatus,
+    checkReason: json<CheckReason | null>(r.check_reason_json, null),
     suggestedProfiles: json<string[]>(r.suggested_profiles_json, []),
   };
 }
@@ -135,7 +139,8 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
   const setResolution = db.prepare(
     "update ingestion_proposal set resolution_json = ? where id = ?",
   );
-  const setCheck = db.prepare("update ingestion_proposal set check_status = ? where id = ?");
+  // preparado no primeiro uso: os testes de migração antigos montam os repos sobre schemas sem `check_reason_json`
+  let setCheck: ReturnType<Db["prepare"]> | null = null;
   const setProfiles = db.prepare(
     "update ingestion_proposal set suggested_profiles_json = ? where id = ?",
   );
@@ -156,8 +161,11 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
     setResolution(id, resolution) {
       setResolution.run(resolution ? JSON.stringify(resolution) : null, id);
     },
-    setCheckStatus(id, status) {
-      setCheck.run(status, id);
+    setCheckStatus(id, status, reason = null) {
+      setCheck ??= db.prepare(
+        "update ingestion_proposal set check_status = ?, check_reason_json = ? where id = ?",
+      );
+      setCheck.run(status, reason ? JSON.stringify(reason) : null, id);
     },
     setSuggestedProfiles(id, profileIds) {
       setProfiles.run(JSON.stringify(profileIds), id);

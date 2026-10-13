@@ -64,6 +64,7 @@ export function toProposalDto(p: ProposalRecord, segments: SegmentRecord[]) {
     resolution: p.resolution,
     evidence: p.evidence,
     checkStatus: p.checkStatus,
+    checkReason: p.checkReason,
     suggestedProfiles: p.suggestedProfiles,
   };
 }

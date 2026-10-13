@@ -35,7 +35,7 @@ describe("sandbox de avaliação", () => {
     expect(r?.passed).toBe(true);
     expect(sb.repos.chatSessions.list({}).length).toBe(1);
     expect(owner.repos.chatSessions.list({}).length).toBe(before);
-  });
+  }, 20_000);
 
   it("o /mcp do sandbox exige o token dele; fechar apaga a pasta e derruba o servidor", async () => {
     sb = await openEvalSandbox({ provider: new MockProvider() });

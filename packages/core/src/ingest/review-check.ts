@@ -1,6 +1,7 @@
 import {
   BENEFIT_LABELS,
   type CheckProposalsOutput,
+  type CheckReason,
   type CheckStatus,
   CONTRACT_TYPE_LABELS,
   type Evidence,
@@ -19,19 +20,52 @@ import type { ProposalRecord } from "../db/repos/proposals";
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 const MIN_QUOTE = 3;
 
+/**
+ * Forma comparável (2026-10-13): o modelo "arruma" o trecho e o PDF deforma o texto, então a conferência ignora a
+ * forma e exige o conteúdo. Ligaduras (ﬁ → fi, NFKC), palavra quebrada no fim da linha ("desenvol-\nvimento"),
+ * aspas e travessões tipográficos, acentos, maiúsculas e espaços.
+ */
+export function matchable(s: string): string {
+  return squash(
+    s
+      .normalize("NFKC")
+      .replace(/(\p{L})[-\u00ad\u2010\u2011]\s*\n\s*(\p{L})/gu, "$1$2")
+      .replace(/[\u2018\u2019\u201a\u201b\u2032`´]/g, "'")
+      .replace(/[\u201c\u201d\u201e\u201f\u2033\u00ab\u00bb]/g, '"')
+      .replace(/[\u2010-\u2015\u2212]/g, "-")
+      .replace(/\u2026/g, "...")
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase(),
+  );
+}
+
+type Layer1 = {
+  status: Extract<CheckStatus, "unchecked" | "unsupported">;
+  reason: CheckReason | null;
+};
+
+function layer1(evidence: Evidence | null | undefined, sources: Record<string, string>): Layer1 {
+  if (!evidence) return { status: "unsupported", reason: { layer: 1, code: "no_evidence" } };
+  const quote = matchable(evidence.quote);
+  if (quote.length < MIN_QUOTE)
+    return { status: "unsupported", reason: { layer: 1, code: "quote_too_short" } };
+  const direct = sources[evidence.ref];
+  // o modelo erra o nome da fonte com frequência ("README" × "README.md"): procura em todas as enviadas
+  const found =
+    (direct !== undefined && matchable(direct).includes(quote)) ||
+    Object.values(sources).some((s) => matchable(s).includes(quote));
+  return found
+    ? { status: "unchecked", reason: null }
+    : { status: "unsupported", reason: { layer: 1, code: "quote_not_found" } };
+}
+
 /** `sources`: conteúdo enviado ao modelo, por referência (`cv`, `README.md`, caminho do arquivo…). */
 export function checkEvidence(
   evidence: Evidence | null | undefined,
   sources: Record<string, string>,
 ): Extract<CheckStatus, "unchecked" | "unsupported"> {
-  const quote = evidence ? squash(evidence.quote) : "";
-  if (!evidence || quote.length < MIN_QUOTE) return "unsupported";
-  const direct = sources[evidence.ref];
-  if (direct !== undefined && squash(direct).includes(quote)) return "unchecked";
-  // o modelo erra o nome da fonte com frequência ("README" × "README.md"): procura em todas as enviadas
-  return Object.values(sources).some((s) => squash(s).includes(quote))
-    ? "unchecked"
-    : "unsupported";
+  return layer1(evidence, sources).status;
 }
 
 export function runCheckLayer1(
@@ -42,8 +76,8 @@ export function runCheckLayer1(
   const counts = { unchecked: 0, unsupported: 0 };
   for (const p of repos.proposals.listByRun(runId)) {
     if (p.decision !== "pending") continue;
-    const status = checkEvidence(p.evidence, sources);
-    repos.proposals.setCheckStatus(p.id, status);
+    const { status, reason } = layer1(p.evidence, sources);
+    repos.proposals.setCheckStatus(p.id, status, reason);
     counts[status]++;
   }
   return counts;
@@ -109,7 +143,13 @@ export function applyCheckResults(repos: Repos, results: CheckProposalsOutput["r
   let n = 0;
   for (const r of results) {
     try {
-      repos.proposals.setCheckStatus(r.proposalId, r.status);
+      repos.proposals.setCheckStatus(
+        r.proposalId,
+        r.status,
+        r.status === "supported"
+          ? null
+          : { layer: 2, code: "reviewer", ...(r.note ? { note: r.note } : {}) },
+      );
       n++;
     } catch {
       // proposta inexistente (o modelo inventou um id): ignora

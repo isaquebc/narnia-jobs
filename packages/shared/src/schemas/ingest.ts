@@ -111,6 +111,17 @@ export type Evidence = z.infer<typeof EvidenceSchema>;
 export const CheckStatusSchema = z.enum(["supported", "partial", "unsupported", "unchecked"]);
 export type CheckStatus = z.infer<typeof CheckStatusSchema>;
 
+/**
+ * Motivo do selo: camada 1 (`no_evidence` sem trecho, `quote_too_short`, `quote_not_found` trecho fora do texto lido)
+ * ou camada 2 (`reviewer`, com a nota do revisor). Só existe para `partial` e `unsupported`.
+ */
+export const CheckReasonSchema = z.object({
+  layer: z.union([z.literal(1), z.literal(2)]),
+  code: z.enum(["no_evidence", "quote_too_short", "quote_not_found", "reviewer"]),
+  note: z.string().optional(),
+});
+export type CheckReason = z.infer<typeof CheckReasonSchema>;
+
 /** Reconciliação com os fatos existentes (F03 §2.8). */
 export const ProposalMatchSchema = z.enum(["new", "existing", "conflict"]);
 export type ProposalMatch = z.infer<typeof ProposalMatchSchema>;

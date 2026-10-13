@@ -347,6 +347,7 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
                       </Badge>
                     ) : null}
                   </div>
+                  {reasonText(p) ? <p className="text-xs text-muted-fg">{reasonText(p)}</p> : null}
                   {p.evidence ? (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-muted-fg">
@@ -434,6 +435,23 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
       ) : null}
     </section>
   );
+}
+
+/**
+ * Por que o item ficou "Sem suporte" ou "Parcial" (pedido do dono, 2026-10-13). Execuções anteriores não guardavam o
+ * motivo: sem trecho, dá para inferir; com trecho, fica sem texto.
+ */
+export function reasonText(p: Proposal): string | null {
+  const check = p.checkStatus ?? "unchecked";
+  if (check !== "unsupported" && check !== "partial") return null;
+  const reason =
+    p.checkReason ?? (p.evidence ? null : { layer: 1 as const, code: "no_evidence" as const });
+  if (!reason) return null;
+  if (reason.code === "reviewer")
+    return t("review3.reason.reviewer", {
+      note: reason.note ?? t("review3.reason.reviewerDefault"),
+    });
+  return t(`review3.reason.${reason.code}` as TKey);
 }
 
 function toFriendly(e: unknown) {
