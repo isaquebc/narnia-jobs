@@ -1,5 +1,5 @@
 import type { ChatSession } from "@narnia-jobs/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Archive, Paperclip, Pencil, Square, Wrench } from "lucide-react";
 import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -26,6 +26,7 @@ import { type TKey, t } from "../../i18n";
 import { formatDate, formatTokens } from "../../lib/format";
 import { FriendlyError } from "../ingestion/FriendlyError";
 import { ACCEPT, validateFile } from "../onboarding/components/FileDropzone";
+import { ChatIngestionCard } from "./ChatIngestionCard";
 import { Markdown } from "./Markdown";
 import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "./SessionLimitDialog";
 
@@ -529,49 +530,15 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 }
 
 /**
- * Execução aberta pela conversa (auditoria E1): link para a tela e, se ficou acima do limite de custo, a estimativa com
- * "Confirmar ingestão" (o recrutador também confirma por `ingest_confirm` quando o usuário concorda na conversa).
+ * Execução aberta pela conversa (auditoria E1): link para a tela. Progresso, confirmação do custo e revisão ficam no
+ * card "Ingestão da conversa" do painel da direita (2026-10-13).
  */
 function CreatedRun({ runId }: { runId: string }) {
-  const api = useApi();
-  const ws = useWs();
-  const qc = useQueryClient();
-  const key = ["ingestion", runId, "chat"] as const;
-  const run = useQuery({ queryKey: key, queryFn: () => api.getIngestion(runId) });
-  useEffect(
-    () =>
-      ws.subscribe((e) => {
-        if (e.type === "ingestion.updated" && e.runId === runId)
-          void qc.invalidateQueries({ queryKey: ["ingestion", runId, "chat"] });
-      }),
-    [ws, qc, runId],
-  );
-  const confirm = useMutation({
-    mutationFn: () => api.confirmIngestion(runId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
-  });
-  const r = run.data;
-  const est = r?.estimate
-    ? r.estimate.documentTokens + r.estimate.factsTokens + r.estimate.digestTokens
-    : null;
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
       <NavLink to={`/ingestao/${runId}`} className="underline">
         {t("chat.ingestionCreated")}
       </NavLink>
-      {r?.status === "awaiting_confirmation" && r.fileId !== null ? (
-        <>
-          <span className="text-muted-fg">
-            {t("chat.runAwaiting", { tokens: formatTokens(est ?? 0) })}
-          </span>
-          <Button size="sm" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
-            {t("chat.runConfirm")}
-          </Button>
-        </>
-      ) : null}
-      {confirm.isError ? (
-        <span className="text-danger">{(confirm.error as Error).message}</span>
-      ) : null}
     </div>
   );
 }
@@ -622,11 +589,14 @@ function ContextPanel({ sessionId }: { sessionId: string }) {
     ]),
   );
   const mine = sources.filter((s) => s.sessionId === null || s.sessionId === sessionId);
+  const currentRun = chat.createdRuns.at(-1) ?? null;
   return (
     <aside
       aria-label={t("chat.context")}
-      className="hidden min-h-0 w-72 shrink-0 flex-col gap-3 overflow-y-auto lg:flex"
+      className="hidden min-h-0 w-80 shrink-0 flex-col gap-3 overflow-y-auto lg:flex"
     >
+      {/* ingestão aberta pela conversa: card próprio acima do cartão do perfil; a revisão usa a rolagem do painel */}
+      {currentRun ? <ChatIngestionCard key={currentRun} runId={currentRun} /> : null}
       <Card className="p-3">
         <CardTitle className="mb-2 text-sm">{t("chat.card")}</CardTitle>
         <p className="whitespace-pre-wrap text-xs text-muted-fg">{card.data?.text ?? "…"}</p>

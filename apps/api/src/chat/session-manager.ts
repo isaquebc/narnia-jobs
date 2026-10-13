@@ -114,6 +114,8 @@ interface Live {
   pendingText: string;
   /** Categoria com que o processo foi aberto: mudou no banco = reabrir para o CLI ver as tools novas. */
   category: ChatCategory;
+  /** Turno aberto pelo sistema (aviso de ingestão pronta): ingestão criada nele não gera outro aviso (sem laço). */
+  systemTurn?: boolean;
 }
 
 /**
@@ -121,6 +123,9 @@ interface Live {
  * e escolha (F04-3), hibernação por inatividade e no boot com retomada por `resume` (F04-4), nota de cartão atualizado
  * (F04-1), persistência de mensagens e uso por turno, eventos `chat.*` no `/ws` (F04-13).
  */
+/** Estados em que a execução terminou o trabalho do worker (a revisão fica com o usuário). */
+const RUN_FINISHED: ReadonlySet<string> = new Set(["review", "done", "error"]);
+
 export class SessionManager {
   private readonly live = new Map<string, Live>();
   private sweeper: NodeJS.Timeout | null = null;
@@ -128,9 +133,83 @@ export class SessionManager {
   constructor(private readonly deps: SessionManagerDeps) {
     // o `/mcp` avisa qual execução a tool de ingestão desta conversa criou; o fim da tool grava o runId (auditoria D)
     deps.bus.on((e) => {
-      if (e.type === "chat.ingestion_created")
-        this.live.get(e.sessionId)?.pendingRuns.push(e.runId);
+      if (e.type === "chat.ingestion_created") {
+        const entry = this.live.get(e.sessionId);
+        entry?.pendingRuns.push(e.runId);
+        if (!entry?.systemTurn) this.repos.ingestionRuns.linkChat(e.runId, e.sessionId);
+      }
+      if (e.type === "ingestion.updated" && RUN_FINISHED.has(e.status)) this.onRunFinished(e.runId);
     });
+  }
+
+  /** Execuções prontas esperando o turno em andamento da conversa acabar (o aviso não interrompe o agente). */
+  private readonly waitingRuns = new Map<string, string[]>();
+
+  /**
+   * Fim de uma execução aberta pela conversa (pedido do dono, 2026-10-13): o recrutador não gasta tokens esperando o
+   * job; quando ele termina, a conversa ganha a nota visível e o agente é chamado uma vez para avisar. Com turno em
+   * andamento, espera ele acabar; sem orçamento ou sem vaga de conversa viva, fica só a nota.
+   */
+  private onRunFinished(runId: string) {
+    const run = this.repos.ingestionRuns.get(runId);
+    if (!run?.chatSessionId || !RUN_FINISHED.has(run.status)) return;
+    const session = this.repos.chatSessions.get(run.chatSessionId);
+    if (!session || session.state === "archived") return;
+    if (this.live.get(session.id)?.busy) {
+      const list = this.waitingRuns.get(session.id) ?? [];
+      if (!list.includes(runId)) this.waitingRuns.set(session.id, [...list, runId]);
+      return;
+    }
+    if (!this.repos.ingestionRuns.claimChatNotice(runId)) return;
+    const pending = this.repos.proposals
+      .listByRun(runId)
+      .filter((p) => p.decision === "pending").length;
+    const count = pending === 1 ? "1 proposta" : `${pending} propostas`;
+    const display =
+      run.status === "error"
+        ? "Ingestão com erro"
+        : pending > 0
+          ? `Ingestão pronta: ${count} para revisar`
+          : "Ingestão concluída: nada novo para revisar";
+    const note = renderNote(readPluginFile("prompts/ingestao-pronta.md"), {
+      run_id: runId,
+      status: run.status === "error" ? `com erro (${run.error ?? "sem detalhe"})` : "com sucesso",
+      pending: count,
+    });
+    const settings = resolveChatSettings(this.repos.settings);
+    const broke = settings.maxBudgetUsd !== null && session.costUsdEst >= settings.maxBudgetUsd;
+    if (!broke) {
+      try {
+        this.send(session.id, note, { display });
+        return;
+      } catch {
+        // sem vaga de conversa viva ou sessão em estado que não recebe turno: fica só a nota
+      }
+    }
+    this.repos.chatMessages.add({
+      sessionId: session.id,
+      turnIndex: this.repos.chatMessages.nextTurnIndex(session.id),
+      role: "system_note",
+      contentMd: display,
+      toolCalls: [],
+      usage: null,
+    });
+    this.deps.bus.emit({
+      type: "chat.session_updated",
+      sessionId: session.id,
+      state: session.state,
+      category: session.category,
+    });
+  }
+
+  private flushWaitingRuns(id: string) {
+    const list = this.waitingRuns.get(id);
+    if (!list?.length) return;
+    this.waitingRuns.delete(id);
+    // um aviso por vez: o próximo espera o turno deste acabar
+    const [first, ...rest] = list;
+    if (rest.length) this.waitingRuns.set(id, rest);
+    if (first) this.onRunFinished(first);
   }
 
   private get repos() {
@@ -251,7 +330,11 @@ export class SessionManager {
   }
 
   /** Envia uma mensagem; acorda a sessão hibernada (com `resume`) e antepõe as notas de contexto quando couber. */
-  send(id: string, text: string): { turnIndex: number } {
+  /**
+   * `system`: turno aberto pelo sistema (aviso de ingestão pronta): a conversa mostra só `display` como nota e o texto
+   * vai ao agente sem virar mensagem do usuário.
+   */
+  send(id: string, text: string, system?: { display: string }): { turnIndex: number } {
     const session = this.get(id);
     if (session.state === "archived")
       throw new SessionStateError(
@@ -308,8 +391,8 @@ export class SessionManager {
     this.repos.chatMessages.add({
       sessionId: id,
       turnIndex,
-      role: "user",
-      contentMd: text,
+      role: system ? "system_note" : "user",
+      contentMd: system ? system.display : text,
       toolCalls: [],
       usage: null,
     });
@@ -336,6 +419,7 @@ export class SessionManager {
       interrupting: false,
       needsBreak: false,
       pendingText: full,
+      systemTurn: Boolean(system),
     });
     entry.handle.send(full);
     return { turnIndex };
@@ -469,6 +553,7 @@ export class SessionManager {
           usage: { inputTokens: e.usage.inputTokens, outputTokens: e.usage.outputTokens },
         });
         this.reopenIfCategoryChanged(id, entry);
+        this.flushWaitingRuns(id);
         return;
       }
       case "error":

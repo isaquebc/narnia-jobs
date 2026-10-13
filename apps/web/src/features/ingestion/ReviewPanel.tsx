@@ -162,7 +162,18 @@ function ConflictResolver({
  * com o trecho de evidência, resolução de conflito campo a campo (salvar fica bloqueado até resolver os aceitos) e
  * tags por perfil por linha e em lote. "Clarificar com o recrutador" abre uma conversa de clarificação (F04).
  */
-export function ReviewPanel({ run }: { run: IngestionDetail }) {
+export function ReviewPanel({
+  run,
+  variant = "page",
+}: {
+  run: IngestionDetail;
+  /**
+   * `panel`: ao lado do chat (pedido do dono, 2026-10-13): só as pendentes, em cards empilhados, sem filtros, tags por
+   * perfil nem "Clarificar"; o salvar fica num espaço fixo no rodapé, que existe vazio e mostra o botão com decisão.
+   */
+  variant?: "page" | "panel";
+}) {
+  const panel = variant === "panel";
   const api = useApi();
   const qc = useQueryClient();
   const { profiles } = useProfiles();
@@ -201,7 +212,9 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
         return (p.match ?? "new") === f;
     }
   };
-  const visible = proposals.filter((p) => matches(p, filter));
+  const visible = panel
+    ? proposals.filter((p) => p.decision === "pending")
+    : proposals.filter((p) => matches(p, filter));
   const decide = (p: Proposal, decision: "accepted" | "rejected" | null) =>
     setLocal((cur) => {
       const next = { ...cur };
@@ -266,20 +279,22 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
   return (
     <section aria-label={t("review3.title")} className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">{t("review3.title")}</h2>
-      <fieldset className="flex flex-wrap gap-3">
-        <legend className="sr-only">{t("review3.filterLegend")}</legend>
-        {FILTERS.map((f) => (
-          <label key={f} className="flex items-center gap-1 text-sm">
-            <input
-              type="radio"
-              name="review-filter"
-              checked={filter === f}
-              onChange={() => setFilter(f)}
-            />
-            {t(`review3.filters.${f}` as TKey, { count: count(f) })}
-          </label>
-        ))}
-      </fieldset>
+      {panel ? null : (
+        <fieldset className="flex flex-wrap gap-3">
+          <legend className="sr-only">{t("review3.filterLegend")}</legend>
+          {FILTERS.map((f) => (
+            <label key={f} className="flex items-center gap-1 text-sm">
+              <input
+                type="radio"
+                name="review-filter"
+                checked={filter === f}
+                onChange={() => setFilter(f)}
+              />
+              {t(`review3.filters.${f}` as TKey, { count: count(f) })}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
@@ -303,7 +318,7 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
         >
           {t("review.rejectAll")}
         </Button>
-        {profiles.map((pr) => (
+        {(panel ? [] : profiles).map((pr) => (
           <label key={pr.id} className="flex items-center gap-1 text-sm">
             <input
               type="checkbox"
@@ -318,7 +333,7 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
           </label>
         ))}
       </div>
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2" aria-label={t("review3.listLabel")}>
         {visible.map((p) => {
           const d = local[p.id];
           const current = d?.decision ?? (p.decision === "pending" ? "pending" : p.decision);
@@ -330,7 +345,9 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
               aria-label={summary}
               className="flex flex-col gap-2 rounded-md border border-border p-3"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div
+                className={panel ? "flex flex-col gap-2" : "flex items-start justify-between gap-3"}
+              >
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm">{summary}</span>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -358,7 +375,7 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
                     </details>
                   ) : null}
                 </div>
-                <div className="flex shrink-0 gap-1">
+                <div className={panel ? "flex gap-1" : "flex shrink-0 gap-1"}>
                   {p.decision === "pending" ? (
                     d ? (
                       <Button size="sm" variant="ghost" onClick={() => decide(p, null)}>
@@ -392,7 +409,10 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
                   }
                 />
               ) : null}
-              {TAGGABLE.has(p.proposal.kind) && p.decision === "pending" && profiles.length > 0 ? (
+              {!panel &&
+              TAGGABLE.has(p.proposal.kind) &&
+              p.decision === "pending" &&
+              profiles.length > 0 ? (
                 <div className="flex flex-wrap gap-3">
                   {profiles.map((pr) => (
                     <label key={pr.id} className="flex items-center gap-1 text-xs">
@@ -410,29 +430,52 @@ export function ReviewPanel({ run }: { run: IngestionDetail }) {
           );
         })}
       </ul>
-      {unresolved ? <Alert tone="warn">{t("review3.unresolved")}</Alert> : null}
-      {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}
-      <div className="flex items-center gap-2">
-        <Button
-          disabled={decided.length === 0 || unresolved || save.isPending}
-          onClick={() => save.mutate()}
-        >
-          {t("review3.save")}
-        </Button>
-        <Button variant="outline" disabled={clarify.isPending} onClick={() => clarify.mutate()}>
-          {t("review.clarify")}
-        </Button>
-        <SessionLimitDialog
-          limit={limit}
-          onChoose={(id) => void closeAndClarify(id)}
-          onCancel={() => setLimit(null)}
-        />
-      </div>
-      {clarify.isError && !sessionLimitOf(clarify.error) ? (
-        <Alert tone="danger">
-          <FriendlyError error={toFriendly(clarify.error)} />
-        </Alert>
-      ) : null}
+      {panel ? (
+        <>
+          {unresolved ? <Alert tone="warn">{t("review3.unresolved")}</Alert> : null}
+          {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}
+          <div
+            data-testid="review-save-slot"
+            className="sticky bottom-0 flex min-h-12 items-center rounded-md border border-dashed border-border bg-card p-2"
+          >
+            {decided.length > 0 ? (
+              <Button
+                className="w-full"
+                disabled={unresolved || save.isPending}
+                onClick={() => save.mutate()}
+              >
+                {t("review3.save")}
+              </Button>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
+          {unresolved ? <Alert tone="warn">{t("review3.unresolved")}</Alert> : null}
+          {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}
+          <div className="flex items-center gap-2">
+            <Button
+              disabled={decided.length === 0 || unresolved || save.isPending}
+              onClick={() => save.mutate()}
+            >
+              {t("review3.save")}
+            </Button>
+            <Button variant="outline" disabled={clarify.isPending} onClick={() => clarify.mutate()}>
+              {t("review.clarify")}
+            </Button>
+            <SessionLimitDialog
+              limit={limit}
+              onChoose={(id) => void closeAndClarify(id)}
+              onCancel={() => setLimit(null)}
+            />
+          </div>
+          {clarify.isError && !sessionLimitOf(clarify.error) ? (
+            <Alert tone="danger">
+              <FriendlyError error={toFriendly(clarify.error)} />
+            </Alert>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

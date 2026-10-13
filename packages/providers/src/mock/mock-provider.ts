@@ -578,6 +578,8 @@ export function mockChatScript(
   text: string,
   opts: Pick<ChatOpenOptions, "category" | "ingestionRunId">,
 ): [string, Record<string, unknown>] {
+  // aviso de ingestão pronta (2026-10-13): o modelo real só avisa; o mock usa uma tool de leitura, nunca abre ingestão
+  if (text.startsWith("(nota do sistema: a ingestão")) return ["evidence_experience_list", {}];
   // entrevista de descoberta (auditoria E2): o 1º turno (com a nota do sistema) e respostas curtas olham as lacunas;
   // um relato de 200+ caracteres vai para a revisão por ingest_text, como a orientação do plugin pede
   if (opts.category === "discovery")

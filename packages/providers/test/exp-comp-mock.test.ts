@@ -42,3 +42,13 @@ describe("extração de salário, carga e contrato", () => {
     expect(mockCompensation("sem salário no texto")).toBeNull();
   });
 });
+
+describe("mock do chat: aviso de ingestão pronta", () => {
+  it("a nota do sistema do fim da ingestão nunca abre outra ingestão", async () => {
+    const { mockChatScript } = await import("../src/mock/mock-provider");
+    const note =
+      "(nota do sistema: a ingestão r1 que você abriu nesta conversa terminou: com sucesso. 2 propostas esperando a revisão.)";
+    expect(mockChatScript(note, { category: "career" })[0]).toBe("evidence_experience_list");
+    expect(mockChatScript("texto: minha história", { category: "career" })[0]).toBe("ingest_text");
+  });
+});

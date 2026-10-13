@@ -1,0 +1,1 @@
+(nota do sistema: a ingestão {{run_id}} que você abriu nesta conversa terminou: {{status}}. {{pending}} esperando a revisão do usuário no painel ao lado da conversa. Avise o usuário em uma ou duas frases curtas e diga onde revisar; não chame tools, não liste as propostas e não pergunte nada além de se ele quer ajuda na revisão.)

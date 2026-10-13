@@ -179,6 +179,8 @@ export function useChatSession(sessionId: string) {
           // hibernada, arquivada ou com erro no meio de um turno: o "pensando" acaba (auditoria D)
           if (e.state !== "live") setTurnActive(false);
           void qc.invalidateQueries({ queryKey: chatKeys.session(sessionId) });
+          // nota do sistema gravada sem turno (ex.: ingestão pronta com o teto de custo atingido)
+          void qc.invalidateQueries({ queryKey: chatKeys.messages(sessionId) });
           break;
       }
     });

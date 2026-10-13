@@ -25,7 +25,7 @@ Status: **M1–M5 implementados** (2026-10-13, provados com o mock na instância
 ## 3 · Marcos
 
 1. **M1 · Ponte e Configurações › Avaliações:** `POST /bridge/anthropic/v1/messages` (com e sem streaming, saída estruturada, uso), chave própria, concorrência, liga/desliga, modelo padrão, registro do provedor no Phoenix, chave de API opcional no Phoenix.
-2. **M2 · Prompts versionados:** sincronização dos 17 prompts (8 estruturados, persona, 3 notas, 5 skills) com tag `production`.
+2. **M2 · Prompts versionados:** sincronização dos 18 prompts (8 estruturados, persona, 4 notas, 5 skills) com tag `production`.
 3. **M3 · Datasets e avaliadores de código** dos 8 prompts estruturados, versionados no Phoenix e presos aos datasets.
 4. **M4 · Juízes** (avaliadores com modelo) com o padrão de entrega de cada prompt.
 5. **M5 · Comando dos prompts com tools** em perfil temporário, experimentos com os mesmos avaliadores.

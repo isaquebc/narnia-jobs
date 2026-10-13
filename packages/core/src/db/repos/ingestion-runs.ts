@@ -61,6 +61,8 @@ export interface IngestionRunRecord {
   model: string | null;
   report: RunReport | null;
   parentRunId: string | null;
+  /** Conversa que abriu a execução (tool de ingestão do chat); recebe o aviso do fim. */
+  chatSessionId: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -102,6 +104,10 @@ export interface IngestionRunsRepo {
   setReport(id: string, report: RunReport): void;
   /** Parâmetros da execução (repositórios, login, tabela de métricas, plano antes da execução…). */
   setParams(id: string, params: RunParams): void;
+  /** Liga a execução à conversa que a abriu. */
+  linkChat(id: string, sessionId: string): void;
+  /** Marca o aviso do fim para a conversa; true só na primeira vez (o aviso sai uma vez). */
+  claimChatNotice(id: string): boolean;
 }
 
 const TERMINAL: ReadonlySet<RunStatus> = new Set(["review", "done", "error", "cancelled"]);
@@ -125,6 +131,7 @@ function map(r: Row): IngestionRunRecord {
     model: str(r.model),
     report: json<RunReport | null>(r.report_json, null),
     parentRunId: str(r.parent_run_id),
+    chatSessionId: str(r.chat_session_id),
     createdAt: String(r.created_at),
     startedAt: str(r.started_at),
     finishedAt: str(r.finished_at),
@@ -184,6 +191,19 @@ export function ingestionRunsRepo(db: Db): IngestionRunsRepo {
         nowUtc(),
       );
       return map(get.get(id) as Row);
+    },
+    // preparados no primeiro uso: testes de migração antigos montam os repos sobre schemas sem as colunas
+    linkChat(id, sessionId) {
+      db.prepare("update ingestion_run set chat_session_id = ? where id = ?").run(sessionId, id);
+    },
+    claimChatNotice(id) {
+      return (
+        db
+          .prepare(
+            "update ingestion_run set chat_notified_at = ? where id = ? and chat_notified_at is null",
+          )
+          .run(nowUtc(), id).changes === 1
+      );
     },
     get(id) {
       const row = get.get(id) as Row | undefined;

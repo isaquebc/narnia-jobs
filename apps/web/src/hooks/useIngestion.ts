@@ -8,8 +8,12 @@ export function ingestionKey(runId: string) {
   return ["ingestion", runId] as const;
 }
 
-/** Ingestão em andamento: polling enquanto roda + invalidação por eventos WS de jobs e da execução (F03). */
-export function useIngestion(runId: string | undefined) {
+/**
+ * Ingestão em andamento: polling enquanto roda + invalidação por eventos WS de jobs e da execução (F03). `poll: false`
+ * (painel do chat): só pelo WS.
+ */
+export function useIngestion(runId: string | undefined, opts: { poll?: boolean } = {}) {
+  const poll = opts.poll ?? true;
   const api = useApi();
   const ws = useWs();
   const qc = useQueryClient();
@@ -17,7 +21,8 @@ export function useIngestion(runId: string | undefined) {
     queryKey: ingestionKey(runId ?? "none"),
     queryFn: () => api.getIngestion(runId as string),
     enabled: Boolean(runId),
-    refetchInterval: (q) => (q.state.data && RUNNING.has(q.state.data.status) ? 2000 : false),
+    refetchInterval: (q) =>
+      poll && q.state.data && RUNNING.has(q.state.data.status) ? 2000 : false,
   });
   useEffect(() => {
     if (!runId) return;

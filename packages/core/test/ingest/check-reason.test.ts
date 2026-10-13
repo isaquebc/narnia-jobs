@@ -109,7 +109,7 @@ describe("migration 0008_check_reason", () => {
     const [id] = repos.proposals.insertMany(run.id, [
       { kind: "skill", confidence: 0.9, data: { name: "Go", category: "language" } },
     ]);
-    expect(migrate(db).applied).toEqual(["0008_check_reason"]);
+    expect(migrate(db, { until: "0008_check_reason" }).applied).toEqual(["0008_check_reason"]);
     const after = createRepos(db);
     expect(after.proposals.listByRun(run.id)[0]?.checkReason).toBeNull();
     after.proposals.setCheckStatus(id as string, "partial", {

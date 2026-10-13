@@ -724,6 +724,7 @@ export const ptBR = {
     bulkTag: "Destacar os aceitos em {name}",
     unresolved: "Resolva os conflitos aceitos antes de salvar.",
     save: "Salvar revisão",
+    listLabel: "Propostas para revisar",
   },
   report: {
     title: "Relatório da execução",
@@ -1006,6 +1007,13 @@ export const ptBR = {
     toolDuration: "{ms} ms",
     toolError: "erro",
     ingestionCreated: "Abrir a ingestão criada",
+    ingestion: {
+      title: "Ingestão da conversa",
+      open: "Abrir a página da ingestão",
+      progress: "Progresso da ingestão",
+      failed: "A ingestão falhou.",
+      saved: "Revisão salva. Os fatos aceitos já estão no perfil.",
+    },
     loadOlder: "Carregar anteriores",
     limitDialog: "Você tem {max} conversas abertas. Qual encerrar?",
     limitClose: "Encerrar {title}",
