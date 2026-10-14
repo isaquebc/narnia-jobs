@@ -2,7 +2,7 @@
 
 Entregável 6 do plan-v0. Cobre a feature **#2** de `../02-fluxos-do-usuario.md §F5`: a pessoa cola a descrição de uma vaga (ou a URL) e recebe uma análise honesta de aderência ao perfil ativo, com lacunas sem evidência, riscos, palavras-chave ausentes e perguntas prováveis, pronta para virar candidatura, CV direcionado (F05) ou simulação de entrevista (F08).
 
-Status: **em escopo, replanejada pelo dono em 2026-10-14** (a F06 vem antes da F05). Decisões F06-1 a F06-15 fechadas (§5); F06-16 e F06-17 abertos pela revisão do código (§5.1); requisitos novos em §1.1 a §1.4; marcos em §6.0. Nada implementado.
+Status: **em escopo, replanejada pelo dono em 2026-10-14** (a F06 vem antes da F05). Decisões F06-1 a F06-17 fechadas (§5); F06-16 e F06-17 fechadas depois da revisão do código; requisitos novos em §1.1 a §1.4; marcos em §6.0. Nada implementado.
 
 ---
 
@@ -257,13 +257,8 @@ Regras:
 | F06-13 | Modelos configuráveis | **só modelos do Claude** por enquanto (configuração por tarefa em Configurações); outros provedores com a F11 |
 | F06-14 | Avaliação de prompt no Phoenix | **gate de qualidade com o Claude real** a cada prompt novo ou alterado, rodando na assinatura (custo de construção aceito pelo dono); o mock segue como smoke no dia a dia |
 | F06-15 | Teto de conversas vivas | a sessão da análise **conta no teto**; **sessões hibernadas não contam** |
-
-### 5.1 · Pontos abertos pela revisão do código (perguntar ao dono, um por vez)
-
-| # | Ponto | Proposta |
-|---|-------|----------|
-| F06-16 | "Prompts vivem no Phoenix" × AV-4 (o repositório é a fonte; o app nunca lê prompt do Phoenix) | manter o repositório como fonte (versionado no git, revisável, funciona sem Phoenix); o Phoenix guarda cada versão, as rodadas de avaliação e a linha de base do gate |
-| F06-17 | Confirmação da nota alterada pelo recrutador: "bandeja" (hoje só jobs e ingestões) × Pendências (onde já ficam as aprovações) | seção nova "Aguardando você" na bandeja, com o mesmo item também em Pendências, e a confirmação feita na página da vaga com o diff da nota |
+| F06-16 | Onde os prompts vivem | **o repositório é a fonte** (AV-4 mantida); o Phoenix guarda cada versão, as rodadas de avaliação (entradas, saídas, custo) e a linha de base do gate. **Quem clona o projeto abre o Phoenix e roda os testes por lá**: cada prompt novo da F06 entra com dataset, avaliadores sincronizados e a versão de produção pronta para rodar no Playground pela ponte da assinatura. Prompts com tools (skill `analisar-vaga`) não rodam no Playground; ficam no `evals chat` (sandbox), com os resultados no Phoenix |
+| F06-17 | Confirmação da nota alterada pelo recrutador | **bandeja com seção nova "Aguardando você"**, com o mesmo item também em Pendências; o clique abre a página da vaga com o diff da nota (antes × depois) e confirmar/recusar; até confirmar, a nota mantém o texto antigo |
 
 ## 6 · O que precisa estar coberto para o F06 funcionar
 
@@ -353,4 +348,6 @@ Arquivos `apps/e2e/tests/f06-NN-<slug>.spec.ts`, títulos `F06/E2E-NN …`; mock
 | 2026-10-14 | — | **F06-9 fechada (dono):** data de publicação opcional e fora do hash (ajusta F06-2); hash coincidente → Haiku compara as JDs e devolve % de duplicata → modal com diff (atualizar salva · seguir como nova · cancelar). |
 | 2026-10-14 | — | **F06-10 a F06-15 fechadas (dono):** sem reanálise automática; alerta de candidatura repetida "em breve"; cargo/role/senioridade separados; só modelos do Claude; avaliação real de prompt na assinatura como gate; hibernadas fora do teto. Todas as decisões da F06 fechadas. |
 | 2026-10-14 | — | **Revisão contra o código:** §2 a §4, §6 e §7 reescritos (§2.0 lista as divergências: dicionário inexistente, `facts_version` já pronto, evidência `{kind,id}`, nomes reais das tools, preferências sem flag de obrigatória, dependências novas, sessões `NOT NULL` por perfil, subagente sem suporte no modo A, botão derivado da tool, gate de regressão inexistente). Marcos M1–M7 em §6.0. Abertos F06-16 e F06-17. |
+| 2026-10-14 | — | **F06-16 fechada (dono):** repositório como fonte; o Phoenix como registro, e quem clona roda os testes pelo Phoenix. |
+| 2026-10-14 | — | **F06-17 fechada (dono):** seção "Aguardando você" na bandeja, espelhada em Pendências. Todas as decisões fechadas; pronto para o M1. |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)
