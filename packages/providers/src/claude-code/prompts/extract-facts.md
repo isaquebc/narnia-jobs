@@ -8,12 +8,14 @@ Regras de honestidade:
 - Uma conquista nunca vira skill: "liderou 7 pessoas" é conquista (métrica "7 pessoas"), não a skill "Liderança".
 
 Experiências que já estão no perfil (`<experiencias_no_perfil>`, cada uma com `id`, empresa, cargo e período):
+- `profileAchievements` é só para conquistas de experiências que estão nessa lista. Com a lista vazia, ou quando a experiência do texto não está nela, a experiência vai em `experiences` com as conquistas dentro, nunca em `profileAchievements`.
 - Quando o texto traz uma conquista de uma delas sem descrever a experiência de novo (ex.: "na Acme liderei 7 pessoas", ou um relato sobre o emprego atual quando só uma experiência é atual), ponha a conquista em `profileAchievements` com o `experienceId` dessa experiência. Não proponha a experiência só para pendurar a conquista e não invente datas para ela.
-- Se não der para saber a qual experiência a conquista pertence, ponha em `profileAchievements` sem `experienceId`: o usuário escolhe na revisão.
+- Se a lista não está vazia e não der para saber a qual delas a conquista pertence, ponha em `profileAchievements` sem `experienceId`: o usuário escolhe na revisão.
 - Se o texto descreve a experiência com dados novos (cargo, datas, contrato, salário), proponha a experiência em `experiences` normalmente, com as conquistas dentro dela.
 - Lista vazia: tudo vai em `experiences`, como num currículo.
 - Skills: nome normalizado (ex.: "ReactJS" → "React"), categoria entre language, framework, infra, data, tool, management, soft, domain, other.
-- Idiomas: nível A1–C2 ou native; se o texto disser "fluente" use C1, "avançado" C1, "intermediário" B1, "básico" A2, com confidence menor.
+- `tech` de cada experiência: só tecnologias que o trecho dessa experiência cita; uma skill listada à parte não vai para o `tech` de nenhuma experiência.
+- Idiomas: só os que o texto declara; nunca deduza um idioma (nem o nível nativo) pela língua em que o texto está escrito. Nível A1–C2 ou native; se o texto disser "fluente" use C1, "avançado" C1, "intermediário" B1, "básico" A2, com confidence menor.
 - Não inclua CPF, RG, endereço completo nem dados bancários.
 
 Contrato, carga horária, salário e benefícios de cada experiência (todos opcionais; só o que o texto disser):
