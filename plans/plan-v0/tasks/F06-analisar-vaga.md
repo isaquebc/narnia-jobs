@@ -2,7 +2,7 @@
 
 Entregável 6 do plan-v0. Cobre a feature **#2** de `../02-fluxos-do-usuario.md §F5`: a pessoa cola a descrição de uma vaga (ou a URL) e recebe uma análise honesta de aderência ao perfil ativo, com lacunas sem evidência, riscos, palavras-chave ausentes e perguntas prováveis, pronta para virar candidatura, CV direcionado (F05) ou simulação de entrevista (F08).
 
-Status: **em escopo** (2026-10-07). Nada implementado.
+Status: **em escopo, replanejada pelo dono em 2026-10-14** (a F06 vem antes da F05). Decisões F06-1 a F06-15 fechadas (§5); requisitos novos em §1.1 a §1.4. Nada implementado.
 
 ---
 
@@ -34,6 +34,57 @@ Com F01 e F04 prontos, a pessoa consegue:
 - Busca ativa de vagas em job boards, scraping em massa, login em sites → fora do projeto (risco legal e de bloqueio).
 - Pesquisa salarial na internet pelo recrutador → já coberta em F04 (WebSearch); F06 apenas usa o que o perfil tem.
 - Comparação entre várias vagas (ranking) → fase posterior, fora do plan-v0.
+
+### 1.1 · Requisitos do dono (2026-10-14)
+
+**Mudança de planos: recrutador global.** O agente recrutador deixa de ser de um perfil específico e passa a ser **global**. Ele pode chamar um **recrutador especializado** (subagente, com o contexto de um perfil ou área), que faz análises dirigidas: aderência a uma vaga, recomendação de estudos, o que melhorar no currículo.
+
+**Sessão da análise.** Quando o usuário pede a análise de uma vaga, o chat abre uma **sessão nova** com o título `<empresa contratante>/<empresa cliente, se houver> - <role da vaga>` (ex.: `Accenture/Itaú - Backend Engineer`; sem cliente, `Nubank - Backend Engineer`).
+
+**Dados extraídos de cada vaga (além dos já descritos):**
+
+| Campo | Observação |
+|-------|------------|
+| Empresa contratante | quem contrata |
+| Empresa cliente | onde a pessoa vai trabalhar (consultoria, terceirização); opcional |
+| Cargo e senioridade | ex.: "Desenvolvedor Sênior" |
+| Role | a função da vaga (ex.: Backend, Engineering Manager) |
+| Local | cidade e estado |
+| Tipo de contratação | CLT, PJ, cooperado, estágio, temporário… |
+| Moeda | da faixa salarial citada |
+| Benefícios | lista |
+| Responsabilidades | lista |
+| Skills obrigatórias | lista |
+| Skills diferenciais | lista |
+| Resumo da empresa contratante | texto curto |
+| Link da vaga | URL |
+| Link do site da empresa | URL |
+| Job description | texto integral, editável pelo usuário |
+| Data de publicação | data |
+| Contatos | lista: nome, origem (LinkedIn, WhatsApp, e-mail), e-mail (opcional), telefone (opcional); todas as pessoas com quem o usuário falou |
+
+### 1.2 · Comportamento
+
+- **Candidaturas anteriores:** a análise procura se o usuário já se candidatou à mesma empresa e lista essas candidaturas. Se já se candidatou à **mesma role na mesma empresa**, mostra um **alerta de bloqueio**.
+- **Dados aos poucos:** nem tudo chega junto. Tudo o que chegar é salvo no banco, e os campos obrigatórios são mínimos; a vaga é completada ao longo das conversas.
+- **Keywords: heurística + modelo.** A heurística sem tokens extrai palavras-chave e é comparada com a extração do modelo; **outro agente faz o merge**. A UI mostra a origem de cada dado (heurística, modelo ou os dois) e destaca quando a heurística foi confirmada pelo modelo.
+- **Análise com o usuário inteiro:** considera **todas** as skills e habilidades do usuário, não um recorte. Pode buscar as palavras-chave da JD dentro dos dados do usuário para economizar tokens e tempo.
+- **Salvar a JD** ao fim da análise (sempre; ver F06-7).
+- **Botão na mensagem do agente:** "Criar CV para esta vaga" (em breve, desabilitado até a F05).
+- **Prompts no Phoenix:** todo prompt da F06 é versionado no Phoenix e vive lá, com avaliações e **bloqueadores de regressão**. Toda criação ou alteração de prompt passa por avaliação no Phoenix, de forma persistente: o usuário vê o rastreio com entradas, saídas e o valor que a requisição custaria pela API.
+
+### 1.3 · Acesso
+
+- Item **Vagas** no menu esquerdo → página com todas as vagas analisadas em cards: empresa contratante, cliente (se houver), cargo e senioridade, role e data de criação no sistema.
+- Clique no card → **página da vaga**, com toda a extração; todos os campos preenchidos e **editáveis**, com tratamento prévio quando necessário (normalização de datas, moeda, links).
+- A **job description** também é editável pelo usuário e salva.
+- **Notas da vaga:** usuário e recrutador adicionam e editam notas. Quando o recrutador altera uma nota escrita por um humano, a alteração só vale depois de **confirmada na bandeja**.
+
+### 1.4 · Efeito nas regras anteriores
+
+- "Candidatura automática" (antigo F06-7) sai: salvar a vaga **não** é candidatar-se. Candidatar-se é aplicar na vaga, provavelmente depois de ter um CV (F05/F07).
+- A regra "`job_posting` é imutável" (§3) cai: a vaga é editável e cresce aos poucos. A análise continua com histórico (reanálise cria novo registro).
+- O "perfil mais indicado" (2026-10-11) passa a ser feito pelo recrutador global, que compara os perfis e chama o especializado.
 
 ---
 
@@ -139,19 +190,25 @@ Referência: `../05-layouts.md` L6. Componentes a construir:
 
 ---
 
-## 5 · Decisões em aberto deste entregável
+## 5 · Decisões
 
-| # | Decisão | Opções | Padrão proposto |
-|---|---------|--------|-----------------|
-| F06-1 | Heurística local de keywords | dicionário curado + n-gramas · só modelo · biblioteca NLP (`compromise`) | **dicionário + n-gramas** (0 tokens, previsível, testável) |
-| F06-2 | Cache de análise | por hash + perfil + `facts_version` · por hash só · sem cache | **hash + perfil + facts_version** |
-| F06-3 | Fetch de URL | `undici` + Readability, respeitando robots · Chromium headless (já na imagem por F05) · só colar | **undici + Readability**; Chromium como opção futura para páginas JS |
-| F06-4 | Limite de texto ao modelo | resumo por seções até 6k chars · texto completo · chunks | **resumo por seções** |
-| F06-5 | Modelo | Sonnet · Haiku | **Sonnet** (julgamento de fit); Haiku para a extração de metadados do posting |
-| F06-6 | Fit % | número do modelo com justificativa · fórmula local (keywords) · média dos dois | **modelo, exibindo ao lado o % heurístico** para transparência |
-| F06-7 | Candidatura automática | sempre criar · perguntar · nunca | **perguntar** (padrão "nova") |
-
----
+| # | Decisão | Fechada pelo dono (2026-10-14) |
+|---|---------|--------------------------------|
+| F06-1 | Heurística local de keywords | **dicionário curado + n-gramas** (0 tokens), revisada e comparada com a extração do modelo |
+| F06-2 | Identidade e cache da análise | **hash por empresa + cargo + cliente (se houver) + role** (a data de publicação saiu do hash por ajuste do dono, ver F06-9) |
+| F06-3 | Fetch de URL | **undici + Readability**, respeitando robots; Chromium como opção futura |
+| F06-4 | O que vai ao modelo | **resumo por experiência**; skills e habilidades vão **completas** |
+| F06-5 | Modelo | **Sonnet (análise) + Haiku (extração) por padrão**, configurável em Configurações; aceita outro modelo configurado antes (ex.: Fable, ou um modelo da OpenAI) |
+| F06-6 | Fit e keywords | **modelo + heurística**, mostrando de onde vem cada dado e destacando quando a heurística foi confirmada pelo modelo |
+| F06-7 | Salvar × candidatar | **sempre salvar a vaga**; salvar não é candidatar-se (candidatura é na F07, depois do CV) |
+| F06-8 | Alcance do recrutador global | **o chat inteiro é global**: um recrutador geral conhece todos os perfis; o recrutador especializado é um **subagente** do geral, chamado com um perfil. As sessões deixam de pertencer a um perfil (mexe na persona, nas sessões e no menu da F04, e nos prompts no Phoenix) |
+| F06-9 | Vaga duplicada com dados incompletos | **a data de publicação não é obrigatória e não entra no hash**. Hash coincidente aciona um **fallback com modelo barato (Haiku)**, que compara a JD salva com a nova e devolve um **% de certeza de duplicata**, baseado no hash e em campos como JD, role, empresa, cliente e senioridade. A UI abre um **modal com o diff das duas vagas**, e o usuário escolhe **atualizar a vaga salva**, **seguir como vaga nova** ou **cancelar** |
+| F06-10 | Validade da análise | **sem reanálise automática**. Cada análise guarda a `facts_version`; se os fatos do usuário ou a vaga (JD, campos) mudarem depois, a página da vaga e o recrutador avisam "seus dados mudaram desde a análise de <data>" e oferecem **reanalisar**; a reanálise cria uma análise nova e mantém o histórico. Abrir uma vaga analisada nunca gasta tokens |
+| F06-11 | Alerta de candidatura repetida | **"em breve" na F06**: o espaço do alerta aparece na análise e na página da vaga como "em breve"; a F07 implementa com as candidaturas reais |
+| F06-12 | Cargo, role e senioridade | **cargo** = título publicado; **role** = função normalizada (lista curada); **senioridade/nível** = campo próprio |
+| F06-13 | Modelos configuráveis | **só modelos do Claude** por enquanto (configuração por tarefa em Configurações); outros provedores com a F11 |
+| F06-14 | Avaliação de prompt no Phoenix | **gate de qualidade com o Claude real** a cada prompt novo ou alterado, rodando na assinatura (custo de construção aceito pelo dono); o mock segue como smoke no dia a dia |
+| F06-15 | Teto de conversas vivas | a sessão da análise **conta no teto**; **sessões hibernadas não contam** |
 
 ## 6 · O que precisa estar coberto para o F06 funcionar
 
@@ -228,4 +285,8 @@ Compose com `NARNIA_PROVIDER=mock` (o mock devolve um `JobAnalysis` fixo coerent
 |------|-------|-----------------|
 | 2026-10-11 | — | **Plano incrementado (dono):** comparação com todos os perfis e recomendação do mais indicado; vaga salva como entrada da F05/F07; teste e2e correspondente. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** o agente analisa uma vaga, mostra a compatibilidade com a carreira do usuário e **indica qual perfil é o mais indicado** para ela (comparando todos os perfis, não só o ativo); disponível pela tela e pelo chat (F04). |
+| 2026-10-14 | — | **Replanejamento (dono):** F06 antes da F05; recrutador global com recrutador especializado; sessão nova com título empresa/cliente - role; campos novos (§1.1), contatos, notas com confirmação na bandeja, página Vagas, JD editável, alerta de candidatura repetida, prompts versionados e avaliados no Phoenix; F06-1 a F06-7 fechadas. Pontos F06-8 a F06-15 abertos. |
+| 2026-10-14 | — | **F06-8 fechada (dono):** chat inteiro global; recrutador especializado como subagente do geral. |
+| 2026-10-14 | — | **F06-9 fechada (dono):** data de publicação opcional e fora do hash (ajusta F06-2); hash coincidente → Haiku compara as JDs e devolve % de duplicata → modal com diff (atualizar salva · seguir como nova · cancelar). |
+| 2026-10-14 | — | **F06-10 a F06-15 fechadas (dono):** sem reanálise automática; alerta de candidatura repetida "em breve"; cargo/role/senioridade separados; só modelos do Claude; avaliação real de prompt na assinatura como gate; hibernadas fora do teto. Todas as decisões da F06 fechadas. |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)
