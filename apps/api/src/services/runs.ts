@@ -10,6 +10,7 @@ import {
 } from "@narnia-jobs/core";
 import type { EventBus } from "../events";
 import type { QueueAdapter } from "../queue";
+import { runOrigin } from "./ingestions";
 
 /** Estado da execução e notificações por WS (F03 §2.8), espelhando o que o worker publica. */
 export function emitRun(bus: EventBus, repos: Repos, runId: string): void {
@@ -52,7 +53,7 @@ export function runProgress(repos: Repos, run: IngestionRunRecord) {
 /** Resumo da execução para listas (bandeja, pendências); nunca inclui credenciais. */
 export function runSummary(run: IngestionRunRecord, repos?: Repos) {
   return {
-    ...(repos ? { progress: runProgress(repos, run) } : {}),
+    ...(repos ? { progress: runProgress(repos, run), origin: runOrigin(repos, run) } : {}),
     id: run.id,
     source: run.source,
     mode: run.mode,

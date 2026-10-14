@@ -21,8 +21,13 @@ test("F01/E2E-07 rejeitar uma experiência e editar o título de outra: dashboar
   await startExtraction(page);
   await waitExtractionDone(page);
 
-  const acme = page.locator('[data-testid^="proposal-"]', { hasText: "Acme Ltda" });
-  const globex = page.locator('[data-testid^="proposal-"]', { hasText: "Globex S.A." });
+  // o card da experiência (as conquistas também citam a empresa no "Entra em", desde 2026-10-14)
+  const card = (company: string) =>
+    page
+      .locator('[data-testid^="proposal-"]', { hasText: company })
+      .filter({ hasNotText: "› conquistas" });
+  const acme = card("Acme Ltda");
+  const globex = card("Globex S.A.");
   await globex.getByRole("button", { name: "Rejeitar" }).click();
   await expect(globex.getByText("Rejeitar", { exact: true }).first()).toBeVisible();
 

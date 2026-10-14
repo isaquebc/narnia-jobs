@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApi } from "../../app/context";
+import { useApi, useTimezone } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { ingestionKey, useIngestion } from "../../hooks/useIngestion";
-import { type TKey, t } from "../../i18n";
-import { formatTokens } from "../../lib/format";
+import { t } from "../../i18n";
+import { formatDate, formatTokens } from "../../lib/format";
+import { originText } from "../ingestion/proposalReference";
 import { ReviewPanel } from "../ingestion/ReviewPanel";
 import { runHeadline } from "../ingestion/runHeadline";
 
@@ -18,6 +19,7 @@ import { runHeadline } from "../ingestion/runHeadline";
  */
 export function ChatIngestionCard({ runId }: { runId: string }) {
   const api = useApi();
+  const tz = useTimezone();
   const qc = useQueryClient();
   const query = useIngestion(runId, { poll: false });
   const confirm = useMutation({
@@ -51,10 +53,12 @@ export function ChatIngestionCard({ runId }: { runId: string }) {
           <p className="text-xs text-muted-fg">{t("app.loading")}</p>
         ) : (
           <>
+            <p className="text-xs text-muted-fg" data-testid="review-origin">
+              <span className="font-medium text-fg">{t("review3.origin.label")}:</span>{" "}
+              {originText(run.source, run.origin)}
+              {run.createdAt ? ` · ${formatDate(run.createdAt, tz)}` : ""}
+            </p>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-muted-fg">
-                {t(`ingestion.sources.${run.source ?? "cv"}` as TKey)}
-              </span>
               <Badge tone={run.status === "done" ? "ok" : progress?.stuck ? "warn" : "info"}>
                 {runHeadline(run.status, progress)}
               </Badge>

@@ -41,7 +41,7 @@ import { apiError, ingestErrorResponse } from "../errors";
 import type { EventBus } from "../events";
 import type { QueueAdapter } from "../queue";
 import { readMeta } from "../services/files";
-import { toIngestionResponse, toProposalDto } from "../services/ingestions";
+import { proposalReferences, toIngestionResponse, toProposalDto } from "../services/ingestions";
 import { emitRun, enqueueAll, runSummary } from "../services/runs";
 import { patchOnboarding } from "./onboarding";
 import { emitInvalidated } from "./profiles";
@@ -415,7 +415,11 @@ export function ingestionsRoutes(deps: IngestionStartDeps) {
     if (!run) return apiError(c, 404, "not_found", "Ingestão não encontrada");
     const segments = deps.repos.readings.segmentsByRun(run.id);
     return c.json({
-      proposals: deps.repos.proposals.listByRun(run.id).map((p) => toProposalDto(p, segments)),
+      proposals: (() => {
+        const records = deps.repos.proposals.listByRun(run.id);
+        const refs = proposalReferences(deps.repos, records);
+        return records.map((p) => toProposalDto(p, segments, refs));
+      })(),
     });
   });
 

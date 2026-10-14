@@ -32,7 +32,13 @@ export function StepReview({ state, go }: StepProps) {
     () =>
       proposals
         .filter((p) => p.proposal.kind !== "identity")
-        .map((p) => ({ id: p.id, proposal: p.proposal, decision: p.decision, origin: p.origin })),
+        .map((p) => ({
+          id: p.id,
+          proposal: p.proposal,
+          decision: p.decision,
+          origin: p.origin,
+          ...(p.reference ? { reference: p.reference } : {}),
+        })),
     [proposals],
   );
   const effective = useMemo(() => {

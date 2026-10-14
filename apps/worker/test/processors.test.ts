@@ -202,6 +202,72 @@ describe("M4/worker processadores da cadeia (F01 §2.5)", () => {
     expect(h.repos.ingestionRuns.get(run.id)?.status).toBe("review");
   });
 
+  it("conquista de experiência do perfil: o extrator recebe as experiências; id desconhecido vira 'sem experiência'", async () => {
+    const seen: Array<Parameters<Provider["extractFacts"]>[0]> = [];
+    const mock = new MockProvider();
+    const h2 = harness(
+      Object.assign(Object.create(mock), {
+        extractFacts: async (i: Parameters<Provider["extractFacts"]>[0]) => {
+          seen.push(i);
+          const r = await mock.extractFacts(i);
+          r.output.profileAchievements?.push({
+            confidence: 0.5,
+            experienceId: "fantasma",
+            text: "Ganhou um prêmio",
+          });
+          return r;
+        },
+      }) as Provider,
+    );
+    const acme = h2.repos.facts.experiences.insert({
+      company: "Acme Pagamentos",
+      title: "Tech Lead",
+      startDate: "2022-01",
+      isCurrent: true,
+      tech: [],
+      confidence: 1,
+      verified: true,
+    });
+    const text =
+      "Conquista: liderei 7 pessoas na Acme Pagamentos\nConquista: criei o guia de onboarding\n";
+    const rel = join("uploads", "conquistas.txt");
+    writeFileSync(join(h2.dataDir, rel), text);
+    const file = h2.repos.sourceFiles.insert({
+      originalName: null,
+      mime: "text/plain",
+      size: text.length,
+      sha256: "c".repeat(64),
+      path: rel,
+      kind: "text",
+    });
+    const run = newRun(h2, file.id);
+    await runAll(h2, run.id, planStages({ isPdf: false, options: run.options }));
+    expect(seen[0]?.experiences).toEqual([
+      {
+        id: acme.id,
+        company: "Acme Pagamentos",
+        title: "Tech Lead",
+        startDate: "2022-01",
+        isCurrent: true,
+      },
+    ]);
+    const achievements = h2.repos.proposals
+      .listByRun(run.id)
+      .filter((p) => p.kind === "achievement")
+      .map((p) => p.proposal.data);
+    expect(achievements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: "liderei 7 pessoas na Acme Pagamentos",
+          experienceId: acme.id,
+        }),
+        expect.not.objectContaining({ experienceId: expect.anything() }),
+      ]),
+    );
+    const ghost = achievements.find((a) => (a as { text: string }).text === "Ganhou um prêmio");
+    expect(ghost).toEqual({ text: "Ganhou um prêmio" });
+  });
+
   it("idempotência: reprocessar extract.read_doc e extract.facts não duplica leitura/propostas nem chama o modelo de novo", async () => {
     const file = addFile(h, "cv_text.pdf");
     const run = newRun(h, file.id);

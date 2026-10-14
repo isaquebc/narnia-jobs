@@ -148,6 +148,27 @@ export type IngestionCreateRequest = z.infer<typeof IngestionCreateRequestSchema
 // F03: estados do F01 + confirmação, decisão no freio, pausa e cancelamento.
 export const IngestionStatusSchema = RunStatusSchema;
 // F03 §2.9-6: reconciliação, evidência e selo anti-alucinação; opcionais para o F01 continuar válido.
+/** Experiência dona de uma conquista na revisão: uma do perfil ou uma proposta desta ingestão (2026-10-14). */
+export const ProposalExperienceRefSchema = z.object({
+  source: z.enum(["profile", "run"]),
+  /** "Cargo · Empresa · início–fim" */
+  label: z.string(),
+  experienceId: IdSchema.nullable().optional(),
+  /** Proposta de experiência desta ingestão que leva até ela (repetida ou nova). */
+  proposalId: IdSchema.nullable().optional(),
+  experienceIndex: z.number().int().nullable().optional(),
+});
+export type ProposalExperienceRef = z.infer<typeof ProposalExperienceRefSchema>;
+
+/** Onde o card entra no perfil (pedido do dono, 2026-10-14): o fato que já existe e, na conquista, a experiência. */
+export const ProposalReferenceSchema = z.object({
+  /** Rótulo do fato do perfil que a proposta repete ou atualiza (match existente ou conflito). */
+  existing: z.string().nullable(),
+  /** Só na conquista; null = sem experiência definida (o usuário escolhe na revisão). */
+  experience: ProposalExperienceRefSchema.nullable(),
+});
+export type ProposalReference = z.infer<typeof ProposalReferenceSchema>;
+
 export const ProposalWithIdSchema = z.object({
   id: IdSchema,
   proposal: FactProposalSchema,
@@ -160,6 +181,7 @@ export const ProposalWithIdSchema = z.object({
   checkStatus: CheckStatusSchema.optional(),
   checkReason: CheckReasonSchema.nullable().optional(),
   suggestedProfiles: z.array(IdSchema).optional(),
+  reference: ProposalReferenceSchema.optional(),
 });
 export const FriendlyErrorSchema = z.object({
   key: z.string().min(1),
@@ -193,6 +215,13 @@ export const RunProgressSchema = z.object({
   stuck: z.boolean(),
 });
 
+export const RunOriginSchema = z.object({
+  name: z.string().nullable(),
+  excerpt: z.string().nullable(),
+  chatTitle: z.string().nullable(),
+});
+export type RunOrigin = z.infer<typeof RunOriginSchema>;
+
 export const IngestionResponseSchema = z.object({
   id: IdSchema,
   /** Nulo para o GitHub, que não tem arquivo (F03 §2.9-2). */
@@ -212,6 +241,10 @@ export const IngestionResponseSchema = z.object({
   childRunIds: z.array(IdSchema).optional(),
   /** Etapas reais da execução (plano de comunicação C1). */
   timeline: TimelineSchema.optional(),
+  /** De onde veio (2026-10-14): nome do arquivo ou repositórios, começo do texto e a conversa que abriu. */
+  origin: RunOriginSchema.optional(),
+  /** Experiências do perfil, para escolher a dona de uma conquista na revisão. */
+  profileExperiences: z.array(z.object({ id: IdSchema, label: z.string() })).optional(),
 });
 export type IngestionResponse = z.infer<typeof IngestionResponseSchema>;
 

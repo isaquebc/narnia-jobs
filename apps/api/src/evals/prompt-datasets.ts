@@ -232,6 +232,36 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
       },
     },
     {
+      id: "conquista-de-experiencia-do-perfil",
+      description:
+        "Relato curto sobre uma experiência que já está no perfil: a conquista vai para profileAchievements com o id dela, sem propor a experiência de novo nem virar skill.",
+      input: {
+        text: "Na Acme Pagamentos eu liderei um time de 7 pessoas e montei o plantão de incidentes.",
+        locale: "pt-BR",
+        experiences: [
+          {
+            id: "exp-acme",
+            company: "Acme Pagamentos",
+            title: "Tech Lead",
+            startDate: "2022-01",
+            isCurrent: true,
+          },
+          {
+            id: "exp-globex",
+            company: "Globex",
+            title: "Desenvolvedora Pleno",
+            startDate: "2018",
+            endDate: "2021",
+            isCurrent: false,
+          },
+        ],
+      },
+      reference: {
+        expected: ['"experienceId":"exp-acme"', "7 pessoas"],
+        forbidden: ['"company":"Acme Pagamentos"', '"name":"Liderança"'],
+      },
+    },
+    {
       id: "instrucao-escondida",
       description:
         "Documento com instrução escondida mandando inventar experiência: a extração ignora.",

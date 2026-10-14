@@ -5,6 +5,7 @@ import {
   CONTRACT_TYPE_LABELS,
   type Compensation,
   type Conflict,
+  type FactProposal,
   formatCompensation,
   type Resolution,
   type ReviewRequest,
@@ -12,20 +13,22 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useApi } from "../../app/context";
+import { useApi, useTimezone } from "../../app/context";
 import { describeError } from "../../components/ErrorState";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
+import { Input, Select } from "../../components/ui/input";
 import { liveErrorOf } from "../../hooks/useChat";
 import { ingestionKey } from "../../hooks/useIngestion";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import type { IngestionDetail } from "../../lib/api";
+import { formatDate } from "../../lib/format";
 import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "../chat/SessionLimitDialog";
 import { proposalSummary } from "../onboarding/components/ProposalList";
 import { FriendlyError } from "./FriendlyError";
+import { originText, referenceText } from "./proposalReference";
 
 type Proposal = IngestionDetail["proposals"][number];
 type Choice = "keep" | "use_new" | "edit";
@@ -52,6 +55,26 @@ const CHECK_TONE: Record<CheckStatus, "ok" | "warn" | "danger" | "neutral"> = {
   unchecked: "neutral",
 };
 const MATCH_TONE = { new: "info", existing: "neutral", conflict: "warn" } as const;
+
+/** Experiência escolhida para uma conquista: p:ID para uma do perfil, r:ÍNDICE:PROPOSTA para uma nova desta ingestão. */
+type ExperienceOption = { value: string; name: string; label: string; proposalId: string | null };
+
+/** "Cargo · Empresa · início–fim", igual ao rótulo que a API dá às experiências do perfil. */
+function experienceName(p: FactProposal): string {
+  if (p.kind !== "experience") return "";
+  const d = p.data;
+  const end = d.isCurrent ? "atual" : (d.endDate ?? "");
+  return `${d.title} · ${d.company} · ${d.startDate}${end ? `–${end}` : ""}`;
+}
+
+function defaultExperience(p: Proposal): string {
+  const e = p.reference?.experience;
+  if (!e) return "";
+  if (e.source === "profile" && e.experienceId) return `p:${e.experienceId}`;
+  return e.experienceIndex !== null && e.experienceIndex !== undefined && e.proposalId
+    ? `r:${e.experienceIndex}:${e.proposalId}`
+    : "";
+}
 
 const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
 
@@ -175,6 +198,7 @@ export function ReviewPanel({
 }) {
   const panel = variant === "panel";
   const api = useApi();
+  const tz = useTimezone();
   const qc = useQueryClient();
   const { profiles } = useProfiles();
   const navigate = useNavigate();
@@ -195,6 +219,8 @@ export function ReviewPanel({
   const [filter, setFilter] = useState<Filter>("all");
   const [local, setLocal] = useState<Record<string, LocalDecision>>({});
   const [bulkProfiles, setBulkProfiles] = useState<string[]>([]);
+  // experiência escolhida na revisão para cada conquista (sobrepõe a que o extrator indicou)
+  const [expChoice, setExpChoice] = useState<Record<string, string>>({});
   const [rowProfiles, setRowProfiles] = useState<Record<string, string[]>>(() =>
     Object.fromEntries(proposals.map((p) => [p.id, p.suggestedProfiles ?? []])),
   );
@@ -223,6 +249,37 @@ export function ReviewPanel({
       return next;
     });
   const unresolved = proposals.some((p) => !resolved(p.conflict, local[p.id]));
+  const rejected = (p: Proposal | undefined) =>
+    !p || (local[p.id]?.decision ?? p.decision) === "rejected";
+  // experiências que podem receber a conquista: as do perfil e as novas desta ingestão que não foram rejeitadas
+  const experienceOptions: ExperienceOption[] = (() => {
+    const fromProfile = (run.profileExperiences ?? []).map((e) => ({
+      value: `p:${e.id}`,
+      name: e.label,
+      label: e.label,
+      proposalId: null,
+    }));
+    const fromRun = proposals
+      .filter((p) => p.proposal.kind === "experience")
+      .map((p, index) => ({ p, index }))
+      .filter(({ p }) => !p.reference?.existing && !rejected(p))
+      .map(({ p, index }) => ({
+        value: `r:${index}:${p.id}`,
+        name: experienceName(p.proposal),
+        label: t("review3.experiencePickRun", { label: experienceName(p.proposal) }),
+        proposalId: p.id,
+      }));
+    return [...fromRun, ...fromProfile];
+  })();
+  const chosenExperience = (p: Proposal) => expChoice[p.id] ?? defaultExperience(p);
+  // conquista aceita sem experiência (ou presa a uma experiência nova rejeitada) não pode ser salva
+  const experienceMissing = proposals.some((p) => {
+    if (p.proposal.kind !== "achievement" || local[p.id]?.decision !== "accepted") return false;
+    const v = chosenExperience(p);
+    if (!v) return true;
+    const pid = v.startsWith("r:") ? v.split(":")[2] : null;
+    return pid ? rejected(proposals.find((x) => x.id === pid)) : false;
+  });
   const decided = proposals.filter((p) => p.decision === "pending" && local[p.id]);
 
   const body = useMemo((): ReviewRequest => {
@@ -245,20 +302,30 @@ export function ReviewPanel({
             }),
           )
         : undefined;
+      // experiência trocada na revisão: vai como edição da conquista
+      const choice = expChoice[p.id];
+      const editedData =
+        p.proposal.kind === "achievement" && choice && choice !== defaultExperience(p)
+          ? choice.startsWith("p:")
+            ? { experienceId: choice.slice(2) }
+            : { experienceIndex: Number(choice.split(":")[1]) }
+          : undefined;
       return {
         proposalId: p.id,
-        decision: "accepted" as const,
+        decision: editedData ? ("edited" as const) : ("accepted" as const),
+        ...(editedData ? { editedData } : {}),
         ...(tags.length ? { profiles: tags } : {}),
         ...(resolution ? { resolution } : {}),
       };
     });
     return { decisions } as ReviewRequest;
-  }, [decided, local, rowProfiles, bulkProfiles]);
+  }, [decided, local, rowProfiles, bulkProfiles, expChoice]);
 
   const save = useMutation({
     mutationFn: () => api.reviewIngestion(run.id, body),
     onSuccess: () => {
       setLocal({});
+      setExpChoice({});
       void qc.invalidateQueries({ queryKey: ingestionKey(run.id) });
       void qc.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -279,6 +346,14 @@ export function ReviewPanel({
   return (
     <section aria-label={t("review3.title")} className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">{t("review3.title")}</h2>
+      {/* no painel do chat a origem já está no card da ingestão */}
+      {panel ? null : (
+        <p className="text-xs text-muted-fg" data-testid="review-origin">
+          <span className="font-medium text-fg">{t("review3.origin.label")}:</span>{" "}
+          {originText(run.source, run.origin)}
+          {run.createdAt ? ` · ${formatDate(run.createdAt, tz)}` : ""}
+        </p>
+      )}
       {panel ? null : (
         <fieldset className="flex flex-wrap gap-3">
           <legend className="sr-only">{t("review3.filterLegend")}</legend>
@@ -339,6 +414,22 @@ export function ReviewPanel({
           const current = d?.decision ?? (p.decision === "pending" ? "pending" : p.decision);
           const summary = proposalSummary(p.proposal);
           const check = p.checkStatus ?? "unchecked";
+          const isAchievement = p.proposal.kind === "achievement";
+          const choice = isAchievement ? chosenExperience(p) : "";
+          const chosen = experienceOptions.find((o) => o.value === choice);
+          // a escolha na revisão vale para o texto de "Entra em"
+          const reference =
+            isAchievement && expChoice[p.id] !== undefined
+              ? {
+                  existing: null,
+                  experience: chosen
+                    ? {
+                        source: chosen.proposalId ? ("run" as const) : ("profile" as const),
+                        label: chosen.name,
+                      }
+                    : null,
+                }
+              : p.reference;
           return (
             <li
               key={p.id}
@@ -350,6 +441,10 @@ export function ReviewPanel({
               >
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm">{summary}</span>
+                  <p className="text-xs" data-testid="entry-reference">
+                    <span className="font-medium">{t("review3.refLabel")}:</span>{" "}
+                    {referenceText(p.proposal, reference, p.match ?? "new")}
+                  </p>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Badge tone={MATCH_TONE[p.match ?? "new"]}>
                       {t(`review3.match.${p.match ?? "new"}` as TKey)}
@@ -394,6 +489,26 @@ export function ReviewPanel({
                   ) : null}
                 </div>
               </div>
+              {isAchievement && p.decision === "pending" ? (
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="font-medium" aria-hidden="true">
+                    {t("review3.experiencePick")}
+                  </span>
+                  <Select
+                    aria-label={t("review3.experiencePick")}
+                    value={choice}
+                    onChange={(e) => setExpChoice((cur) => ({ ...cur, [p.id]: e.target.value }))}
+                    className="h-8 text-xs"
+                  >
+                    <option value="">{t("review3.experiencePickNone")}</option>
+                    {experienceOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
               {p.conflict && d?.decision === "accepted" ? (
                 <ConflictResolver
                   conflict={p.conflict}
@@ -433,6 +548,7 @@ export function ReviewPanel({
       {panel ? (
         <>
           {unresolved ? <Alert tone="warn">{t("review3.unresolved")}</Alert> : null}
+          {experienceMissing ? <Alert tone="warn">{t("review3.experienceMissing")}</Alert> : null}
           {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}
           <div
             data-testid="review-save-slot"
@@ -441,7 +557,7 @@ export function ReviewPanel({
             {decided.length > 0 ? (
               <Button
                 className="w-full"
-                disabled={unresolved || save.isPending}
+                disabled={unresolved || experienceMissing || save.isPending}
                 onClick={() => save.mutate()}
               >
                 {t("review3.save")}
@@ -452,10 +568,11 @@ export function ReviewPanel({
       ) : (
         <>
           {unresolved ? <Alert tone="warn">{t("review3.unresolved")}</Alert> : null}
+          {experienceMissing ? <Alert tone="warn">{t("review3.experienceMissing")}</Alert> : null}
           {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}
           <div className="flex items-center gap-2">
             <Button
-              disabled={decided.length === 0 || unresolved || save.isPending}
+              disabled={decided.length === 0 || unresolved || experienceMissing || save.isPending}
               onClick={() => save.mutate()}
             >
               {t("review3.save")}

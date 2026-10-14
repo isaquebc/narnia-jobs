@@ -81,6 +81,7 @@ export {
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
+  type ProfileExperienceRef,
   type Provider,
   ProviderError,
   type ProviderErrorCode,

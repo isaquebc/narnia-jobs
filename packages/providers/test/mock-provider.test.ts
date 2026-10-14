@@ -70,6 +70,31 @@ describe("M4/providers MockProvider: modos controláveis e fixtures", () => {
     expect(digest.sdk.usage?.input_tokens).toBe(digest.usage.inputTokens);
   });
 
+  it("extractFacts: linha 'Conquista:' vira conquista da experiência do perfil cuja empresa aparece; sem empresa, sem id", async () => {
+    const out = await new MockProvider().extractFacts({
+      text: "Conquista: liderei 7 pessoas na Acme Pagamentos\nConquista: criei o guia de onboarding",
+      locale: "pt-BR",
+      model: "haiku",
+      experiences: [
+        {
+          id: "e1",
+          company: "Acme Pagamentos",
+          title: "Tech Lead",
+          startDate: "2022",
+          isCurrent: true,
+        },
+      ],
+    });
+    expect(out.output.profileAchievements).toEqual([
+      expect.objectContaining({
+        text: "liderei 7 pessoas na Acme Pagamentos",
+        experienceId: "e1",
+        metric: "7 pessoas",
+      }),
+      expect.not.objectContaining({ experienceId: expect.anything() }),
+    ]);
+  });
+
   it("modo slow atrasa a resposta pelo tempo configurado", async () => {
     const p = new MockProvider({ delayMs: 60 });
     const t0 = Date.now();

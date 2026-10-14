@@ -44,7 +44,12 @@ export const ExperienceDataSchema = z.object({
 
 export const AchievementDataSchema = z.object({
   /** Índice da experiência (na mesma extração) a que a conquista pertence. */
-  experienceIndex: z.number().int().min(0),
+  experienceIndex: z.number().int().min(0).optional(),
+  /**
+   * Experiência que já está no perfil (2026-10-14): o extrator recebe a lista e liga a conquista sem propor a
+   * experiência de novo. Vence `experienceIndex`. Sem nenhum dos dois, o usuário escolhe na revisão.
+   */
+  experienceId: z.string().min(1).optional(),
   text: z.string().min(1),
   metric: z.string().optional(),
 });

@@ -99,4 +99,34 @@ describe("M2/shared · schemas de saída da extração", () => {
     );
     expect(proposals.map((p) => p.kind)).toEqual(["education", "skill", "language", "link"]);
   });
+
+  it("conquista de experiência do perfil vira achievement com experienceId; sem id, fica sem experiência", () => {
+    const proposals = extractFactsOutputToProposals(
+      ExtractFactsOutputSchema.parse({
+        ...factsOutput,
+        profileAchievements: [
+          {
+            confidence: 0.8,
+            experienceId: "exp-acme",
+            text: "Liderou 7 pessoas",
+            metric: "7 pessoas",
+          },
+          { confidence: 0.6, text: "Criou o guia de onboarding" },
+        ],
+      }),
+    );
+    const achievements = proposals.filter((p) => p.kind === "achievement");
+    expect(achievements.map((p) => p.data)).toEqual([
+      { text: "Reduziu latência p95 em 40%", metric: "40%", experienceIndex: 0 },
+      { experienceId: "exp-acme", text: "Liderou 7 pessoas", metric: "7 pessoas" },
+      { text: "Criou o guia de onboarding" },
+    ]);
+  });
+
+  it("saída sem profileAchievements (prompts antigos) continua válida", () => {
+    const out = ExtractFactsOutputSchema.parse(factsOutput);
+    expect(extractFactsOutputToProposals(out).filter((p) => p.kind === "achievement")).toHaveLength(
+      1,
+    );
+  });
 });

@@ -29,6 +29,11 @@ export const ReadDocumentOutputSchema = z.object({
 export type ReadDocumentOutput = z.infer<typeof ReadDocumentOutputSchema>;
 
 const AchievementOutputSchema = withConfidence(
+  AchievementDataSchema.omit({ experienceIndex: true, experienceId: true }).shape,
+);
+
+/** Conquista de uma experiência que já está no perfil; sem `experienceId` quando o texto não diz qual. */
+const ProfileAchievementOutputSchema = withConfidence(
   AchievementDataSchema.omit({ experienceIndex: true }).shape,
 );
 
@@ -40,6 +45,8 @@ export const ExtractFactsOutputSchema = z.object({
       achievements: z.array(AchievementOutputSchema).default([]),
     }),
   ),
+  /** Conquistas de experiências do perfil (`<experiencias_no_perfil>`), sem repetir a experiência. */
+  profileAchievements: z.array(ProfileAchievementOutputSchema).optional(),
   education: z.array(withConfidence(EducationDataSchema.shape)),
   skills: z.array(withConfidence(SkillDataSchema.shape)),
   languages: z.array(withConfidence(LanguageDataSchema.shape)),
@@ -57,7 +64,7 @@ export type BuildDigestOutput = z.infer<typeof BuildDigestOutputSchema>;
 
 /**
  * Achata a saída do modelo em propostas + evidência paralela (F03-12), na ordem identity → experience(+achievements)
- * → education → skill → language → link. A evidência sai do `data` da proposta.
+ * → conquistas de experiências do perfil → education → skill → language → link. A evidência sai do `data` da proposta.
  */
 export function extractFactsOutputWithEvidence(output: ExtractFactsOutput): {
   proposals: FactProposal[];
@@ -84,6 +91,10 @@ export function extractFactsOutputWithEvidence(output: ExtractFactsOutput): {
       );
     }
   });
+  for (const ach of output.profileAchievements ?? []) {
+    const { confidence, evidence: e, ...data } = ach;
+    push({ kind: "achievement", confidence, data }, e);
+  }
   for (const edu of output.education) {
     const { confidence, evidence: e, ...data } = edu;
     push({ kind: "education", confidence, data }, e);

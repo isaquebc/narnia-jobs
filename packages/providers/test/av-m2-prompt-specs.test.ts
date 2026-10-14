@@ -97,7 +97,7 @@ describe("registro dos prompts estruturados", () => {
       r("readDocument", rd),
     ]);
     expect(c.prompts[0]).toBe(
-      "Idioma do documento: pt-BR.\n\n<documento>\nAna {{não é variável}}\n</documento>",
+      "Idioma do documento: pt-BR.\n\n<experiencias_no_perfil>\n[]\n</experiencias_no_perfil>\n\n<documento>\nAna {{não é variável}}\n</documento>",
     );
     expect(c.prompts[4]).toContain('Leia o arquivo "cv.pdf"');
   });

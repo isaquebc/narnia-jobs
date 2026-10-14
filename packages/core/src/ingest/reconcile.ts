@@ -226,14 +226,17 @@ export function reconcileProposals(
         r = result(index, target.id, fields);
       }
     } else if (p.kind === "achievement") {
-      const parent = byIndex.get(
-        items.find((x) => x.proposal.kind === "experience" && x.index === p.data.experienceIndex)
-          ?.index ?? -1,
-      );
-      if (parent?.targetId) {
+      // experiência do perfil (experienceId) ou a da mesma extração que bateu com uma do perfil
+      const parentId =
+        p.data.experienceId ??
+        byIndex.get(
+          items.filter((x) => x.proposal.kind === "experience")[p.data.experienceIndex ?? -1]
+            ?.index ?? -1,
+        )?.targetId;
+      if (parentId) {
         const text = normalizeText(p.data.text);
         const same = facts.achievements.find(
-          (a) => a.experienceId === parent.targetId && normalizeText(a.text) === text,
+          (a) => a.experienceId === parentId && normalizeText(a.text) === text,
         );
         if (same) r = result(index, same.id, []);
       }

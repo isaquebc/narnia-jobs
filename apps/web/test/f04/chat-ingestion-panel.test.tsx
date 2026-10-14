@@ -155,3 +155,161 @@ describe("ingestão da conversa no painel da direita", () => {
     expect(screen.queryByRole("region", { name: "Ingestão da conversa" })).toBeNull();
   });
 });
+
+/**
+ * Onde cada card entra (pedido do dono, 2026-10-14): informação pessoal, experiência (do perfil ou nova desta
+ * ingestão), skill…; a conquista sem experiência pede a escolha antes de salvar; a ingestão diz de onde veio.
+ */
+describe("revisão: onde cada card entra e de onde veio a ingestão", () => {
+  const ach = (text: string, data: Record<string, unknown> = {}) => ({
+    kind: "achievement",
+    confidence: 0.8,
+    data: { text, ...data },
+  });
+  const run = {
+    status: "review",
+    createdAt: "2026-10-14T13:20:00.000Z",
+    origin: {
+      name: null,
+      excerpt: "Na Acme eu liderei 7 pessoas…",
+      chatTitle: "Liderança na Acme",
+    },
+    profileExperiences: [
+      { id: "e1", label: "Tech Lead · Acme · 2022-01–atual" },
+      { id: "e2", label: "Dev · Beta · 2019–2021" },
+    ],
+    proposals: [
+      proposal("p1", {
+        proposal: { kind: "identity", confidence: 0.9, data: { city: "Campinas" } },
+        reference: { existing: null, experience: null },
+      }),
+      proposal("p2", {
+        proposal: {
+          kind: "experience",
+          confidence: 0.9,
+          data: {
+            company: "Zeta",
+            title: "SRE",
+            startDate: "2018",
+            endDate: "2019",
+            isCurrent: false,
+            tech: [],
+          },
+        },
+        reference: { existing: null, experience: null },
+      }),
+      proposal("p3", {
+        proposal: ach("Liderou 7 pessoas", { experienceId: "e1" }),
+        reference: {
+          existing: null,
+          experience: {
+            source: "profile",
+            label: "Tech Lead · Acme · 2022-01–atual",
+            experienceId: "e1",
+          },
+        },
+      }),
+      proposal("p4", {
+        proposal: ach("Automatizou o plantão", { experienceIndex: 0 }),
+        reference: {
+          existing: null,
+          experience: {
+            source: "run",
+            label: "SRE · Zeta · 2018–2019",
+            proposalId: "p2",
+            experienceIndex: 0,
+          },
+        },
+      }),
+      proposal("p5", {
+        proposal: ach("Criou o guia de onboarding"),
+        reference: { existing: null, experience: null },
+      }),
+      proposal("p6", {
+        proposal: skill("Go"),
+        match: "existing",
+        matchTargetId: "s1",
+        reference: { existing: "Go", experience: null },
+      }),
+    ],
+  };
+
+  it("cada card diz onde entra; a origem diz o texto e a conversa", async () => {
+    renderApp({ api: chatApi(run) as never, initialUrl: "/chat/s1" });
+    const panel = await screen.findByRole("region", { name: "Ingestão da conversa" });
+    const list = await within(panel).findByRole("list", { name: "Propostas para revisar" });
+    expect(within(panel).getByTestId("review-origin")).toHaveTextContent(
+      "Origem: Texto: “Na Acme eu liderei 7 pessoas…” · conversa “Liderança na Acme”",
+    );
+    const ref = (name: string) =>
+      within(within(list).getByRole("listitem", { name })).getByTestId("entry-reference");
+    expect(ref("Campinas")).toHaveTextContent(
+      "Entra em: Informações pessoais › nome, contato e localização",
+    );
+    expect(ref("SRE · Zeta · 2018–2019")).toHaveTextContent(
+      "Entra em: Experiências › nova experiência",
+    );
+    expect(ref("Liderou 7 pessoas")).toHaveTextContent(
+      "Entra em: Experiências › Tech Lead · Acme · 2022-01–atual › conquistas",
+    );
+    expect(ref("Automatizou o plantão")).toHaveTextContent(
+      "Entra em: Experiências › SRE · Zeta · 2018–2019 (nova, desta ingestão) › conquistas",
+    );
+    expect(ref("Criou o guia de onboarding")).toHaveTextContent(
+      "Entra em: Conquistas › sem experiência definida: escolha abaixo",
+    );
+    expect(ref("Go")).toHaveTextContent("Entra em: Skills › linguagens › Go (já está no perfil)");
+  });
+
+  it("conquista aceita sem experiência (ou presa a uma experiência rejeitada) bloqueia o salvar até escolher", async () => {
+    const api = chatApi(run);
+    renderApp({ api: api as never, initialUrl: "/chat/s1" });
+    const panel = await screen.findByRole("region", { name: "Ingestão da conversa" });
+    const list = await within(panel).findByRole("list", { name: "Propostas para revisar" });
+    const item = (name: string) => within(list).getByRole("listitem", { name });
+    const slot = within(panel).getByTestId("review-save-slot");
+
+    await userEvent.click(
+      within(item("Criou o guia de onboarding")).getByRole("button", { name: "Aceitar" }),
+    );
+    expect(
+      within(panel).getByText("Escolha a experiência de cada conquista aceita antes de salvar."),
+    ).toBeInTheDocument();
+    expect(within(slot).getByRole("button", { name: "Salvar revisão" })).toBeDisabled();
+    await userEvent.selectOptions(
+      within(item("Criou o guia de onboarding")).getByRole("combobox", {
+        name: "Experiência da conquista",
+      }),
+      "Dev · Beta · 2019–2021",
+    );
+    expect(within(slot).getByRole("button", { name: "Salvar revisão" })).toBeEnabled();
+    expect(
+      within(item("Criou o guia de onboarding")).getByTestId("entry-reference"),
+    ).toHaveTextContent("Experiências › Dev · Beta · 2019–2021 › conquistas");
+
+    // a experiência nova é rejeitada: a conquista dela precisa de outra
+    await userEvent.click(
+      within(item("SRE · Zeta · 2018–2019")).getByRole("button", { name: "Rejeitar" }),
+    );
+    await userEvent.click(
+      within(item("Automatizou o plantão")).getByRole("button", { name: "Aceitar" }),
+    );
+    expect(within(slot).getByRole("button", { name: "Salvar revisão" })).toBeDisabled();
+    await userEvent.selectOptions(
+      within(item("Automatizou o plantão")).getByRole("combobox", {
+        name: "Experiência da conquista",
+      }),
+      "Tech Lead · Acme · 2022-01–atual",
+    );
+    await userEvent.click(within(slot).getByRole("button", { name: "Salvar revisão" }));
+    await waitFor(() =>
+      expect(api.reviewIngestion).toHaveBeenCalledWith("r1", {
+        decisions: [
+          { proposalId: "p2", decision: "rejected" },
+          { proposalId: "p4", decision: "edited", editedData: { experienceId: "e1" } },
+          { proposalId: "p5", decision: "edited", editedData: { experienceId: "e2" } },
+        ],
+      }),
+    );
+  });
+});

@@ -31,7 +31,10 @@ interface FactRecordMeta {
 }
 
 export type ExperienceData = z.infer<typeof ExperienceDataSchema>;
-export type AchievementInput = Omit<z.infer<typeof AchievementDataSchema>, "experienceIndex"> & {
+export type AchievementInput = Omit<
+  z.infer<typeof AchievementDataSchema>,
+  "experienceIndex" | "experienceId"
+> & {
   experienceId: string;
 };
 export type EducationData = z.infer<typeof EducationDataSchema>;

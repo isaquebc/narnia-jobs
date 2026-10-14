@@ -6,6 +6,7 @@ import { NavLink } from "../../components/shell/NavLink";
 import { Badge } from "../../components/ui/badge";
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
+import { originText } from "./proposalReference";
 import { runHeadline } from "./runHeadline";
 
 /** Estados em que a execução ainda está andando ou espera o usuário (lista de pendências, F03-3 §6). */
@@ -62,6 +63,9 @@ export function PendingRuns() {
               <span className="text-sm font-medium">
                 {t(`ingestion.sources.${r.source}` as TKey)}
               </span>
+              {r.origin && (r.origin.excerpt || r.origin.name || r.origin.chatTitle) ? (
+                <span className="text-xs text-muted-fg">{originText(r.source, r.origin)}</span>
+              ) : null}
               <span className="text-xs text-muted-fg">{formatDate(r.createdAt, tz)}</span>
             </div>
             <div className="flex items-center gap-2">

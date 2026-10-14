@@ -113,6 +113,29 @@ export function quoteFrom(source: string, needle: string): string | null {
   return null;
 }
 
+/**
+ * Linhas "Conquista: …" viram conquista de uma experiência do perfil (2026-10-14): a experiência cuja empresa aparece
+ * na linha; sem empresa reconhecida, fica sem experiência (o usuário escolhe na revisão). Métrica = primeiro número.
+ */
+export function mockProfileAchievements(
+  input: ExtractFactsInput,
+): NonNullable<ExtractFactsOutput["profileAchievements"]> {
+  return [...input.text.matchAll(/^\s*Conquista:\s*(.+?)\s*$/gim)].map((m) => {
+    const text = m[1] ?? "";
+    const exp = (input.experiences ?? []).find((e) =>
+      text.toLowerCase().includes(e.company.toLowerCase()),
+    );
+    const metric = text.match(/\d+(?:[.,]\d+)?\s*\p{L}*/u)?.[0];
+    return {
+      confidence: 0.8,
+      text,
+      ...(exp ? { experienceId: exp.id } : {}),
+      ...(metric ? { metric } : {}),
+      evidence: { ref: "text", quote: (m[0] ?? text).trim().slice(0, 600) },
+    };
+  });
+}
+
 function evidenceFor(source: string, ref: string, needle: string): Evidence {
   return { ref, quote: (quoteFrom(source, needle) ?? needle).slice(0, 600) };
 }
@@ -259,6 +282,7 @@ export class MockProvider implements Provider {
     if (this.mode.unsupportedEvidence && out.experiences[0]) {
       out.experiences[0].evidence = { ref: "cv", quote: MOCK_FAKE_QUOTE };
     }
+    out.profileAchievements = mockProfileAchievements(input);
     return this.result(out, input.text, input.model);
   }
 

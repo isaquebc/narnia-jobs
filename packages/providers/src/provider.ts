@@ -70,10 +70,21 @@ export interface ReadDocumentInput {
   locale: string;
   model: string;
 }
+/** Experiência que já está no perfil, para o extrator ligar conquistas a ela (2026-10-14). */
+export interface ProfileExperienceRef {
+  id: string;
+  company: string;
+  title: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent: boolean;
+}
 export interface ExtractFactsInput {
   text: string;
   locale: string;
   model: string;
+  /** Experiências do perfil; ausente ou vazia = só o documento (CV no onboarding). */
+  experiences?: ProfileExperienceRef[];
 }
 export interface BuildDigestInput {
   text: string;

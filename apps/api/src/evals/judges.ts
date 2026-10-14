@@ -20,7 +20,7 @@ const OUTPUT = "output.messages[0].content";
 
 const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
   readDocument: { referencia: "reference", resposta: OUTPUT },
-  extractFacts: { fonte: "input.text", resposta: OUTPUT },
+  extractFacts: { fonte: "input.text", perfil: "input.experiences_json", resposta: OUTPUT },
   buildDigest: { fonte: "input.text", resposta: OUTPUT },
   analyzeProfiles: { historico: "input.history_json", resposta: OUTPUT },
   pickFiles: {

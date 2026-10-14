@@ -8,11 +8,25 @@ export const facts: Processor = async (env, ctx, deps) => {
   if (existing.length > 0) return { skipped: true, summary: { proposals: existing.length } };
   await ctx.progress(10);
   const model = env.run.models.facts;
+  // experiências do perfil: a conquista de uma delas fica ligada a ela, sem a ingestão propor a experiência de novo
+  const experiences = deps.repos.facts.experiences.list().map((e) => ({
+    id: e.id,
+    company: e.company,
+    title: e.title,
+    startDate: e.startDate,
+    ...(e.endDate ? { endDate: e.endDate } : {}),
+    isCurrent: e.isCurrent,
+  }));
   const result = await deps.provider.extractFacts({
     text: consolidatedText(deps, env.run.id),
     locale: runLocale(deps.repos, env.run.id),
     model,
+    experiences,
   });
+  // id que não é de uma experiência do perfil (inventado pelo modelo): a conquista fica sem experiência e a revisão pede
+  const known = new Set(experiences.map((e) => e.id));
+  for (const a of result.output.profileAchievements ?? [])
+    if (a.experienceId && !known.has(a.experienceId)) delete a.experienceId;
   // F03-12: cada proposta guarda o trecho literal que a sustenta (camada 1 da revisão anti-alucinação)
   const { proposals, evidence } = extractFactsOutputWithEvidence(result.output);
   deps.repos.proposals.insertMany(env.run.id, proposals, evidence);

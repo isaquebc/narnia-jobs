@@ -104,6 +104,7 @@ export const MOCK_EXTRACT_FACTS: ExtractFactsOutput = {
       ],
     },
   ],
+  profileAchievements: [],
   education: [
     {
       confidence: 0.93,

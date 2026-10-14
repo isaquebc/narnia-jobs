@@ -7,6 +7,7 @@ import {
   type FactKind,
   type FactProposal,
   formatCompensation,
+  type ProposalReference,
 } from "@narnia-jobs/shared";
 import { useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/badge";
@@ -15,6 +16,7 @@ import { Dialog } from "../../../components/ui/dialog";
 import { Field } from "../../../components/ui/field";
 import { Input, Select } from "../../../components/ui/input";
 import { type TKey, t } from "../../../i18n";
+import { referenceText } from "../../ingestion/proposalReference";
 import { type Origin, ReadingOriginBadge } from "./ReadingOriginBadge";
 
 export type DecisionValue = "accepted" | "edited" | "rejected";
@@ -28,6 +30,8 @@ export interface ProposalItem {
   decision: "pending" | DecisionValue;
   origin: Origin | null;
   divergent?: boolean;
+  /** Onde o item entra no perfil (2026-10-14). */
+  reference?: ProposalReference;
 }
 
 const KIND_ORDER: FactKind[] = [
@@ -98,12 +102,15 @@ export function proposalSummary(p: FactProposal): string {
 
 /** Campos da experiência com controle próprio na edição (contrato, carga, salário, benefícios). */
 const EXPERIENCE_OWN_FIELDS = new Set(["employmentType", "weeklyHours"]);
+/** Ligação da conquista com a experiência: não é texto para editar. */
+const LINK_FIELDS = new Set(["experienceIndex", "experienceId"]);
 
 function editableFields(kind: FactKind, data: Record<string, unknown>): string[] {
   return Object.entries(data)
     .filter(
       ([k, v]) =>
         (typeof v === "string" || typeof v === "number") &&
+        !LINK_FIELDS.has(k) &&
         !(kind === "experience" && EXPERIENCE_OWN_FIELDS.has(k)),
     )
     .map(([k]) => k);
@@ -289,6 +296,12 @@ export function ProposalRow({
               : item.proposal,
           )}
         </span>
+        {item.reference ? (
+          <span className="text-xs" data-testid="entry-reference">
+            <span className="font-medium">{t("review3.refLabel")}:</span>{" "}
+            {referenceText(item.proposal, item.reference)}
+          </span>
+        ) : null}
         <div className="flex items-center gap-2 text-xs text-muted-fg">
           <span>{t("review.confidence", { pct: Math.round(item.proposal.confidence * 100) })}</span>
           <ReadingOriginBadge origin={item.origin} divergent={item.divergent} />

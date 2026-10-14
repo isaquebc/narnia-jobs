@@ -38,7 +38,7 @@ describe("catálogo de prompts", () => {
     ]);
     expect(ef?.jsonSchema).toEqual(STRUCTURED_PROMPTS.extractFacts.jsonSchema);
     expect(ef?.modelName).toBe(MODEL_IDS.haiku);
-    expect(ef?.variables).toEqual(["locale", "text"]);
+    expect(ef?.variables).toEqual(["locale", "experiences_json", "text"]);
   });
 
   it("persona sem frontmatter, com as variáveis do cartão e da persona; skill como system + mensagem", () => {

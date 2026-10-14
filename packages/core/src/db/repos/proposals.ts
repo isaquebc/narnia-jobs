@@ -276,7 +276,10 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
         for (const p of all) {
           if (p.kind === "experience") {
             expOrdinal.set(p.id, ordinal);
-            if (p.targetId) experienceIds.set(ordinal, p.targetId);
+            // a experiência repetida (já no perfil) vale para as conquistas dela mesmo se for rejeitada
+            const known =
+              p.targetId ?? (p.match !== "new" && p.matchTargetId ? p.matchTargetId : null);
+            if (known) experienceIds.set(ordinal, known);
             ordinal++;
           }
         }
@@ -320,10 +323,18 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
             else result.accepted++;
             return;
           }
-          const data =
+          const data: Record<string, unknown> =
             d.decision === "edit"
               ? { ...(p.proposal.data as object), ...d.editedData }
-              : p.proposal.data;
+              : (p.proposal.data as Record<string, unknown>);
+          // escolher na revisão a experiência nova desta ingestão troca a do perfil que o extrator sugeriu
+          if (
+            p.kind === "achievement" &&
+            d.editedData &&
+            "experienceIndex" in d.editedData &&
+            !("experienceId" in d.editedData)
+          )
+            delete data.experienceId;
           const valid = FactProposalSchema.parse({
             kind: p.kind,
             confidence: p.proposal.confidence,
@@ -349,13 +360,18 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
               break;
             }
             case "achievement": {
-              const expId = experienceIds.get(valid.data.experienceIndex);
+              const { experienceId, experienceIndex } = valid.data;
+              const expId = experienceId
+                ? deps.facts.experiences.get(experienceId)?.id
+                : experienceIndex !== undefined
+                  ? experienceIds.get(experienceIndex)
+                  : undefined;
               if (!expId) {
                 decide.run("skipped", null, null, now, p.id);
                 result.skipped++;
                 return;
               }
-              const { experienceIndex: _i, ...rest } = valid.data;
+              const { experienceIndex: _i, experienceId: _e, ...rest } = valid.data;
               targetId = deps.facts.achievements.insert({
                 ...rest,
                 experienceId: expId,

@@ -491,6 +491,10 @@ exports[`F03/M1 shared · tools MCP file.* e ingest.* (definição; exposição 
                       "data": {
                         "additionalProperties": false,
                         "properties": {
+                          "experienceId": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
                           "experienceIndex": {
                             "maximum": 9007199254740991,
                             "minimum": 0,
@@ -505,7 +509,6 @@ exports[`F03/M1 shared · tools MCP file.* e ingest.* (definição; exposição 
                           },
                         },
                         "required": [
-                          "experienceIndex",
                           "text",
                         ],
                         "type": "object",

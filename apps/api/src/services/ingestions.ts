@@ -7,7 +7,12 @@ import {
   type SegmentRecord,
   STAGES,
 } from "@narnia-jobs/core";
-import type { FactProposal } from "@narnia-jobs/shared";
+import type {
+  FactProposal,
+  ProposalExperienceRef,
+  ProposalReference,
+  RunOrigin,
+} from "@narnia-jobs/shared";
 import { runTimeline } from "./runs";
 
 type Origin = "text_layer" | "ocr" | "model_read" | "consolidated";
@@ -50,8 +55,127 @@ export function inferOrigin(p: FactProposal, segments: SegmentRecord[]): Origin 
   return "consolidated";
 }
 
+/** "Cargo · Empresa · início–fim" de uma experiência (do perfil ou proposta). */
+export function experienceLabel(e: {
+  title: string;
+  company: string;
+  startDate: string;
+  endDate?: string | null | undefined;
+  isCurrent: boolean;
+}): string {
+  const end = e.isCurrent ? "atual" : (e.endDate ?? "");
+  return `${e.title} · ${e.company} · ${e.startDate}${end ? `–${end}` : ""}`;
+}
+
+/** Rótulo do fato do perfil com que a proposta bateu (match existente ou conflito). */
+function factLabel(repos: Repos, kind: string, id: string): string | null {
+  const f = repos.facts;
+  switch (kind) {
+    case "experience": {
+      const e = f.experiences.get(id);
+      return e ? experienceLabel(e) : null;
+    }
+    case "achievement":
+      return f.achievements.get(id)?.text ?? null;
+    case "education": {
+      const e = f.education.get(id);
+      return e ? `${e.course} · ${e.institution}` : null;
+    }
+    case "skill":
+      return f.skills.get(id)?.name ?? null;
+    case "language": {
+      const l = f.languages.get(id);
+      return l ? `${l.name} · ${l.level}` : null;
+    }
+    case "project":
+      return f.projects.get(id)?.name ?? null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Onde cada card entra (pedido do dono, 2026-10-14): o fato do perfil que ele repete e, na conquista, a experiência
+ * dona — uma do perfil (pelo id, ou pela experiência repetida desta ingestão) ou uma nova proposta nesta ingestão.
+ */
+export function proposalReferences(
+  repos: Repos,
+  proposals: ProposalRecord[],
+): Map<string, ProposalReference> {
+  const experiences = proposals.filter((p) => p.kind === "experience");
+  const fromProfile = (
+    id: string,
+    proposalId: string | null = null,
+  ): ProposalExperienceRef | null => {
+    const e = repos.facts.experiences.get(id);
+    return e
+      ? { source: "profile", label: experienceLabel(e), experienceId: e.id, proposalId }
+      : null;
+  };
+  const out = new Map<string, ProposalReference>();
+  for (const p of proposals) {
+    const existing =
+      p.match !== "new" && p.matchTargetId ? factLabel(repos, p.kind, p.matchTargetId) : null;
+    let experience: ProposalExperienceRef | null = null;
+    if (p.proposal.kind === "achievement") {
+      const data: Record<string, unknown> = { ...p.proposal.data, ...(p.editedData ?? {}) };
+      if (p.editedData && "experienceIndex" in p.editedData && !("experienceId" in p.editedData))
+        delete data.experienceId;
+      const index = typeof data.experienceIndex === "number" ? data.experienceIndex : null;
+      if (typeof data.experienceId === "string") experience = fromProfile(data.experienceId);
+      else if (index !== null) {
+        const e = experiences[index];
+        const known =
+          e?.targetId ?? (e && e.match !== "new" && e.matchTargetId ? e.matchTargetId : null);
+        if (e && known) experience = fromProfile(known, e.id);
+        else if (e?.proposal.kind === "experience")
+          experience = {
+            source: "run",
+            label: experienceLabel(e.proposal.data),
+            proposalId: e.id,
+            experienceIndex: index,
+          };
+      }
+    }
+    out.set(p.id, { existing, experience });
+  }
+  return out;
+}
+
+const EXCERPT = 120;
+
+/** De onde veio a execução (pedido do dono, 2026-10-14): várias ingestões na revisão ficam distinguíveis. */
+export function runOrigin(repos: Repos, run: IngestionRunRecord): RunOrigin {
+  const file = run.fileId ? repos.sourceFiles.get(run.fileId) : null;
+  const repoNames = run.params.repos ?? [];
+  const name = file?.originalName ?? (repoNames.length > 0 ? repoNames.join(", ") : null);
+  let excerpt: string | null = null;
+  if (run.source === "text") {
+    const text = repos.readings
+      .segmentsByRun(run.id)
+      .map((s) => s.text)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text) excerpt = text.length > EXCERPT ? `${text.slice(0, EXCERPT).trimEnd()}…` : text;
+  }
+  const chatTitle = run.chatSessionId
+    ? (repos.chatSessions.get(run.chatSessionId)?.title ?? null)
+    : null;
+  return { name, excerpt, chatTitle };
+}
+
+/** Experiências do perfil para escolher a dona de uma conquista. */
+export function profileExperiences(repos: Repos) {
+  return repos.facts.experiences.list().map((e) => ({ id: e.id, label: experienceLabel(e) }));
+}
+
 /** Proposta para a revisão (F03 §2.9-6): reconciliação, evidência literal, selo e perfis sugeridos. */
-export function toProposalDto(p: ProposalRecord, segments: SegmentRecord[]) {
+export function toProposalDto(
+  p: ProposalRecord,
+  segments: SegmentRecord[],
+  refs?: Map<string, ProposalReference>,
+) {
   return {
     id: p.id,
     proposal: p.proposal,
@@ -66,6 +190,7 @@ export function toProposalDto(p: ProposalRecord, segments: SegmentRecord[]) {
     checkStatus: p.checkStatus,
     checkReason: p.checkReason,
     suggestedProfiles: p.suggestedProfiles,
+    ...(refs?.get(p.id) ? { reference: refs.get(p.id) } : {}),
   };
 }
 
@@ -77,7 +202,9 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
       (STAGES[a.type as keyof typeof STAGES]?.order ?? 99) -
       (STAGES[b.type as keyof typeof STAGES]?.order ?? 99),
   );
-  const proposals = repos.proposals.listByRun(run.id).map((p) => toProposalDto(p, segments));
+  const records = repos.proposals.listByRun(run.id);
+  const refs = proposalReferences(repos, records);
+  const proposals = records.map((p) => toProposalDto(p, segments, refs));
   const digest = run.fileId ? repos.digests.get(run.fileId) : null;
   return {
     id: run.id,
@@ -120,6 +247,8 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
     error: run.error,
     errorFriendly: run.error ? friendlyError(run.error) : null,
     timeline: runTimeline(repos, run),
+    origin: runOrigin(repos, run),
+    profileExperiences: profileExperiences(repos),
     failedTaskType: (run.params.failedTask as { type?: string } | undefined)?.type ?? null,
     createdAt: run.createdAt,
     startedAt: run.startedAt,

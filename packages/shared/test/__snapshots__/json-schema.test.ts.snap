@@ -522,6 +522,56 @@ exports[`M2/shared · JSON Schema para outputFormat do SDK > é estável (snapsh
         },
         "type": "array",
       },
+      "profileAchievements": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "description": "Trecho copiado literalmente da fonte",
+                  "maxLength": 600,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "ref": {
+                  "description": "Onde está o trecho: caminho do arquivo, 'README.md', 'cv'…",
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "ref",
+                "quote",
+              ],
+              "type": "object",
+            },
+            "experienceId": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "metric": {
+              "type": "string",
+            },
+            "text": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "confidence",
+            "text",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
       "skills": {
         "items": {
           "additionalProperties": false,

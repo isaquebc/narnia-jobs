@@ -72,7 +72,8 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     description:
       "Fatos candidatos de um documento (identidade, experiências, formação, skills, idiomas, links).",
     file: FILE("extract-facts"),
-    userTemplate: "Idioma do documento: {{locale}}.\n\n<documento>\n{{text}}\n</documento>",
+    userTemplate:
+      "Idioma do documento: {{locale}}.\n\n<experiencias_no_perfil>\n{{experiences_json}}\n</experiencias_no_perfil>\n\n<documento>\n{{text}}\n</documento>",
     defaultModel: "haiku",
     jsonSchema: EXTRACTION_JSON_SCHEMAS.extractFacts,
     tools: [],
@@ -152,7 +153,11 @@ const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
 /** Variáveis do template a partir da entrada de cada operação (o mesmo cálculo para o app e para os datasets). */
 export const structuredPromptVars = {
   readDocument: (i: ReadDocumentInput) => ({ file_name: basename(i.filePath), locale: i.locale }),
-  extractFacts: (i: ExtractFactsInput) => ({ locale: i.locale, text: i.text }),
+  extractFacts: (i: ExtractFactsInput) => ({
+    locale: i.locale,
+    text: i.text,
+    experiences_json: JSON.stringify(i.experiences ?? []),
+  }),
   buildDigest: (i: BuildDigestInput) => ({
     locale: i.locale,
     text: i.text,

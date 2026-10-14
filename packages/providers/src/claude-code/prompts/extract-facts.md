@@ -5,6 +5,13 @@ Regras de honestidade:
 - Datas em YYYY, YYYY-MM ou YYYY-MM-DD; se o texto só dá o ano, use o ano.
 - `confidence` entre 0 e 1 reflete a sua certeza de que o fato está correto e completo; use valores baixos para inferências (ex.: nível de idioma não declarado).
 - Conquistas ficam dentro da experiência correspondente; inclua a métrica quando houver número.
+- Uma conquista nunca vira skill: "liderou 7 pessoas" é conquista (métrica "7 pessoas"), não a skill "Liderança".
+
+Experiências que já estão no perfil (`<experiencias_no_perfil>`, cada uma com `id`, empresa, cargo e período):
+- Quando o texto traz uma conquista de uma delas sem descrever a experiência de novo (ex.: "na Acme liderei 7 pessoas", ou um relato sobre o emprego atual quando só uma experiência é atual), ponha a conquista em `profileAchievements` com o `experienceId` dessa experiência. Não proponha a experiência só para pendurar a conquista e não invente datas para ela.
+- Se não der para saber a qual experiência a conquista pertence, ponha em `profileAchievements` sem `experienceId`: o usuário escolhe na revisão.
+- Se o texto descreve a experiência com dados novos (cargo, datas, contrato, salário), proponha a experiência em `experiences` normalmente, com as conquistas dentro dela.
+- Lista vazia: tudo vai em `experiences`, como num currículo.
 - Skills: nome normalizado (ex.: "ReactJS" → "React"), categoria entre language, framework, infra, data, tool, management, soft, domain, other.
 - Idiomas: nível A1–C2 ou native; se o texto disser "fluente" use C1, "avançado" C1, "intermediário" B1, "básico" A2, com confidence menor.
 - Não inclua CPF, RG, endereço completo nem dados bancários.
