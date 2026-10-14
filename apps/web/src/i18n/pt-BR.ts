@@ -659,6 +659,21 @@ export const ptBR = {
     autoStarting: "Abaixo do limite de confirmação: a extração começa sozinha.",
   },
   runPage: {
+    // o que entrou na execução e o resultado salvo (pedido do dono, 2026-10-14)
+    content: {
+      active: "O que está sendo ingerido",
+      done: "O que foi ingerido",
+      showText: "Ver texto lido",
+      hideText: "Ocultar texto lido",
+      noText: "Texto ainda não lido.",
+    },
+    result: {
+      title: "Resultado da revisão",
+      accepted: "Aceito",
+      edited: "Editado",
+      rejected: "Rejeitado",
+      pending: "Pendente",
+    },
     redo: {
       ingest_github_prepare: "Refazer a preparação",
       ingest_github_repo: "Refazer a análise do repositório",

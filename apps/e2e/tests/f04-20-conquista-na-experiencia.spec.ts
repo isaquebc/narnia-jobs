@@ -85,4 +85,18 @@ test("F04/E2E-20 conquista dita na conversa: liga à experiência do perfil, cad
   expect(achievement("criei")?.reference?.experience?.label).toBe(
     "Engenheira de Software Pleno · Beta Logística · 2020-06–2023-01",
   );
+
+  // a página da ingestão terminada mostra o que entrou e o que foi salvo, com onde cada item entrou
+  await page.goto(`/ingestao/${run.id}`);
+  const content = page.getByRole("region", { name: "O que foi ingerido" });
+  await expect(content.getByTestId("ingested-text")).toContainText(
+    "Conquista: liderei 7 pessoas na Acme Pagamentos",
+  );
+  await expect(content).toContainText("conversa “Conquistas”");
+  const result = page.getByRole("region", { name: "Resultado da revisão" });
+  const saved = result.getByRole("listitem", { name: /^liderei 7 pessoas na Acme Pagamentos/ });
+  await expect(saved.getByText("Aceito")).toBeVisible();
+  await expect(saved.getByTestId("entry-reference")).toHaveText(
+    "Entra em: Experiências › Engenheira de Software Sênior · Acme Pagamentos · 2023-02–atual › conquistas",
+  );
 });

@@ -17,6 +17,7 @@ import { FriendlyError } from "./FriendlyError";
 import { shortTokens } from "./format";
 import { STATUS_TONE } from "./PendingRuns";
 import { ReviewPanel } from "./ReviewPanel";
+import { RunContent, RunResult } from "./RunContent";
 import { RunReportView } from "./RunReportView";
 import { RunTimeline } from "./RunTimeline";
 import { runHeadline } from "./runHeadline";
@@ -169,6 +170,8 @@ export function RunPage({ runId }: { runId: string }) {
         </Card>
       ) : null}
 
+      {run.source !== "github" ? <RunContent run={run} /> : null}
+
       {run.status === "awaiting_confirmation" ? (
         <Card className="flex flex-col gap-3">
           {run.budget ? (
@@ -274,6 +277,7 @@ export function RunPage({ runId }: { runId: string }) {
       ) : null}
 
       {run.status === "review" ? <ReviewPanel run={run} /> : null}
+      {run.status === "done" ? <RunResult run={run} /> : null}
 
       {run.report && (run.status === "done" || run.status === "review") ? (
         <RunReportView report={run.report} />
