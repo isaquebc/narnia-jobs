@@ -2,11 +2,13 @@
 
 Entregável 6 do plan-v0. Cobre a feature **#2** de `../02-fluxos-do-usuario.md §F5`: a pessoa cola a descrição de uma vaga (ou a URL) e recebe uma análise honesta de aderência ao perfil ativo, com lacunas sem evidência, riscos, palavras-chave ausentes e perguntas prováveis, pronta para virar candidatura, CV direcionado (F05) ou simulação de entrevista (F08).
 
-Status: **em escopo, replanejada pelo dono em 2026-10-14** (a F06 vem antes da F05). Decisões F06-1 a F06-15 fechadas (§5); requisitos novos em §1.1 a §1.4. Nada implementado.
+Status: **em escopo, replanejada pelo dono em 2026-10-14** (a F06 vem antes da F05). Decisões F06-1 a F06-15 fechadas (§5); F06-16 e F06-17 abertos pela revisão do código (§5.1); requisitos novos em §1.1 a §1.4; marcos em §6.0. Nada implementado.
 
 ---
 
 ## 1 · Objetivo e resultado esperado
+
+> O texto original desta seção (até "Fora do escopo") é de 2026-10-07. Onde ele fala em candidatura criada pela análise, cache por perfil ou tools `job_posting.*`, valem §1.1 a §1.4, §2 e §5 (replanejamento e revisão de 2026-10-14).
 
 Com F01 e F04 prontos, a pessoa consegue:
 
@@ -90,103 +92,149 @@ Com F01 e F04 prontos, a pessoa consegue:
 
 ## 2 · Arquitetura deste entregável
 
+> Reescrita em 2026-10-14 depois da revisão contra o código (§2.0). Onde o texto antigo divergia do código ou das decisões F06-1 a F06-15, vale este.
+
+### 2.0 · Revisão contra o código (2026-10-14)
+
+| Premissa do plano antigo | O que o código mostra | Consequência |
+|---|---|---|
+| Dicionário de tecnologias "já usado para normalizar skills em F01/F03" | não existe; `normalizeSkillName` só faz trim, minúsculas e espaços (`packages/core/src/db/repos/facts.ts:88`); o mais próximo é `targetTerms` da relevância da F02 (`packages/core/src/profile/relevance.ts:95`) | dicionário com aliases e n-gramas é trabalho novo (M3) |
+| `settings.facts_version` a criar | já existe, com ponto único de incremento `settingsRepo.bumpFactsVersion` (`packages/core/src/db/repos/settings.ts:30`), chamado em toda escrita de fato | só `job_analysis.facts_version` é novo |
+| `fact_ids[]` como evidência | não há tabela genérica de fato; o id só é único junto com o tipo (`experience`, `skill`, `project`, `education`, `language`, `achievement`), como em `profile_fact_relevance` | evidência vira `{kind, id}[]` |
+| Tools `skill.list`, `experience.list/get` | os nomes reais são `evidence.skill.list`, `evidence.experience.list/get` (`packages/core/src/chat/tools.ts:81`); `fact.search` e `profile.get_card` existem | §2.4 usa os nomes reais |
+| "Preferências obrigatórias" do perfil (F01) | não há esse conceito; as preferências estão em `user` (`remote_pref`, `relocation_json`, `work_auth_json`) e em `profile` (salário, `contract_types_json`, `locations_json`, `seniority`) | conflitos viram **riscos** calculados dessas colunas, sem bloqueio |
+| `@mozilla/readability`, `linkedom`, `undici` disponíveis | nenhum está em `package.json`; o `fetch` do Node 22 já é undici | adicionar `@mozilla/readability` e `linkedom` ao `api`; usar o `fetch` nativo |
+| Módulo `packages/core/jobs/` | `packages/core/src/jobs/tasks.ts` já é a fila (BullMQ) e a tabela `job` é o espelho da fila | o domínio da vaga vai para `packages/core/src/postings/`; tools `posting.*` (não `job_posting.*`, para não confundir com `job.status`/`job.list`) |
+| Job com "etapas persistidas" genéricas | não há mecanismo genérico; tarefas encadeadas com `enqueueTask` e progresso por `ctx.progress` até a bandeja (`ActivityTray`) | a análise é uma tarefa nova na fila `extract`, com `progress` por etapa e rótulos em `STAGE_ORDER` |
+| Sessões por perfil | `chat_session.profile_id` é `NOT NULL` com `on delete cascade` (`0006_chat_discovery.sql`); repo, rotas, `useChatSessions`, `ChatNav`, `ChatPage`, painel de contexto, tools MCP, `TurnTrace` e o hook do modo B dependem dele | M1 reconstrói a tabela (`profile_id` opcional, `on delete set null`) e troca todos esses pontos |
+| Subagente | não há opção `agents` no `query` do modo A (`packages/providers/src/claude-code/claude-code-provider.ts:292`); a tool Agent está bloqueada por `tools`/`allowedTools`/`canUseTool`; `plugin/agents/recrutador.md` é só template do system prompt | subagente novo em `plugin/agents/` (o modo B lê nativo) e, no modo A, a opção `agents` montada do mesmo arquivo, com a tool Agent liberada só para ele |
+| Teto conta só sessões vivas (F06-15) | já implementado (`ensureCapacity`, `apps/api/src/chat/session-manager.ts:227`) | nada a fazer |
+| Título da sessão | sessão criada com `title` explícito não passa pelo nome do Haiku (`session-manager.ts:426`) | a sessão da análise já nasce com `empresa/cliente - role` |
+| Botão na mensagem | `ChatMessage` não tem campo de ação; a única ação é `runId` em `toolCalls`; a regra 7 da persona proíbe "marcadores nem botões" | o botão é **derivado da tool** `analysis.save` na mensagem (como `RunLinks`), sem o modelo escrever botão; regra 7 intacta |
+| Confirmação na bandeja | a bandeja só mostra jobs e ingestões paradas; aprovação de mudança proposta hoje é Pendências (notificações) ou a revisão da ingestão | mecanismo novo; ver F06-17 |
+| Prompts "vivem no Phoenix" | AV-4 (F04-avaliações): o repositório é a fonte e o app nunca lê prompt do Phoenix; a sincronização versiona por hash | ver F06-16 |
+| Bloqueador de regressão | `evals --strict` só falha abaixo de 100 %; não compara com a rodada anterior; a CI não roda evals | mecanismo novo de linha de base (M1) |
+| Custo "como se fosse API" | já vai ao span como `narnia.cost_usd` (o `total_cost_usd` do SDK); o mock reporta 0 | conferir se o Phoenix mostra o custo nativo; senão, mapear para os atributos de custo do OpenInference |
+| Modelo por tarefa | `resolveModel(settings, key)` existe (`packages/core/src/models.ts`), mas não há tela; só o modelo do chat, com lista fixa | seção "Modelos" em Configurações e lista de modelos compartilhada |
+| Diff entre vagas | não há componente de diff; o `Dialog` tem 560 px | variante larga do `Dialog` e componente de diff novos |
+| Candidatura mínima (`application.create_minimal`) | não existe tabela `application` | sai da F06 (F06-7, F06-11); a F07 cria |
+
 ### 2.1 Pipeline
 ```
-texto colado ─────────────────────────────┐
-URL ─► fetch (api, sem JS) ─► extração ───┴─► job_posting (texto normalizado, hash, metadados)
-        └─ falhou? ─► UI pede para colar
-job_posting + perfil ─► heurística local (0 tokens): keywords, tech, senioridade pedida, localidade/contrato, salário citado
-                     ─► pré-análise (atende/ausente por skill, conflitos com preferências obrigatórias)
-                     ─► skill analisar-vaga (modelo, Sonnet): fit, lacunas com justificativa, riscos, perguntas prováveis
-                     ─► analysis.save(JobAnalysis) ─► ligada à candidatura
+chat ("analisa esta vaga") ou página Vagas
+  └─► recrutador geral ─► sessão nova (categoria `job`, título empresa/cliente - role)
+texto colado ──────────────────────────────┐
+URL ─► fetch (api, sem JS, anti-SSRF, robots) ─► Readability ─┴─► posting (rascunho)
+posting ─► heurística local (0 tokens): keywords + aliases, n-gramas, senioridade, seções, contrato, moeda, benefícios
+        ─► extração (Haiku): campos de §1.1
+        ─► merge (agente; Haiku por padrão): heurística × modelo, com a origem de cada campo
+        ─► hash de identidade (F06-2) ─► coincidiu? ─► comparação (Haiku) ─► % de duplicata ─► modal de diff (F06-9)
+        ─► vaga salva (sempre, F06-7)
+vaga + todos os perfis ─► busca local das keywords nos fatos do usuário (FTS `fact_fts`, 0 tokens)
+                      ─► recrutador especializado (subagente, Sonnet), um perfil por vez: fit, atende {kind,id}, lacunas, riscos, perguntas
+                      ─► recrutador geral: perfil recomendado ─► analysis.save ─► mensagem com "Criar CV para esta vaga (em breve)"
 ```
-- A heurística reduz o que vai ao modelo: o agente recebe a vaga **resumida** (seções relevantes, até ~6k chars), a lista de keywords e a pré-análise, mais o cartão do perfil; detalha experiências sob demanda via tools.
-- Honestidade: "lacuna" só pode ser afirmada quando `fact.search` não encontra evidência; "atende" exige `fact_ids`. O schema obriga.
+- **O que vai ao modelo (F06-4):** todas as skills e habilidades do usuário (completas), o resumo de cada experiência, a vaga por seções e a pré-análise local (keywords que já casaram com fatos). Os detalhes de uma experiência vêm sob demanda pelas tools `evidence.*`.
+- **Honestidade:** "atende" exige `evidence: {kind, id}[]` existentes; "lacuna" exige `evidence_checked: true` depois de `fact.search` sem resultado. O schema e `analysis.save` validam.
 
 ### 2.2 Captura de URL (no `api`)
 | Regra | Valor |
 |-------|-------|
-| Métodos | `GET` único, sem seguir mais de 3 redirects, só `http(s)`; bloqueia IPs privados/loopback (anti-SSRF) |
-| User-agent | `narnia-jobs/<versão> (+repo URL)`; respeita `robots.txt` para o path (se `Disallow`, não busca e pede para colar) |
+| Métodos | `fetch` nativo (undici), `GET` único, até 3 redirects verificados um a um, só `http(s)`; bloqueia IPs privados, loopback e link-local após a resolução de DNS (anti-SSRF) |
+| User-agent | `narnia-jobs/<versão> (+repo URL)`; respeita `robots.txt` (se `Disallow`, não busca e pede para colar) |
 | Limites | 2 MB de HTML, timeout 15 s, 1 tentativa |
-| Extração | `@mozilla/readability` + `linkedom` → texto principal; título da página; metadados `og:` quando houver (empresa, cargo) |
-| Resultado | nunca executa JS; páginas renderizadas só por JS resultam em "não consegui extrair, cole o texto" |
-| Privacidade | a URL e o HTML bruto ficam em `/data/snapshots/jobs/<hash>.html` para auditoria; não são enviados ao modelo |
+| Extração | `@mozilla/readability` + `linkedom` (dependências novas do `api`) → texto principal, título, `og:` |
+| Resultado | nunca executa JS; página só-JS → "não consegui extrair, cole o texto" |
+| Privacidade | HTML bruto em `/data/snapshots/postings/<id>.html`; não vai ao modelo |
 
-### 2.3 Heurística local (`packages/core/jobs/`)
-- Dicionário de tecnologias/competências (o mesmo usado para normalizar skills em F01/F03) + extração de n-gramas frequentes da vaga.
-- Senioridade pedida: regex multilíngue (júnior/pleno/sênior/staff/lead/manager, "5+ years").
-- Requisitos obrigatórios vs desejáveis: separação por cabeçalhos comuns ("Requisitos", "Diferenciais", "Nice to have").
-- Conflitos com preferências obrigatórias do perfil (F01): presencial × remoto, cidade/país, tipo de contrato, faixa salarial citada × pretendida.
-- Saída: `PreAnalysis` (keywords com `matched_skill_id?`, seniority, conflicts[], sections), também exibida na UI enquanto o modelo roda.
+### 2.3 Heurística local (`packages/core/src/postings/`)
+- **Dicionário novo** (`postings/dictionary/`): termos canônicos com aliases (pt-BR e en-US: "ReactJS" → "React", "Node" → "Node.js"), categoria (linguagem, framework, nuvem, prática, idioma, soft skill) e arquivo versionado fácil de ampliar; mais n-gramas da vaga com lista de ruído ("equipe dinâmica").
+- O casamento com o usuário usa o dicionário sobre `skill.name_normalized`, `experience.tech_json` e projetos, e o FTS (`fact_fts`) para o resto. A normalização de `normalizeSkillName` não muda.
+- Senioridade, seções (obrigatórias × diferenciais), tipo de contratação, moeda, benefícios e local por regex e cabeçalhos.
+- **Role normalizada (F06-12):** lista curada de funções (Backend, Frontend, Full Stack, Mobile, Dados, DevOps/SRE, QA, Segurança, Produto, Design, Engineering Manager, Tech Lead…), a mesma usada pela extração do modelo.
+- Riscos a partir das preferências reais (`user.remote_pref`, `relocation_json`, `profile.contract_types_json`, `locations_json`, faixa salarial): presencial × remoto, cidade, contrato, salário citado × pretendido.
+- Saída: `PreAnalysis` com cada keyword marcada `heuristic`; o merge acrescenta `model` ou `both` (F06-6).
 
-### 2.4 Skill `analisar-vaga` e tools MCP
+### 2.4 Tools MCP e agentes
 | Tool | Função |
 |------|--------|
-| `job_posting.create({text|url, application_id?})` | normaliza, hasheia, extrai, roda heurística; devolve `posting_id`, `pre_analysis`, `cache_hit?` |
-| `job_posting.get(id)` | texto resumido + pré-análise |
-| `profile.get_card`, `skill.list`, `experience.list/get`, `fact.search` (F04) | evidências |
-| `analysis.save(posting_id, JobAnalysis)` | valida schema (fact_ids obrigatórios em "atende"), grava, liga à candidatura |
-| `analysis.get(id)`, `analysis.list(profile)` | reabrir |
-| `application.create_minimal({company, title, posting_id})` (F07; stub em F06) | cria a candidatura mínima quando o usuário escolhe "nova" |
+| `posting.create({text?, url?, fields?})` | cria a vaga (rascunho), roda a heurística, devolve `posting_id`, `pre_analysis` e `duplicate_candidates[]` |
+| `posting.update({id, fields})` | completa campos aos poucos (§1.2); o usuário e o recrutador usam |
+| `posting.get(id)` · `posting.list()` · `posting.search({company?, role?})` | reabrir; achar a vaga ao falar dela no chat |
+| `posting.contact_add/update` | contatos (nome, origem, e-mail, telefone) |
+| `posting.note_add/update` | notas; o recrutador alterando nota humana gera **pedido de confirmação** (F06-17) |
+| `profile.list`, `profile.get_card`, `evidence.*`, `fact.search` (existentes) | evidências |
+| `analysis.save(posting_id, JobAnalysis)` · `analysis.get` · `analysis.list(posting_id)` | grava (valida `{kind,id}`), histórico |
 
-### 2.5 `JobAnalysis` (schema em `packages/shared/analysis-schema`)
+- **Recrutador geral** (`plugin/agents/recrutador.md`, reescrito): persona global; recebe a lista de perfis (cartões curtos) em vez de um `{{card}}` só.
+- **Recrutador especializado** (`plugin/agents/recrutador-especializado.md`, novo): subagente chamado com `profile_id`; lê o cartão pela tool `profile.get_card` (subagente não recebe placeholders). No modo B o Claude Code carrega nativo; no modo A o `api` monta a opção `agents` do SDK a partir do mesmo arquivo e libera a tool Agent só para esse subagente.
+- **Skill `analisar-vaga`** do especializado; prompts estruturados novos no provider: `postingExtract`, `postingMerge`, `postingDuplicate`.
+
+### 2.5 `JobAnalysis` (`packages/shared/src/schemas/analysis.ts`)
 | Bloco | Conteúdo |
 |-------|----------|
-| `fit` | 0–100 + justificativa curta + `confidence` |
-| `matches[]` | requisito, `fact_ids[]`, força (forte/parcial) |
-| `gaps[]` | requisito, `severity` (bloqueante/importante/menor), `evidence_checked: true`, sugestão (como compensar) |
-| `risks[]` | tipo (senioridade, localidade, contrato, salário, idioma, setor), descrição, `source` (heurística/modelo) |
-| `ats_keywords_missing[]` | termo, onde caberia (seção) |
-| `likely_questions[]` | pergunta, por quê, fato que ajuda a responder |
-| `seniority` | pedida × declarada no perfil |
-| `meta` | modelo, tokens, `posting_hash`, `facts_version`, `created_at` (UTC) |
+| `profiles[]` | por perfil: `profile_id`, `fit` 0–100, justificativa, `confidence` |
+| `recommended_profile_id` | com justificativa |
+| `matches[]` | requisito, `evidence: {kind, id}[]` (≥ 1), força (forte/parcial), `source` (heuristic/model/both) |
+| `gaps[]` | requisito, `severity`, `evidence_checked: true`, sugestão |
+| `risks[]` | tipo (senioridade, localidade, contrato, salário, idioma, setor), descrição, `source` |
+| `ats_keywords_missing[]` | termo, onde caberia |
+| `likely_questions[]` | pergunta, por quê, evidência que ajuda |
+| `seniority` | pedida × declarada |
+| `meta` | modelos, tokens, custo equivalente, `posting_hash`, `posting_updated_at`, `facts_version`, `created_at` (UTC) |
 
-### 2.6 Jobs e cache
-| Job | Etapas |
+### 2.6 Tarefas e validade
+| Tarefa (fila `extract`) | Etapas (`ctx.progress`) |
 |-----|--------|
-| `job_posting.analyze` | `fetching?` → `extracting` → `heuristics` → `analyzing` (modelo) → `saving` → `done` |
-Cache: chave = `sha256(texto normalizado) + profile_id + facts_version` (contador incrementado a cada fato aceito/editado). Hit → devolve a análise existente sem job de modelo, com aviso "análise de <data>" e botão "reanalisar".
+| `posting.extract` | `fetching?` → `heuristics` → `extracting` → `merging` → `dedupe` → `saved` |
+| `posting.analyze` | `searching` → `analyzing` (um perfil por vez) → `saving` |
+- **Validade (F06-10):** a análise guarda `facts_version` e `posting_updated_at`; se algum mudou, aparece "seus dados mudaram desde a análise de <data>" com **reanalisar**. Nada reanalisa sozinho.
 
 ### 2.7 API
 | Método e rota | Função |
 |---------------|--------|
-| `POST /api/job-postings` `{text|url, application_id?, create_application?}` | cria posting + job (ou cache hit) |
-| `GET /api/job-postings/:id` | texto, pré-análise, snapshot info |
-| `GET /api/analyses/:id` · `GET /api/analyses?profile=` | resultado |
-| `POST /api/analyses/:id/reanalyze` | ignora cache |
-| `GET /api/job-postings/estimate` | estimativa de tokens dado o tamanho do texto |
+| `POST /api/postings` `{text?, url?, fields?}` | cria e enfileira `posting.extract` |
+| `GET /api/postings` · `GET /api/postings/:id` · `PATCH /api/postings/:id` | lista, detalhe, edição (incluindo a JD) |
+| `POST /api/postings/:id/duplicate-decision` `{action: update|new|cancel, target_id?}` | resposta do modal da F06-9 |
+| `POST|PATCH /api/postings/:id/contacts` · `…/notes` | contatos e notas |
+| `POST /api/postings/:id/analyze` | enfileira `posting.analyze` (também a reanálise) |
+| `GET /api/postings/:id/analyses` | histórico de análises |
+| `GET|PUT /api/settings/models` | modelo por tarefa (F06-5, F06-13) |
 
 ---
 
 ## 3 · Dados deste entregável
 
+Migrações novas a partir de `0011`.
+
 | Tabela | Colunas principais |
 |--------|--------------------|
-| `job_posting` | `id`, `source` (paste/url), `url?`, `fetched_at?` (UTC), `title?`, `company?`, `location?`, `raw_path` (snapshot), `text`, `text_hash`, `lang`, `sections_json`, `pre_analysis_json`, `created_at` |
-| `job_analysis` | `id`, `posting_id`, `profile_id`, `application_id?`, `analysis_json` (JobAnalysis), `fit`, `facts_version`, `cache_key`, `model`, `usage_json`, `job_id`, `created_at` |
-| `application` (F07; mínimo em F06) | `id`, `profile_id`, `company`, `title`, `posting_id?`, `status` (= interesse), `created_at` |
-| `settings` | `facts_version` (inteiro incrementado por escrita em fatos) |
+| `chat_session` (reconstruída, M1) | `profile_id` passa a opcional com `on delete set null`; categoria nova `job`; `posting_id` (fk, nulo) |
+| `posting` | `id`, `company` (único obrigatório junto com `role` ou `title`), `client?`, `title?` (cargo), `role?` (normalizada), `seniority?`, `city?`, `state?`, `contract_type?`, `currency?`, `salary_min?`, `salary_max?`, `benefits_json`, `responsibilities_json`, `skills_required_json`, `skills_nice_json`, `company_summary?`, `posting_url?`, `company_url?`, `jd_text?`, `published_at?`, `identity_hash`, `field_sources_json` (heurística/modelo/ambos/usuário por campo), `pre_analysis_json`, `raw_path?`, `created_at`, `updated_at` |
+| `posting_contact` | `id`, `posting_id`, `name`, `origin` (linkedin/whatsapp/email/outro), `email?`, `phone?`, `created_at` |
+| `posting_note` | `id`, `posting_id`, `author` (user/recruiter), `body`, `pending_body?` (edição do recrutador aguardando confirmação), `created_at`, `updated_at` |
+| `job_analysis` | `id`, `posting_id`, `analysis_json`, `recommended_profile_id?`, `facts_version`, `posting_updated_at`, `models_json`, `usage_json`, `chat_session_id?`, `created_at` |
+| `settings` | chaves novas `models.posting_extract`, `models.posting_merge`, `models.posting_duplicate`, `models.posting_analyze` |
 
 Regras:
-- `job_posting` é imutável; reanálise cria novo `job_analysis`.
-- Uma candidatura tem no máximo uma análise "atual" (a mais recente); as anteriores ficam no histórico.
-- Texto da vaga nunca é enviado inteiro ao modelo quando > 6k chars: vai o resumo por seções.
+- A vaga é editável e cresce aos poucos; `identity_hash` é recalculado quando empresa, cliente, cargo ou role mudam.
+- Reanálise cria um `job_analysis` novo; a mais recente é a atual.
+- `facts_version` já existe (`settings`), não é migração nova.
 
 ---
 
 ## 4 · Layouts deste entregável
 
-Referência: `../05-layouts.md` L6. Componentes a construir:
-
 | Tela | Componentes | Estados a cobrir |
 |------|-------------|------------------|
-| Entrada | `PostingInput` (abas Colar / URL), `ApplicationLink` (nova · existente ▼), `EstimateBadge`, "Analisar" | vazio · URL inválida · buscando · fetch falhou (pede colar) · robots bloqueou · texto curto (< 300 chars) |
-| Pré-análise instantânea | `KeywordChips` (atende ● / ausente ○), `SeniorityBadge`, `ConflictList` (preferências obrigatórias) | sem conflitos · com conflitos · sem skills no perfil |
-| Resultado | `FitGauge`, `MatchList` (com fatos linkados), `GapList` (severidade, sugestão), `RiskList`, `AtsKeywords`, `LikelyQuestions`, `AnalysisMeta` (modelo, tokens, data no fuso) | cache hit (com aviso e "reanalisar") · fresco · erro |
-| Ações | `ActionBar`: "Gerar CV para esta vaga" (F05), "Simular entrevista" (F08), "Abrir candidatura" (F07) | ações desabilitadas quando a task dependente não existe |
-| Histórico | `AnalysisList` por perfil, com empresa/cargo/fit/data | vazio · com itens |
-| Modo B | resposta textual: fit, 3 maiores lacunas, 2 riscos, link `…/vagas/<analysis_id>` | — |
+| Menu | item **Vagas** no grupo "Geral" do `SideNav`; o chip "em breve" de vagas no Dashboard vira link | — |
+| Lista `/vagas` | cards (empresa, cliente, cargo e senioridade, role, data de criação) | vazio · com itens |
+| Vaga `/vagas/$id` | formulário com todos os campos (react-hook-form + zod, `FormGuard`), selo de origem por campo (heurística · modelo · ambos · usuário), JD editável, `ContactList`, `NoteList`, análises (fit por perfil, recomendado, atende, lacunas, riscos, keywords ATS, perguntas), alerta de candidatura "em breve" (F06-11), botão "Criar CV para esta vaga" (em breve) | rascunho incompleto · extraindo · analisada · "seus dados mudaram" (reanalisar) · nota aguardando confirmação |
+| Entrada | colar texto ou URL (na página Vagas e pelo chat) | URL inválida · buscando · fetch falhou (pede colar) · robots bloqueou · texto curto |
+| Duplicata | `Dialog` largo com diff lado a lado e o % de certeza; atualizar salva · seguir como nova · cancelar | — |
+| Chat | sessão nova com o título da vaga; mensagem com `analysis.save` mostra o botão "Criar CV para esta vaga" (em breve); menu de conversas agrupado por categoria | — |
+| Configurações | seção **Modelos** (modelo por tarefa, só Claude) | — |
+| Modo B | resposta textual: fit por perfil, recomendado, 3 lacunas, 2 riscos, link `…/vagas/<id>` | — |
 
 ---
 
@@ -198,7 +246,7 @@ Referência: `../05-layouts.md` L6. Componentes a construir:
 | F06-2 | Identidade e cache da análise | **hash por empresa + cargo + cliente (se houver) + role** (a data de publicação saiu do hash por ajuste do dono, ver F06-9) |
 | F06-3 | Fetch de URL | **undici + Readability**, respeitando robots; Chromium como opção futura |
 | F06-4 | O que vai ao modelo | **resumo por experiência**; skills e habilidades vão **completas** |
-| F06-5 | Modelo | **Sonnet (análise) + Haiku (extração) por padrão**, configurável em Configurações; aceita outro modelo configurado antes (ex.: Fable, ou um modelo da OpenAI) |
+| F06-5 | Modelo | **Sonnet (análise) + Haiku (extração) por padrão**, configurável por tarefa em Configurações (só modelos do Claude por enquanto, F06-13) |
 | F06-6 | Fit e keywords | **modelo + heurística**, mostrando de onde vem cada dado e destacando quando a heurística foi confirmada pelo modelo |
 | F06-7 | Salvar × candidatar | **sempre salvar a vaga**; salvar não é candidatar-se (candidatura é na F07, depois do CV) |
 | F06-8 | Alcance do recrutador global | **o chat inteiro é global**: um recrutador geral conhece todos os perfis; o recrutador especializado é um **subagente** do geral, chamado com um perfil. As sessões deixam de pertencer a um perfil (mexe na persona, nas sessões e no menu da F04, e nos prompts no Phoenix) |
@@ -210,75 +258,90 @@ Referência: `../05-layouts.md` L6. Componentes a construir:
 | F06-14 | Avaliação de prompt no Phoenix | **gate de qualidade com o Claude real** a cada prompt novo ou alterado, rodando na assinatura (custo de construção aceito pelo dono); o mock segue como smoke no dia a dia |
 | F06-15 | Teto de conversas vivas | a sessão da análise **conta no teto**; **sessões hibernadas não contam** |
 
+### 5.1 · Pontos abertos pela revisão do código (perguntar ao dono, um por vez)
+
+| # | Ponto | Proposta |
+|---|-------|----------|
+| F06-16 | "Prompts vivem no Phoenix" × AV-4 (o repositório é a fonte; o app nunca lê prompt do Phoenix) | manter o repositório como fonte (versionado no git, revisável, funciona sem Phoenix); o Phoenix guarda cada versão, as rodadas de avaliação e a linha de base do gate |
+| F06-17 | Confirmação da nota alterada pelo recrutador: "bandeja" (hoje só jobs e ingestões) × Pendências (onde já ficam as aprovações) | seção nova "Aguardando você" na bandeja, com o mesmo item também em Pendências, e a confirmação feita na página da vaga com o diff da nota |
+
 ## 6 · O que precisa estar coberto para o F06 funcionar
 
+### 6.0 Marcos
+
+Cada marco fecha com lint, typecheck, testes e e2e verdes na instância `claude`, commit local e aviso ao dono para `promote`. Todo prompt novo ou alterado passa pelo gate de avaliação real (F06-14) antes do commit do marco.
+
+1. **M1 · Recrutador global e gate de prompts.** Migração `0011` (`chat_session.profile_id` opcional, `on delete set null`, categoria `job`, `posting_id`); repo, rotas, `useChatSessions`, `ChatNav` (agrupado por categoria), `ChatPage` (sem redirecionar na troca de perfil), painel de contexto, resolução de perfil nas tools MCP, `TurnTrace` e o hook `session-start.sh` do modo B; persona global; subagente `recrutador-especializado` nos dois modos (opção `agents` no modo A, tool Agent liberada só para ele). Gate de regressão: `evals --gate` compara cada avaliador com a linha de base da versão anterior no Phoenix e falha se cair. Conferir o custo equivalente no Phoenix.
+2. **M2 · Dados da vaga.** Migrações de `posting`, `posting_contact`, `posting_note`, `job_analysis`; schemas zod em `packages/shared`; repos; API de §2.7 (sem análise); campos obrigatórios mínimos; `identity_hash`.
+3. **M3 · Heurística sem tokens.** `packages/core/src/postings/`: dicionário com aliases, n-gramas e ruído, senioridade, seções, contrato, moeda, benefícios, local, role normalizada, riscos a partir das preferências reais; busca local das keywords nos fatos (dicionário + `fact_fts`).
+4. **M4 · Captura e extração.** Fetch de URL (anti-SSRF, robots, Readability + linkedom); prompts `postingExtract`, `postingMerge`, `postingDuplicate` (provider, mock, datasets, avaliadores, juiz); tarefa `posting.extract`; origem por campo; % de duplicata (F06-9).
+5. **M5 · Análise.** Skill `analisar-vaga`, tools `posting.*` e `analysis.*`, tarefa `posting.analyze`, fit por perfil e recomendado, sessão nova com o título da vaga, botão "Criar CV" (em breve) derivado de `analysis.save`, alerta de candidatura "em breve", validade por `facts_version`/`posting_updated_at`. Avaliação da skill pelo caminho de sandbox do `evals chat`.
+6. **M6 · Páginas.** Vagas no menu, lista, página da vaga editável, contatos, notas com confirmação (F06-17), modal de diff largo, "seus dados mudaram", seção Modelos em Configurações (lista compartilhada de modelos do Claude).
+7. **M7 · Fechamento.** e2e `f06-NN-*`, modo B (`/narnia-jobs:analisar-vaga`), README, CLAUDE.md, `../02`–`../05`.
+
 ### 6.1 Pré-requisitos e dependências
-1. **F01**: jobs, bandeja, preferências obrigatórias do perfil, `facts_version`.
-2. **F04**: MCP, `plugin/`, sessões, tools `profile.*`, `skill.*`, `experience.*`, `fact.search`.
-3. **F07** opcional: ligação completa com candidatura; F06 entrega `application.create_minimal` como stub que F07 substitui.
-4. **F05** e **F08** opcionais: botões de ação ficam desabilitados até existirem.
-5. Ordem interna: heurística local + schema → captura de URL → tools/skill → página L6 → cache.
+1. **F01–F04** entregues: fila e bandeja, `facts_version`, tools `profile.*`, `evidence.*`, `fact.search`, sessões, sincronização e avaliações no Phoenix.
+2. **Dependências novas:** `@mozilla/readability` e `linkedom` no `api` (a imagem muda: avisar o dono para `make dev-down && make dev` após o `promote`).
+3. **F05, F07, F08** não são pré-requisito: "Criar CV" e o alerta de candidatura ficam "em breve".
 
 ### 6.2 Testes unitários (Vitest) · obrigatórios
-**`packages/core` (jobs/)**
-- Keywords: fixtures de vagas pt-BR e en-US extraem as tecnologias esperadas; normalização ("ReactJS" = "React"); n-gramas de ruído ("equipe dinâmica") não entram.
-- Senioridade: "Sênior", "Senior", "5+ years", "Pleno/Sênior" → valores corretos; ausência → `unknown`.
-- Seções: separa obrigatórios/desejáveis em 4 formatos de cabeçalho; vaga sem cabeçalhos → tudo "obrigatório" com flag.
-- Conflitos: presencial em outra cidade × perfil remoto-only → conflito `localidade`; PJ × só CLT → `contrato`; salário citado abaixo do mínimo → `salário`.
-- Hash: texto com espaços/acentos/caixa diferentes gera o mesmo hash; textos diferentes, hashes diferentes.
+**`packages/core` (`postings/`, chat)**
+- Keywords: fixtures pt-BR e en-US extraem as tecnologias esperadas; aliases ("ReactJS" = "React"); ruído não entra; casamento com `skill.name_normalized` e `tech_json`.
+- Senioridade, seções (4 formatos de cabeçalho; sem cabeçalho → tudo obrigatório com flag), contrato, moeda, benefícios, role normalizada.
+- Riscos: remoto-only × presencial em outra cidade → `localidade`; PJ × só CLT → `contrato`; salário citado abaixo do mínimo → `salário`.
+- `identity_hash`: caixa, acentos e espaços não mudam o hash; mudar empresa, cliente, cargo ou role muda; data de publicação não entra.
+- Sessões: criar sem perfil; apagar perfil não apaga a sessão (`set null`); teto continua contando só vivas.
 
 **`packages/shared`**
-- `analysis-schema`: rejeita `matches[]` sem `fact_ids`, `gaps[]` sem `evidence_checked`, `fit` fora de 0–100; snapshot do JSON Schema.
+- `JobAnalysis`: rejeita `matches[]` sem `evidence`, `evidence` com `kind` inválido, `gaps[]` sem `evidence_checked`, `fit` fora de 0–100; snapshot do JSON Schema.
 
 **`apps/api`**
-- Fetch: segue até 3 redirects; bloqueia `127.0.0.1`, `10.x`, `169.254.x`, `localhost`; respeita `robots.txt` `Disallow`; corta em 2 MB; timeout; HTML só-JS → erro `extract_failed`.
-- Readability: fixtures de 3 job boards (HTML salvo) → texto principal sem menu/rodapé; `og:title`/`og:site_name` preenchem título/empresa.
-- Job `job_posting.analyze` com provider mock: etapas em ordem; cache hit não cria job de modelo; `facts_version` alterado invalida o cache; `reanalyze` ignora cache.
-- `analysis.save`: rejeita análise com "atende" sem fato existente (fact_id inexistente → 400).
-- Rotas: 400 URL inválida; 422 texto curto; 404 análise inexistente; `create_application` cria candidatura mínima com empresa/cargo da heurística.
+- Fetch: até 3 redirects; bloqueia `127.0.0.1`, `10.x`, `169.254.x`, `localhost` e DNS que resolve para IP privado; robots `Disallow`; 2 MB; timeout; só-JS → `extract_failed`.
+- Readability: fixtures de 3 job boards → texto principal; `og:` preenche título e empresa.
+- Tarefas com o mock: etapas em ordem; duplicata com hash igual chama `postingDuplicate`; `analysis.save` rejeita `{kind,id}` inexistente; análise marcada desatualizada quando `facts_version` ou a vaga mudam.
+- Notas: recrutador editando nota de usuário grava `pending_body` e cria o pedido de confirmação; confirmar aplica; recusar descarta.
+- Modo A: opção `agents` montada de `plugin/agents/recrutador-especializado.md`; tool Agent permitida só para ele.
 
-**`apps/web`**
-- `PostingInput`: alterna abas, valida URL, mostra fallback de colar quando o fetch falha.
-- `KeywordChips`/`ConflictList`: renderizam a pré-análise antes do resultado do modelo.
-- `GapList`: ordena por severidade; cada lacuna mostra "nenhuma evidência encontrada" e a sugestão.
-- `ActionBar`: botões desabilitados quando a feature dependente está indisponível (flag da API).
-- `AnalysisMeta`: data no fuso do usuário; aviso de cache com botão reanalisar.
+**`apps/web`** (`apps/web/test/f06/`)
+- Lista e página da vaga, selos de origem, `FormGuard`, contatos, notas pendentes, modal de diff com as três ações, aviso "seus dados mudaram", botão "Criar CV" em breve na mensagem, `ChatNav` agrupado, seção Modelos.
 
 ### 6.3 Testes e2e (Playwright, Chromium) · obrigatórios
-Compose com `NARNIA_PROVIDER=mock` (o mock devolve um `JobAnalysis` fixo coerente com o perfil de fixture) e um servidor HTTP de fixtures para as URLs.
-- **E2E-01 colar e analisar**: colar vaga pt-BR → pré-análise aparece em < 1 s → job na bandeja → resultado com fit, 2 lacunas, 1 risco → candidatura nova criada em "Interesse".
-- **E2E-02 URL com sucesso**: URL do servidor de fixtures → título/empresa preenchidos → análise igual à de E2E-01 (mesmo hash → cache hit com aviso).
-- **E2E-03 URL que falha**: página só-JS → mensagem "não consegui extrair" → aba Colar aberta com a URL guardada como referência.
-- **E2E-04 robots bloqueia**: fixture com `Disallow` → não busca → orienta colar.
-- **E2E-05 conflito de preferência**: perfil remoto-only × vaga presencial em outra cidade → risco `localidade` visível já na pré-análise.
-- **E2E-06 reanalisar após novo fato**: aceitar um fato novo (endpoint de teste) → abrir análise → aviso "fatos mudaram" → reanalisar → nova análise com `facts_version` maior.
-- **E2E-07 ligar a candidatura existente**: escolher candidatura existente → análise aparece no cartão dela.
-- **E2E-08 ações**: "Gerar CV para esta vaga" abre L5 com a candidatura pré-selecionada (com F05) · desabilitado sem F05.
-- **E2E-09 modo B**: `claude -p "/narnia-jobs:analisar-vaga <texto>" --plugin-dir plugin/` → resposta com fit e link → link abre o resultado.
-- **E2E-10 persistência**: `down/up` → análises e snapshots continuam.
-
-- **E2E-x perfil mais indicado**: usuário com perfis "Backend" e "Engineering Manager" → vaga de gestão → análise mostra o fit dos dois e recomenda "Engineering Manager" com justificativa → "Usar este perfil" troca o perfil ativo.
+Arquivos `apps/e2e/tests/f06-NN-<slug>.spec.ts`, títulos `F06/E2E-NN …`; mock com fixtures de extração, merge, duplicata e análise; servidor HTTP de fixtures para as URLs.
+- **E2E-01 colar e analisar pelo chat:** "analisa esta vaga" + texto → sessão nova com o título `empresa/cliente - role` → bandeja → resultado com fit por perfil, recomendado, lacunas e riscos → botão "Criar CV" (em breve) → vaga aparece em Vagas.
+- **E2E-02 URL com sucesso:** URL de fixture → campos preenchidos com selo de origem.
+- **E2E-03 URL que falha:** página só-JS → "não consegui extrair" → pede colar.
+- **E2E-04 robots bloqueia.**
+- **E2E-05 duplicata:** mesma empresa/role de novo → modal com diff e % → "atualizar salva" mantém um registro; "seguir como nova" cria outro; "cancelar" não cria.
+- **E2E-06 reanalisar após novo fato:** `PATCH /api/_test/facts/...` → aviso "seus dados mudaram" → reanalisar → análise nova no histórico.
+- **E2E-07 edição:** editar campos e a JD → salvar → recarregar → valores persistem; a análise fica marcada desatualizada.
+- **E2E-08 notas:** usuário cria nota → recrutador altera → item de confirmação → confirmar aplica.
+- **E2E-09 modo B:** `/narnia-jobs:analisar-vaga` → resposta com link → link abre a vaga.
+- **E2E-10 persistência:** `down/up` → vagas, notas e análises continuam.
+- **E2E-11 recrutador global:** conversa sem perfil ativo funciona; trocar de perfil não fecha a conversa; especializado chamado com o perfil certo.
 
 ### 6.4 Teste manual com provider real (antes de fechar F06)
-10 vagas reais (5 pt-BR, 5 en-US, de 3 job boards, 2 por URL) contra 2 perfis reais: medir tokens × estimativa, se alguma "lacuna" era falsa (havia evidência), se algum "atende" não tinha fato, utilidade das perguntas prováveis, taxa de sucesso do fetch por URL. Decide F06-5 e ajusta heurística/skill.
+10 vagas reais (5 pt-BR, 5 en-US, 3 job boards, 2 por URL) contra os perfis reais: tokens e custo, lacuna falsa, "atende" sem evidência, utilidade das perguntas, sucesso do fetch, acerto do % de duplicata, concordância heurística × modelo.
 
 ### 6.5 Definição de pronto
-- Testes de 6.2 e 6.3 verdes na CI; cobertura ≥ 80 % em `core/jobs` e `analysis-schema`.
-- Zero "atende" sem fato e zero "lacuna" com evidência existente no teste manual (critério de honestidade).
-- Fetch respeita robots e anti-SSRF, verificado por testes.
-- `../02`, `../03`, `../04`, `../05` atualizados.
+- Testes de 6.2 e 6.3 verdes; cobertura ≥ 80 % em `core/src/postings` e no schema da análise.
+- Gate de avaliação verde para todos os prompts novos e alterados, com as rodadas visíveis no Phoenix.
+- Zero "atende" sem evidência e zero "lacuna" com evidência no teste manual.
+- Fetch com robots e anti-SSRF testados.
+- `../02`, `../03`, `../04`, `../05`, README e CLAUDE.md atualizados.
 
 ---
 
 ## 7 · Riscos específicos
 | Risco | Mitigação |
 |-------|-----------|
-| Job boards bloqueiam fetch ou mudam HTML | fallback colar sempre visível; snapshots como fixtures de regressão; sem scraping em massa |
-| Modelo "inventa" aderência | schema exige `fact_ids` em matches e `evidence_checked` em gaps; teste manual mede |
-| Fit % passa falsa precisão | mostrar justificativa e o % heurístico ao lado; rótulo "estimativa" |
-| SSRF via URL | bloqueio de IPs privados, redirects limitados, sem credenciais |
-| Vagas longas gastam tokens | resumo por seções; estimativa antes; cache |
-| Dicionário de tecnologias desatualizado | arquivo versionado em `core`, fácil de ampliar; n-gramas cobrem termos novos |
+| M1 mexe em toda a F04 (sessões, persona, MCP, modo B) | marco próprio, primeiro; e2e da F04 inteiros rodando no fechamento do M1 |
+| Subagente no modo A depende da opção `agents` do SDK | testar no M1 com o mock e uma rodada real antes de construir a análise em cima |
+| Job boards bloqueiam fetch ou mudam HTML | colar sempre disponível; snapshots como fixtures |
+| Modelo "inventa" aderência | `evidence {kind,id}` obrigatória, `evidence_checked`, validação no `analysis.save` |
+| Fit % passa falsa precisão | justificativa, origem e rótulo "estimativa" |
+| SSRF via URL | bloqueio após DNS, redirects verificados um a um |
+| Custo do gate real a cada prompt | só roda quando o hash do prompt muda; datasets pequenos |
+| Dicionário desatualizado | arquivo versionado e n-gramas |
 
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
@@ -289,4 +352,5 @@ Compose com `NARNIA_PROVIDER=mock` (o mock devolve um `JobAnalysis` fixo coerent
 | 2026-10-14 | — | **F06-8 fechada (dono):** chat inteiro global; recrutador especializado como subagente do geral. |
 | 2026-10-14 | — | **F06-9 fechada (dono):** data de publicação opcional e fora do hash (ajusta F06-2); hash coincidente → Haiku compara as JDs e devolve % de duplicata → modal com diff (atualizar salva · seguir como nova · cancelar). |
 | 2026-10-14 | — | **F06-10 a F06-15 fechadas (dono):** sem reanálise automática; alerta de candidatura repetida "em breve"; cargo/role/senioridade separados; só modelos do Claude; avaliação real de prompt na assinatura como gate; hibernadas fora do teto. Todas as decisões da F06 fechadas. |
+| 2026-10-14 | — | **Revisão contra o código:** §2 a §4, §6 e §7 reescritos (§2.0 lista as divergências: dicionário inexistente, `facts_version` já pronto, evidência `{kind,id}`, nomes reais das tools, preferências sem flag de obrigatória, dependências novas, sessões `NOT NULL` por perfil, subagente sem suporte no modo A, botão derivado da tool, gate de regressão inexistente). Marcos M1–M7 em §6.0. Abertos F06-16 e F06-17. |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)
