@@ -17,6 +17,7 @@ import {
   type ChatCategory,
   type ChatSession,
   type ChatToolCall,
+  DEFAULT_CHAT_TITLE,
   getTracer,
   nowUtc,
   type SpanAnnotation,
@@ -257,7 +258,7 @@ export class SessionManager {
     const s = this.repos.chatSessions.create({
       profileId,
       category: input.category,
-      title: input.title ?? "Nova conversa",
+      title: input.title ?? DEFAULT_CHAT_TITLE,
       provider: this.deps.provider.id,
       model: input.model ?? settings.defaultModel,
       ingestionRunId: input.ingestionRunId ?? null,
@@ -422,7 +423,65 @@ export class SessionManager {
       systemTurn: Boolean(system),
     });
     entry.handle.send(full);
+    // tema da conversa junto com a primeira resposta: "Nova conversa" só até ela chegar (2026-10-13)
+    if (!system && session.title === DEFAULT_CHAT_TITLE) void this.nameSession(id, text);
     return { turnIndex };
+  }
+
+  private readonly naming = new Set<string>();
+
+  /**
+   * Título pelo modelo mais barato (haiku) a partir da primeira mensagem; o gasto vai para o medidor e para a conversa,
+   * o rastro para o Phoenix (span `llm.structured`). Falha deixa "Nova conversa" e a próxima mensagem tenta de novo.
+   */
+  private async nameSession(id: string, text: string): Promise<void> {
+    if (this.naming.has(id)) return;
+    this.naming.add(id);
+    try {
+      const message = text
+        .replace(/^\[anexo: (.+?) · fileId [^\]\s]+\]\n?/, "[anexo: $1]\n")
+        .slice(0, 4000);
+      const r = await this.deps.provider.chatTitle({ message, model: "haiku" });
+      const title = r.output.title.trim().replace(/[.!?…]+$/, "");
+      const usage = r.usage;
+      this.repos.usageEvents.insert({
+        id: newId(),
+        ts: nowUtc(),
+        origin: "narnia",
+        category: "chat.title",
+        jobId: null,
+        sessionId: id,
+        model: usage.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheRead: usage.cacheReadTokens,
+        cacheWrite: usage.cacheWriteTokens,
+        costUsdEst: r.costUsd,
+      });
+      const current = this.repos.chatSessions.get(id);
+      if (!current) return;
+      this.repos.chatSessions.addUsage(id, {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        costUsd: r.costUsd,
+      });
+      // renomeada pelo usuário enquanto o modelo pensava: vale o nome dele
+      if (title && current.title === DEFAULT_CHAT_TITLE) {
+        this.repos.chatSessions.setTitle(id, title);
+        this.emitState(id, current.state);
+      }
+    } catch (e) {
+      console.warn(`[chat] título da conversa ${id}: ${(e as Error).message}`);
+    } finally {
+      this.naming.delete(id);
+    }
+  }
+
+  /** O usuário viu a mensagem na tela (2026-10-13): a marca de leitura avança; mensagem de outra conversa = 404. */
+  markRead(id: string, messageId: string): ChatSession {
+    this.get(id);
+    this.repos.chatSessions.markRead(id, messageId);
+    return this.get(id);
   }
 
   /** O processo desta entrada ainda é o da sessão? Eventos de processo fechado ou substituído são ignorados. */

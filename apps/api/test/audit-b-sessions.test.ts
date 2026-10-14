@@ -120,7 +120,7 @@ describe("auditoria B · SessionManager com o Claude real", () => {
     expect(t.repos.chatSessions.get(sid)?.costUsdEst).toBeCloseTo(0.3, 6);
     const costs = t.repos.usageEvents
       .list()
-      .filter((u) => u.sessionId === sid)
+      .filter((u) => u.sessionId === sid && u.category !== "chat.title")
       .map((u) => u.costUsdEst);
     expect(costs.map((c) => Number(c.toFixed(6)))).toEqual([0.1, 0.1, 0.1]);
   });

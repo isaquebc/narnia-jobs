@@ -13,6 +13,8 @@ import { useOnboardingState } from "../../hooks/useOnboarding";
 import { useProfiles } from "../../hooks/useProfiles";
 import { t } from "../../i18n";
 import { cn } from "../../lib/cn";
+import { Badge } from "../ui/badge";
+import { ChatNav, useLiveChats } from "./ChatNav";
 import { NavLink } from "./NavLink";
 
 const item =
@@ -43,6 +45,7 @@ export function SideNav({ className }: { className?: string }) {
   const onboarding = useOnboardingState();
   const { active } = useProfiles();
   const completed = onboarding.data?.completed === true;
+  const live = useLiveChats(completed ? (active?.id ?? null) : null);
   return (
     <nav
       className={cn(
@@ -70,7 +73,16 @@ export function SideNav({ className }: { className?: string }) {
             <li>
               <NavLink to="/chat" className={item}>
                 <MessageSquare size={16} /> {t("nav.chat")}
+                {live > 0 ? (
+                  <Badge tone="ok" className="ml-auto">
+                    <span aria-hidden>{live}</span>
+                    <span className="sr-only">
+                      {live === 1 ? t("nav.chatLiveOne") : t("nav.chatLive", { count: live })}
+                    </span>
+                  </Badge>
+                ) : null}
               </NavLink>
+              <ChatNav profileId={active?.id ?? null} />
             </li>
           </Group>
           <hr className="border-border" />

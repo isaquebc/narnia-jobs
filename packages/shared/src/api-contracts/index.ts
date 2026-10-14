@@ -666,6 +666,8 @@ export const ChatSessionPatchRequestSchema = z.object({
   archived: z.boolean().optional(),
 });
 export const ChatSendRequestSchema = z.object({ text: z.string().min(1).max(50_000) });
+/** Mensagem que apareceu na tela do usuário (2026-10-13): tudo até ela conta como lido. */
+export const ChatReadRequestSchema = z.object({ messageId: IdSchema });
 export const ChatSessionResponseSchema = z.object({ session: ChatSessionSchema });
 export const ChatSessionListResponseSchema = z.object({ sessions: z.array(ChatSessionSchema) });
 export const ChatMessagesResponseSchema = z.object({ messages: z.array(ChatMessageSchema) });

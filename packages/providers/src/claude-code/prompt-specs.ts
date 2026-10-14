@@ -1,5 +1,6 @@
 import {
   AnalyzeProfilesOutputSchema,
+  CHAT_OUTPUT_JSON_SCHEMAS,
   EXTRACTION_JSON_SCHEMAS,
   INGEST_OUTPUT_JSON_SCHEMAS,
   toJsonSchema,
@@ -8,6 +9,7 @@ import type {
   AnalyzeProfilesProviderInput,
   AnalyzeRepoInput,
   BuildDigestInput,
+  ChatTitleInput,
   CheckProposalsInput,
   ExtractFactsInput,
   PickFilesInput,
@@ -134,6 +136,15 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: INGEST_OUTPUT_JSON_SCHEMAS.checkProposals,
     tools: [],
   }),
+  chatTitle: spec("chatTitle", {
+    name: "narnia-chat-title",
+    description: "Título da conversa do chat a partir da primeira mensagem (modelo mais barato).",
+    file: FILE("chat-title"),
+    userTemplate: "<mensagem>\n{{message}}\n</mensagem>",
+    defaultModel: "haiku",
+    jsonSchema: CHAT_OUTPUT_JSON_SCHEMAS.chatTitle,
+    tools: [],
+  }),
 };
 
 const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
@@ -165,6 +176,7 @@ export const structuredPromptVars = {
     metrics_table: i.metricsTable,
   }),
   checkProposals: (i: CheckProposalsInput) => ({ items_json: JSON.stringify(i.items, null, 1) }),
+  chatTitle: (i: ChatTitleInput) => ({ message: i.message }),
 } satisfies Record<StructuredOperation, (input: never) => Record<string, string>>;
 
 /** Troca `{{nome}}` pelas variáveis numa passada só (conteúdo com chaves não é reinterpretado). */

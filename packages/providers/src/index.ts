@@ -73,6 +73,7 @@ export {
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,
+  type ChatTitleInput,
   type CheckProposalsInput,
   type CompleteInput,
   type CompleteResult,

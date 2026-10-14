@@ -15,4 +15,5 @@ export const PROMPTS = {
   analyzeRepo: () => loadPrompt("analyze-repo"),
   synthesizeRun: () => loadPrompt("synthesize-run"),
   checkProposals: () => loadPrompt("check-proposals"),
+  chatTitle: () => loadPrompt("chat-title"),
 };

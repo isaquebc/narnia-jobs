@@ -34,7 +34,12 @@ export function useChatSessions(profileId: string | null) {
   useEffect(() => {
     ws.connect();
     return ws.subscribe((e) => {
-      if (e.type === "chat.session_updated" || e.type === "profile.switched")
+      // fim de turno traz resposta nova: a lista do menu recalcula as não lidas (ponto verde)
+      if (
+        e.type === "chat.session_updated" ||
+        e.type === "chat.turn_end" ||
+        e.type === "profile.switched"
+      )
         void qc.invalidateQueries({ queryKey: ["chat", "sessions"] });
     });
   }, [ws, qc]);
@@ -243,6 +248,21 @@ export function useChatSession(sessionId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chat"] }),
   });
   const clearError = useCallback(() => setError(null), []);
+  // a mensagem apareceu na tela (2026-10-13): marca como lida uma vez e atualiza o ponto verde do menu
+  const readSent = useRef<string | null>(null);
+  const markRead = useCallback(
+    (messageId: string) => {
+      if (readSent.current === messageId) return;
+      readSent.current = messageId;
+      void api
+        .markChatRead(sessionId, messageId)
+        .then(() => qc.invalidateQueries({ queryKey: ["chat", "sessions"] }))
+        .catch(() => {
+          readSent.current = null;
+        });
+    },
+    [api, qc, sessionId],
+  );
 
   // a mensagem do usuário já está no histórico: não mostra a bolha provisória duas vezes
   const persistedUser =
@@ -260,6 +280,7 @@ export function useChatSession(sessionId: string) {
     limit,
     lastUsage,
     createdRuns: runIds,
+    markRead,
     hasOlder,
     loadOlder,
     send,

@@ -30,6 +30,8 @@ export const ChatSessionSchema = z.object({
    * reconectar. Só nas respostas da api; ausente no banco.
    */
   busy: z.boolean().optional(),
+  /** Mensagens do recrutador ou do sistema depois da última lida pelo usuário (ponto verde no menu, 2026-10-13). */
+  unread: z.number().int().min(0).optional(),
 });
 export type ChatSession = z.infer<typeof ChatSessionSchema>;
 
@@ -59,6 +61,13 @@ export const ChatMessageSchema = z.object({
   createdAt: IsoDateTimeSchema,
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+/** Título da conversa escolhido pelo modelo mais barato a partir da primeira mensagem (2026-10-13). */
+export const ChatTitleOutputSchema = z.object({ title: z.string().min(2).max(60) });
+export type ChatTitleOutput = z.infer<typeof ChatTitleOutputSchema>;
+
+/** Valor de `title` enquanto a conversa não tem tema (só até a primeira resposta). */
+export const DEFAULT_CHAT_TITLE = "Nova conversa";
 
 /** Rótulo de confiança da fonte pesquisada (F04-5). */
 export const TrustTagSchema = z.enum(["official", "survey", "jobboard", "other"]);

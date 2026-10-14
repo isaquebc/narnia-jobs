@@ -22,7 +22,9 @@ describe("migration 0009_run_chat_session", () => {
       models: { document: "h", facts: "h", digest: "s" },
       options: { ocr: false, modelRead: false },
     });
-    expect(migrate(db).applied).toEqual(["0009_run_chat_session"]);
+    expect(migrate(db, { until: "0009_run_chat_session" }).applied).toEqual([
+      "0009_run_chat_session",
+    ]);
     const after = createRepos(db);
     expect(after.ingestionRuns.get(run.id)?.chatSessionId).toBeNull();
     const ids = seedFixture(after, "engineer");

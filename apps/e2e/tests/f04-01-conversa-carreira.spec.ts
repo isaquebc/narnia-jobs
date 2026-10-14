@@ -3,7 +3,7 @@ import { sendInUi } from "../helpers/chat";
 import { freshStart } from "../helpers/ingest";
 import { login } from "../helpers/profiles";
 
-test("F04/E2E-01 conversa de carreira: Chat no grupo do perfil, ferramenta real chamada, resposta com fonte e uso", async ({
+test("F04/E2E-01 conversa de carreira: Chat no grupo do perfil, ferramenta real chamada, resposta com fonte, uso, tema e autor", async ({
   page,
 }) => {
   await freshStart("engineer");
@@ -19,4 +19,18 @@ test("F04/E2E-01 conversa de carreira: Chat no grupo do perfil, ferramenta real 
   await expect(list.getByText("evidence_experience_list").first()).toBeVisible();
   await expect(list.getByText(/fonte: evidence_experience_list/)).toBeVisible();
   await expect(page.getByTestId("session-usage")).not.toContainText("conversa: 0 tokens");
+  // 2026-10-13: título "Recrutador <perfil>", autor com a senioridade do recrutador e o tema escolhido pelo modelo
+  // mais barato a partir da primeira mensagem (o mock usa as primeiras palavras), já no menu
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Recrutador Eng. Software Sênior",
+  );
+  await expect(list.getByText("Recrutador Eng. Software Sênior Sênior").first()).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "O que está fraco no", exact: true }),
+  ).toBeVisible();
+  await expect(
+    nav.getByRole("list", { name: "Conversas do chat" }).getByRole("link", {
+      name: "O que está fraco no",
+    }),
+  ).toBeVisible();
 });

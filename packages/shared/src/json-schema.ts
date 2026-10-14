@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ChatTitleOutputSchema } from "./schemas/chat";
 import {
   BuildDigestOutputSchema,
   ExtractFactsOutputSchema,
@@ -38,4 +39,8 @@ export const INGEST_OUTPUT_JSON_SCHEMAS = {
   analyzeRepo: toJsonSchema(AnalyzeRepoOutputSchema),
   synthesizeRun: toJsonSchema(SynthesizeRunOutputSchema),
   checkProposals: toJsonSchema(CheckProposalsOutputSchema),
+} as const;
+
+export const CHAT_OUTPUT_JSON_SCHEMAS = {
+  chatTitle: toJsonSchema(ChatTitleOutputSchema),
 } as const;

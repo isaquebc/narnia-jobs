@@ -133,6 +133,7 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
       impl: checkVerdicts as Rule["impl"],
     },
   ],
+  chatTitle: (op) => [schemaRule(op), lang(["title"]), coverage(1)],
 };
 
 export const PROMPTS_WITH_EVALUATORS = Object.keys(RULES) as StructuredOperation[];

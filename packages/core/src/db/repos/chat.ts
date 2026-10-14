@@ -61,6 +61,11 @@ export interface ChatSessionsRepo {
   /** null = o transcript do provider se perdeu; a próxima abertura começa sem `resume` (auditoria B). */
   setProviderSessionId(id: string, providerSessionId: string | null): void;
   setCardHash(id: string, hash: string | null): void;
+  /**
+   * Usuário viu a mensagem na tela (2026-10-13): a marca só avança (mensagem desta conversa e mais nova que a marca
+   * atual). Devolve true quando avançou.
+   */
+  markRead(id: string, messageId: string): boolean;
   /** Soma uso do turno e marca atividade agora. */
   addUsage(
     id: string,
@@ -72,7 +77,7 @@ export interface ChatSessionsRepo {
   remove(id: string): void;
 }
 
-function mapSession(r: Row): ChatSession {
+function mapSession(r: Row, unread?: number): ChatSession {
   return ChatSessionSchema.parse({
     id: r.id,
     profileId: r.profile_id,
@@ -89,6 +94,7 @@ function mapSession(r: Row): ChatSession {
     costUsdEst: Number(r.cost_usd_est),
     createdAt: r.created_at,
     lastActivityAt: r.last_activity_at,
+    ...(unread !== undefined ? { unread } : {}),
   });
 }
 
@@ -96,6 +102,24 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
   const q = lazy(db);
   const set = (col: string, id: string, value: unknown) =>
     q(`update chat_session set ${col} = ? where id = ?`).run(value as never, id);
+  const rowidOf = (messageId: string | null, sessionId: string) =>
+    messageId
+      ? ((
+          q("select rowid as r from chat_message where id = ? and session_id = ?").get(
+            messageId,
+            sessionId,
+          ) as { r: number } | undefined
+        )?.r ?? null)
+      : null;
+  // não lidas: do recrutador ou do sistema, depois da marca; bancos antes da 0010 não têm a coluna (sem contagem)
+  const map = (r: Row) => {
+    if (!("read_message_id" in r)) return mapSession(r);
+    const after = rowidOf((r.read_message_id as string | null) ?? null, r.id as string) ?? 0;
+    const n = q(
+      "select count(*) as n from chat_message where session_id = ? and role <> 'user' and rowid > ?",
+    ).get(r.id as string, after) as { n: number };
+    return mapSession(r, Number(n.n));
+  };
   const repo: ChatSessionsRepo = {
     create(i) {
       const now = nowUtc();
@@ -118,7 +142,7 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
     },
     get(id) {
       const r = q("select * from chat_session where id = ?").get(id) as Row | undefined;
-      return r ? mapSession(r) : null;
+      return r ? map(r) : null;
     },
     list(f = {}) {
       const where: string[] = [];
@@ -133,7 +157,7 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
       } else if (!f.includeArchived) where.push("state <> 'archived'");
       const sql = `select * from chat_session ${where.length ? `where ${where.join(" and ")}` : ""}
                    order by last_activity_at desc, rowid desc`;
-      return (db.prepare(sql).all(...(params as never[])) as Row[]).map(mapSession);
+      return (db.prepare(sql).all(...(params as never[])) as Row[]).map(map);
     },
     setState: (id, state) => void set("state", id, state),
     setCategory: (id, category) => void set("category", id, category),
@@ -141,6 +165,18 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
     setTitle: (id, title) => void set("title", id, title),
     setProviderSessionId: (id, psid) => void set("provider_session_id", id, psid),
     setCardHash: (id, hash) => void set("card_hash", id, hash),
+    markRead(id, messageId) {
+      const target = rowidOf(messageId, id);
+      if (target === null) return false;
+      const cur = q("select read_message_id as m from chat_session where id = ?").get(id) as
+        | { m: string | null }
+        | undefined;
+      if (!cur) return false;
+      const current = rowidOf(cur.m, id);
+      if (current !== null && current >= target) return false;
+      set("read_message_id", id, messageId);
+      return true;
+    },
     addUsage(id, u) {
       q(
         `update chat_session set tokens_in = tokens_in + ?, tokens_out = tokens_out + ?,

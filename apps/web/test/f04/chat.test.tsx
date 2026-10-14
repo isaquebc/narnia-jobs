@@ -152,7 +152,7 @@ describe("F04/M4 · chat com o recrutador", () => {
       }),
       initialUrl: "/chat/s1",
     });
-    expect(await screen.findByText(/hibernada/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Conversa hibernada: ela acorda/)).toBeInTheDocument();
   });
 
   it("erro do provider aparece com mensagem amigável e detalhes técnicos recolhidos", async () => {

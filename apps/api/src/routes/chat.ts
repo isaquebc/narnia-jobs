@@ -1,5 +1,6 @@
 import type { Repos } from "@narnia-jobs/core";
 import {
+  ChatReadRequestSchema,
   ChatSendRequestSchema,
   ChatSessionCreateRequestSchema,
   ChatSessionPatchRequestSchema,
@@ -115,6 +116,16 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
   app.post("/api/sessions/:id/messages", validate("json", ChatSendRequestSchema), (c) => {
     try {
       return c.json(sessions.send(c.req.param("id"), c.req.valid("json").text), 202);
+    } catch (e) {
+      return sessionError(c, e);
+    }
+  });
+
+  app.post("/api/sessions/:id/read", validate("json", ChatReadRequestSchema), (c) => {
+    try {
+      return c.json({
+        session: sessions.markRead(c.req.param("id"), c.req.valid("json").messageId),
+      });
     } catch (e) {
       return sessionError(c, e);
     }

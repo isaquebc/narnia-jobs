@@ -32,6 +32,7 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
   analyzeRepo: { fonte: "input.context", resposta: OUTPUT },
   synthesizeRun: { relatorios: "input.reports", metricas: "input.metrics_table", resposta: OUTPUT },
   checkProposals: { itens: "input.items_json", referencia: "reference", resposta: OUTPUT },
+  chatTitle: { mensagem: "input.message", resposta: OUTPUT },
 };
 
 export const JUDGE_SYSTEM =

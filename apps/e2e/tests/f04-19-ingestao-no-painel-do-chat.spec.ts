@@ -39,4 +39,23 @@ test("F04/E2E-19 ingestão pela conversa no painel: progresso, aviso do fim pelo
   await expect(
     panel.getByText("Revisão salva. Os fatos aceitos já estão no perfil."),
   ).toBeVisible();
+
+  // o link da ingestão vai na mensagem do recrutador que a abriu, não fixo acima do campo
+  await expect(messages.getByRole("link", { name: "Abrir a ingestão criada" })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Abrir a ingestão criada" })).toHaveCount(1);
+
+  // segunda ingestão na mesma conversa: card novo em cima; o anterior continua, finalizado
+  await page
+    .getByRole("textbox", { name: "Mensagem para o recrutador" })
+    .fill(`texto: ${STORY} Segunda vez pelo painel do E2E-19.`);
+  await page.getByRole("button", { name: "Enviar" }).click();
+  const cards = page.getByRole("list", { name: "Ingestões da conversa" }).getByRole("listitem");
+  await expect(cards).toHaveCount(2, { timeout: 60_000 });
+  await expect(cards.nth(1).getByText("Finalizada")).toBeVisible();
+  await expect(
+    cards.nth(1).getByRole("link", { name: "Abrir a página da ingestão" }),
+  ).toHaveAttribute("href", `/ingestao/${run.id}`);
+  await expect(messages.getByRole("link", { name: "Abrir a ingestão criada" })).toHaveCount(2, {
+    timeout: 60_000,
+  });
 });

@@ -1,4 +1,4 @@
-import type { ChatSession } from "@narnia-jobs/shared";
+import type { ChatMessage, ChatSession, Profile } from "@narnia-jobs/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Archive, Paperclip, Pencil, Square, Wrench } from "lucide-react";
@@ -62,6 +62,27 @@ function UserContent({ text }: { text: string }) {
   );
 }
 
+/**
+ * Nome do recrutador (pedido do dono, 2026-10-13): o título da página é "Recrutador <perfil>" e o autor das mensagens
+ * "Recrutador <perfil> <senioridade do recrutador>" (Sênior por padrão; a persona pode trocar para Pleno).
+ */
+export function recruiterNames(profile: Pick<Profile, "name" | "personaOverrides"> | null) {
+  if (!profile) return { title: t("chat.title"), author: t("chat.recruiter") };
+  const seniority = profile.personaOverrides?.recruiterSeniority ?? "senior";
+  return {
+    title: t("chat.titleProfile", { profile: profile.name }),
+    author: t("chat.recruiterName", {
+      profile: profile.name,
+      seniority: t(`chat.seniority.${seniority}` as TKey),
+    }),
+  };
+}
+
+function useRecruiterNames(profileId: string | null | undefined) {
+  const { profiles, active } = useProfiles();
+  return recruiterNames(profiles.find((p) => p.id === profileId) ?? (profileId ? null : active));
+}
+
 /** Chat com o recrutador (F04 §4): conversas do perfil ativo, mensagens em stream, contexto e teto de conversas. */
 export function ChatPage({ sessionId }: { sessionId?: string }) {
   const { active } = useProfiles();
@@ -70,6 +91,7 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   const { sessions, create, hibernate, patch } = useChatSessions(active?.id ?? null);
   const navigate = useNavigate();
   const [limit, setLimit] = useState<SessionLimit | null>(null);
+  const names = useRecruiterNames(active?.id ?? null);
 
   const visible = sessions.filter((s) => s.state !== "archived");
   useEffect(() => {
@@ -113,7 +135,7 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
     <div className="flex h-full min-h-0 gap-4">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl font-semibold">{t("chat.title")}</h1>
+          <h1 className="text-xl font-semibold">{names.title}</h1>
           <Button onClick={() => void startNew()} disabled={!loggedIn || create.isPending}>
             {t("chat.newSession")}
           </Button>
@@ -123,12 +145,14 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
             {t("chat.loggedOut", { hint: provider.data?.loginHint ?? t("chat.loggedOutDefault") })}
           </Alert>
         ) : null}
-        <SessionTabs
-          sessions={visible}
-          current={sessionId ?? null}
-          onRename={(id, title) => patch.mutate({ id, title })}
-          onArchive={(id) => patch.mutate({ id, archived: true })}
-        />
+        {/* a lista de conversas fica no menu da esquerda (2026-10-13); aqui só a aberta, com renomear e arquivar */}
+        {open.data ? (
+          <SessionHeader
+            session={open.data.session}
+            onRename={(title) => patch.mutate({ id: open.data.session.id, title })}
+            onArchive={() => patch.mutate({ id: open.data.session.id, archived: true })}
+          />
+        ) : null}
         {sessionId ? (
           <ChatView key={sessionId} sessionId={sessionId} />
         ) : (
@@ -145,78 +169,62 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   );
 }
 
-function SessionTabs({
-  sessions,
-  current,
+function SessionHeader({
+  session,
   onRename,
   onArchive,
 }: {
-  sessions: ChatSession[];
-  current: string | null;
-  onRename: (id: string, title: string) => void;
-  onArchive: (id: string) => void;
+  session: ChatSession;
+  onRename: (title: string) => void;
+  onArchive: () => void;
 }) {
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
-  if (sessions.length === 0) return null;
   return (
-    <nav aria-label={t("chat.sessions")} className="flex flex-wrap gap-2">
-      {sessions.map((s) => (
-        <div
-          key={s.id}
-          className={`flex items-center gap-1 rounded-md border px-2 py-1 text-sm ${s.id === current ? "border-primary bg-muted" : "border-border"}`}
+    <div className="flex items-center gap-2 text-sm">
+      {editing ? (
+        <form
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            if (title.trim()) onRename(title.trim());
+            setEditing(false);
+          }}
         >
-          {editing === s.id ? (
-            <form
-              onSubmit={(e: FormEvent) => {
-                e.preventDefault();
-                if (title.trim()) onRename(s.id, title.trim());
-                setEditing(null);
-              }}
-            >
-              <Input
-                aria-label={t("chat.renameLabel")}
-                value={title}
-                autoFocus
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => setEditing(null)}
-                className="h-7"
-              />
-            </form>
-          ) : (
-            <NavLink to={`/chat/${s.id}`} className="flex items-center gap-1">
-              <span>{s.title}</span>
-              <Badge tone={s.state === "live" ? "ok" : "neutral"}>
-                {t(`chat.state.${s.state}` as TKey)}
-              </Badge>
-            </NavLink>
-          )}
-          {s.id === current ? (
-            <>
-              <button
-                type="button"
-                aria-label={t("chat.rename")}
-                className="text-muted-fg hover:text-fg"
-                onClick={() => {
-                  setTitle(s.title);
-                  setEditing(s.id);
-                }}
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                type="button"
-                aria-label={t("chat.archive")}
-                className="text-muted-fg hover:text-fg"
-                onClick={() => onArchive(s.id)}
-              >
-                <Archive size={14} />
-              </button>
-            </>
-          ) : null}
-        </div>
-      ))}
-    </nav>
+          <Input
+            aria-label={t("chat.renameLabel")}
+            value={title}
+            autoFocus
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => setEditing(false)}
+            className="h-7"
+          />
+        </form>
+      ) : (
+        <h2 className="truncate font-medium">{session.title}</h2>
+      )}
+      <Badge tone={session.state === "live" ? "ok" : "neutral"}>
+        {t(`chat.state.${session.state}` as TKey)}
+      </Badge>
+      <button
+        type="button"
+        aria-label={t("chat.rename")}
+        className="text-muted-fg hover:text-fg"
+        onClick={() => {
+          setTitle(session.title);
+          setEditing(true);
+        }}
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        type="button"
+        aria-label={t("chat.archive")}
+        className="text-muted-fg hover:text-fg"
+        onClick={onArchive}
+      >
+        <Archive size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -246,6 +254,7 @@ function ToolChip({
 export function ChatView({ sessionId }: { sessionId: string }) {
   const chat = useChatSession(sessionId);
   const api = useApi();
+  const names = useRecruiterNames(chat.session?.profileId);
   const [text, setText] = useState("");
   // teto de conversas ao enviar numa conversa hibernada (F04-3): pergunta qual encerrar e reenvia a mensagem
   const [limit, setLimit] = useState<(SessionLimit & { text: string }) | null>(null);
@@ -317,6 +326,29 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     }
     if (stuck.current) el.scrollTop = el.scrollHeight;
   }, [historyLength, toolsLength, chat.streamed, chat.pendingUser, chat.turnActive]);
+  // ingestões do turno em andamento: as que o histórico ainda não tem vão com o link na bolha provisória
+  const savedRuns = new Set(chat.history.flatMap(runsOf));
+  const liveRuns = chat.createdRuns.filter((r) => !savedRuns.has(r));
+  // lida só quando a última mensagem aparece na tela (2026-10-13): rolou para cima, escondendo-a, não marca
+  const lastSeen = useRef<HTMLLIElement>(null);
+  const last = chat.history.at(-1) ?? null;
+  const lastId = last && last.role !== "user" ? last.id : null;
+  const { markRead } = chat;
+  const unread = (s?.unread ?? 0) > 0;
+  useEffect(() => {
+    const el = lastSeen.current;
+    if (!lastId || !el || !unread) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && document.visibilityState !== "hidden")
+          markRead(lastId);
+      },
+      { root: scroller.current, threshold: 0.5 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [lastId, unread, markRead]);
   return (
     <section
       className="flex min-h-0 flex-1 flex-col gap-3"
@@ -372,13 +404,18 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             <li className="text-sm text-muted-fg">{t("chat.emptySession")}</li>
           ) : null}
           {chat.history.map((m) => (
-            <li key={m.id} className={m.role === "user" ? "self-end max-w-[80%]" : "max-w-[90%]"}>
+            <li
+              key={m.id}
+              ref={m.id === lastId ? lastSeen : undefined}
+              data-message-id={m.id}
+              className={m.role === "user" ? "self-end max-w-[80%]" : "max-w-[90%]"}
+            >
               {m.role === "system_note" ? (
                 <p className="text-xs italic text-muted-fg">{m.contentMd}</p>
               ) : (
                 <Card className={m.role === "user" ? "bg-muted p-3" : "p-3"}>
                   <span className="mb-1 block text-xs text-muted-fg">
-                    {m.role === "user" ? t("chat.you") : t("chat.recruiter")}
+                    {m.role === "user" ? t("chat.you") : names.author}
                   </span>
                   {m.toolCalls.length > 0 ? (
                     <div className="mb-2 flex flex-wrap gap-1">
@@ -393,6 +430,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                   ) : (
                     <Markdown text={m.contentMd} />
                   )}
+                  <RunLinks runIds={runsOf(m)} />
                 </Card>
               )}
             </li>
@@ -408,7 +446,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           {chat.turnActive || chat.streamed || chat.tools.length > 0 ? (
             <li className="max-w-[90%]" aria-live="polite">
               <Card className="p-3">
-                <span className="mb-1 block text-xs text-muted-fg">{t("chat.recruiter")}</span>
+                <span className="mb-1 block text-xs text-muted-fg">{names.author}</span>
                 {chat.tools.length > 0 ? (
                   <div className="mb-2 flex flex-wrap gap-1">
                     {chat.tools.map((tl: LiveTool, i) => (
@@ -428,14 +466,12 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                 {chat.turnActive && !chat.streamed ? (
                   <span className="text-sm text-muted-fg">{t("chat.thinking")}</span>
                 ) : null}
+                <RunLinks runIds={liveRuns} />
               </Card>
             </li>
           ) : null}
         </ol>
       </div>
-      {chat.createdRuns.map((runId) => (
-        <CreatedRun key={runId} runId={runId} />
-      ))}
       {chat.error ? (
         <Alert tone="danger">
           <FriendlyError
@@ -529,16 +565,21 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   );
 }
 
+const runsOf = (m: ChatMessage) => m.toolCalls.flatMap((tc) => (tc.runId ? [tc.runId] : []));
+
 /**
- * Execução aberta pela conversa (auditoria E1): link para a tela. Progresso, confirmação do custo e revisão ficam no
- * card "Ingestão da conversa" do painel da direita (2026-10-13).
+ * Ingestão aberta no turno (2026-10-13): o link vai no corpo da mensagem do recrutador que a criou, e não fixo acima
+ * do campo de mensagem (com várias ingestões não dava para saber qual era qual).
  */
-function CreatedRun({ runId }: { runId: string }) {
+function RunLinks({ runIds }: { runIds: string[] }) {
+  if (runIds.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      <NavLink to={`/ingestao/${runId}`} className="underline">
-        {t("chat.ingestionCreated")}
-      </NavLink>
+    <div className="mt-2 flex flex-wrap gap-3 text-sm">
+      {runIds.map((runId) => (
+        <NavLink key={runId} to={`/ingestao/${runId}`} className="underline">
+          {t("chat.ingestionCreated")}
+        </NavLink>
+      ))}
     </div>
   );
 }
@@ -589,14 +630,23 @@ function ContextPanel({ sessionId }: { sessionId: string }) {
     ]),
   );
   const mine = sources.filter((s) => s.sessionId === null || s.sessionId === sessionId);
-  const currentRun = chat.createdRuns.at(-1) ?? null;
+  // cada ingestão da conversa tem o seu card; as anteriores ficam (finalizadas quando salvas), a mais nova em cima
+  const runs = [...chat.createdRuns].reverse();
   return (
     <aside
       aria-label={t("chat.context")}
       className="hidden min-h-0 w-80 shrink-0 flex-col gap-3 overflow-y-auto lg:flex"
     >
       {/* ingestão aberta pela conversa: card próprio acima do cartão do perfil; a revisão usa a rolagem do painel */}
-      {currentRun ? <ChatIngestionCard key={currentRun} runId={currentRun} /> : null}
+      {runs.length > 0 ? (
+        <ul aria-label={t("chat.ingestion.list")} className="flex flex-col gap-3">
+          {runs.map((runId) => (
+            <li key={runId}>
+              <ChatIngestionCard runId={runId} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <Card className="p-3">
         <CardTitle className="mb-2 text-sm">{t("chat.card")}</CardTitle>
         <p className="whitespace-pre-wrap text-xs text-muted-fg">{card.data?.text ?? "…"}</p>

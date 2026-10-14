@@ -2,6 +2,7 @@ import type {
   AnalyzeProfilesProviderInput,
   AnalyzeRepoInput,
   BuildDigestInput,
+  ChatTitleInput,
   CheckProposalsInput,
   ExtractFactsInput,
   PickFilesInput,
@@ -27,6 +28,7 @@ type Input<Op extends StructuredOperation> = Omit<
     analyzeRepo: AnalyzeRepoInput;
     synthesizeRun: SynthesizeRunInput;
     checkProposals: CheckProposalsInput;
+    chatTitle: ChatTitleInput;
   }[Op],
   "model"
 >;
@@ -359,6 +361,37 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
         ],
       },
       reference: { p1: "partial" },
+    },
+  ],
+  chatTitle: [
+    {
+      id: "negociacao-pj",
+      description:
+        "Pedido claro: o título diz o objetivo (negociar salário PJ), sem inventar empresa.",
+      input: {
+        message:
+          "Recebi uma proposta PJ de R$ 18 mil por mês da Acme. Quanto devo pedir para ficar equivalente ao meu CLT de R$ 14 mil?",
+      },
+      reference: { expected: ["PJ"], forbidden: ["Globex"] },
+    },
+    {
+      id: "anexo-curriculo",
+      description: "Só o anexo, sem pedido: título sobre o currículo.",
+      input: {
+        message:
+          "[anexo: curriculo-ana.pdf · fileId 01JEXEMPLO]\nAnexei este arquivo: leia e me diga o que entra no meu perfil.",
+      },
+      reference: { expected: ["currículo"] },
+    },
+    {
+      id: "objetivo-nao-palavras",
+      description:
+        "O objetivo não está nas primeiras palavras: o título nomeia a decisão (mudar de emprego), não o desabafo.",
+      input: {
+        message:
+          "Estou cansado do meu time, as reuniões não acabam e meu gestor não me escuta. Será que é hora de procurar outra empresa?",
+      },
+      reference: { expected: ["emprego"], forbidden: ["cansado", "reuniões"] },
     },
   ],
 };

@@ -115,4 +115,54 @@ describe("F04/M5 · span das chamadas estruturadas", () => {
     expect(String(s?.attrs["input.value"])).toContain("ana/projeto-exemplo");
     expect(JSON.parse(String(s?.attrs["output.value"]))).toEqual(output);
   });
+
+  it("toda chamada ao modelo registra o gasto (2026-10-13): complete (ponte e avaliações) e chatTitle", async () => {
+    const spans: Array<{ name: string; attrs: Record<string, unknown>; ended: boolean }> = [];
+    setTracer({
+      startSpan(name, attrs = {}) {
+        const s = { name, attrs: { ...attrs }, ended: false };
+        spans.push(s);
+        return {
+          setAttributes: (a) => Object.assign(s.attrs, a),
+          recordError: () => undefined,
+          end: () => {
+            s.ended = true;
+          },
+        };
+      },
+    });
+    const query = ((params: { options: { outputFormat?: unknown } }) =>
+      (async function* () {
+        yield {
+          type: "result",
+          subtype: "success",
+          result: "ok",
+          ...(params.options.outputFormat
+            ? { structured_output: { title: "Negociação de salário PJ" } }
+            : {}),
+          usage: { input_tokens: 50, output_tokens: 10 },
+          total_cost_usd: 0.0021,
+        } as SdkMessageLike;
+      })()) as unknown as QueryFn;
+    const p = new ClaudeCodeProvider({
+      exec: async () => ({ stdout: "", stderr: "", code: 0 }),
+      query,
+      binaryPath: "/bin/claude",
+    });
+    await p.complete({ system: "s", prompt: "p", model: "haiku" });
+    const complete = spans.find((x) => x.name === "llm.complete");
+    expect(complete?.ended).toBe(true);
+    expect(complete?.attrs).toMatchObject({
+      "openinference.span.kind": "LLM",
+      "narnia.operation": "complete",
+      "llm.token_count.total": 60,
+      "narnia.cost_usd": 0.0021,
+    });
+    const r = await p.chatTitle({ message: "Quanto pedir como PJ?", model: "haiku" });
+    expect(r.output.title).toBe("Negociação de salário PJ");
+    const title = spans.find(
+      (x) => x.name === "llm.structured" && x.attrs["narnia.operation"] === "chatTitle",
+    );
+    expect(title?.attrs).toMatchObject({ "llm.model_name": "haiku", "narnia.cost_usd": 0.0021 });
+  });
 });

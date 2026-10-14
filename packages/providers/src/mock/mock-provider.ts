@@ -5,6 +5,7 @@ import type {
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
   BuildDigestOutput,
+  ChatTitleOutput,
   CheckProposalsOutput,
   Evidence,
   ExtractFactsOutput,
@@ -20,6 +21,7 @@ import {
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,
+  type ChatTitleInput,
   type CheckProposalsInput,
   type CompleteInput,
   type CompleteResult,
@@ -54,6 +56,7 @@ export type MockOperation =
   | "analyzeRepo"
   | "synthesizeRun"
   | "checkProposals"
+  | "chatTitle"
   | "complete"
   | "openChat";
 
@@ -365,6 +368,30 @@ export class MockProvider implements Provider {
       }),
     };
     return this.result(output, JSON.stringify(input.items), input.model);
+  }
+
+  /**
+   * Título previsível para testes (o real é o objetivo da mensagem, escolhido pelo haiku): as primeiras palavras, sem
+   * o marcador de anexo, com a inicial maiúscula.
+   */
+  async chatTitle(input: ChatTitleInput): Promise<ProviderResult<ChatTitleOutput>> {
+    await this.gate("chatTitle");
+    const words = input.message
+      .replace(/\[anexo: [^\]]*\]/g, " ")
+      .replace(/[^\p{L}\p{N}$%.,/ -]+/gu, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 5);
+    const text = words
+      .join(" ")
+      .replace(/[.,?!]+$/, "")
+      .slice(0, 60)
+      .trim();
+    const title =
+      words.length >= 2
+        ? `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+        : "Conversa com o recrutador";
+    return this.result({ title }, input.message, input.model);
   }
 
   planWindowSnapshot(): { utilization: number | null; resetsAt: string | null } | null {

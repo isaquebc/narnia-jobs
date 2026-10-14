@@ -52,3 +52,16 @@ describe("mock do chat: aviso de ingestão pronta", () => {
     expect(mockChatScript("texto: minha história", { category: "career" })[0]).toBe("ingest_text");
   });
 });
+
+describe("mock: título da conversa", () => {
+  it("as primeiras palavras da mensagem, sem o marcador de anexo; mensagem vaga vira o título padrão", async () => {
+    const m = new MockProvider();
+    const a = await m.chatTitle({
+      message: "[anexo: cv.pdf]\nquanto pedir numa proposta PJ da Acme?",
+      model: "haiku",
+    });
+    expect(a.output.title).toBe("Quanto pedir numa proposta PJ");
+    const b = await m.chatTitle({ message: "oi", model: "haiku" });
+    expect(b.output.title).toBe("Conversa com o recrutador");
+  });
+});

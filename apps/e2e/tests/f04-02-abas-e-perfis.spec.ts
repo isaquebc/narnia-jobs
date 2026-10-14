@@ -3,7 +3,7 @@ import { createProfile, createSession, say } from "../helpers/chat";
 import { freshStart } from "../helpers/ingest";
 import { login, switchTo } from "../helpers/profiles";
 
-test("F04/E2E-02 abas por perfil: conversas do perfil A somem ao trocar para B e voltam com o histórico", async ({
+test("F04/E2E-02 conversas por perfil no menu: as do perfil A somem ao trocar para B e voltam com o histórico", async ({
   page,
 }) => {
   const { ids } = await freshStart("engineer");
@@ -14,7 +14,8 @@ test("F04/E2E-02 abas por perfil: conversas do perfil A somem ao trocar para B e
   await say(a1.id, "o que está fraco?");
 
   await login(page, `/chat/${a1.id}`);
-  const tabs = page.getByRole("navigation", { name: "Conversas" });
+  // as conversas ficam como subitens do Chat no menu da esquerda (2026-10-13)
+  const tabs = page.getByRole("list", { name: "Conversas do chat" });
   await expect(tabs.getByText("Conversa A1")).toBeVisible();
   await expect(tabs.getByText("Conversa A2")).toBeVisible();
   await expect(tabs.getByText("Conversa B1")).toHaveCount(0);

@@ -13,7 +13,8 @@ import { runHeadline } from "../ingestion/runHeadline";
 
 /**
  * Ingestão aberta pela conversa, administrada no painel da direita (pedido do dono, 2026-10-13): etapa e progresso
- * pelo WS (sem polling e sem o recrutador gastar tokens esperando), confirmação do custo e a revisão ali mesmo.
+ * pelo WS (sem polling e sem o recrutador gastar tokens esperando), confirmação do custo e a revisão ali mesmo. Uma
+ * por ingestão: as anteriores continuam no painel e mostram "Finalizada" quando tudo foi decidido e salvo.
  */
 export function ChatIngestionCard({ runId }: { runId: string }) {
   const api = useApi();
@@ -54,7 +55,7 @@ export function ChatIngestionCard({ runId }: { runId: string }) {
               <span className="text-muted-fg">
                 {t(`ingestion.sources.${run.source ?? "cv"}` as TKey)}
               </span>
-              <Badge tone={progress?.stuck ? "warn" : "info"}>
+              <Badge tone={run.status === "done" ? "ok" : progress?.stuck ? "warn" : "info"}>
                 {runHeadline(run.status, progress)}
               </Badge>
             </div>

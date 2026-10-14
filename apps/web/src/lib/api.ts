@@ -209,6 +209,11 @@ export function createApiClient(opts: ApiClientOptions = {}) {
             .map(([k, v]) => [k, String(v)]),
         ).toString()}`,
       ),
+    markChatRead: (id: string, messageId: string) =>
+      request<{ session: ChatSession }>(
+        `/api/sessions/${encodeURIComponent(id)}/read`,
+        json({ messageId }),
+      ),
     sendChatMessage: (id: string, text: string) =>
       request<{ turnIndex: number }>(
         `/api/sessions/${encodeURIComponent(id)}/messages`,

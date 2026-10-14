@@ -3,17 +3,17 @@ import { describe, expect, it } from "vitest";
 import { MODEL_IDS, promptCatalog } from "../src/evals/prompt-catalog";
 import { syncPrompts } from "../src/evals/prompt-sync";
 
-/** Avaliações no Phoenix (M2, decisão AV-4): os 18 prompts do repositório versionados no Phoenix. */
+/** Avaliações no Phoenix (M2, decisão AV-4): os 19 prompts do repositório versionados no Phoenix. */
 describe("catálogo de prompts", () => {
-  it("18 prompts: 8 estruturados, a persona, 4 notas e 5 skills; nomes únicos narnia-*", () => {
+  it("19 prompts: 9 estruturados, a persona, 4 notas e 5 skills; nomes únicos narnia-*", () => {
     const c = promptCatalog();
-    expect(c).toHaveLength(18);
+    expect(c).toHaveLength(19);
     const kinds = c.reduce<Record<string, number>>((acc, p) => {
       acc[p.kind] = (acc[p.kind] ?? 0) + 1;
       return acc;
     }, {});
-    expect(kinds).toEqual({ structured: 8, agent: 1, note: 4, skill: 5 });
-    expect(new Set(c.map((p) => p.name)).size).toBe(18);
+    expect(kinds).toEqual({ structured: 9, agent: 1, note: 4, skill: 5 });
+    expect(new Set(c.map((p) => p.name)).size).toBe(19);
     for (const p of c) {
       expect(p.name).toMatch(/^narnia-[a-z0-9-]+$/);
       expect(p.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -110,7 +110,7 @@ function fakePhoenix() {
 }
 
 describe("sincronização com o Phoenix", () => {
-  it("primeira vez cria os 18 com a tag production, na ponte e com o commit; depois nada muda", async () => {
+  it("primeira vez cria os 19 com a tag production, na ponte e com o commit; depois nada muda", async () => {
     const px = fakePhoenix();
     const o = {
       baseUrl: "http://phoenix:6006",
@@ -119,7 +119,7 @@ describe("sincronização com o Phoenix", () => {
       commit: "abc1234",
     };
     const first = await syncPrompts(promptCatalog(), o);
-    expect(first.filter((r) => r.action === "created")).toHaveLength(18);
+    expect(first.filter((r) => r.action === "created")).toHaveLength(19);
     const create = px.calls.find(
       (c) => c.op === "create" && c.vars?.name === "narnia-extract-facts",
     );

@@ -10,6 +10,9 @@ import {
   AnalyzeRepoOutputSchema,
   type BuildDigestOutput,
   BuildDigestOutputSchema,
+  CHAT_OUTPUT_JSON_SCHEMAS,
+  type ChatTitleOutput,
+  ChatTitleOutputSchema,
   type CheckProposalsOutput,
   CheckProposalsOutputSchema,
   clip,
@@ -48,6 +51,7 @@ import {
   type AnalyzeRepoInput,
   type AuthMethod,
   type BuildDigestInput,
+  type ChatTitleInput,
   type CheckProposalsInput,
   type CompleteInput,
   type CompleteResult,
@@ -553,7 +557,59 @@ export class ClaudeCodeProvider implements Provider {
    * usuário; com schema, a saída estruturada do SDK (o JSON vira o texto da resposta). Erro do modelo vira
    * `ProviderError` com a mensagem dele.
    */
-  async complete(input: CompleteInput, onText?: (text: string) => void): Promise<CompleteResult> {
+  complete(input: CompleteInput, onText?: (text: string) => void): Promise<CompleteResult> {
+    // toda chamada ao modelo deixa o gasto no Phoenix (2026-10-13), inclusive a da ponte e a das avaliações
+    const content = contentTracingEnabled();
+    return withSpan(
+      "llm.complete",
+      {
+        "openinference.span.kind": "LLM",
+        "llm.provider": "anthropic",
+        "llm.system": "anthropic",
+        "llm.model_name": input.model,
+        "narnia.operation": "complete",
+        ...(content
+          ? {
+              ...messageAttrs("llm.input_messages", [
+                { role: "system", content: input.system },
+                { role: "user", content: input.prompt },
+              ]),
+              "input.value": clip(input.prompt),
+              "input.mime_type": "text/plain",
+            }
+          : {}),
+      },
+      async (span) => {
+        const r = await this.completeRaw(input, onText);
+        const promptTokens =
+          r.usage.inputTokens + r.usage.cacheReadTokens + r.usage.cacheWriteTokens;
+        span.setAttributes({
+          "llm.model_name": r.model,
+          "llm.token_count.prompt": promptTokens,
+          "llm.token_count.prompt_details.cache_read": r.usage.cacheReadTokens,
+          "llm.token_count.prompt_details.cache_write": r.usage.cacheWriteTokens,
+          "llm.token_count.completion": r.usage.outputTokens,
+          "llm.token_count.total": promptTokens + r.usage.outputTokens,
+          "narnia.cost_usd": r.costUsd,
+          ...(content
+            ? {
+                ...messageAttrs("llm.output_messages", [
+                  { role: "assistant", content: clip(r.text) },
+                ]),
+                "output.value": clip(r.text),
+                "output.mime_type": "text/plain",
+              }
+            : {}),
+        });
+        return r;
+      },
+    );
+  }
+
+  private async completeRaw(
+    input: CompleteInput,
+    onText?: (text: string) => void,
+  ): Promise<CompleteResult> {
     const options: SdkQueryOptions = {
       model: input.model,
       tools: [],
@@ -730,6 +786,18 @@ export class ClaudeCodeProvider implements Provider {
       INGEST_OUTPUT_JSON_SCHEMAS.checkProposals,
       CheckProposalsOutputSchema,
       "checkProposals",
+    );
+  }
+
+  chatTitle(input: ChatTitleInput): Promise<ProviderResult<ChatTitleOutput>> {
+    const prompt = renderStructuredPrompt("chatTitle", input);
+    return this.single(
+      prompt,
+      input.model,
+      PROMPTS.chatTitle(),
+      CHAT_OUTPUT_JSON_SCHEMAS.chatTitle,
+      ChatTitleOutputSchema,
+      "chatTitle",
     );
   }
 

@@ -3,6 +3,7 @@ import type {
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
   BuildDigestOutput,
+  ChatTitleOutput,
   CheckProposalsOutput,
   ExtractFactsOutput,
   FactProposal,
@@ -111,6 +112,12 @@ export interface CheckProposalsInput {
   model: string;
 }
 
+/** Título da conversa (2026-10-13): primeira mensagem do usuário, modelo mais barato. */
+export interface ChatTitleInput {
+  message: string;
+  model: string;
+}
+
 /** Avaliações no Phoenix (M1): chamada simples, sem tools, usada pela ponte da assinatura. */
 export interface CompleteInput {
   system: string;
@@ -149,6 +156,8 @@ export interface Provider {
   synthesizeRun(input: SynthesizeRunInput): Promise<ProviderResult<SynthesizeRunOutput>>;
   /** F03 §2.8: camada 2 da revisão anti-alucinação. */
   checkProposals(input: CheckProposalsInput): Promise<ProviderResult<CheckProposalsOutput>>;
+  /** Tema da conversa do chat a partir da primeira mensagem (haiku por padrão, 2026-10-13). */
+  chatTitle(input: ChatTitleInput): Promise<ProviderResult<ChatTitleOutput>>;
   /**
    * F03 §2.4: diagnóstico do plano (assinatura e uso das janelas). Nunca gasta tokens; `null` quando o plano não se
    * aplica (API key, terceiros) ou não há dado.
