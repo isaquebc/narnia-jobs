@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COOKIE_ACCEPT, requestDecision } from "../src/postings/browser";
+import { browserUserAgent, COOKIE_ACCEPT, requestDecision } from "../src/postings/browser";
 import {
   extractPosting,
   fetchPostingPage,
@@ -82,6 +82,8 @@ describe("F06/M4 · fetchPostingPage", () => {
     if (!r.ok) return;
     expect(r.text).toContain("5+ anos com Node.js");
     expect(r.text).not.toContain("Rodapé");
+    // blocos e itens viram linhas (sem "frase.Outra frase" grudadas)
+    expect(r.text).toMatch(/Requisitos\n- 5\+ anos com Node\.js\n- PostgreSQL/);
     expect(r).toMatchObject({ title: "Backend Sênior · Acme Pay", siteName: "Acme Pay Jobs" });
   });
 
@@ -238,6 +240,27 @@ describe("F06 · vaga atrás de banner de cookies ou JS (2026-10-15)", () => {
     ).toMatchObject({ ok: false, code: "http_error" });
   });
 
+  it("vaga em vários módulos (Prisma Consultoria): o texto traz todas as seções, não só a maior", () => {
+    const mod = (h: string, body: string) =>
+      `<div class="module"><div><h2>${h}</h2><div class="description">${body}</div></div></div>`;
+    const html = `<html><head><title>Jobs</title></head><body><header><nav>Menu Insights Careers Search</nav></header><main><header><a href="/x">Tech &amp; AI</a><h1>Senior Software Engineer - QuantumBlack</h1><ul><li>Doha</li><li>Dubai</li></ul></header>
+${mod("Your impact", `<p>${"You will work with clients across many industries advising them on technology. ".repeat(12)}</p><p>${"You will drive architectural design and make key technology decisions. ".repeat(10)}</p>`)}
+${mod("Your growth", `<ul><li>${"Continuous learning with structured programs. ".repeat(3)}</li><li>Global community</li></ul>`)}
+${mod("Your qualifications and skills", "<ul><li>7+ years of experience in software development</li><li>TypeScript, React and Node.js</li><li>AWS, Azure or GCP</li></ul>")}
+</main><footer>© 1996-2026 Prisma Consultoria</footer><script>var x = 1;</script></body></html>`;
+    const r = extractPosting(html, "https://www.prisma.example/careers/x", "browser");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.text).toContain("Tech & AI\nSenior Software Engineer - QuantumBlack");
+    expect(r.title).toBe("Senior Software Engineer - QuantumBlack");
+    expect(r.text).toContain("Your qualifications and skills");
+    expect(r.text).toContain("- 7+ years of experience in software development");
+    expect(r.text).toContain("You will drive architectural design");
+    expect(r.text).not.toContain("Menu Insights");
+    expect(r.text).not.toContain("Prisma Consultoria");
+    expect(r.text).not.toContain("var x");
+  });
+
   it("página de bloqueio ou captcha não vira vaga", () => {
     const blocked = `<html><head><title>Blocked - Indeed.com</title></head><body><main><article><h1>Solicitação bloqueada</h1><p>${"O sistema bloqueou você. Se acredita que houve erro, acesse o suporte e informe o código. ".repeat(4)}</p></article></main></body></html>`;
     expect(extractPosting(blocked, "https://x.com/", "browser")).toMatchObject({
@@ -280,6 +303,30 @@ describe("F06 · vaga atrás de banner de cookies ou JS (2026-10-15)", () => {
     expect(await requestDecision("https://cdn.exemplo.com/f.woff2", "font", guard)).toBe("abort");
     expect(await requestDecision("file:///etc/passwd", "document", guard)).toBe("abort");
     expect(await requestDecision("data:text/plain,oi", "other", guard)).toBe("continue");
+  });
+
+  it("navegador se apresenta como Chrome comum, sem 'HeadlessChrome' (CDN anti-robô derruba o headless, 2026-10-15)", () => {
+    const ua = browserUserAgent("155.0.8059.39");
+    expect(ua).toContain("Chrome/155.0.0.0");
+    expect(ua).not.toMatch(/headless/i);
+  });
+
+  it("com navegador disponível, o fetch simples desiste antes (8 s) para sobrar tempo ao navegador", async () => {
+    const started: number[] = [];
+    const slow = (async (_u: unknown, init?: RequestInit) =>
+      new Promise<Response>((_res, rej) => {
+        started.push(Date.now());
+        init?.signal?.addEventListener("abort", () => rej(new Error("abort")));
+      })) as typeof fetch;
+    const t0 = Date.now();
+    const r = await fetchPostingPage("https://lento.exemplo.com/1", {
+      fetch: slow,
+      lookup: publicDns,
+      plainTimeoutWithBrowserMs: 60,
+      render: async (url) => ({ ok: true, html: ARTICLE, url }),
+    });
+    expect(r).toMatchObject({ ok: true, via: "browser" });
+    expect(Date.now() - t0).toBeLessThan(2000);
   });
 
   it("botões de aceitar cookies em pt e en", () => {

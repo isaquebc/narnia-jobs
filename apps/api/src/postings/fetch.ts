@@ -49,6 +49,11 @@ export interface FetchPostingOptions {
    * desligado.
    */
   render?: PageRender | null;
+  /**
+   * Teto do fetch simples quando há navegador (padrão 8 s): site que segura robôs (CDN anti-robô) não consome o tempo
+   * todo antes do navegador tentar. Sem navegador vale `timeoutMs` (15 s).
+   */
+  plainTimeoutWithBrowserMs?: number;
 }
 
 /** Abre a página num navegador (com o anti-SSRF por requisição) e devolve o HTML renderizado e a URL final. */
@@ -186,10 +191,14 @@ export async function fetchPostingPage(
   rawUrl: string,
   opts: FetchPostingOptions = {},
 ): Promise<FetchPostingResult> {
-  const first = await fetchPlain(rawUrl, opts);
-  if (first.ok || !first.retry) return first.result;
   const render = opts.render === undefined ? defaultRender(opts) : opts.render;
-  if (!render) return first.result;
+  const first = await fetchPlain(
+    rawUrl,
+    render && opts.timeoutMs === undefined
+      ? { ...opts, timeoutMs: opts.plainTimeoutWithBrowserMs ?? 8_000 }
+      : opts,
+  );
+  if (first.ok || !first.retry || !render) return first.result;
   const page = await render(first.url);
   if (!page.ok) return first.result;
   const fromBrowser = extractPosting(page.html, page.url, "browser");
@@ -305,20 +314,34 @@ export function extractPosting(
       html,
       via,
     };
+  // texto do conteúdo principal, antes do Readability (que altera o documento)
+  const main = mainText(document);
+  const h1 =
+    (document.querySelector("main h1, [role=main] h1, h1")?.textContent ?? "")
+      .replace(/\s+/g, " ")
+      .trim() || null;
   let text = "";
   let title: string | null = null;
   try {
     const article = new Readability(
       document as unknown as ConstructorParameters<typeof Readability>[0],
     ).parse();
-    text = (article?.textContent ?? "")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
+    // o HTML do artigo, não o textContent: blocos e itens viram linhas
+    text = article?.content
+      ? htmlToLines(article.content)
+      : (article?.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
     title = article?.title?.trim() || null;
   } catch {
     text = "";
   }
+  // vaga dividida em vários blocos (Prisma Consultoria: impacto, crescimento, requisitos): o Readability fica com o maior e
+  // perde o resto; cobrindo menos da metade do conteúdo principal, ou sem a seção de requisitos que o conteúdo
+  // principal tem, vale o conteúdo principal inteiro
+  if (
+    main.length <= MAIN_TEXT_MAX &&
+    (text.length < main.length * 0.5 || (REQUIREMENTS.test(main) && !REQUIREMENTS.test(text)))
+  )
+    text = main;
   // página de bloqueio, captcha ou checagem anti-robô (curta e com o aviso no título ou no texto) não é a vaga
   const pageTitle = document.querySelector("title")?.textContent ?? "";
   if (text.length < 2000 && BLOCKED_PAGE.test(`${pageTitle}\n${text.slice(0, 600)}`))
@@ -335,7 +358,8 @@ export function extractPosting(
     ok: true,
     url,
     text,
-    title: meta("og:title") ?? title,
+    // og:title, senão o <h1> (o <title> costuma ser genérico: "Jobs", "Vagas")
+    title: meta("og:title") ?? h1 ?? title,
     siteName: meta("og:site_name"),
     company: null,
     html,
@@ -373,6 +397,28 @@ function findJobPosting(document: ReturnType<typeof parseHTML>["document"]): Jso
   return null;
 }
 
+const MAIN_TEXT_MAX = 30_000;
+/** Cabeçalho de requisitos (pt e en): toda vaga tem; se o Readability perdeu, perdeu a parte que mais importa. */
+const REQUIREMENTS =
+  /\b(requisitos|qualifica[cç][oõ]es|o que (buscamos|esperamos)|requirements|qualifications|what you('ll)? (need|bring)|must have|skills)\b/i;
+const NOT_CONTENT =
+  "script, style, noscript, template, svg, iframe, nav, aside, form, button, [role=navigation], [aria-hidden=true]";
+/** Cabeçalho e rodapé do site; dentro do `<main>` são do artigo (o cargo costuma estar no `<header>` dele). */
+const SITE_CHROME = "header, footer, [role=banner], [role=contentinfo]";
+
+/** Texto do `<main>` (ou do `<body>`) sem menu, cabeçalho e rodapé do site, formulários e scripts, em linhas. */
+function mainText(document: ReturnType<typeof parseHTML>["document"]): string {
+  const main = document.querySelector("main, [role=main]");
+  const root = main ?? document.body;
+  if (!root) return "";
+  const { document: copy } = parseHTML(
+    `<!doctype html><html><body>${root.innerHTML}</body></html>`,
+  );
+  for (const el of copy.querySelectorAll(main ? NOT_CONTENT : `${NOT_CONTENT}, ${SITE_CHROME}`))
+    el.remove();
+  return htmlToLines(copy.body?.innerHTML ?? "");
+}
+
 /** HTML da descrição em texto com quebras: blocos e `<br>` viram linha, itens de lista ganham "- ". */
 function htmlToLines(fragment: string): string {
   // alguns sites mandam a descrição com o HTML escapado (&lt;p&gt;): desfaz uma vez
@@ -384,6 +430,8 @@ function htmlToLines(fragment: string): string {
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
   for (const br of document.querySelectorAll("br")) br.replaceWith(document.createTextNode("\n"));
   for (const li of document.querySelectorAll("li")) li.prepend(document.createTextNode("\n- "));
+  for (const h of document.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+    h.prepend(document.createTextNode("\n"));
   for (const b of document.querySelectorAll("p, div, h1, h2, h3, h4, h5, h6, ul, ol, section"))
     b.append(document.createTextNode("\n"));
   return (

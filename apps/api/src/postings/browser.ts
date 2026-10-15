@@ -34,6 +34,16 @@ export async function requestDecision(
 export const COOKIE_ACCEPT =
   /^\s*(aceitar( todos)?( os cookies)?|aceito|accept( all)?( cookies)?|concordo|i agree|agree|allow all|permitir todos|ok|entendi|got it)\s*[.!]?\s*$/i;
 
+/**
+ * User-agent de um Chrome comum da mesma versão, sem "HeadlessChrome": CDNs anti-robô (Akamai, na Prisma Consultoria) derrubam
+ * a conexão do headless (`ERR_HTTP2_PROTOCOL_ERROR`). A busca continua sendo uma página pedida pelo usuário, com o
+ * robots.txt respeitado antes (2026-10-15).
+ */
+export function browserUserAgent(version: string): string {
+  const major = version.split(".")[0] || "130";
+  return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
+}
+
 export interface RenderOptions {
   guard: HostGuard;
   timeoutMs?: number;
@@ -51,6 +61,7 @@ export async function renderInBrowser(
     browser = await chromium.connect(wsEndpoint, { timeout: 10_000 });
     const context = await browser.newContext({
       serviceWorkers: "block",
+      userAgent: browserUserAgent(browser.version()),
       locale: "pt-BR",
       javaScriptEnabled: true,
     });
