@@ -45,7 +45,7 @@ export function SideNav({ className }: { className?: string }) {
   const onboarding = useOnboardingState();
   const { active } = useProfiles();
   const completed = onboarding.data?.completed === true;
-  const live = useLiveChats(completed ? (active?.id ?? null) : null);
+  const live = useLiveChats(completed);
   return (
     <nav
       className={cn(
@@ -70,6 +70,9 @@ export function SideNav({ className }: { className?: string }) {
                 <LayoutDashboard size={16} /> {t("nav.dashboard")}
               </NavLink>
             </li>
+          </Group>
+          <hr className="border-border" />
+          <Group label={t("nav.general")}>
             <li>
               <NavLink to="/chat" className={item}>
                 <MessageSquare size={16} /> {t("nav.chat")}
@@ -82,11 +85,8 @@ export function SideNav({ className }: { className?: string }) {
                   </Badge>
                 ) : null}
               </NavLink>
-              <ChatNav profileId={active?.id ?? null} />
+              <ChatNav enabled={completed} />
             </li>
-          </Group>
-          <hr className="border-border" />
-          <Group label={t("nav.general")}>
             <li>
               <NavLink to="/perfis" className={item}>
                 <Users size={16} /> {t("nav.profiles")}

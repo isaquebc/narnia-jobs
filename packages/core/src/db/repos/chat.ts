@@ -37,7 +37,8 @@ function lazy(db: Db) {
 /* ---------- sessões e mensagens ---------- */
 
 export interface ChatSessionCreate {
-  profileId: string;
+  /** Perfil em foco (contexto, F06-8); null = conversa global. */
+  profileId: string | null;
   category: ChatCategory;
   title: string;
   provider: string;
@@ -80,7 +81,7 @@ export interface ChatSessionsRepo {
 function mapSession(r: Row, unread?: number): ChatSession {
   return ChatSessionSchema.parse({
     id: r.id,
-    profileId: r.profile_id,
+    profileId: r.profile_id ?? null,
     category: r.category,
     title: r.title,
     provider: r.provider,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Repos } from "../db";
 import { domainMatches } from "../db/repos/chat";
 
 /**
@@ -72,10 +73,31 @@ const years = (text: string) => [...new Set(text.match(/\b(19|20)\d{2}\b/g) ?? [
  * Nomes de empresa citados: sequência de palavras com inicial maiúscula depois de "na/no/pela/pelo/da/do/empresa/at".
  * Heurística (sem modelo): só vale nos casos que a pedem.
  */
+// ponto só dentro da palavra (S.A, Node.js): "Acme. Vale" é fim de frase, não a empresa "Acme Vale"
 const COMPANY =
-  /\b(?:[Nn][ao]|[Pp]el[ao]|[Dd][ao]|[Ee]mpresa|at)\s+([A-ZÀ-Ý][\w&.-]*(?:\s+[A-ZÀ-Ý][\w&.-]*)*)/g;
+  /\b(?:[Nn][ao]|[Pp]el[ao]|[Dd][ao]|[Ee]mpresa|at)\s+([A-ZÀ-Ý][\w&-]*(?:\.[\w&-]+)*(?:\s+[A-ZÀ-Ý][\w&-]*(?:\.[\w&-]+)*)*)/g;
+/** Lugares e bases públicas que a regra acima pega ("do Brasil", "do CAGED") e não são empresas. */
+const NOT_COMPANIES = new Set([
+  "brasil",
+  "brazil",
+  "caged",
+  "rais",
+  "pnad",
+  "dieese",
+  "latam",
+  "clt",
+  "pj",
+]);
+/** Percentis ("do P75") também não são empresa. */
+const NOT_COMPANY_PATTERN = /^p\d{1,2}$/;
 const companies = (text: string) => [
-  ...new Set([...text.matchAll(COMPANY)].map((m) => (m[1] ?? "").replace(/[.]+$/, ""))),
+  ...new Set(
+    [...text.matchAll(COMPANY)]
+      .map((m) => (m[1] ?? "").replace(/[.]+$/, ""))
+      .filter(
+        (c) => !NOT_COMPANIES.has(c.toLowerCase()) && !NOT_COMPANY_PATTERN.test(c.toLowerCase()),
+      ),
+  ),
 ];
 
 const hostOf = (url: string): string | null => {
@@ -221,4 +243,26 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
         throw new Error(`Avaliador desconhecido: ${String((g as { type: unknown }).type)}`);
     }
   });
+}
+
+/**
+ * Todos os fatos do usuário em texto (empresas, cargos, instituições, projetos, conquistas e datas), para os avaliadores
+ * de dados desconhecidos: o cartão resume só as experiências mais recentes, e o recrutador pode citar o resto depois
+ * de ler pelas tools (Gama, Unicamp, 2014) sem estar inventando.
+ */
+export function knownFactsText(repos: Repos): string {
+  const f = repos.facts;
+  const span = (a?: string, b?: string) => [a, b].filter(Boolean).join("–");
+  return [
+    ...f.experiences
+      .list()
+      .map((e) => `${e.company} · ${e.title} · ${span(e.startDate, e.endDate)}`),
+    ...f.achievements.list().map((a) => `${a.text} ${a.metric ?? ""}`),
+    ...f.education
+      .list()
+      .map((e) => `${e.institution} · ${e.course} · ${span(e.startDate, e.endDate)}`),
+    ...f.projects.list().map((p) => `${p.name} · ${span(p.startDate, p.endDate)}`),
+    ...f.languages.list().map((l) => l.name),
+    ...f.skills.list().map((s) => s.name),
+  ].join("\n");
 }

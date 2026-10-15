@@ -11,6 +11,7 @@ export * from "./ingest-output";
 export * from "./job";
 export * from "./notification";
 export * from "./persona";
+export * from "./posting";
 export * from "./profile";
 export * from "./profile-card";
 export * from "./profile-suggestion";

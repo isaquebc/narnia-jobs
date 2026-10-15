@@ -27,7 +27,7 @@ describe("migration 0010_chat_read", () => {
       });
     msg("user", 0);
     msg("assistant", 0);
-    expect(migrate(db).applied).toEqual(["0010_chat_read"]);
+    expect(migrate(db, { until: "0010_chat_read" }).applied).toEqual(["0010_chat_read"]);
     const after = createRepos(db);
     expect(after.chatSessions.get(s.id)?.unread).toBe(0);
     const reply = after.chatMessages.add({

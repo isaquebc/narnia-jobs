@@ -19,12 +19,15 @@ describe("avaliação local", () => {
   it("juiz do recrutador: arquivo próprio e variáveis do dataset do chat", () => {
     const j = chatJudge();
     expect(j.file).toBe("evals/judges/narnia-recrutador.md");
+    // F06-8: o juiz recebe o system prompt do recrutador (cartões de todos os perfis) como contexto
     expect(j.variables).toEqual({
+      contexto: "input.context",
       conversa: "input.messages",
       respostas: "output.replies",
       ferramentas: "output.tools",
     });
     expect(j.body).toContain("{{conversa}}");
+    expect(j.body).toContain("{{contexto}}");
   });
 
   it("judgeLocally renderiza o texto do juiz com o contexto e pede a classificação como saída estruturada", async () => {

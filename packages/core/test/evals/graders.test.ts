@@ -91,6 +91,19 @@ describe("F04/M5 · avaliadores do chat", () => {
       expect(r?.detail).toContain("Globex Corp");
     });
 
+    it("no_unknown_companies: fim de frase não emenda nomes; país e bases públicas não são empresa (F06/M1)", () => {
+      const t = {
+        ...base,
+        card: "Acme Pagamentos · Engenheira",
+        replies: [
+          "Seu melhor resultado foi na Acme. Vale destacar a latência. Os dados do Brasil e do CAGED mostram a faixa; você fica acima do P75.",
+        ],
+      };
+      expect(gradeTranscript(t, [{ type: "no_unknown_companies" }])[0]).toMatchObject({
+        passed: true,
+      });
+    });
+
     it("no_unknown_companies: fonte citada (domínio confiável ou registrado) não conta como empresa inventada", () => {
       const t = {
         ...base,

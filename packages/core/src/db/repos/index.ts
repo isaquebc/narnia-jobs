@@ -28,6 +28,16 @@ import {
 import { type IngestionRunsRepo, ingestionRunsRepo } from "./ingestion-runs";
 import { type JobsRepo, jobsRepo } from "./jobs";
 import { type NotificationsRepo, notificationsRepo } from "./notifications";
+import {
+  type JobAnalysesRepo,
+  jobAnalysesRepo,
+  type PostingContactsRepo,
+  type PostingNotesRepo,
+  type PostingsRepo,
+  postingContactsRepo,
+  postingNotesRepo,
+  postingsRepo,
+} from "./postings";
 import { type ProfilesRepo, profilesRepo } from "./profiles";
 import { type ProposalsRepo, proposalsRepo } from "./proposals";
 import { type ReadingsRepo, readingsRepo } from "./readings";
@@ -71,6 +81,11 @@ export interface Repos {
   researchSources: ResearchSourcesRepo;
   trustedDomains: TrustedDomainsRepo;
   factSearch: FactSearchRepo;
+  // F06
+  postings: PostingsRepo;
+  postingContacts: PostingContactsRepo;
+  postingNotes: PostingNotesRepo;
+  jobAnalyses: JobAnalysesRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -126,6 +141,10 @@ export function createRepos(db: Db): Repos {
     researchSources: researchSourcesRepo(db),
     trustedDomains: trustedDomainsRepo(db),
     factSearch: factSearchRepo(db),
+    postings: postingsRepo(db),
+    postingContacts: postingContactsRepo(db),
+    postingNotes: postingNotesRepo(db),
+    jobAnalyses: jobAnalysesRepo(db),
   };
 }
 
@@ -138,6 +157,7 @@ export * from "./github";
 export * from "./ingestion-runs";
 export * from "./jobs";
 export * from "./notifications";
+export * from "./postings";
 export * from "./profiles";
 export * from "./proposals";
 export * from "./readings";

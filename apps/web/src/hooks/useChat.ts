@@ -13,7 +13,7 @@ import { ApiError } from "../lib/api";
 import { useProfileCard } from "./useProfileCard";
 
 export const chatKeys = {
-  sessions: (profileId: string | null) => ["chat", "sessions", profileId] as const,
+  sessions: ["chat", "sessions"] as const,
   session: (id: string) => ["chat", "session", id] as const,
   messages: (id: string) => ["chat", "messages", id] as const,
   research: (profileId: string | null) => ["chat", "research", profileId] as const,
@@ -21,32 +21,31 @@ export const chatKeys = {
   domains: ["chat", "domains"] as const,
 };
 
-/** Conversas do perfil (F04 §4): lista, criar (409 `session_limit` sobe para a UI perguntar), renomear, arquivar. */
-export function useChatSessions(profileId: string | null) {
+/**
+ * Conversas do recrutador global (F04 §4; F06-8: não pertencem a um perfil): lista, criar (409 `session_limit` sobe
+ * para a UI perguntar), renomear, arquivar. `enabled` = false antes do primeiro uso.
+ */
+export function useChatSessions(enabled = true) {
   const api = useApi();
   const ws = useWs();
   const qc = useQueryClient();
   const query = useQuery({
-    queryKey: chatKeys.sessions(profileId),
-    queryFn: () => api.listChatSessions(profileId),
-    enabled: profileId !== null,
+    queryKey: chatKeys.sessions,
+    queryFn: () => api.listChatSessions(null),
+    enabled,
   });
   useEffect(() => {
     ws.connect();
     return ws.subscribe((e) => {
       // fim de turno traz resposta nova: a lista do menu recalcula as não lidas (ponto verde)
-      if (
-        e.type === "chat.session_updated" ||
-        e.type === "chat.turn_end" ||
-        e.type === "profile.switched"
-      )
+      if (e.type === "chat.session_updated" || e.type === "chat.turn_end")
         void qc.invalidateQueries({ queryKey: ["chat", "sessions"] });
     });
   }, [ws, qc]);
   const refresh = () => qc.invalidateQueries({ queryKey: ["chat"] });
   const create = useMutation({
     mutationFn: (req: { category?: ChatCategory; model?: string; title?: string }) =>
-      api.createChatSession({ ...(profileId ? { profileId } : {}), ...req }),
+      api.createChatSession(req),
     onSuccess: refresh,
   });
   const patch = useMutation({

@@ -52,6 +52,8 @@ const BY_CATEGORY: Record<ChatCategory, string[]> = {
   clarify: CLARIFY,
   interview: CAREER, // F08 refina
   discovery: DISCOVERY,
+  // análise de vaga (F06): carreira inteira; as tools `posting.*` e `analysis.*` entram com elas (M5)
+  job: [...CAREER, ...INGEST],
 };
 
 const matches = (name: string, prefixes: string[]) =>
@@ -72,6 +74,7 @@ export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
   clarify: [],
   interview: [],
   discovery: [],
+  job: ["WebSearch", "WebFetch"],
 };
 
 const ALL_TOOLS = [

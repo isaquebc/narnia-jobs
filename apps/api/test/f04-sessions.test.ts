@@ -256,11 +256,11 @@ describe("F04/M3 · sessões de chat", () => {
     );
   });
 
-  it("listar por perfil, renomear, trocar modelo, arquivar e apagar", async () => {
+  it("listar (global, F06-8), renomear, trocar modelo, arquivar e apagar", async () => {
     t = makeTestApp();
-    const ids = seedFixture(t.repos, "engineer");
+    seedFixture(t.repos, "engineer");
     const sid = (await newSession(t, { title: "Carreira", model: "haiku" })).body.session.id;
-    const list = (await (await t.api(`/api/sessions?profile=${ids.profileId}`)).json()) as {
+    const list = (await (await t.api("/api/sessions")).json()) as {
       sessions: Array<{ id: string }>;
     };
     expect(list.sessions.map((x) => x.id)).toEqual([sid]);

@@ -1,17 +1,22 @@
 import {
-  buildPersona,
   cardUpdatedNote,
   friendlyError,
-  getCard,
   gradeTranscript,
   newId,
   type Repos,
+  recruiterContext,
   renderNote,
   renderRecruiterPrompt,
   resolveChatSettings,
   resumeLostNote,
 } from "@narnia-jobs/core";
-import type { ChatEvent, ChatHandle, Provider, Usage } from "@narnia-jobs/providers";
+import type {
+  ChatAgentDefinition,
+  ChatEvent,
+  ChatHandle,
+  Provider,
+  Usage,
+} from "@narnia-jobs/providers";
 import {
   annotateSpan,
   type ChatCategory,
@@ -25,7 +30,13 @@ import {
 } from "@narnia-jobs/shared";
 import type { EventBus } from "../events";
 import { NATIVE_TOOLS } from "../mcp/scopes";
-import { pluginDir, readPluginFile, readRecruiterTemplate, stripFrontmatter } from "../plugin";
+import {
+  pluginDir,
+  readPluginFile,
+  readRecruiterTemplate,
+  splitFrontmatter,
+  stripFrontmatter,
+} from "../plugin";
 import { TurnTrace } from "./turn-trace";
 
 export class SessionLimitError extends Error {
@@ -91,7 +102,7 @@ interface Live {
   toolCalls: ChatToolCall[];
   /** Execuções criadas pelas tools de ingestão do turno (evento do `/mcp`), na ordem: vão para a tool call. */
   pendingRuns: string[];
-  toolStarts: Map<string, { name: string; args: string; t0: number }>;
+  toolStarts: Map<string, { name: string; args: string; t0: number; subagent?: boolean }>;
   /** F04/M5: rastro do turno em andamento (no-op sem NARNIA_OTEL_ENDPOINT). */
   trace?: TurnTrace | undefined;
   /** System prompt com que o processo foi aberto (entrada da 1ª chamada ao modelo no rastro). */
@@ -250,9 +261,8 @@ export class SessionManager {
     title?: string;
     ingestionRunId?: string | null;
   }): ChatSession {
-    const profileId = input.profileId ?? this.repos.profiles.active()?.id;
-    if (!profileId)
-      throw new SessionStateError("no_profile", "Nenhum perfil ativo: conclua o primeiro uso.");
+    // recrutador global (F06-8): a conversa não pertence a um perfil; o perfil informado fica só como contexto
+    const profileId = input.profileId ?? null;
     this.ensureCapacity();
     const settings = resolveChatSettings(this.repos.settings);
     const s = this.repos.chatSessions.create({
@@ -269,12 +279,10 @@ export class SessionManager {
   }
 
   private open(session: ChatSession): Live {
-    const profile = this.repos.profiles.get(session.profileId);
-    if (!profile)
-      throw new SessionStateError("no_profile", "O perfil desta conversa não existe mais.");
-    const card = getCard(this.repos, profile.id);
-    // o prompt vai sem snapshot (renderizado a cada abertura) com o cartão atual: a nota de cartão não se repete
-    this.repos.chatSessions.setCardHash(session.id, card.hash);
+    // recrutador geral (F06-8): todos os perfis no prompt, persona do perfil ativo
+    const ctx = recruiterContext(this.repos);
+    // o prompt vai sem snapshot (renderizado a cada abertura) com os cartões atuais: a nota de cartão não se repete
+    this.repos.chatSessions.setCardHash(session.id, ctx.hash);
     const settings = resolveChatSettings(this.repos.settings);
     // teto por sessão: o SDK conta só o gasto desde esta abertura, então o processo recebe o que resta
     const budget =
@@ -283,8 +291,8 @@ export class SessionManager {
         : Math.max(0, settings.maxBudgetUsd - session.costUsdEst);
     const plugin = this.deps.pluginDir === undefined ? pluginDir() : this.deps.pluginDir;
     const systemPrompt = renderRecruiterPrompt(stripFrontmatter(readRecruiterTemplate()), {
-      persona: buildPersona(profile),
-      card: card.text,
+      persona: ctx.persona,
+      card: ctx.text,
       trustedDomains: this.repos.trustedDomains.list(),
     });
     const handle = this.deps.provider.openChat({
@@ -300,6 +308,7 @@ export class SessionManager {
       pluginDir: plugin,
       tools: NATIVE_TOOLS[session.category],
       canFetch: (url) => this.canFetch(url),
+      agents: specialistAgents(),
       env: { NARNIA_SESSION_HAS_CARD: "1" },
       category: session.category,
       ingestionRunId: session.ingestionRunId,
@@ -376,10 +385,10 @@ export class SessionManager {
         }),
       );
     const current = this.repos.chatSessions.get(id);
-    const card = getCard(this.repos, session.profileId);
-    if (current?.cardHash && current.cardHash !== card.hash) {
-      notes.push(cardUpdatedNote(card.text));
-      this.repos.chatSessions.setCardHash(id, card.hash);
+    const ctx = recruiterContext(this.repos);
+    if (current?.cardHash && current.cardHash !== ctx.hash) {
+      notes.push(cardUpdatedNote(ctx.text));
+      this.repos.chatSessions.setCardHash(id, ctx.hash);
       this.repos.chatMessages.add({
         sessionId: id,
         turnIndex,
@@ -534,7 +543,12 @@ export class SessionManager {
         return;
       }
       case "tool_start":
-        entry.toolStarts.set(e.id, { name: e.name, args: e.args, t0: Date.now() });
+        entry.toolStarts.set(e.id, {
+          name: e.name,
+          args: e.args,
+          t0: Date.now(),
+          ...(e.subagent ? { subagent: true } : {}),
+        });
         bus.emit({ type: "chat.tool", sessionId: id, name: e.name, phase: "start" });
         return;
       case "tool_end": {
@@ -549,6 +563,7 @@ export class SessionManager {
           durationMs,
           isError: e.isError,
           ...(runId ? { runId } : {}),
+          ...(start?.subagent ? { subagent: true } : {}),
         });
         bus.emit({
           type: "chat.tool",
@@ -688,10 +703,10 @@ export class SessionManager {
         {
           replies: [text],
           tools: entry.toolCalls.map((t) => t.name),
-          card: getCard(this.repos, s.profileId).text,
+          card: recruiterContext(this.repos).text,
           userText,
           sources: this.repos.researchSources
-            .list({ profileId: s.profileId, limit: 200 })
+            .list({ limit: 500 })
             .filter((r) => r.sessionId === id)
             .map((r) => ({ url: r.url, userConfirmed: r.userConfirmed })),
           trustedDomains: this.repos.trustedDomains
@@ -1023,4 +1038,25 @@ export class SessionManager {
     this.sweeper = null;
     for (const id of [...this.live.keys()]) this.closeHandle(id, false);
   }
+}
+
+/**
+ * Subagentes do recrutador geral no modo A (F06-8), do mesmo arquivo que o modo B carrega pelo plugin
+ * (`plugin/agents/recrutador-especializado.md`): descrição e modelo do frontmatter, corpo como prompt. O especializado
+ * não chama outros subagentes.
+ */
+export function specialistAgents(dir?: string): Record<string, ChatAgentDefinition> {
+  const { frontmatter, body } = splitFrontmatter(
+    readPluginFile("agents/recrutador-especializado.md", dir),
+  );
+  const field = (name: string) =>
+    frontmatter.match(new RegExp(`^${name}:\\s*(.+)$`, "m"))?.[1]?.trim();
+  return {
+    "recrutador-especializado": {
+      description: field("description") ?? "Recrutador especializado em um perfil do usuário.",
+      prompt: body.trim(),
+      model: field("model") ?? "sonnet",
+      disallowedTools: ["Agent"],
+    },
+  };
 }

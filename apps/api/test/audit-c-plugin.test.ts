@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type ServerType, serve } from "@hono/node-server";
-import { getCard, seedFixture } from "@narnia-jobs/core";
+import { recruiterContext, seedFixture } from "@narnia-jobs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { pluginDir } from "../src/plugin";
 import { makeTestApp, type TestApp, TOKEN } from "./helpers";
@@ -80,7 +80,11 @@ describe("auditoria C · rota persona-card em texto e como agente", () => {
     const r = await t.api("/api/profiles/active/persona-card?format=text");
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toMatch(/^text\/plain/);
-    expect(r.headers.get("x-narnia-card-hash")).toBe(getCard(t.repos, ids.profileId).hash);
+    // recrutador global (F06-8): o hash é o dos cartões de todos os perfis
+    expect(r.headers.get("x-narnia-card-hash")).toBe(recruiterContext(t.repos).hash);
+    expect(await (await t.api("/api/profiles/active/persona-card?format=text")).text()).toContain(
+      `id ${ids.profileId}`,
+    );
     expect(await r.text()).toBe(json.text);
   });
 
@@ -158,6 +162,9 @@ describe("auditoria C · stage_plugin (start.sh) contra a rota real", () => {
     expect(files.some((f) => f.endsWith(".mcp.json.template"))).toBe(false);
     const agent = readFileSync(join(dir, "plugin/agents/recrutador.md"), "utf8");
     expect(agent).toMatch(/^tools: mcp__narnia-jobs-claude__\*, WebSearch, WebFetch$/m);
+    // o especializado (F06-8) vai cru do repositório, só com o nome do servidor da instância
+    const specialist = readFileSync(join(dir, "plugin/agents/recrutador-especializado.md"), "utf8");
+    expect(specialist).toMatch(/^tools: mcp__narnia-jobs-claude__\*$/m);
     const headers = join(dir, "mcp-headers.json");
     expect(JSON.parse(readFileSync(headers, "utf8"))).toEqual({
       Authorization: `Bearer ${TOKEN}`,

@@ -88,7 +88,7 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   const { active } = useProfiles();
   const provider = useProviderStatus();
   const loggedIn = provider.data?.loggedIn !== false;
-  const { sessions, create, hibernate, patch } = useChatSessions(active?.id ?? null);
+  const { sessions, create, hibernate, patch } = useChatSessions();
   const navigate = useNavigate();
   const [limit, setLimit] = useState<SessionLimit | null>(null);
   const names = useRecruiterNames(active?.id ?? null);
@@ -97,23 +97,13 @@ export function ChatPage({ sessionId }: { sessionId?: string }) {
   useEffect(() => {
     if (!sessionId && visible[0]) void navigate({ to: `/chat/${visible[0].id}` as string });
   }, [sessionId, visible, navigate]);
-  // trocou o perfil ativo com uma conversa de outro perfil aberta: vai para as conversas do perfil novo (auditoria D)
+  // recrutador global (F06-8): trocar o perfil ativo não fecha a conversa aberta
   const api = useApi();
   const open = useQuery({
     queryKey: chatKeys.session(sessionId ?? ""),
     queryFn: () => api.getChatSession(sessionId as string),
     enabled: Boolean(sessionId),
   });
-  const openProfile = open.data?.session.profileId;
-  const activeId = active?.id ?? null;
-  const prevActive = useRef(activeId);
-  useEffect(() => {
-    const switched = prevActive.current !== null && prevActive.current !== activeId;
-    prevActive.current = activeId;
-    // só na troca: abrir pela URL uma conversa de outro perfil continua possível (o painel mostra o perfil dela)
-    if (switched && sessionId && activeId && openProfile && openProfile !== activeId)
-      void navigate({ to: "/chat" });
-  }, [sessionId, activeId, openProfile, navigate]);
 
   const startNew = async () => {
     try {
@@ -231,13 +221,20 @@ function SessionHeader({
 function ToolChip({
   tool,
 }: {
-  tool: { name: string; durationMs?: number | null | undefined; isError?: boolean };
+  tool: {
+    name: string;
+    durationMs?: number | null | undefined;
+    isError?: boolean;
+    subagent?: boolean | undefined;
+  };
 }) {
   return (
     <details className="inline-block rounded-md border border-border px-2 py-0.5 text-xs">
       <summary className="flex cursor-pointer items-center gap-1">
         <Wrench size={12} />
         <span>{tool.name}</span>
+        {/* chamada do recrutador especializado (F06-8) */}
+        {tool.subagent ? <span className="text-muted-fg">· {t("chat.bySpecialist")}</span> : null}
       </summary>
       <span className="text-muted-fg">
         {tool.isError
@@ -619,9 +616,10 @@ function ClarifyHeader({ runId }: { runId: string }) {
 
 function ContextPanel({ sessionId }: { sessionId: string }) {
   const chat = useChatSession(sessionId);
-  const profileId = chat.session?.profileId ?? null;
-  const card = useSessionCard(profileId);
-  const sources = useResearch(profileId);
+  // recrutador global (F06-8): o painel mostra o cartão do perfil em foco da conversa, ou o ativo
+  const { active } = useProfiles();
+  const card = useSessionCard(chat.session?.profileId ?? active?.id ?? null);
+  const sources = useResearch(null);
   const tz = useTimezone();
   const used = Array.from(
     new Set([

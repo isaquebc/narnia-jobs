@@ -79,6 +79,7 @@ export function judgeFor(op: StructuredOperation): JudgeDef {
  */
 export function chatJudge(): JudgeDef {
   return judge("chat", "narnia-recrutador", {
+    contexto: "input.context",
     conversa: "input.messages",
     respostas: "output.replies",
     ferramentas: "output.tools",

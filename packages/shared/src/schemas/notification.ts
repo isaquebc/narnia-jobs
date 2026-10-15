@@ -18,6 +18,8 @@ export const NOTIFICATION_KINDS = [
   "ingestion.awaiting_confirmation",
   /** Execução sem sinal de atividade há mais de 2 minutos (plano de comunicação C3). */
   "ingestion.stuck",
+  /** O recrutador quer alterar uma nota escrita pelo usuário numa vaga (F06-17): espera confirmação. */
+  "posting.note_pending",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

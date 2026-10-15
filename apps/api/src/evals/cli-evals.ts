@@ -1,9 +1,15 @@
 import { copyFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { initTelemetry, parseEvalCases, shutdownTelemetry } from "@narnia-jobs/core";
+import {
+  initTelemetry,
+  knownFactsText,
+  parseEvalCases,
+  shutdownTelemetry,
+} from "@narnia-jobs/core";
 import { createProviderFromEnv, type Provider, STRUCTURED_PROMPTS } from "@narnia-jobs/providers";
 import { contentTracingEnabled } from "@narnia-jobs/shared";
+import { BaselineGate, gateFlags } from "./baseline-file";
 import { syncChatJudge, syncEvaluators } from "./eval-sync";
 import { chatJudge, judgeFor } from "./judges";
 import { judgeLocally, type LocalEvaluation, recordLocalExperiment } from "./local-eval";
@@ -46,7 +52,7 @@ async function context(): Promise<Ctx> {
 
 const mark = (score: number) => (score >= 1 ? "✔" : score >= 0.5 ? "~" : "✘");
 
-async function chat(ctx: Ctx, only: string[]): Promise<number> {
+async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<number> {
   const dir = join(repoRoot(), "evals/chat");
   const cases = readdirSync(dir)
     .filter((f) => f.endsWith(".jsonl"))
@@ -58,7 +64,11 @@ async function chat(ctx: Ctx, only: string[]): Promise<number> {
     console.log(
       `Sandbox isolado em ${sandbox.baseUrl} (banco descartável com a fixture fictícia).`,
     );
-    const report = await runEvalCases(cases, { baseUrl: sandbox.baseUrl, token: sandbox.token });
+    const report = await runEvalCases(cases, {
+      baseUrl: sandbox.baseUrl,
+      token: sandbox.token,
+      knownFacts: knownFactsText(sandbox.repos),
+    });
     const judge = chatJudge();
     for (const r of report) {
       const c = cases.find((x) => x.id === r.id);
@@ -66,7 +76,7 @@ async function chat(ctx: Ctx, only: string[]): Promise<number> {
       try {
         r.judges = [
           await judgeLocally(ctx.provider, judge, {
-            input: { messages: c.messages },
+            input: { messages: c.messages, context: r.context ?? "" },
             output: { replies: r.replies, tools: r.tools },
           }),
         ];
@@ -80,7 +90,20 @@ async function chat(ctx: Ctx, only: string[]): Promise<number> {
       for (const j of r.judges ?? [])
         console.log(`    ${mark(j.score)} ${j.name} (${j.label}): ${j.explanation}`);
       if (!r.passed || (r.judges ?? []).some((j) => j.score < 1)) failed++;
+      // avaliadores determinísticos por caso; o juiz (uma amostra por caso, rótulo 0/0,5/1) entra pela média abaixo
+      gate?.record(`chat:${r.id}`, {
+        graders: r.results.length
+          ? r.results.filter((g) => g.passed).length / r.results.length
+          : r.passed
+            ? 1
+            : 0,
+      });
     }
+    const judged = report.flatMap((r) => r.judges ?? []);
+    if (gate && judged.length > 0 && only.length === 0)
+      gate.record("chat:juiz", {
+        media: judged.reduce((sum, j) => sum + j.score, 0) / judged.length,
+      });
     if (ctx.phoenix && report.length > 0) {
       const exp = await recordPhoenixExperiment(cases, report, {
         baseUrl: ctx.phoenix,
@@ -177,15 +200,20 @@ async function pdf(ctx: Ctx): Promise<number> {
   return failed;
 }
 
-/** `narnia-jobs evals chat|pdf [ids…] [--strict]`. */
+/**
+ * `narnia-jobs evals chat|pdf [ids…] [--strict] [--gate] [--update-baseline]`. No chat, `--gate` compara cada caso com
+ * a linha de base de `evals/baselines.json` (F06-14: a persona do recrutador é um prompt como os outros).
+ */
 export async function runSandboxEvals(kind: "chat" | "pdf", args: string[]): Promise<number> {
   const strict = args.includes("--strict");
+  const gate = new BaselineGate(gateFlags(args));
   const only = args.filter((a) => !a.startsWith("--"));
   await initTelemetry({ ...process.env, NARNIA_OTEL_PROJECT: "narnia-evals" }, "narnia-evals");
   try {
     const ctx = await context();
-    const failed = kind === "chat" ? await chat(ctx, only) : await pdf(ctx);
-    return strict && failed > 0 ? 1 : 0;
+    const failed = kind === "chat" ? await chat(ctx, only, gate) : await pdf(ctx);
+    const regressed = gate.finish();
+    return (strict && failed > 0) || regressed ? 1 : 0;
   } finally {
     await shutdownTelemetry();
   }

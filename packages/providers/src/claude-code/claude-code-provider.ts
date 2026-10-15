@@ -298,11 +298,12 @@ export class ClaudeCodeProvider implements Provider {
       systemPrompt: { type: "custom", prompt: opts.systemPrompt, snapshot: false },
       maxTurns: opts.maxTurns,
       includePartialMessages: true,
-      tools: opts.tools,
+      // subagentes (F06-8): a tool Agent só existe quando há subagente declarado, e passa pelo canUseTool
+      tools: opts.agents ? [...opts.tools, "Agent"] : opts.tools,
       // o chat roda sem terminal: tool sem permissão explícita é negada (dono, 2026-10-12). O /mcp já limita as tools
       // pela categoria da sessão. WebFetch fica fora: o canUseTool só libera domínio confiável (auditoria A)
       allowedTools: [`mcp__${CHAT_MCP_SERVER}`, ...opts.tools.filter((t) => t !== "WebFetch")],
-      canUseTool: chatCanUseTool(opts.canFetch),
+      canUseTool: chatCanUseTool(opts.canFetch, Object.keys(opts.agents ?? {})),
       verbatimPrompts: true,
       plugins: opts.pluginDir
         ? [{ type: "local", path: opts.pluginDir, skipMcpDiscovery: true }]
@@ -316,11 +317,13 @@ export class ClaudeCodeProvider implements Provider {
         },
       },
       // o env do SDK substitui o do processo: herda tudo (PATH, HOME, token) e acrescenta o da sessão
-      env: { ...process.env, ...(opts.env ?? {}) },
+      // sem tarefas em segundo plano (F06-8): o subagente roda dentro do turno, que só fecha com a análise pronta
+      env: { ...process.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1", ...(opts.env ?? {}) },
       settingSources: [],
       ...(opts.resume ? { resume: opts.resume } : {}),
       ...(typeof opts.maxBudgetUsd === "number" ? { maxBudgetUsd: opts.maxBudgetUsd } : {}),
       ...(this.binaryPath ? { pathToClaudeCodeExecutable: this.binaryPath } : {}),
+      ...(opts.agents ? { agents: opts.agents } : {}),
     };
     const ready: Promise<ChatQueryLike> = (async () => {
       const fn = this.chatQuery ?? (await defaultChatQuery());

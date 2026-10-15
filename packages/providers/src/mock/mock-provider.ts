@@ -556,7 +556,11 @@ export class MockProvider implements Provider {
         });
         out.push(step(approxTokens(input)));
         out.push({ type: "tool_start", id, name: tool, args: input.slice(0, 500), input });
-        const r = await callTool(tool, args);
+        // subagente (F06-8): o mock não roda outro agente; devolve a análise fixa do especializado
+        const r =
+          tool === "Agent"
+            ? { text: MOCK_SPECIALIST_REPORT, isError: false }
+            : await callTool(tool, args);
         out.push({ type: "tool_end", id, isError: r.isError, output: r.text });
         if (aborted) return interrupted("");
         const reply = mockChatReply(tool, r.isError);
@@ -627,7 +631,7 @@ function parseRpcBody(raw: string): { result?: unknown; error?: unknown } | null
 /** Roteiro do mock: qual tool chamar para a mensagem (e com que argumentos válidos). */
 export function mockChatScript(
   text: string,
-  opts: Pick<ChatOpenOptions, "category" | "ingestionRunId">,
+  opts: Pick<ChatOpenOptions, "category" | "ingestionRunId" | "agents">,
 ): [string, Record<string, unknown>] {
   // aviso de ingestão pronta (2026-10-13): o modelo real só avisa; o mock usa uma tool de leitura, nunca abre ingestão
   if (text.startsWith("(nota do sistema: a ingestão")) return ["evidence_experience_list", {}];
@@ -705,10 +709,27 @@ export function mockChatScript(
         usedFor: "salary",
       },
     ];
+  // recrutador especializado (F06-8): comparação entre perfis e análises dirigidas vão para o subagente
+  if (
+    opts.agents?.["recrutador-especializado"] &&
+    /qual (dos meus )?perfi|perfil mais indicado|especializad/i.test(text)
+  )
+    return [
+      "Agent",
+      {
+        subagent_type: "recrutador-especializado",
+        description: "Análise dirigida a um perfil",
+        prompt: `profileId: (do cartão) · objetivo: ${text.slice(0, 200)}`,
+      },
+    ];
   if (/^texto:|minha hist[oó]ria|ingira|ingest/i.test(text))
     return ["ingest_text", { text: text.replace(/^texto:\s*/i, "") }];
   return ["evidence_experience_list", {}];
 }
+
+/** Resposta fixa do recrutador especializado no mock (o real roda o subagente). */
+const MOCK_SPECIALIST_REPORT =
+  "Conclusão: aderência alta ao perfil, com evidências em experiências de backend (experience). Lacuna: nenhuma métrica de liderança.";
 
 /** Marcador do roteiro: troca pelo id da fonte mais recente antes de chamar `research_apply`. */
 const LATEST_RESEARCH = "__fonte_mais_recente__";
@@ -738,6 +759,8 @@ function mockChatReply(tool: string, isError: boolean): string {
     ingest_confirm: "Confirmei a estimativa; a ingestão começou e as propostas vão para a revisão.",
     ingest_propose:
       "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",
+    Agent:
+      "Pedi ao recrutador especializado de cada perfil (fonte: recrutador-especializado): o perfil Eng. Software Sênior é o mais indicado, pelas experiências em backend. Quer que eu detalhe as lacunas?",
   };
   return byTool[tool] ?? `Usei ${tool}.`;
 }

@@ -38,6 +38,7 @@ import { notificationsRoutes } from "./routes/notifications";
 import { onboardingRoutes } from "./routes/onboarding";
 import { personaCardRoutes } from "./routes/persona-card";
 import { pluginStatusRoutes } from "./routes/plugin-status";
+import { postingsRoutes } from "./routes/postings";
 import { profilesRoutes } from "./routes/profiles";
 import { providerRoutes } from "./routes/provider";
 import { reposRoutes } from "./routes/repos";
@@ -220,6 +221,7 @@ export function createApp(deps: AppDeps) {
     reposRoutes({ repos: deps.repos, provider: deps.provider, queue: deps.queue, bus: deps.bus }),
   );
   app.route("/", notificationsRoutes({ repos: deps.repos, bus: deps.bus }));
+  app.route("/", postingsRoutes({ repos: deps.repos, bus: deps.bus }));
   app.route("/", snapshotsRoutes({ repos: deps.repos, dataDir: deps.dataDir, bus: deps.bus }));
   app.route("/", usageRoutes({ repos: deps.repos }));
   app.route("/", userRoutes({ repos: deps.repos, bus: deps.bus }));

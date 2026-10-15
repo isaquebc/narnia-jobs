@@ -11,7 +11,15 @@ export type ChatEvent =
   /** Começo de um bloco de texto novo no turno (narração antes da tool, resposta final): a api separa com "\n\n". */
   | { type: "text_break" }
   /** `args`: resumo (até 500) para o histórico; `input`: o JSON inteiro, para o rastro. */
-  | { type: "tool_start"; id: string; name: string; args: string; input: string }
+  /** `subagent`: chamada feita por um subagente (F06-8), não pelo agente da conversa. */
+  | {
+      type: "tool_start";
+      id: string;
+      name: string;
+      args: string;
+      input: string;
+      subagent?: true;
+    }
   /** `output`: o que a tool devolveu ao modelo (texto), para o rastro. */
   | { type: "tool_end"; id: string; isError: boolean; output: string }
   /**
@@ -64,6 +72,20 @@ export interface ChatOpenOptions {
    * pós-F04, bloco A: página com instruções escondidas não pode mandar dados do perfil para fora). Ausente = nega.
    */
   canFetch?: (url: string) => boolean;
+  /**
+   * Subagentes que o agente principal pode chamar pela tool Agent (F06-8: o recrutador especializado). Ausente = sem
+   * tool Agent. O `canUseTool` só libera os nomes declarados aqui.
+   */
+  agents?: Record<string, ChatAgentDefinition>;
+}
+
+/** Subconjunto do `AgentDefinition` do SDK. */
+export interface ChatAgentDefinition {
+  description: string;
+  prompt: string;
+  model?: string;
+  tools?: string[];
+  disallowedTools?: string[];
 }
 
 export interface ChatHandle {
@@ -88,6 +110,8 @@ export interface SdkChatMessageLike {
   type: string;
   subtype?: string;
   session_id?: string;
+  /** Mensagem de dentro de um subagente: id da chamada da tool Agent que o abriu (F06-8). */
+  parent_tool_use_id?: string | null;
   event?: {
     type?: string;
     delta?: { type?: string; text?: string };
@@ -155,6 +179,7 @@ export interface ChatSdkOptions {
   env: Record<string, string | undefined>;
   settingSources: [];
   pathToClaudeCodeExecutable?: string;
+  agents?: Record<string, ChatAgentDefinition>;
 }
 
 export type ChatPermission =
@@ -176,8 +201,21 @@ export const FETCH_DENIED_MESSAGE =
  * Permissões da sessão de chat: WebFetch só para URL http(s) aprovada por `canFetch`; qualquer outra tool que chegue
  * aqui (fora de `allowedTools`) é negada, porque o chat não tem quem aprove na hora.
  */
-export function chatCanUseTool(canFetch?: (url: string) => boolean): ChatCanUseTool {
+export function chatCanUseTool(
+  canFetch?: (url: string) => boolean,
+  agents: string[] = [],
+): ChatCanUseTool {
   return async (toolName, input) => {
+    if (toolName === "Agent") {
+      const kind = typeof input.subagent_type === "string" ? input.subagent_type : "";
+      // o SDK roda subagente em segundo plano por padrão; o turno do chat precisa do resultado antes de responder
+      if (agents.includes(kind))
+        return { behavior: "allow", updatedInput: { ...input, run_in_background: false } };
+      return {
+        behavior: "deny",
+        message: `Só os subagentes do narnia-jobs podem ser chamados: ${agents.join(", ") || "nenhum nesta conversa"}.`,
+      };
+    }
     if (toolName === "WebFetch") {
       const url = typeof input.url === "string" ? input.url : "";
       if (/^https?:\/\//i.test(url) && canFetch?.(url))
@@ -238,6 +276,8 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
   if (m.type === "system" && m.subtype === "init" && m.session_id)
     return [{ type: "init", providerSessionId: m.session_id }];
   if (m.type === "stream_event") {
+    // texto parcial do subagente não é a resposta da conversa: o agente principal resume o resultado dele
+    if (m.parent_tool_use_id) return [];
     if (m.event?.type === "content_block_start" && m.event.content_block?.type === "text")
       return [{ type: "text_break" }];
     const d = m.event?.delta;
@@ -268,6 +308,7 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
           name: toolDisplayName(b.name as string),
           args: summarizeArgs(b.input),
           input: JSON.stringify(b.input ?? {}),
+          ...(m.parent_tool_use_id ? { subagent: true as const } : {}),
         })),
     ];
   }

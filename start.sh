@@ -207,6 +207,9 @@ stage_plugin() {
   # prompts/ são notas que a api preenche (modo A e a rota do agente); o Claude Code não as usa e elas têm `{{…}}`
   rm -rf "$stage/plugin/prompts"
   printf '%s\n' "$agent" > "$stage/plugin/agents/recrutador.md"
+  # recrutador especializado (F06-8): sem placeholder, só as tools do servidor desta instância
+  sed "s/mcp__narnia-jobs__\*/mcp__${name}__*/g" "$src/agents/recrutador-especializado.md" \
+    > "$stage/plugin/agents/recrutador-especializado.md"
   (umask 077
     printf 'NARNIA_API_URL=%s\nNARNIA_TOKEN=%s\n' "$url" "$token" > "$stage/plugin/.narnia-env"
     printf '{"Authorization":"Bearer %s"}' "$token" > "$stage/mcp-headers.json")

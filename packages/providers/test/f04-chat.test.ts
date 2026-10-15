@@ -130,6 +130,49 @@ describe("normalizeSdkChatMessage", () => {
     ]);
   });
 
+  it("subagente (F06-8): texto parcial dele não entra na resposta; tools dele vêm marcadas", () => {
+    const sub = "toolu_agent_1";
+    expect(
+      normalizeSdkChatMessage(
+        {
+          type: "stream_event",
+          parent_tool_use_id: sub,
+          event: { type: "content_block_delta", delta: { type: "text_delta", text: "rascunho" } },
+        },
+        "sonnet",
+      ),
+    ).toEqual([]);
+    const start = normalizeSdkChatMessage(
+      {
+        type: "assistant",
+        parent_tool_use_id: sub,
+        message: {
+          content: [
+            { type: "tool_use", id: "tu9", name: "mcp__narnia-jobs__fact_search", input: {} },
+          ],
+        },
+      },
+      "sonnet",
+    );
+    expect(start).toEqual([
+      expect.objectContaining({
+        type: "tool_start",
+        id: "tu9",
+        name: "fact_search",
+        subagent: true,
+      }),
+    ]);
+    const top = normalizeSdkChatMessage(
+      {
+        type: "assistant",
+        parent_tool_use_id: null,
+        message: { content: [{ type: "tool_use", id: "tu1", name: "Agent", input: {} }] },
+      },
+      "sonnet",
+    );
+    expect(top[0]).not.toHaveProperty("subagent");
+  });
+
   it("estouro de turnos e de orçamento viram limit; erro de execução vira error", () => {
     const usage = { input_tokens: 1, output_tokens: 1 };
     expect(
@@ -245,6 +288,8 @@ describe("ClaudeCodeProvider.openChat", () => {
     });
     const env = (captured.options?.env ?? {}) as Record<string, string>;
     expect(env.NARNIA_SESSION_HAS_CARD).toBe("1");
+    // subagente sempre dentro do turno (F06-8): a sessão do chat não tem tarefas em segundo plano
+    expect(env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe("1");
     expect(env.PATH).toBe(process.env.PATH);
   });
 
@@ -296,6 +341,68 @@ describe("ClaudeCodeProvider.openChat", () => {
     expect((await can("Bash", { command: "ls" }, { signal })).behavior).toBe("deny");
     expect(fetched).toEqual(["https://ibge.gov.br/x", "https://atacante.com/?d=1"]);
     chat.close();
+  });
+
+  it("subagentes (F06-8): vão na opção agents, a tool Agent fica disponível e o canUseTool só libera os declarados", async () => {
+    let options: Record<string, unknown> = {};
+    const chatQuery: ChatQueryFn = ({ options: o }) => {
+      options = o as unknown as Record<string, unknown>;
+      async function* run() {}
+      const it = run();
+      return Object.assign(it, {
+        interrupt: async () => undefined,
+        setModel: async () => undefined,
+        close: () => void it.return(undefined),
+      });
+    };
+    const p = new ClaudeCodeProvider({
+      exec: async () => ({ stdout: "", stderr: "", code: 0 }),
+      chatQuery,
+      binaryPath: "/bin/claude",
+    });
+    const agents = {
+      "recrutador-especializado": {
+        description: "perfil",
+        prompt: "você é o especializado",
+        model: "sonnet",
+        disallowedTools: ["Agent"],
+      },
+    };
+    p.openChat({ ...BASE, agents }).close();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(options.agents).toEqual(agents);
+    expect(options.tools).toEqual(["WebSearch", "WebFetch", "Agent"]);
+    // Agent não é auto-liberada: passa pelo canUseTool, que confere o subagente pedido
+    expect(options.allowedTools).toEqual(["mcp__narnia-jobs", "WebSearch"]);
+    const can = options.canUseTool as (
+      tool: string,
+      input: Record<string, unknown>,
+      o: { signal: AbortSignal },
+    ) => Promise<{ behavior: string; message?: string }>;
+    const signal = new AbortController().signal;
+    // sempre em primeiro plano: o turno precisa da análise antes de responder
+    expect(
+      await can(
+        "Agent",
+        { subagent_type: "recrutador-especializado", prompt: "x", run_in_background: true },
+        { signal },
+      ),
+    ).toEqual({
+      behavior: "allow",
+      updatedInput: {
+        subagent_type: "recrutador-especializado",
+        prompt: "x",
+        run_in_background: false,
+      },
+    });
+    const other = await can("Agent", { subagent_type: "general-purpose", prompt: "x" }, { signal });
+    expect(other.behavior).toBe("deny");
+    expect(other.message).toMatch(/recrutador-especializado/);
+    // sem agents, nada de Agent
+    p.openChat(BASE).close();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(options.tools).toEqual(["WebSearch", "WebFetch"]);
+    expect(options.agents).toBeUndefined();
   });
 
   it("sem canFetch, WebFetch é sempre negado", async () => {

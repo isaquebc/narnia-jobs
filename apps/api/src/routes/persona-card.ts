@@ -1,4 +1,4 @@
-import { buildPersona, getCard, type Repos, renderRecruiterPrompt } from "@narnia-jobs/core";
+import { type Repos, recruiterContext, renderRecruiterPrompt } from "@narnia-jobs/core";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
@@ -9,8 +9,8 @@ import { PLUGIN_LAST_SEEN_KEY } from "./plugin-status";
 const SERVER_NAME = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
- * Persona + cartão do perfil ativo para o modo B (F04-1), renderizados pelo mesmo template do plugin que o modo A usa
- * no system prompt (fonte única). Três formatos:
+ * Persona + cartões de todos os perfis para o modo B (F04-1; recrutador global, F06-8), renderizados pelo mesmo
+ * template do plugin que o modo A usa no system prompt (fonte única). Três formatos:
  * - JSON (padrão): `{ profileId, cardHash, text }`; `cardHash` permite ao chat detectar cartão atualizado;
  * - `?format=text`: o texto puro, com o hash no header `X-Narnia-Card-Hash` (o hook `SessionStart` lê sem jq/node);
  * - `?format=agent&server=<nome>`: o arquivo do agente `recrutador` para o plugin instalado (auditoria C): frontmatter
@@ -27,11 +27,12 @@ export function personaCardRoutes(deps: { repos: Repos }) {
     const profile = deps.repos.profiles.active();
     if (!profile)
       return apiError(c, 404, "no_profile", "Nenhum perfil ativo: conclua o primeiro uso.");
-    const card = getCard(deps.repos, profile.id);
+    const ctx = recruiterContext(deps.repos);
+    const card = { text: ctx.text, hash: ctx.hash };
     const { frontmatter, body } = splitFrontmatter(readRecruiterTemplate());
     const render = (cardText: string) =>
       renderRecruiterPrompt(body, {
-        persona: buildPersona(profile),
+        persona: ctx.persona,
         card: cardText,
         trustedDomains: deps.repos.trustedDomains.list(),
       });

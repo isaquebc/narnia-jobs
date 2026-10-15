@@ -11,7 +11,8 @@ import {
 
 export interface TurnTraceInit {
   sessionId: string;
-  profileId: string;
+  /** Perfil em foco da conversa (contexto, F06-8); null = conversa global. */
+  profileId: string | null;
   category: string;
   turnIndex: number;
   /** Modelo da sessão (apelido); cada chamada ao modelo leva o id exato que o SDK devolver. */
@@ -82,7 +83,7 @@ export class TurnTrace {
     this.root = startSpan("chat.turn", {
       "openinference.span.kind": "CHAIN",
       "session.id": init.sessionId,
-      "user.id": init.profileId,
+      "user.id": init.profileId ?? "global",
       "tag.tags": [init.category],
       metadata: JSON.stringify({
         category: init.category,
@@ -91,7 +92,7 @@ export class TurnTrace {
         model: init.model,
       }),
       "narnia.session_id": init.sessionId,
-      "narnia.profile_id": init.profileId,
+      "narnia.profile_id": init.profileId ?? "",
       "narnia.category": init.category,
       "narnia.turn_index": init.turnIndex,
       "llm.model_name": init.model,

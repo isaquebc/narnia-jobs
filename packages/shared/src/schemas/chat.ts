@@ -3,7 +3,15 @@ import { IdSchema, IsoDateTimeSchema } from "./common";
 
 /** F04 §3: categorias de sessão (definem o escopo de tools, F04-2) e estados de uma sessão de chat. */
 /** `discovery` (auditoria E2): entrevista de descoberta do primeiro uso, só sobre as lacunas do perfil. */
-export const ChatCategorySchema = z.enum(["career", "clarify", "ingest", "interview", "discovery"]);
+/** `job` (F06): análise de uma vaga, numa conversa própria com o título da vaga. */
+export const ChatCategorySchema = z.enum([
+  "career",
+  "clarify",
+  "ingest",
+  "interview",
+  "discovery",
+  "job",
+]);
 export type ChatCategory = z.infer<typeof ChatCategorySchema>;
 
 export const ChatSessionStateSchema = z.enum(["live", "hibernated", "archived", "error"]);
@@ -11,7 +19,11 @@ export type ChatSessionState = z.infer<typeof ChatSessionStateSchema>;
 
 export const ChatSessionSchema = z.object({
   id: IdSchema,
-  profileId: IdSchema,
+  /**
+   * Recrutador global (F06-8): a conversa não pertence a um perfil. Aqui fica só o perfil em foco quando ela nasceu
+   * (contexto); null = conversa sem perfil, ou perfil apagado.
+   */
+  profileId: IdSchema.nullable(),
   category: ChatCategorySchema,
   title: z.string(),
   provider: z.string().min(1),
@@ -45,6 +57,8 @@ export const ChatToolCallSchema = z.object({
   isError: z.boolean(),
   /** Execução criada por esta tool (ingest_text/file/github): o link "Abrir a ingestão criada" sobrevive ao reload. */
   runId: IdSchema.optional(),
+  /** Chamada feita pelo recrutador especializado (subagente, F06-8), não pelo recrutador da conversa. */
+  subagent: z.boolean().optional(),
 });
 export type ChatToolCall = z.infer<typeof ChatToolCallSchema>;
 

@@ -186,6 +186,9 @@ function Build-PluginStage([string] $Src, [string] $Stage, [string] $Url, [strin
   # prompts/ são notas que a api preenche (modo A e a rota do agente); o Claude Code não as usa e elas têm `{{…}}`
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $Stage "plugin/prompts")
   Set-Content -NoNewline -Path (Join-Path $Stage "plugin/agents/recrutador.md") -Value $agent
+  # recrutador especializado (F06-8): sem placeholder, só as tools do servidor desta instância
+  $spec = Join-Path $Stage "plugin/agents/recrutador-especializado.md"
+  (Get-Content -Raw $spec).Replace('mcp__narnia-jobs__*', "mcp__${Name}__*") | Set-Content -NoNewline -Path $spec
   Set-Content -Path (Join-Path $Stage "plugin/.narnia-env") -Value @("NARNIA_API_URL=$Url", "NARNIA_TOKEN=$Token")
   # cabeçalho do MCP lido pelo headersHelper: o token não vai na linha de comando nem na config do Claude Code
   Set-Content -NoNewline -Path (Join-Path $Stage "mcp-headers.json") -Value "{`"Authorization`":`"Bearer $Token`"}"

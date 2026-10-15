@@ -13,6 +13,8 @@ export interface EvalRunOptions {
   token: string;
   fetch?: FetchLike;
   turnTimeoutMs?: number;
+  /** Todos os fatos do usuário (`knownFactsText`): datas e empresas que o recrutador leu pelas tools não são inventadas. */
+  knownFacts?: string;
 }
 
 export interface EvalCaseReport {
@@ -27,6 +29,8 @@ export interface EvalCaseReport {
   replies: string[];
   /** Ferramentas chamadas na conversa (nome publicado). */
   tools: string[];
+  /** System prompt do recrutador na rodada (persona e cartões): o juiz o recebe como contexto. */
+  context?: string;
   /** Juízes com modelo (padrão de entrega), preenchidos pelo comando de avaliações. */
   judges?: Array<{ name: string; label: string; score: number; explanation: string }>;
   error?: string;
@@ -42,7 +46,7 @@ interface SessionView {
 interface Message {
   role: string;
   contentMd: string;
-  toolCalls: Array<{ name: string }>;
+  toolCalls: Array<{ name: string; subagent?: boolean }>;
 }
 
 export async function runEvalCases(
@@ -58,9 +62,11 @@ export async function runEvalCases(
     if (!r.ok) throw new Error(`${init.method ?? "GET"} ${path} → ${r.status} ${await r.text()}`);
     return (await r.json()) as T;
   };
-  const card = await call<{ text: string }>("/api/profiles/active/persona-card")
+  // o que o recrutador recebe no system prompt (persona e cartões de todos os perfis): contexto do juiz
+  const context = await call<{ text: string }>("/api/profiles/active/persona-card")
     .then((c) => c.text)
     .catch(() => "");
+  const card = [context, o.knownFacts ?? ""].join("\n");
   // tetos e domínios confiáveis valem para a rodada inteira (auditoria E2, 19b)
   const settings = await call<{ settings: { maxBudgetUsd: number | null; maxTurns: number } }>(
     "/api/settings/chat",
@@ -125,7 +131,8 @@ export async function runEvalCases(
           usage: { tokens: session.tokensIn + session.tokensOut, costUsd: session.costUsdEst },
           budgetUsd: settings?.maxBudgetUsd ?? null,
           ...(settings ? { maxTurns: settings.maxTurns } : {}),
-          toolsPerReply: assistant.map((m) => m.toolCalls.length),
+          // o teto de turnos é do recrutador da conversa: as tools do especializado (F06-8) rodam no turno dele
+          toolsPerReply: assistant.map((m) => m.toolCalls.filter((t) => !t.subagent).length),
         },
         c.graders,
       );
@@ -174,6 +181,7 @@ export async function runEvalCases(
         endedAt: new Date().toISOString(),
         replies,
         tools,
+        context,
       });
     } catch (e) {
       span.recordError(e);

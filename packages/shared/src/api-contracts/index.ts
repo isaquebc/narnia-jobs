@@ -789,6 +789,12 @@ export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
 });
 export const TrustedDomainPatchRequestSchema = z.object({ enabled: z.boolean() });
 
+/** Vaga criada, editada ou com nota/contato/análise nova (F06): a web recarrega a lista e a página da vaga. */
+export const PostingUpdatedEventSchema = z.object({
+  type: z.literal("posting.updated"),
+  postingId: IdSchema,
+});
+
 // WS /ws — jobs/provider (F01) + perfil (F02). Quem lê `jobId` discrimina por `type` antes.
 export const WsEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("provider.status"), status: ProviderStatusResponseSchema }),
@@ -813,6 +819,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   ChatLimitEventSchema,
   ChatSessionUpdatedEventSchema,
   ChatIngestionCreatedEventSchema,
+  PostingUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

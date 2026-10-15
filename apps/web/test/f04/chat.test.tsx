@@ -36,10 +36,11 @@ function chatApi(overrides: Record<string, unknown> = {}) {
 }
 
 describe("F04/M4 · chat com o recrutador", () => {
-  it("o menu tem Chat no grupo do perfil atual", async () => {
+  it("o menu tem Chat no grupo Geral (recrutador global, F06-8)", async () => {
     renderApp({ api: chatApi(), initialUrl: "/dashboard" });
-    const group = await screen.findByRole("group", { name: "Eng" });
-    expect(await within(group).findByRole("link", { name: "Chat" })).toHaveAttribute(
+    const group = await screen.findByRole("group", { name: "Geral" });
+    // com conversa ativa o nome acessível ganha o selo ("Chat 1 ativa")
+    expect(await within(group).findByRole("link", { name: /^Chat/ })).toHaveAttribute(
       "href",
       "/chat",
     );
@@ -276,6 +277,7 @@ describe("Auditoria pós-F04 · bloco A · painel Contexto usa o perfil da conve
     const aside = await screen.findByRole("complementary", { name: "Contexto" });
     expect(await within(aside).findByText("Cartão do perfil da conversa")).toBeInTheDocument();
     expect(aside).not.toHaveTextContent("Cartão do perfil ativo");
-    await waitFor(() => expect(listResearch).toHaveBeenCalledWith("p2"));
+    // recrutador global (F06-8): as fontes pesquisadas são de todas as conversas, filtradas pela sessão
+    await waitFor(() => expect(listResearch).toHaveBeenCalledWith(null));
   });
 });

@@ -20,7 +20,7 @@ const ChatView = lazy(() => import("../../chat/ChatPage").then((m) => ({ default
 export function StepDiscovery({ finish }: StepProps) {
   const api = useApi();
   const { active } = useProfiles();
-  const { sessions, create, isLoading } = useChatSessions(active?.id ?? null);
+  const { sessions, create, isLoading } = useChatSessions();
   const existing = sessions.find((s) => s.category === "discovery" && s.state !== "archived");
   const [error, setError] = useState<unknown>(null);
   const [starting, setStarting] = useState(false);

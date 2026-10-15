@@ -1552,7 +1552,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
     },
   },
   "session.get": {
-    "description": "Dados da sessão de chat atual: categoria, perfil, modelo e execução ligada (clarificação).",
+    "description": "Dados da sessão de chat atual: categoria, perfil em foco (null = conversa global), modelo e execução ligada (clarificação).",
     "input": {
       "additionalProperties": false,
       "properties": {},
@@ -1568,6 +1568,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
             "ingest",
             "interview",
             "discovery",
+            "job",
           ],
           "type": "string",
         },
@@ -1590,8 +1591,15 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
           "type": "string",
         },
         "profileId": {
-          "minLength": 1,
-          "type": "string",
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string",
+            },
+            {
+              "type": "null",
+            },
+          ],
         },
         "state": {
           "enum": [
@@ -1626,6 +1634,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
             "ingest",
             "interview",
             "discovery",
+            "job",
           ],
           "type": "string",
         },

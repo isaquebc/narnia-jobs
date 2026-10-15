@@ -3,7 +3,7 @@ import { createProfile, createSession, say } from "../helpers/chat";
 import { freshStart } from "../helpers/ingest";
 import { login, switchTo } from "../helpers/profiles";
 
-test("F04/E2E-02 conversas por perfil no menu: as do perfil A somem ao trocar para B e voltam com o histórico", async ({
+test("F04/E2E-02 conversas globais no menu (F06-8): trocar de perfil não esconde nenhuma e a aberta continua", async ({
   page,
 }) => {
   const { ids } = await freshStart("engineer");
@@ -14,18 +14,17 @@ test("F04/E2E-02 conversas por perfil no menu: as do perfil A somem ao trocar pa
   await say(a1.id, "o que está fraco?");
 
   await login(page, `/chat/${a1.id}`);
-  // as conversas ficam como subitens do Chat no menu da esquerda (2026-10-13)
+  // as conversas ficam como subitens do Chat no menu da esquerda (2026-10-13), de todos os perfis
   const tabs = page.getByRole("list", { name: "Conversas do chat" });
   await expect(tabs.getByText("Conversa A1")).toBeVisible();
   await expect(tabs.getByText("Conversa A2")).toBeVisible();
-  await expect(tabs.getByText("Conversa B1")).toHaveCount(0);
+  await expect(tabs.getByText("Conversa B1")).toBeVisible();
 
   await switchTo(page, "Gestão de Engenharia");
   await expect(tabs.getByText("Conversa B1")).toBeVisible();
-  await expect(tabs.getByText("Conversa A1")).toHaveCount(0);
-
-  await switchTo(page, "Eng. Software Sênior");
-  await tabs.getByText("Conversa A1").click();
+  await expect(tabs.getByText("Conversa A1")).toBeVisible();
+  // a conversa aberta não fecha na troca
+  await expect(page).toHaveURL(new RegExp(`/chat/${a1.id}$`));
   await expect(
     page.getByRole("list", { name: "Mensagens" }).getByText(/conquistas sem métrica/),
   ).toBeVisible();

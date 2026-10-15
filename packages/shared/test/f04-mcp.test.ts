@@ -96,6 +96,7 @@ describe("F04/M1 shared · tools MCP do chat", () => {
       "ingest",
       "interview",
       "discovery",
+      "job",
     ]);
     expect(CHAT_TOOLS["session.set_category"].input.safeParse({ category: "career" }).success).toBe(
       true,

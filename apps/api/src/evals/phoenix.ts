@@ -50,7 +50,13 @@ export async function recordPhoenixExperiment(
     action: found ? "update" : "create",
     name: PHOENIX_DATASET,
     description: "Conversas de referência do recrutador (evals/chat)",
-    inputs: cases.map((c) => ({ id: c.id, category: c.category, messages: c.messages })),
+    // contexto = o system prompt do recrutador na rodada (persona e cartões): o juiz no Phoenix lê `input.context`
+    inputs: cases.map((c) => ({
+      id: c.id,
+      category: c.category,
+      messages: c.messages,
+      context: reports.find((r) => r.id === c.id)?.context ?? "",
+    })),
     outputs: cases.map((c) => ({ graders: c.graders })),
     metadata: cases.map((c) => ({ description: c.description ?? "" })),
   });

@@ -20,14 +20,9 @@ test("F04/E2E-04 teto de 5 conversas: a sexta pergunta qual encerrar e abre depo
   await dialog.getByRole("button", { name: "Encerrar Aberta 1" }).click();
   await expect(dialog).toHaveCount(0);
   await expect
-    .poll(
-      async () => (await listSessions(ids.profileId)).find((x) => x.title === "Aberta 1")?.state,
-    )
+    .poll(async () => (await listSessions()).find((x) => x.title === "Aberta 1")?.state)
     .toBe("hibernated");
   await expect
-    .poll(
-      async () =>
-        (await listSessions(ids.profileId)).filter((x) => x.title === "Nova conversa").length,
-    )
+    .poll(async () => (await listSessions()).filter((x) => x.title === "Nova conversa").length)
     .toBe(1);
 });

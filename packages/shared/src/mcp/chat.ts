@@ -220,11 +220,11 @@ export const CHAT_TOOLS = {
   ),
   "job.list": tool("Jobs recentes, uma linha cada (tipo · estado · progresso).", Page, Paged),
   "session.get": tool(
-    "Dados da sessão de chat atual: categoria, perfil, modelo e execução ligada (clarificação).",
+    "Dados da sessão de chat atual: categoria, perfil em foco (null = conversa global), modelo e execução ligada (clarificação).",
     z.object({}),
     z.object({
       id: IdSchema,
-      profileId: IdSchema,
+      profileId: IdSchema.nullable(),
       category: ChatCategorySchema,
       model: z.string(),
       state: ChatSessionStateSchema,

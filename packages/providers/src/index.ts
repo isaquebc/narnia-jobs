@@ -1,5 +1,6 @@
 export { reportActivity, runWithActivity } from "./activity";
 export {
+  type ChatAgentDefinition,
   type ChatEvent,
   type ChatHandle,
   type ChatOpenOptions,

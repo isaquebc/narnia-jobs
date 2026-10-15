@@ -210,7 +210,7 @@ describe("auditoria D · painel, perfil, histórico e categoria", () => {
     );
   });
 
-  it("trocar o perfil ativo com conversa de outro perfil aberta leva à conversa do perfil novo", async () => {
+  it("recrutador global (F06-8): trocar o perfil ativo não fecha a conversa aberta", async () => {
     let active = "p1";
     const api = chatApi({
       listProfiles: async () => ({
@@ -237,9 +237,8 @@ describe("auditoria D · painel, perfil, histórico e categoria", () => {
     await screen.findByRole("group", { name: "Eng" });
     active = "p2";
     act(() => ws.emit({ type: "profile.switched", profileId: "p2" }));
-    // troca → /chat → primeira conversa do perfil novo
-    await waitFor(() => expect(router.state.location.pathname).toBe("/chat/s7"));
-    expect(await screen.findByRole("region", { name: "Da liderança" })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(router.state.location.pathname).toBe("/chat/s1");
   });
 
   it("'Carregar anteriores' pagina com before e mantém as mensagens já carregadas", async () => {

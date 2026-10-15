@@ -82,7 +82,7 @@ export function promptCatalog(dir = pluginDir()): PromptDef[] {
     name: "narnia-recrutador",
     kind: "agent",
     description:
-      "Persona do recrutador (system prompt do chat e agente do terminal), com o cartão do perfil.",
+      "Persona do recrutador geral (system prompt do chat e agente do terminal), com os cartões de todos os perfis.",
     sources: ["plugin/agents/recrutador.md"],
     messages: [
       { role: "SYSTEM", content: agentFile.body.trim() },
@@ -95,6 +95,25 @@ export function promptCatalog(dir = pluginDir()): PromptDef[] {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean),
+  });
+  // recrutador especializado (F06-8): subagente do geral, mesmo arquivo nos modos A e B
+  const specialistFile = splitFrontmatter(
+    readPluginFile("agents/recrutador-especializado.md", dir),
+  );
+  const specialist = def({
+    name: "narnia-recrutador-especializado",
+    kind: "agent",
+    description:
+      "Subagente do recrutador geral: análise dirigida a um perfil (vaga, estudos, currículo).",
+    sources: ["plugin/agents/recrutador-especializado.md"],
+    messages: [
+      { role: "SYSTEM", content: specialistFile.body.trim() },
+      { role: "USER", content: USER_MESSAGE },
+    ],
+    modelName: MODEL_IDS.sonnet,
+    jsonSchema: null,
+    schemaName: null,
+    tools: ["mcp__narnia-jobs__*"],
   });
   const notes = readdirSync(join(dir, "prompts"))
     .filter((f) => f.endsWith(".md"))
@@ -135,5 +154,5 @@ export function promptCatalog(dir = pluginDir()): PromptDef[] {
         tools: ["mcp__narnia-jobs__*"],
       });
     });
-  return [...structured, agent, ...notes, ...skills];
+  return [...structured, agent, specialist, ...notes, ...skills];
 }
