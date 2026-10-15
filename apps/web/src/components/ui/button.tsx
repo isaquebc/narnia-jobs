@@ -19,6 +19,9 @@ const button = cva(
   },
 );
 
+/** Classes do botão, para um link (`<a>`) com a mesma aparência. */
+export const buttonClass = button;
+
 export interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof button> {}

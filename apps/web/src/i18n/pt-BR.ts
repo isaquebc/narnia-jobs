@@ -1242,6 +1242,7 @@ export const ptBR = {
       none: "—",
       saved: "Vaga salva.",
     },
+    openOriginal: "Ver vaga oficial",
     reextract: "Extrair de novo com o modelo",
     remove: "Apagar vaga",
     removeConfirm: "Apagar esta vaga, os contatos, as notas e as análises?",

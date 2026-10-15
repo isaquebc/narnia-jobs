@@ -78,6 +78,47 @@ describe("F06/M6 · Vagas", () => {
     expect(patchPosting).toHaveBeenCalledWith("v1", { client: "Initech Brasil" });
   });
 
+  it("link para a vaga oficial ao lado das ações", async () => {
+    renderApp({
+      api: api({
+        getPosting: vi.fn(async (id: string) => ({
+          posting: posting(id, { postingUrl: "https://jobs.example.com/vaga/123" }),
+          contacts: [],
+          notes: [],
+          duplicates: [],
+        })),
+      }) as never,
+      initialUrl: "/vagas/v1",
+    });
+    const link = await screen.findByRole("link", { name: "Ver vaga oficial" });
+    expect(link).toHaveAttribute("href", "https://jobs.example.com/vaga/123");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+    // ao lado de "Extrair de novo", "Criar CV" e "Apagar vaga"
+    expect(link.parentElement).toBe(
+      screen.getByRole("button", { name: "Apagar vaga" }).parentElement,
+    );
+  });
+
+  it.each([null, "javascript:alert(1)"])(
+    "vaga com link %s: sem botão da vaga oficial",
+    async (postingUrl) => {
+      renderApp({
+        api: api({
+          getPosting: vi.fn(async (id: string) => ({
+            posting: posting(id, { postingUrl }),
+            contacts: [],
+            notes: [],
+            duplicates: [],
+          })),
+        }) as never,
+        initialUrl: "/vagas/v1",
+      });
+      await screen.findByRole("button", { name: "Apagar vaga" });
+      expect(screen.queryByRole("link", { name: "Ver vaga oficial" })).toBeNull();
+    },
+  );
+
   it("vaga parecida já registrada: alerta com o link para ela", async () => {
     renderApp({
       api: api({

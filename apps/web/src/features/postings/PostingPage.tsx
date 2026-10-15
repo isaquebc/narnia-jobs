@@ -6,7 +6,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
+import { Button, buttonClass } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/tooltip";
 import { postingKeys, usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
@@ -17,10 +17,16 @@ import { postingWho, statusTone } from "./PostingsPage";
 
 /**
  * Página da vaga (F06 §1.3, M6): duplicata pendente (F06-9), análise do recrutador com validade (F06-10), pré-análise
- * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. "Criar CV" fica "em breve" (F05);
+ * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. Link para a vaga oficial (`postingUrl`)
+ * junto das ações (2026-10-15). "Criar CV" fica "em breve" (F05);
  * o alerta de vagas parecidas (mesma empresa e role) só aparece quando existe outra vaga assim (correção 2026-10-15;
  * o de candidatura repetida chega com as candidaturas, F06-11/F07).
  */
+/** Só http(s) vira link: o campo é editável e `z.url()` aceita `javascript:`. */
+function isHttpUrl(url: string | null): boolean {
+  return /^https?:\/\//i.test(url ?? "");
+}
+
 export function PostingPage({
   postingId,
   noteId,
@@ -63,6 +69,16 @@ export function PostingPage({
           <Badge tone={statusTone[posting.status]}>
             {t(`postings.status.${posting.status}` as TKey)}
           </Badge>
+          {isHttpUrl(posting.postingUrl) ? (
+            <a
+              href={posting.postingUrl ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.openOriginal")}
+            </a>
+          ) : null}
           {posting.jdText ? (
             <Button
               type="button"
