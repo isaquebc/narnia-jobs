@@ -34,6 +34,7 @@ import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
 import { ingestionsRoutes } from "./routes/ingestions";
 import { jobsRoutes } from "./routes/jobs";
+import { modelSettingsRoutes } from "./routes/model-settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { onboardingRoutes } from "./routes/onboarding";
 import { personaCardRoutes } from "./routes/persona-card";
@@ -174,6 +175,7 @@ export function createApp(deps: AppDeps) {
     );
   }
   app.route("/", chatSettingsRoutes({ repos: deps.repos }));
+  app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",
     pluginStatusRoutes({

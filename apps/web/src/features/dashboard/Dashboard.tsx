@@ -11,11 +11,12 @@ import { formatDate, formatTokens } from "../../lib/format";
 import { CardText } from "../profiles/CardText";
 import { SuggestionBanner } from "../profiles/SuggestionBanner";
 
-const NEXT: Array<{ key: "chat" | "ingest" | "cv" | "jobs"; task: string }> = [
+const NEXT: Array<{ key: "chat" | "ingest" | "cv" | "jobs"; task: string; to?: string }> = [
   { key: "chat", task: "F04" },
   { key: "ingest", task: "F03" },
   { key: "cv", task: "F05" },
-  { key: "jobs", task: "F06" },
+  // F06 entregue: a análise de vagas vira link
+  { key: "jobs", task: "F06", to: "/vagas" },
 ];
 
 export function Dashboard() {
@@ -123,11 +124,20 @@ export function Dashboard() {
         <ul className="flex flex-wrap gap-2">
           {NEXT.map((n) => (
             <li key={n.key}>
-              <Tooltip content={t("nav.soon", { task: n.task })}>
-                <span className="inline-block cursor-not-allowed rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-fg">
+              {n.to ? (
+                <NavLink
+                  to={n.to}
+                  className="inline-block rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                >
                   {t(`dashboard.next.${n.key}`)}
-                </span>
-              </Tooltip>
+                </NavLink>
+              ) : (
+                <Tooltip content={t("nav.soon", { task: n.task })}>
+                  <span className="inline-block cursor-not-allowed rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-fg">
+                    {t(`dashboard.next.${n.key}`)}
+                  </span>
+                </Tooltip>
+              )}
             </li>
           ))}
         </ul>

@@ -297,3 +297,23 @@ export const PostingDuplicateOutputSchema = z.object({
   rationale: z.string().min(1),
 });
 export type PostingDuplicateOutput = z.infer<typeof PostingDuplicateOutputSchema>;
+
+/* ---------- modelos por tarefa (F06-5, F06-13) ---------- */
+
+/** Só modelos do Claude por enquanto (F06-13); outros provedores entram com a F11. */
+export const CLAUDE_MODELS = ["haiku", "sonnet", "opus"] as const;
+export const ClaudeModelSchema = z.enum(CLAUDE_MODELS);
+
+export const POSTING_MODEL_KEYS = [
+  "posting_extract",
+  "posting_merge",
+  "posting_duplicate",
+  "posting_analyze",
+] as const;
+export const PostingModelsSchema = z.object(
+  Object.fromEntries(POSTING_MODEL_KEYS.map((k) => [k, ClaudeModelSchema])) as Record<
+    (typeof POSTING_MODEL_KEYS)[number],
+    typeof ClaudeModelSchema
+  >,
+);
+export type PostingModels = z.infer<typeof PostingModelsSchema>;

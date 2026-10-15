@@ -16,6 +16,7 @@ import { GithubConnectCard } from "../ingestion/github/GithubConnectCard";
 import { bytesLabel } from "../ingestion/units";
 import { ChatSettingsSection } from "./ChatSettingsSection";
 import { EvalsSettingsSection } from "./EvalsSettingsSection";
+import { ModelSettingsSection } from "./ModelSettingsSection";
 import { PluginSettingsSection } from "./PluginSettingsSection";
 
 const GB = 1024 ** 3;
@@ -203,6 +204,7 @@ export function SettingsPage() {
       <h2 className="text-base font-semibold">{t("settings.integrations")}</h2>
       <GithubConnectCard />
       <ChatSettingsSection />
+      <ModelSettingsSection />
       <PluginSettingsSection />
       <EvalsSettingsSection />
       {form ? (

@@ -201,3 +201,40 @@ describe("F06/M5 · conversa da vaga não abre outra", () => {
     }
   });
 });
+
+describe("F06/M6 · Configurações › Modelos", () => {
+  it("padrões, gravação parcial sem apagar outras chaves e só modelos do Claude; a análise usa o modelo escolhido", async () => {
+    const t = makeTestApp();
+    try {
+      t.repos.settings.set("models", { analyze: "opus" });
+      const g = (await (await t.api("/api/settings/models")).json()) as {
+        models: Record<string, string>;
+      };
+      expect(g.models).toEqual({
+        posting_extract: "haiku",
+        posting_merge: "haiku",
+        posting_duplicate: "haiku",
+        posting_analyze: "sonnet",
+      });
+      const put = await t.api("/api/settings/models", json({ posting_analyze: "opus" }, "PUT"));
+      expect(
+        ((await put.json()) as { models: Record<string, string> }).models.posting_analyze,
+      ).toBe("opus");
+      expect(t.repos.settings.get<Record<string, string>>("models")?.analyze).toBe("opus");
+      expect(
+        (await t.api("/api/settings/models", json({ posting_extract: "gpt-5" }, "PUT"))).status,
+      ).toBe(400);
+      seedFixture(t.repos, "engineer");
+      const p = t.repos.postings.create({ company: "Nubank", role: "backend" });
+      const r = (await (
+        await t.api(`/api/postings/${p.id}/analyze`, { method: "POST" })
+      ).json()) as {
+        session: { model: string };
+      };
+      expect(r.session.model).toBe("opus");
+    } finally {
+      t.sessions.closeAll();
+      t.cleanup();
+    }
+  });
+});

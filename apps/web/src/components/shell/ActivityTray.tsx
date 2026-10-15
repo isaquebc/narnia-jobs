@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useApi, useWs } from "../../app/context";
 import { runHeadline } from "../../features/ingestion/runHeadline";
 import { useJobs } from "../../hooks/useJobs";
+import { usePendingNotes } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -28,6 +29,7 @@ const OTHER_STAGES = [
   "ingest.github.repo",
   "ingest.github.synthesis",
   "profile.analyze",
+  "posting.extract",
   "stalled",
 ];
 
@@ -125,6 +127,8 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
   const { jobs, activeCount, cancel, retry } = useJobs();
   const stopped = useStoppedRuns();
   const running = useRunningRuns();
+  // "Aguardando você" (F06-17): edições do recrutador em notas do usuário, esperando confirmação
+  const waiting = usePendingNotes();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="relative">
@@ -137,7 +141,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
       >
         <Activity size={16} />
         <span data-testid="activity-count" className="text-xs">
-          {activeCount}
+          {activeCount + waiting.length}
         </span>
       </Button>
       {open ? (
@@ -146,6 +150,29 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
           className="absolute right-0 z-30 mt-2 max-h-[calc(100vh-5rem)] w-96 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-lg"
         >
           <h3 className="mb-2 text-sm font-semibold">{t("activity.title")}</h3>
+          {waiting.length > 0 ? (
+            <ul aria-label={t("tray.waiting")} className="mb-2 flex flex-col gap-2">
+              {waiting.map(({ note, posting }) => (
+                <li
+                  key={note.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-warn/40 p-2 text-sm"
+                >
+                  <span>
+                    {t("tray.noteChange", {
+                      posting:
+                        [posting?.company, posting?.title].filter(Boolean).join(" · ") || "—",
+                    })}
+                  </span>
+                  <NavLink
+                    to={`/vagas/${note.postingId}?nota=${note.id}`}
+                    className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                  >
+                    {t("tray.review")}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {stopped.length > 0 ? (
             <ul aria-label={t("activity.stopped")} className="mb-2 flex flex-col gap-2">
               {stopped.map((run) => {
@@ -189,7 +216,10 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
               })}
             </ul>
           ) : null}
-          {jobs.length === 0 && stopped.length === 0 && running.length === 0 ? (
+          {jobs.length === 0 &&
+          stopped.length === 0 &&
+          running.length === 0 &&
+          waiting.length === 0 ? (
             <p className="text-sm text-muted-fg">{t("activity.empty")}</p>
           ) : (
             <ul className="flex max-h-96 flex-col gap-2 overflow-auto">

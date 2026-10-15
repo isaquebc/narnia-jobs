@@ -3,12 +3,14 @@ import {
   friendlyError,
   gradeTranscript,
   newId,
+  POSTING_MODEL_DEFAULTS,
   postingSessionTitle,
   type Repos,
   recruiterContext,
   renderNote,
   renderRecruiterPrompt,
   resolveChatSettings,
+  resolveModel,
   resumeLostNote,
 } from "@narnia-jobs/core";
 import type {
@@ -289,7 +291,13 @@ export class SessionManager {
     const posting = this.repos.postings.get(postingId);
     if (!posting) throw new SessionStateError("posting_not_found", "Vaga não encontrada.");
     const title = postingSessionTitle(posting);
-    const session = this.create({ category: "job", title });
+    // modelo da análise por tarefa (F06-5: Sonnet por padrão, Configurações › Modelos)
+    const model = resolveModel(
+      this.repos.settings,
+      "posting_analyze",
+      POSTING_MODEL_DEFAULTS.posting_analyze,
+    );
+    const session = this.create({ category: "job", title, model });
     this.repos.chatSessions.setPosting(session.id, postingId);
     const note = renderNote(readPluginFile("prompts/analise-vaga-contexto.md"), {
       posting_id: postingId,

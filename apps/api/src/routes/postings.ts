@@ -4,11 +4,13 @@ import {
   confirmPostingNote,
   decideDuplicate,
   editPostingNote,
+  evidenceLabels,
   type NoteEditResult,
   type Repos,
   rejectPostingNote,
 } from "@narnia-jobs/core";
 import {
+  JobAnalysisSchema,
   PostingContactInputSchema,
   PostingCreateSchema,
   PostingFieldsSchema,
@@ -153,7 +155,12 @@ export function postingsRoutes(deps: {
     return c.json({
       analyses: repos.jobAnalyses.list(p.id).map((a) => {
         const { usage: _usage, ...rest } = a;
-        return { ...rest, stale: analysisStale(repos, a, p) };
+        const parsed = JobAnalysisSchema.safeParse(a.analysis);
+        return {
+          ...rest,
+          stale: analysisStale(repos, a, p),
+          labels: parsed.success ? evidenceLabels(repos, parsed.data) : {},
+        };
       }),
     });
   });

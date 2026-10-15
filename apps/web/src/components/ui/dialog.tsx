@@ -6,17 +6,22 @@ export function Dialog({
   onOpenChange,
   title,
   children,
+  wide = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   title: string;
   children: ReactNode;
+  /** Largura de comparação (diff lado a lado, F06-9). */
+  wide?: boolean;
 }) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <RadixDialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[560px] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg">
+        <RadixDialog.Content
+          className={`fixed left-1/2 top-1/2 z-50 max-h-[90vh] ${wide ? "w-[960px]" : "w-[560px]"} max-w-[90vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg`}
+        >
           <RadixDialog.Title className="mb-3 text-base font-semibold">{title}</RadixDialog.Title>
           {children}
         </RadixDialog.Content>

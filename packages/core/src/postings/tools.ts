@@ -125,6 +125,40 @@ export function analysisStale(
   };
 }
 
+/** Rótulos legíveis das evidências da análise ("kind:id" → "Engenheira Sênior · Acme"), para a página da vaga. */
+export function evidenceLabels(repos: Repos, analysis: JobAnalysis): Record<string, string> {
+  const f = repos.facts;
+  const label = (e: EvidenceId): string | null => {
+    switch (e.kind) {
+      case "experience": {
+        const x = f.experiences.get(e.id);
+        return x ? `${x.title} · ${x.company}` : null;
+      }
+      case "achievement":
+        return f.achievements.get(e.id)?.text ?? null;
+      case "project":
+        return f.projects.get(e.id)?.name ?? null;
+      case "skill":
+        return f.skills.get(e.id)?.name ?? null;
+      case "education": {
+        const x = f.education.get(e.id);
+        return x ? `${x.course} · ${x.institution}` : null;
+      }
+      case "language":
+        return f.languages.get(e.id)?.name ?? null;
+    }
+  };
+  const out: Record<string, string> = {};
+  for (const e of [
+    ...analysis.matches.flatMap((m) => m.evidence),
+    ...analysis.likelyQuestions.flatMap((q) => q.evidence),
+  ]) {
+    const l = label(e);
+    if (l) out[`${e.kind}:${e.id}`] = l;
+  }
+  return out;
+}
+
 /** Evidências da análise que não existem (o modelo não pode afirmar "atende" com fato inventado). */
 export function missingEvidence(repos: Repos, analysis: JobAnalysis): EvidenceId[] {
   const f = repos.facts;

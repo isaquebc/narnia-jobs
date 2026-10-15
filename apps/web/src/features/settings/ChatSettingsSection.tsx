@@ -1,4 +1,4 @@
-import type { ChatSettingsDto, TrustTag } from "@narnia-jobs/shared";
+import { type ChatSettingsDto, CLAUDE_MODELS, type TrustTag } from "@narnia-jobs/shared";
 import { useEffect, useState } from "react";
 import { describeError } from "../../components/ErrorState";
 import { Alert } from "../../components/ui/alert";
@@ -12,7 +12,8 @@ import { useChatSettings, useTrustedDomains } from "../../hooks/useChat";
 import { type TKey, t } from "../../i18n";
 
 const TAGS: TrustTag[] = ["official", "survey", "jobboard", "other"];
-const MODELS = ["sonnet", "haiku", "opus"];
+// só modelos do Claude por enquanto (F06-13); a lista é a mesma da seção Modelos
+const MODELS = CLAUDE_MODELS;
 
 /** Configurações › Chat (F04 §4): preferências das conversas e lista de domínios confiáveis (F04-3, F04-4, F04-5, F04-9). */
 export function ChatSettingsSection() {

@@ -30,12 +30,19 @@ import type {
   IngestionResponse,
   IngestSettingsSchema,
   Job,
+  JobAnalysis,
   NotificationsListResponse,
   OnboardingState,
   PersonaOverrides,
   PersonaResponse,
   PlanUsage,
   PluginStatusResponse,
+  Posting,
+  PostingContact,
+  PostingContactInput,
+  PostingModels,
+  PostingNote,
+  PostingPatch,
   Profile,
   ProfileCardResponse,
   ProfileCreateRequest,
@@ -478,7 +485,104 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ text: string | null }>(`/api/files/${encodeURIComponent(id)}/text`),
     getFileDigest: (id: string) =>
       request<{ digest: FileDigest | null }>(`/api/files/${encodeURIComponent(id)}/digest`),
+    // F06 · vagas
+    listPostings: () => request<{ postings: Posting[] }>("/api/postings"),
+    getPosting: (id: string) => request<PostingDetail>(`/api/postings/${encodeURIComponent(id)}`),
+    intakePosting: (body: { text?: string; url?: string; fields?: PostingPatch }) =>
+      request<{ posting: Posting; job: Job | null }>("/api/postings/intake", json(body)),
+    patchPosting: (id: string, patch: PostingPatch) =>
+      request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+    deletePosting: (id: string) =>
+      request<null>(`/api/postings/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    reextractPosting: (id: string) =>
+      request<{ job: Job }>(`/api/postings/${encodeURIComponent(id)}/extract`, json({})),
+    decideDuplicate: (id: string, action: "update" | "new" | "cancel") =>
+      request<{ keptId: string | null; removedId: string | null }>(
+        `/api/postings/${encodeURIComponent(id)}/duplicate-decision`,
+        json({ action }),
+      ),
+    analyzePosting: (id: string) =>
+      request<{ session: ChatSession }>(
+        `/api/postings/${encodeURIComponent(id)}/analyze`,
+        json({}),
+      ),
+    listPostingAnalyses: (id: string) =>
+      request<{ analyses: PostingAnalysisView[] }>(
+        `/api/postings/${encodeURIComponent(id)}/analyses`,
+      ),
+    addPostingContact: (id: string, body: PostingContactInput) =>
+      request<{ contact: PostingContact }>(
+        `/api/postings/${encodeURIComponent(id)}/contacts`,
+        json(body),
+      ),
+    patchPostingContact: (id: string, contactId: string, body: Partial<PostingContactInput>) =>
+      request<{ contact: PostingContact }>(
+        `/api/postings/${encodeURIComponent(id)}/contacts/${encodeURIComponent(contactId)}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+    deletePostingContact: (id: string, contactId: string) =>
+      request<null>(
+        `/api/postings/${encodeURIComponent(id)}/contacts/${encodeURIComponent(contactId)}`,
+        { method: "DELETE" },
+      ),
+    addPostingNote: (id: string, body: string) =>
+      request<{ note: PostingNote }>(
+        `/api/postings/${encodeURIComponent(id)}/notes`,
+        json({ body }),
+      ),
+    patchPostingNote: (id: string, noteId: string, body: string) =>
+      request<{ note: PostingNote }>(
+        `/api/postings/${encodeURIComponent(id)}/notes/${encodeURIComponent(noteId)}`,
+        { method: "PATCH", body: JSON.stringify({ body }) },
+      ),
+    decidePostingNote: (id: string, noteId: string, action: "confirm" | "reject") =>
+      request<{ note: PostingNote }>(
+        `/api/postings/${encodeURIComponent(id)}/notes/${encodeURIComponent(noteId)}/${action}`,
+        json({}),
+      ),
+    deletePostingNote: (id: string, noteId: string) =>
+      request<null>(`/api/postings/${encodeURIComponent(id)}/notes/${encodeURIComponent(noteId)}`, {
+        method: "DELETE",
+      }),
+    listPendingNotes: () => request<{ notes: PendingNote[] }>("/api/postings-pending-notes"),
+    getModelSettings: () =>
+      request<{ models: PostingModels; defaults: PostingModels }>("/api/settings/models"),
+    putModelSettings: (patch: Partial<PostingModels>) =>
+      request<{ models: PostingModels; defaults: PostingModels }>("/api/settings/models", {
+        method: "PUT",
+        body: JSON.stringify(patch),
+      }),
   };
+}
+
+/** Detalhe da vaga (F06): campos, contatos, notas e outras vagas com a mesma identidade. */
+export interface PostingDetail {
+  posting: Posting;
+  contacts: PostingContact[];
+  notes: PostingNote[];
+  duplicates: string[];
+}
+/** Análise gravada com a validade (F06-10) e os rótulos das evidências. */
+export interface PostingAnalysisView {
+  id: string;
+  postingId: string;
+  analysis: JobAnalysis;
+  recommendedProfileId: string | null;
+  factsVersion: number;
+  postingUpdatedAt: string;
+  models: string[];
+  chatSessionId: string | null;
+  createdAt: string;
+  stale: { facts: boolean; posting: boolean };
+  labels: Record<string, string>;
+}
+/** Edição do recrutador numa nota do usuário, esperando confirmação (bandeja "Aguardando você", F06-17). */
+export interface PendingNote {
+  note: PostingNote;
+  posting: { id: string; company: string | null; title: string | null; role: string | null } | null;
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;

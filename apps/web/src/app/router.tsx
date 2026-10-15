@@ -228,6 +228,33 @@ const chatSessionRoute = createRoute({
     return <ChatPage sessionId={sessionId} />;
   },
 });
+// F06 · vagas (sob demanda)
+const PostingsPage = lazyRouteComponent(
+  () => import("../features/postings/PostingsPage"),
+  "PostingsPage",
+);
+const PostingPage = lazyRouteComponent(
+  () => import("../features/postings/PostingPage"),
+  "PostingPage",
+);
+const postingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vagas",
+  component: PostingsPage,
+});
+const postingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vagas/$id",
+  // `?nota=` abre a página com a nota pendente em destaque (link da pendência, F06-17)
+  validateSearch: (s: Record<string, unknown>) => ({
+    nota: typeof s.nota === "string" ? s.nota : undefined,
+  }),
+  component: function PostingRoute() {
+    const { id } = postingRoute.useParams();
+    const { nota } = postingRoute.useSearch();
+    return <PostingPage key={id} postingId={id} noteId={nota} />;
+  },
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/configuracoes",
@@ -253,6 +280,8 @@ const routeTree = rootRoute.addChildren([
   repoDetailRoute,
   notificationsRoute,
   settingsRoute,
+  postingsRoute,
+  postingRoute,
   chatRoute,
   chatSessionRoute,
 ]);

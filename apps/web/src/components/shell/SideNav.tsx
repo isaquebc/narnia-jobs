@@ -1,5 +1,6 @@
 import {
   Bell,
+  Briefcase,
   Download,
   FolderGit2,
   LayoutDashboard,
@@ -86,6 +87,11 @@ export function SideNav({ className }: { className?: string }) {
                 ) : null}
               </NavLink>
               <ChatNav enabled={completed} />
+            </li>
+            <li>
+              <NavLink to="/vagas" className={item}>
+                <Briefcase size={16} /> {t("nav.postings")}
+              </NavLink>
             </li>
             <li>
               <NavLink to="/perfis" className={item}>
