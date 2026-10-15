@@ -566,6 +566,7 @@ export const ptBR = {
       ingestion_stuck: "Ingestões paradas",
       posting_note_pending: "Notas de vaga para confirmar",
       posting_analysis_done: "Análises de vaga prontas",
+      posting_analysis_incomplete: "Análises de vaga não concluídas",
     },
   },
   ingestion: {

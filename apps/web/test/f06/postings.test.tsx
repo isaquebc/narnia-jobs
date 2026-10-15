@@ -266,6 +266,87 @@ describe("F06/M6 · Vagas", () => {
     );
   });
 
+  it("bandeja: análise pronta conta no número, esconde o 'Analisando' da mesma vaga; não concluída aparece com a conversa", async () => {
+    const notification = (
+      id: string,
+      kind: string,
+      title: string,
+      actionUrl: string,
+      subjectId: string,
+    ) => ({
+      id,
+      kind,
+      subjectKind: kind === "posting.analysis_done" ? "posting" : "chat_session",
+      subjectId,
+      title,
+      body: null,
+      actionUrl,
+      severity: kind === "posting.analysis_done" ? "info" : "warning",
+      createdAt: "2026-10-15T10:00:00.000Z",
+      readAt: null,
+      dismissedAt: null,
+      resolvedAt: null,
+    });
+    const session = (id: string, postingId: string, title: string) => ({
+      id,
+      profileId: null,
+      category: "job",
+      title,
+      provider: "mock",
+      providerSessionId: null,
+      model: "sonnet",
+      state: "live",
+      ingestionRunId: null,
+      postingId,
+      cardHash: null,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsdEst: 0,
+      createdAt: "2026-10-15T10:00:00.000Z",
+      lastActivityAt: "2026-10-15T10:00:00.000Z",
+      busy: true,
+    });
+    renderApp({
+      api: api({
+        listChatSessions: async () => ({
+          sessions: [session("s1", "v1", "Globex - Backend"), session("s2", "v2", "Nubank - EM")],
+        }),
+        listNotifications: async () => ({
+          notifications: [
+            notification(
+              "n1",
+              "posting.analysis_done",
+              "Análise pronta: Globex - Backend",
+              "/vagas/v1",
+              "v1",
+            ),
+            notification(
+              "n2",
+              "posting.analysis_incomplete",
+              "Análise não concluída: Acme - QA",
+              "/chat/s3",
+              "s3",
+            ),
+          ],
+          unresolved: 1,
+        }),
+      }) as never,
+      initialUrl: "/vagas",
+    });
+    // pronta (1) + não concluída (1) + em andamento de outra vaga (1)
+    await waitFor(() => expect(screen.getByTestId("activity-count")).toHaveTextContent("3"));
+    await act(async () => {
+      await userEvent.click(await screen.findByRole("button", { name: "Atividades" }));
+    });
+    const list = await screen.findByRole("list", { name: "Análises de vaga" });
+    expect(list).not.toHaveTextContent("Analisando Globex - Backend");
+    expect(list).toHaveTextContent("Analisando Nubank - EM");
+    expect(list).toHaveTextContent("Análise pronta: Globex - Backend");
+    expect(list).toHaveTextContent("Análise não concluída: Acme - QA");
+    const links = within(list).getAllByRole("link", { name: "abrir conversa" });
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/chat/s2", "/chat/s3"]);
+  });
+
   it("bandeja: 'Aguardando você' com a nota pendente e o link para a vaga", async () => {
     renderApp({
       api: api({

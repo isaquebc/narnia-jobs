@@ -137,6 +137,28 @@ export function notifyPostingAnalysisDone(
   };
 }
 
+/**
+ * Conversa da análise que terminou o turno sem gravar a análise (correção 2026-10-15): vira pendência com o link da
+ * conversa, para a bandeja não ficar muda. Só conversa `job` ligada a uma vaga e sem análise gravada por ela.
+ */
+export function notifyAnalysisIncomplete(
+  repos: Repos,
+  sessionId: string,
+): { notification: Notification; created: boolean } | null {
+  const s = repos.chatSessions.get(sessionId);
+  if (s?.category !== "job" || !s.postingId) return null;
+  if (repos.jobAnalyses.list(s.postingId).some((a) => a.chatSessionId === s.id)) return null;
+  return repos.notifications.upsert({
+    kind: "posting.analysis_incomplete",
+    subjectKind: "chat_session",
+    subjectId: s.id,
+    title: `Análise não concluída: ${s.title}`,
+    body: "A conversa da análise terminou sem gravar a análise. Abra a conversa para continuar ou peça de novo.",
+    actionUrl: `/chat/${s.id}`,
+    severity: "warning",
+  });
+}
+
 /** Envelheceu (F06-10)? Fatos do usuário ou a vaga mudaram depois da análise. */
 export function analysisStale(
   repos: Repos,
@@ -378,7 +400,13 @@ export function createPostingTools(
         chatSessionId: s?.id ?? null,
       });
       ctx.ports.changed?.(p.id);
-      ctx.ports.notified?.([notifyPostingAnalysisDone(repos, p)]);
+      // a pendência "não concluída" desta conversa, se houver, se resolve
+      const resolved = s
+        ? repos.notifications
+            .resolveSubject("chat_session", s.id, ["posting.analysis_incomplete"])
+            .map((notification) => ({ notification, created: false }))
+        : [];
+      ctx.ports.notified?.([notifyPostingAnalysisDone(repos, p), ...resolved]);
       return { analysisId: record.id, url: postingUrl(p.id) };
     }),
     "analysis.get": wrap("analysis.get", (i) => {

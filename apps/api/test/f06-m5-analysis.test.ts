@@ -195,6 +195,91 @@ describe("F06/M5 · análise da vaga", () => {
   });
 });
 
+describe("F06 · análise não concluída na bandeja (2026-10-15)", () => {
+  it("conversa da vaga que termina o turno sem gravar a análise vira pendência; gravar depois resolve", async () => {
+    const t = makeTestApp();
+    try {
+      const ids = seedFixture(t.repos, "engineer");
+      const p = t.repos.postings.create({ company: "Nubank", role: "backend" });
+      const s = t.repos.chatSessions.create({
+        profileId: null,
+        category: "job",
+        title: "Nubank - Backend",
+        provider: "mock",
+        model: "sonnet",
+      });
+      t.repos.chatSessions.setPosting(s.id, p.id);
+      // o mock responde sem gravar (mensagem comum, não a nota da análise)
+      t.sessions.send(s.id, "o que acha do meu perfil?");
+      await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === s.id);
+      const open = () =>
+        t.repos.notifications.list().filter((n) => n.kind === "posting.analysis_incomplete");
+      expect(open()).toHaveLength(1);
+      expect(open()[0]).toMatchObject({
+        title: "Análise não concluída: Nubank - Backend",
+        actionUrl: `/chat/${s.id}`,
+        severity: "warning",
+      });
+      expect(
+        t.events.some(
+          (e) =>
+            e.type === "notification.created" &&
+            e.notification.kind === "posting.analysis_incomplete",
+        ),
+      ).toBe(true);
+      // gravar a análise nessa conversa resolve a pendência
+      const tools = createPostingTools(t.repos, {
+        sessionId: s.id,
+        ports: { intake: async () => ({ ok: false, code: "x", message: "x" }) },
+      });
+      await tools["analysis.save"]({
+        postingId: p.id,
+        analysis: {
+          summary: "ok",
+          profiles: [{ profileId: ids.profileId, fit: 70, confidence: "medium", rationale: "r" }],
+          recommendedProfileId: ids.profileId,
+          recommendationRationale: "r",
+          matches: [],
+          gaps: [],
+          risks: [],
+          atsKeywordsMissing: [],
+          likelyQuestions: [],
+          studyRecommendations: [],
+          cvImprovements: [],
+          seniority: { asked: null, profile: null, note: "ok" },
+        },
+      });
+      expect(open()).toHaveLength(0);
+    } finally {
+      t.sessions.closeAll();
+      t.cleanup();
+    }
+  });
+
+  it("conversa de vaga que já tem a análise gravada não vira pendência", async () => {
+    const t = makeTestApp();
+    try {
+      seedFixture(t.repos, "engineer");
+      const sid = (
+        (await (await t.api("/api/sessions", json({ category: "career" }))).json()) as {
+          session: { id: string };
+        }
+      ).session.id;
+      await t.api(`/api/sessions/${sid}/messages`, json({ text: `analisa esta vaga: ${JD}` }));
+      const job = async () => t.repos.chatSessions.list().find((s) => s.category === "job");
+      await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === sid);
+      const j = await job();
+      await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === j?.id);
+      expect(
+        t.repos.notifications.list().filter((n) => n.kind === "posting.analysis_incomplete"),
+      ).toHaveLength(0);
+    } finally {
+      t.sessions.closeAll();
+      t.cleanup();
+    }
+  });
+});
+
 describe("F06/M5 · conversa da vaga não abre outra", () => {
   it("posting.open_analysis numa conversa job recusa e liga a vaga à conversa", async () => {
     const t = makeTestApp();

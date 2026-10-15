@@ -22,6 +22,8 @@ export const NOTIFICATION_KINDS = [
   "posting.note_pending",
   /** Análise de vaga gravada pelo recrutador (correção 2026-10-15): aparece na bandeja até ser vista. Informativa. */
   "posting.analysis_done",
+  /** Conversa da análise que terminou sem gravar a análise (erro, limite ou o modelo parou): abrir a conversa. */
+  "posting.analysis_incomplete",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

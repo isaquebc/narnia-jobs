@@ -3,6 +3,7 @@ import {
   friendlyError,
   gradeTranscript,
   newId,
+  notifyAnalysisIncomplete,
   POSTING_MODEL_DEFAULTS,
   postingSessionTitle,
   type Repos,
@@ -662,6 +663,7 @@ export class SessionManager {
         });
         this.reopenIfCategoryChanged(id, entry);
         this.flushWaitingRuns(id);
+        this.checkPostingAnalysis(id);
         return;
       }
       case "error":
@@ -854,6 +856,17 @@ export class SessionManager {
     if (e.usage && typeof e.costUsd === "number" && (e.usage.inputTokens > 0 || e.costUsd > 0))
       this.recordUsage(id, entry, e.usage, e.costUsd, null);
     this.fail(id, entry, e.message);
+    this.checkPostingAnalysis(id);
+  }
+
+  /** Conversa da análise que terminou sem gravar (fim de turno, limite ou erro): pendência na bandeja (2026-10-15). */
+  private checkPostingAnalysis(id: string) {
+    const ev = notifyAnalysisIncomplete(this.repos, id);
+    if (ev)
+      this.deps.bus.emit({
+        type: ev.created ? "notification.created" : "notification.updated",
+        notification: ev.notification,
+      });
   }
 
   /**

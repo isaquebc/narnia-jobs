@@ -124,15 +124,25 @@ function useRunsByStatus(key: string, statuses: RunStatus[]) {
 
 /**
  * Análises de vaga (correção 2026-10-15): a análise roda numa conversa do recrutador, não na fila, então a bandeja
- * mostra as conversas de vaga com turno em andamento e as análises prontas ainda não vistas (notificação
- * `posting.analysis_done`; abrir pela bandeja marca como vista).
+ * mostra as conversas de vaga com turno em andamento (menos as da vaga que já tem a análise pronta), as análises
+ * prontas ainda não vistas (`posting.analysis_done`; abrir pela bandeja marca como vista) e as conversas que
+ * terminaram sem gravar (`posting.analysis_incomplete`, resolvida quando a análise é gravada). Tudo conta no número.
  */
 function usePostingAnalyses() {
   const { sessions } = useChatSessions();
   const { notifications, markRead } = useNotifications("open");
-  const running = sessions.filter((s) => s.category === "job" && s.busy && s.state !== "archived");
   const done = notifications.filter((n) => n.kind === "posting.analysis_done" && !n.readAt);
-  return { running, done, markRead };
+  const incomplete = notifications.filter((n) => n.kind === "posting.analysis_incomplete");
+  const ready = new Set(done.map((n) => n.subjectId));
+  const running = sessions.filter(
+    (s) =>
+      s.category === "job" &&
+      s.busy &&
+      s.state !== "archived" &&
+      !(s.postingId && ready.has(s.postingId)),
+  );
+  const count = running.length + done.length + incomplete.length;
+  return { running, done, incomplete, count, markRead };
 }
 
 const useStoppedRuns = () => useRunsByStatus("stopped", STOPPED_STATUSES);
@@ -157,7 +167,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
       >
         <Activity size={16} />
         <span data-testid="activity-count" className="text-xs">
-          {activeCount + waiting.length + analyses.running.length}
+          {activeCount + waiting.length + analyses.count}
         </span>
       </Button>
       {open ? (
@@ -189,7 +199,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
               ))}
             </ul>
           ) : null}
-          {analyses.running.length + analyses.done.length > 0 ? (
+          {analyses.count > 0 ? (
             <ul aria-label={t("tray.analyses")} className="mb-2 flex flex-col gap-2">
               {analyses.running.map((s) => (
                 <li
@@ -217,6 +227,20 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
                     className="inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
                   >
                     {t("tray.viewAnalysis")}
+                  </NavLink>
+                </li>
+              ))}
+              {analyses.incomplete.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-warn/40 p-2 text-sm"
+                >
+                  <span>{n.title}</span>
+                  <NavLink
+                    to={n.actionUrl}
+                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                  >
+                    {t("tray.openChat")}
                   </NavLink>
                 </li>
               ))}
@@ -269,7 +293,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
           stopped.length === 0 &&
           running.length === 0 &&
           waiting.length === 0 &&
-          analyses.running.length + analyses.done.length === 0 ? (
+          analyses.count === 0 ? (
             <p className="text-sm text-muted-fg">{t("activity.empty")}</p>
           ) : (
             <ul className="flex max-h-96 flex-col gap-2 overflow-auto">
