@@ -1062,6 +1062,11 @@ export const ptBR = {
     usage: "Turno: {turn} tokens · conversa: {session} tokens",
     model: "Modelo",
     bySpecialist: "especializado",
+    posting: {
+      openAnalysis: "Abrir a conversa da análise",
+      open: "Abrir a vaga",
+      createCv: "Criar CV para esta vaga",
+    },
     category: {
       career: "Carreira",
       clarify: "Clarificação",

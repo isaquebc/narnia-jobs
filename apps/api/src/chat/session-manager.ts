@@ -3,6 +3,7 @@ import {
   friendlyError,
   gradeTranscript,
   newId,
+  postingSessionTitle,
   type Repos,
   recruiterContext,
   renderNote,
@@ -54,7 +55,8 @@ export class SessionStateError extends Error {
       | "turn_in_progress"
       | "session_archived"
       | "no_profile"
-      | "budget_exhausted",
+      | "budget_exhausted"
+      | "posting_not_found",
     message: string,
   ) {
     super(message);
@@ -276,6 +278,26 @@ export class SessionManager {
     this.repos.chatSessions.setState(s.id, "live");
     this.emitState(s.id, "live");
     return this.get(s.id);
+  }
+
+  /**
+   * Conversa própria da análise de uma vaga (F06 §1.1): categoria `job`, título "<contratante>/<cliente> - <role>", a
+   * vaga ligada e um turno do sistema que pede a análise com o procedimento da skill `analisar-vaga` (fonte única dos
+   * modos A e B). Conta no teto de conversas vivas (F06-15): cheio, sobe `SessionLimitError` para a UI perguntar.
+   */
+  openPostingAnalysis(postingId: string): ChatSession {
+    const posting = this.repos.postings.get(postingId);
+    if (!posting) throw new SessionStateError("posting_not_found", "Vaga não encontrada.");
+    const title = postingSessionTitle(posting);
+    const session = this.create({ category: "job", title });
+    this.repos.chatSessions.setPosting(session.id, postingId);
+    const note = renderNote(readPluginFile("prompts/analise-vaga-contexto.md"), {
+      posting_id: postingId,
+      title,
+      instrucoes: stripFrontmatter(readPluginFile("skills/analisar-vaga/SKILL.md")).trim(),
+    });
+    this.send(session.id, note, { display: `Análise da vaga ${title}` });
+    return this.get(session.id);
   }
 
   private open(session: ChatSession): Live {
@@ -557,12 +579,14 @@ export class SessionManager {
         const name = start?.name ?? "tool";
         const runId =
           CREATES_RUN_TOOLS.has(name) && !e.isError ? entry.pendingRuns.shift() : undefined;
+        const links = e.isError ? {} : postingLinks(name, e.output);
         entry.toolCalls.push({
           name,
           args: start?.args ?? "{}",
           durationMs,
           isError: e.isError,
           ...(runId ? { runId } : {}),
+          ...links,
           ...(start?.subagent ? { subagent: true } : {}),
         });
         bus.emit({
@@ -1059,4 +1083,26 @@ export function specialistAgents(dir?: string): Record<string, ChatAgentDefiniti
       disallowedTools: ["Agent"],
     },
   };
+}
+
+/**
+ * Links que a mensagem guarda das tools da vaga (F06): a conversa da análise aberta (`posting_open_analysis`) e a vaga
+ * criada ou analisada (`posting_create`, `analysis_save`). A web desenha o link e o botão "Criar CV para esta vaga"
+ * a partir daqui, sem o modelo escrever botão (regra 7 da persona).
+ */
+export function postingLinks(
+  name: string,
+  output: string,
+): { sessionId?: string; postingId?: string } {
+  if (!["posting_open_analysis", "posting_create", "analysis_save"].includes(name)) return {};
+  try {
+    const o = JSON.parse(output) as { sessionId?: unknown; postingId?: unknown; url?: unknown };
+    if (name === "posting_open_analysis" && typeof o.sessionId === "string")
+      return { sessionId: o.sessionId };
+    if (typeof o.postingId === "string") return { postingId: o.postingId };
+    const m = typeof o.url === "string" ? /^\/vagas\/([^/?#]+)/.exec(o.url) : null;
+    return m?.[1] ? { postingId: m[1] } : {};
+  } catch {
+    return {};
+  }
 }

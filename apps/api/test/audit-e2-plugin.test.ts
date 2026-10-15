@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CHAT_TOOLS, INGEST_TOOLS, PROFILE_TOOLS } from "@narnia-jobs/shared";
+import { CHAT_TOOLS, INGEST_TOOLS, POSTING_TOOLS, PROFILE_TOOLS } from "@narnia-jobs/shared";
 import { describe, expect, it } from "vitest";
 import { publishedName } from "../src/mcp/scopes";
 import { pluginDir, splitFrontmatter } from "../src/plugin";
@@ -12,9 +12,12 @@ import { pluginDir, splitFrontmatter } from "../src/plugin";
 const PLUGIN = pluginDir();
 const SKILLS = join(PLUGIN, "skills");
 const PUBLISHED = new Set(
-  [...Object.keys(PROFILE_TOOLS), ...Object.keys(INGEST_TOOLS), ...Object.keys(CHAT_TOOLS)].map(
-    publishedName,
-  ),
+  [
+    ...Object.keys(PROFILE_TOOLS),
+    ...Object.keys(INGEST_TOOLS),
+    ...Object.keys(CHAT_TOOLS),
+    ...Object.keys(POSTING_TOOLS),
+  ].map(publishedName),
 );
 const TOOL_REF = /`([a-z]+_[a-z_]+)`/g;
 

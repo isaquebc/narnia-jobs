@@ -1,39 +1,57 @@
 {
+  "chat:analise-de-vaga": {
+    "scores": {
+      "graders": 1
+    },
+    "updatedAt": "2026-10-15T01:21:11.105Z"
+  },
+  "chat:avaliadores": {
+    "scores": {
+      "media": 0.939
+    },
+    "updatedAt": "2026-10-15T01:21:11.105Z"
+  },
   "chat:especializado": {
     "scores": {
       "graders": 0.8
     },
-    "updatedAt": "2026-10-15T00:24:50.510Z"
+    "updatedAt": "2026-10-15T01:21:11.105Z"
   },
   "chat:historia-livre": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-15T00:24:50.510Z"
+    "updatedAt": "2026-10-15T01:21:11.105Z"
   },
   "chat:juiz": {
     "scores": {
-      "media": 0.6
+      "media": 0.571
     },
-    "updatedAt": "2026-10-15T00:24:50.510Z"
+    "updatedAt": "2026-10-15T01:21:11.105Z"
   },
   "chat:pontos-fracos": {
     "scores": {
-      "graders": 1
+      "graders": 0.833
     },
-    "updatedAt": "2026-10-15T00:24:50.510Z"
+    "updatedAt": "2026-10-15T01:21:11.105Z"
   },
   "chat:salario-de-mercado": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-15T00:24:50.510Z"
+    "updatedAt": "2026-10-15T01:21:11.105Z"
+  },
+  "chat:vaga-no-chat": {
+    "scores": {
+      "graders": 1
+    },
+    "updatedAt": "2026-10-15T01:21:11.105Z"
   },
   "chat:valor-pesquisado": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-15T00:24:50.510Z"
+    "updatedAt": "2026-10-15T01:21:11.105Z"
   },
   "narnia-posting-duplicate": {
     "scores": {

@@ -31,6 +31,8 @@ export const ChatSessionSchema = z.object({
   model: z.string().min(1),
   state: ChatSessionStateSchema,
   ingestionRunId: IdSchema.nullable(),
+  /** Vaga tratada pela conversa da análise (categoria `job`, F06). */
+  postingId: IdSchema.nullable().optional(),
   cardHash: z.string().nullable(),
   tokensIn: z.number().int().min(0),
   tokensOut: z.number().int().min(0),
@@ -57,6 +59,10 @@ export const ChatToolCallSchema = z.object({
   isError: z.boolean(),
   /** Execução criada por esta tool (ingest_text/file/github): o link "Abrir a ingestão criada" sobrevive ao reload. */
   runId: IdSchema.optional(),
+  /** F06: conversa da análise aberta por esta tool (`posting_open_analysis`). */
+  sessionId: IdSchema.optional(),
+  /** F06: vaga criada ou analisada por esta tool (`posting_create`, `analysis_save`). */
+  postingId: IdSchema.optional(),
   /** Chamada feita pelo recrutador especializado (subagente, F06-8), não pelo recrutador da conversa. */
   subagent: z.boolean().optional(),
 });

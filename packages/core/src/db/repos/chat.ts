@@ -44,6 +44,7 @@ export interface ChatSessionCreate {
   provider: string;
   model: string;
   ingestionRunId?: string | null;
+  postingId?: string | null;
 }
 
 export interface ChatSessionsRepo {
@@ -62,6 +63,8 @@ export interface ChatSessionsRepo {
   /** null = o transcript do provider se perdeu; a próxima abertura começa sem `resume` (auditoria B). */
   setProviderSessionId(id: string, providerSessionId: string | null): void;
   setCardHash(id: string, hash: string | null): void;
+  /** Vaga da conversa da análise (F06). */
+  setPosting(id: string, postingId: string | null): void;
   /**
    * Usuário viu a mensagem na tela (2026-10-13): a marca só avança (mensagem desta conversa e mais nova que a marca
    * atual). Devolve true quando avançou.
@@ -89,6 +92,7 @@ function mapSession(r: Row, unread?: number): ChatSession {
     model: r.model,
     state: r.state,
     ingestionRunId: r.ingestion_run_id ?? null,
+    ...("posting_id" in r ? { postingId: (r.posting_id as string | null) ?? null } : {}),
     cardHash: r.card_hash ?? null,
     tokensIn: Number(r.tokens_in),
     tokensOut: Number(r.tokens_out),
@@ -139,6 +143,7 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
         now,
         now,
       );
+      if (i.postingId) set("posting_id", id, i.postingId);
       return repo.get(id) as ChatSession;
     },
     get(id) {
@@ -166,6 +171,7 @@ export function chatSessionsRepo(db: Db): ChatSessionsRepo {
     setTitle: (id, title) => void set("title", id, title),
     setProviderSessionId: (id, psid) => void set("provider_session_id", id, psid),
     setCardHash: (id, hash) => void set("card_hash", id, hash),
+    setPosting: (id, postingId) => void set("posting_id", id, postingId),
     markRead(id, messageId) {
       const target = rowidOf(messageId, id);
       if (target === null) return false;

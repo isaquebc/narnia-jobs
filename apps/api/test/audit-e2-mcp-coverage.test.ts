@@ -26,6 +26,9 @@ interface Ctx {
   /** Preenchidos ao longo da sequência (research_save → research_apply; ingest_text → ingest_confirm). */
   sourceId?: string;
   textRunId?: string;
+  /** F06: vaga criada por posting_create e nota do usuário que o recrutador edita. */
+  postingId?: string;
+  noteId?: string;
 }
 
 interface Case {
@@ -172,6 +175,77 @@ const CASES: Record<string, Case> = {
       login: "ana-exemplo",
     }),
   },
+  // F06: vaga e análise
+  posting_create: {
+    where: "career",
+    args: () => ({
+      text: `Desenvolvedor(a) Backend Sênior\nEmpresa: Globex · Remoto · CLT\n\nRequisitos:\n${"- Node.js, TypeScript e PostgreSQL\n".repeat(8)}`,
+    }),
+    after: (c, out) => {
+      c.postingId = (out as { postingId: string }).postingId;
+      c.noteId = c.t.repos.postingNotes.add(c.postingId, "user", "Falei com a Joana").id;
+    },
+  },
+  posting_get: { where: "career", args: (c) => ({ id: c.postingId }) },
+  posting_search: { where: "career", args: () => ({ query: "globex" }) },
+  posting_update: {
+    where: "career",
+    args: (c) => ({ id: c.postingId, fields: { client: "Initech" } }),
+  },
+  posting_contact_add: {
+    where: "career",
+    args: (c) => ({ postingId: c.postingId, name: "Joana", origin: "linkedin" }),
+  },
+  posting_note_add: {
+    where: "career",
+    args: (c) => ({ postingId: c.postingId, body: "Pede inglês." }),
+  },
+  posting_note_update: {
+    where: "career",
+    args: (c) => ({ id: c.noteId, body: "Falei com a Joana; pediu portfólio" }),
+  },
+  analysis_save: {
+    where: "career",
+    args: (c) => ({
+      postingId: c.postingId,
+      analysis: {
+        summary: "Boa aderência.",
+        profiles: [
+          {
+            profileId: c.ids.profileId,
+            fit: 72,
+            rationale: "Backend sênior.",
+            confidence: "medium",
+          },
+        ],
+        recommendedProfileId: c.ids.profileId,
+        recommendationRationale: "Único perfil.",
+        matches: [
+          {
+            requirement: "Node.js",
+            evidence: [{ kind: "skill", id: first(c.ids.skillIds, "skill") }],
+            strength: "strong",
+          },
+        ],
+        gaps: [
+          {
+            requirement: "AWS",
+            severity: "minor",
+            evidenceChecked: true,
+            suggestion: "Estudar AWS.",
+          },
+        ],
+        risks: [],
+        atsKeywordsMissing: [],
+        likelyQuestions: [],
+        studyRecommendations: [],
+        cvImprovements: [],
+        seniority: { asked: "senior", profile: "senior", note: "Ok." },
+      },
+    }),
+  },
+  analysis_get: { where: "career", args: (c) => ({ postingId: c.postingId }) },
+  posting_open_analysis: { where: "career", args: (c) => ({ postingId: c.postingId }) },
   // mudam o estado global ou da sessão: por último
   session_set_category: { where: "fresh", args: () => ({ category: "ingest" }) },
   profile_switch: { where: "terminal", args: (c) => ({ profileId: c.ids.profileId }) },

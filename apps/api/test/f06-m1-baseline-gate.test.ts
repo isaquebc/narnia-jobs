@@ -54,3 +54,19 @@ describe("F06/M1 · gate da linha de base", () => {
     expect(g.regressions).toHaveLength(1);
   });
 });
+
+describe("F06/M5 · nota só para consulta", () => {
+  it("gate: false grava a nota sem bloquear", () => {
+    const d = mkdtempSync(join(tmpdir(), "narnia-baseline-"));
+    try {
+      const p = join(d, "b.json");
+      writeFileSync(p, JSON.stringify({ k: { scores: { a: 1 }, updatedAt: "t" } }));
+      const g = new BaselineGate({ gate: true, update: true }, p);
+      g.record("k", { a: 0 }, { gate: false });
+      expect(g.finish(() => undefined)).toBe(false);
+      expect(JSON.parse(readFileSync(p, "utf8")).k.scores.a).toBe(0);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+});

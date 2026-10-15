@@ -530,12 +530,129 @@ export class MockProvider implements Provider {
         usage: emptyUsage(opts.model),
         interrupted: true,
       });
+    /** Uma tool do roteiro com os eventos que o CLI emitiria (início, fim) e o texto devolvido. */
+    const step = async (name: string, args: Record<string, unknown>) => {
+      const id = `mock-tool-${++rpcId}`;
+      const input = JSON.stringify(args);
+      out.push({ type: "tool_start", id, name, args: input.slice(0, 500), input });
+      const r = await callTool(name, args);
+      out.push({ type: "tool_end", id, isError: r.isError, output: r.text });
+      if (r.isError) throw new Error(`${name}: ${r.text}`);
+      return JSON.parse(r.text) as Record<string, unknown>;
+    };
+    const analyzePosting = async (postingId: string) => {
+      const posting = await step("posting_get", { id: postingId });
+      const profiles = (
+        (await step("profile_list", {})) as { profiles: Array<{ id: string; name: string }> }
+      ).profiles;
+      const skills = (
+        (await step("evidence_skill_list", { limit: 3 })) as {
+          items: Array<{ id: string; line: string }>;
+        }
+      ).items;
+      const fields = (posting.fields ?? {}) as Record<string, unknown>;
+      const recommended = profiles[0]?.id ?? "sem-perfil";
+      await step("analysis_save", {
+        postingId,
+        analysis: {
+          summary: "Aderência boa ao perfil recomendado, com lacunas em nuvem.",
+          profiles: profiles.map((p, i) => ({
+            profileId: p.id,
+            fit: Math.max(40, 78 - i * 15),
+            rationale: `Experiências do perfil ${p.name} cobrem a maior parte dos requisitos.`,
+            confidence: "medium",
+          })),
+          recommendedProfileId: recommended,
+          recommendationRationale: "Mais experiências ligadas aos requisitos obrigatórios.",
+          matches: skills.slice(0, 2).map((sk) => ({
+            requirement: sk.line.split(" · ")[0] ?? sk.line,
+            evidence: [{ kind: "skill", id: sk.id }],
+            strength: "strong",
+          })),
+          gaps: [
+            {
+              requirement: "AWS",
+              severity: "important",
+              evidenceChecked: true,
+              suggestion: "Citar projetos em nuvem ou estudar AWS.",
+            },
+            {
+              requirement: "Kafka",
+              severity: "minor",
+              evidenceChecked: true,
+              suggestion: "Mostrar experiência com mensageria.",
+            },
+          ],
+          risks: [
+            {
+              type: "salary",
+              description: "Faixa da vaga perto do mínimo do perfil.",
+              source: "model",
+            },
+          ],
+          atsKeywordsMissing: [{ term: "Kafka", where: "skills" }],
+          likelyQuestions: [
+            {
+              question: "Conte um incidente que você resolveu.",
+              why: "Vaga pede sustentação.",
+              evidence: [],
+            },
+          ],
+          studyRecommendations: [{ topic: "AWS", why: "Diferencial da vaga." }],
+          cvImprovements: [
+            { suggestion: "Pôr métricas nas conquistas.", why: "A vaga valoriza impacto." },
+          ],
+          seniority: {
+            asked: (fields.seniority as string | undefined) ?? null,
+            profile: "senior",
+            note: "Compatível.",
+          },
+        },
+      });
+      const reply = `Análise gravada (fonte: analysis_save): fit de ${Math.max(40, 78)} no perfil ${profiles[0]?.name ?? ""}. Maiores lacunas: AWS e Kafka. Quer ver a página da vaga?`;
+      for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
+        out.push({ type: "delta", text: piece });
+      out.push({
+        type: "turn_end",
+        text: reply,
+        providerSessionId,
+        costUsd: 0,
+        usage: { ...emptyUsage(opts.model), inputTokens: 900, outputTokens: 300 },
+      });
+    };
+    const openPostingAnalysis = async (jd: string) => {
+      const url = /^https?:\/\/\S+$/.test(jd) ? jd : undefined;
+      const created = (await step("posting_create", url ? { url } : { text: jd })) as {
+        postingId: string;
+        title: string;
+      };
+      const opened = (await step("posting_open_analysis", { postingId: created.postingId })) as {
+        title: string;
+      };
+      const reply = `Salvei a vaga e abri a conversa "${opened.title}" para a análise; ela já está rodando lá.`;
+      for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
+        out.push({ type: "delta", text: piece });
+      out.push({
+        type: "turn_end",
+        text: reply,
+        providerSessionId,
+        costUsd: 0,
+        usage: { ...emptyUsage(opts.model), inputTokens: 500, outputTokens: 80 },
+      });
+    };
     const turn = async (text: string) => {
       running = true;
       aborted = false;
       try {
         await this.gate("openChat");
         if (aborted) return interrupted("");
+        // análise de vaga (F06): o mock percorre o procedimento da skill (ler a vaga, perfis, evidências, gravar)
+        const job = /^\(nota do sistema: esta conversa é a análise da vaga ([^\s(]+)/.exec(text);
+        if (job) return await analyzePosting(job[1] as string);
+        // pedido de análise numa conversa comum: salva a vaga e abre a conversa própria dela (F06 §1.1)
+        const ask = /analis[ae]\s+(?:esta|essa|a)\s+vaga[:\s]+([\s\S]+)/i.exec(text);
+        if (ask && opts.category !== "job")
+          return await openPostingAnalysis((ask[1] as string).trim());
         const [tool, args] = mockChatScript(text, opts);
         // a fonte que o usuário aprovou é a última registrada (o modelo real leria de research_list)
         if (args.sourceId === LATEST_RESEARCH) {

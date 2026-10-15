@@ -17,6 +17,7 @@ const STATUS: Record<SessionStateError["code"], 404 | 409> = {
   session_archived: 409,
   no_profile: 409,
   budget_exhausted: 409,
+  posting_not_found: 404,
 };
 
 function sessionError(c: Context, e: unknown) {
@@ -151,6 +152,15 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
   app.post("/api/sessions/:id/wake", (c) => {
     try {
       return c.json({ session: sessions.wake(c.req.param("id")) });
+    } catch (e) {
+      return sessionError(c, e);
+    }
+  });
+
+  // F06 §1.1: conversa própria da análise da vaga (título da vaga, categoria job), já com o pedido de análise
+  app.post("/api/postings/:id/analyze", (c) => {
+    try {
+      return c.json({ session: sessions.openPostingAnalysis(c.req.param("id")) }, 201);
     } catch (e) {
       return sessionError(c, e);
     }

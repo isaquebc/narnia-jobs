@@ -1,4 +1,5 @@
 import {
+  analysisStale,
   buildPreAnalysis,
   confirmPostingNote,
   decideDuplicate,
@@ -142,6 +143,18 @@ export function postingsRoutes(deps: {
       duplicates: posting.identityHash
         ? repos.postings.findByIdentity(posting.identityHash, posting.id).map((p) => p.id)
         : [],
+    });
+  });
+
+  // histórico de análises, a mais recente primeiro, com a validade de cada uma (F06-10)
+  app.get("/api/postings/:id/analyses", (c) => {
+    const p = repos.postings.get(c.req.param("id"));
+    if (!p) return notFound(c);
+    return c.json({
+      analyses: repos.jobAnalyses.list(p.id).map((a) => {
+        const { usage: _usage, ...rest } = a;
+        return { ...rest, stale: analysisStale(repos, a, p) };
+      }),
     });
   });
 

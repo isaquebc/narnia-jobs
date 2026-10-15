@@ -90,16 +90,26 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
       for (const j of r.judges ?? [])
         console.log(`    ${mark(j.score)} ${j.name} (${j.label}): ${j.explanation}`);
       if (!r.passed || (r.judges ?? []).some((j) => j.score < 1)) failed++;
-      // avaliadores determinísticos por caso; o juiz (uma amostra por caso, rótulo 0/0,5/1) entra pela média abaixo
-      gate?.record(`chat:${r.id}`, {
-        graders: r.results.length
-          ? r.results.filter((g) => g.passed).length / r.results.length
-          : r.passed
-            ? 1
-            : 0,
-      });
+      // por caso só para consulta: uma amostra por caso oscila (um avaliador a mais ou a menos = 17–20 pontos)
+      gate?.record(
+        `chat:${r.id}`,
+        {
+          graders: r.results.length
+            ? r.results.filter((g) => g.passed).length / r.results.length
+            : r.passed
+              ? 1
+              : 0,
+        },
+        { gate: false },
+      );
     }
+    // o bloqueio é pela média da rodada inteira (todos os avaliadores de todos os casos, e o juiz), só na rodada completa
+    const graded = report.flatMap((r) => r.results);
     const judged = report.flatMap((r) => r.judges ?? []);
+    if (gate && graded.length > 0 && only.length === 0)
+      gate.record("chat:avaliadores", {
+        media: graded.filter((g) => g.passed).length / graded.length,
+      });
     if (gate && judged.length > 0 && only.length === 0)
       gate.record("chat:juiz", {
         media: judged.reduce((sum, j) => sum + j.score, 0) / judged.length,

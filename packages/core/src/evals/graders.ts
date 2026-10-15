@@ -26,7 +26,7 @@ export type Grader = z.infer<typeof GraderSchema>;
 const EvalCaseSchema = z.object({
   id: z.string().min(1),
   description: z.string().optional(),
-  category: z.enum(["career", "ingest", "clarify", "discovery"]).default("career"),
+  category: z.enum(["career", "ingest", "clarify", "discovery", "job"]).default("career"),
   messages: z.array(z.string().min(1)).min(1),
   graders: z.array(GraderSchema).min(1),
 });

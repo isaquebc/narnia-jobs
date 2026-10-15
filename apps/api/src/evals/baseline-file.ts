@@ -51,12 +51,13 @@ export class BaselineGate {
     this.baselines = readBaselines(path);
   }
 
+  /** `gate: false` guarda a nota na linha de base sem bloquear (nota de uma amostra só, para consulta). */
   record(
     key: string,
     scores: Record<string, number>,
-    meta: { versionId?: string; commit?: string } = {},
+    meta: { versionId?: string; commit?: string; gate?: boolean } = {},
   ): Regression[] {
-    const found = findRegressions(this.baselines, key, scores);
+    const found = meta.gate === false ? [] : findRegressions(this.baselines, key, scores);
     this.regressions.push(...found);
     this.runs.push({ key, scores, versionId: meta.versionId, commit: meta.commit });
     return found;

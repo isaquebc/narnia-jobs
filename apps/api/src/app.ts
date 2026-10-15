@@ -138,6 +138,8 @@ export function createApp(deps: AppDeps) {
       queue: deps.queue,
       bus: deps.bus,
       version: deps.version,
+      // a conversa nova da análise (F06) vem do SessionManager, montado mais abaixo
+      openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
     }),
   );
   app.route("/", personaCardRoutes({ repos: deps.repos }));

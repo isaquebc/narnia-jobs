@@ -1,4 +1,10 @@
-import { CHAT_TOOLS, type ChatCategory, INGEST_TOOLS, PROFILE_TOOLS } from "@narnia-jobs/shared";
+import {
+  CHAT_TOOLS,
+  type ChatCategory,
+  INGEST_TOOLS,
+  POSTING_TOOLS,
+  PROFILE_TOOLS,
+} from "@narnia-jobs/shared";
 
 /**
  * Escopos de tools por categoria de sessão (F04-2, lazy load real). A sessão vem do header `X-Narnia-Session` (modo
@@ -15,6 +21,9 @@ const CHAT_PROFILE = [
 ];
 const CAREER = [
   ...CHAT_PROFILE,
+  // F06: vagas e análises (salvar, completar aos poucos, analisar)
+  "posting.",
+  "analysis.",
   "evidence.",
   "fact.",
   "research.",
@@ -52,7 +61,7 @@ const BY_CATEGORY: Record<ChatCategory, string[]> = {
   clarify: CLARIFY,
   interview: CAREER, // F08 refina
   discovery: DISCOVERY,
-  // análise de vaga (F06): carreira inteira; as tools `posting.*` e `analysis.*` entram com elas (M5)
+  // análise de vaga (F06): carreira inteira, com as tools `posting.*` e `analysis.*`
   job: [...CAREER, ...INGEST],
 };
 
@@ -78,6 +87,7 @@ export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
 };
 
 const ALL_TOOLS = [
+  ...Object.keys(POSTING_TOOLS),
   ...Object.keys(PROFILE_TOOLS),
   ...Object.keys(INGEST_TOOLS),
   ...Object.keys(CHAT_TOOLS),

@@ -10,6 +10,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Input, Select, Textarea } from "../../components/ui/input";
+import { Tooltip } from "../../components/ui/tooltip";
 import {
   chatKeys,
   type LiveTool,
@@ -428,6 +429,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
                     <Markdown text={m.contentMd} />
                   )}
                   <RunLinks runIds={runsOf(m)} />
+                  <PostingLinks message={m} />
                 </Card>
               )}
             </li>
@@ -577,6 +579,42 @@ function RunLinks({ runIds }: { runIds: string[] }) {
           {t("chat.ingestionCreated")}
         </NavLink>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Links da vaga na mensagem (F06): a conversa da análise aberta, a vaga salva e, na mensagem que gravou a análise, o
+ * botão "Criar CV para esta vaga" (em breve, F05). Vêm das tools da mensagem, não do texto do modelo (regra 7).
+ */
+export function PostingLinks({ message }: { message: Pick<ChatMessage, "toolCalls"> }) {
+  const opened = message.toolCalls.flatMap((tc) => (tc.sessionId ? [tc.sessionId] : []));
+  const postings = [
+    ...new Set(message.toolCalls.flatMap((tc) => (tc.postingId ? [tc.postingId] : []))),
+  ];
+  const analyzed = message.toolCalls.some((tc) => tc.name === "analysis_save" && tc.postingId);
+  if (opened.length === 0 && postings.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+      {opened.map((id) => (
+        <NavLink key={id} to={`/chat/${id}`} className="underline">
+          {t("chat.posting.openAnalysis")}
+        </NavLink>
+      ))}
+      {postings.map((id) => (
+        <NavLink key={id} to={`/vagas/${id}`} className="underline">
+          {t("chat.posting.open")}
+        </NavLink>
+      ))}
+      {analyzed ? (
+        <Tooltip content={t("nav.soon", { task: "F05" })}>
+          <span>
+            <Button type="button" size="sm" variant="outline" disabled>
+              {t("chat.posting.createCv")}
+            </Button>
+          </span>
+        </Tooltip>
+      ) : null}
     </div>
   );
 }

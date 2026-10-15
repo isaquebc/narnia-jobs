@@ -28,9 +28,9 @@ export type IntakeResult =
 export async function intakePosting(
   deps: IntakeDeps,
   input: {
-    text?: string | null;
-    url?: string | null;
-    fields?: { [K in keyof PostingFields]?: PostingFields[K] | undefined };
+    text?: string | null | undefined;
+    url?: string | null | undefined;
+    fields?: { [K in keyof PostingFields]?: PostingFields[K] | undefined } | undefined;
   },
 ): Promise<IntakeResult> {
   let text = input.text?.trim() || null;

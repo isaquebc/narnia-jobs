@@ -5,6 +5,7 @@ export * from "./i18n";
 export * from "./json-schema";
 export * from "./mcp/chat";
 export * from "./mcp/ingest";
+export * from "./mcp/posting";
 export * from "./mcp/profile";
 export * from "./schemas";
 export * from "./telemetry";

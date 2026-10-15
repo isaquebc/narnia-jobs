@@ -4,6 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import {
   createChatTools,
   createIngestTools,
+  createPostingTools,
   createProfileTools,
   friendlyError,
   friendlyText,
@@ -17,6 +18,8 @@ import {
   contentTracingEnabled,
   INGEST_TOOL_JSON_SCHEMAS,
   INGEST_TOOLS,
+  POSTING_TOOL_JSON_SCHEMAS,
+  POSTING_TOOLS,
   PROFILE_TOOL_JSON_SCHEMAS,
   PROFILE_TOOLS,
   withSpan,
@@ -25,6 +28,7 @@ import { Hono } from "hono";
 import { activeToolSpan } from "../chat/turn-trace";
 import { apiError } from "../errors";
 import type { IngestionStartDeps } from "../routes/ingestions";
+import { intakePosting } from "../services/postings";
 import { createChatIngestPort } from "./ingest-port";
 import { inScope, narrowsScope, publishedName } from "./scopes";
 
@@ -61,8 +65,12 @@ function entries(
   }));
 }
 
-/** Registro único das tools (F04 §2.2): perfil (F02), arquivos e ingestão (F03) e as da conversa (F04). */
-function registry(deps: IngestionStartDeps, session: SessionInfo): Map<string, ToolEntry> {
+/** Porta da conversa nova da análise (F06): o SessionManager, montado depois das rotas do MCP. */
+export type OpenPostingAnalysis = (postingId: string) => { id: string; title: string };
+type McpDeps = IngestionStartDeps & { openAnalysis?: OpenPostingAnalysis | undefined };
+
+/** Registro único das tools (F04 §2.2): perfil (F02), arquivos e ingestão (F03), as da conversa (F04) e da vaga (F06). */
+function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
   const sessionId = session.id;
   const all = [
     ...entries(
@@ -79,6 +87,32 @@ function registry(deps: IngestionStartDeps, session: SessionInfo): Map<string, T
       CHAT_TOOLS,
       CHAT_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
       createChatTools(deps.repos, { ingest: createChatIngestPort(deps, sessionId), sessionId }),
+    ),
+    ...entries(
+      POSTING_TOOLS,
+      POSTING_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
+      createPostingTools(deps.repos, {
+        sessionId,
+        ports: {
+          intake: (i) => intakePosting(deps, i),
+          ...(deps.openAnalysis && sessionId
+            ? {
+                openAnalysis: async (postingId: string) => {
+                  const s = (deps.openAnalysis as OpenPostingAnalysis)(postingId);
+                  return { sessionId: s.id, title: s.title };
+                },
+              }
+            : {}),
+          changed: (postingId) => deps.bus.emit({ type: "posting.updated", postingId }),
+          notified: (events) => {
+            for (const ev of events)
+              deps.bus.emit({
+                type: ev.created ? "notification.created" : "notification.updated",
+                notification: ev.notification,
+              });
+          },
+        },
+      }),
     ),
   ];
   return new Map(all.map((t) => [publishedName(t.name), t]));
@@ -109,7 +143,7 @@ export function toolErrorText(e: unknown): string {
   return `[${tag}] ${friendlyText(f).text} Detalhe técnico: ${message}`;
 }
 
-function buildServer(deps: IngestionStartDeps, version: string, session: SessionInfo) {
+function buildServer(deps: McpDeps, version: string, session: SessionInfo) {
   const tools = registry(deps, session);
   const visible = [...tools.entries()].filter(([, t]) => inScope(t.name, session.category));
   const server = new Server({ name: "narnia-jobs", version }, { capabilities: { tools: {} } });
@@ -212,7 +246,7 @@ interface SessionInfo {
  * requisições (cada uma monta servidor + transporte com o escopo da sessão). O token de boot é exigido pelo
  * `authMiddleware` (o `/mcp` entra na lista protegida).
  */
-export function mcpRoutes(deps: IngestionStartDeps & { version: string }) {
+export function mcpRoutes(deps: McpDeps & { version: string }) {
   const app = new Hono();
   // sem estado não há stream de notificações (GET) nem sessão a encerrar (DELETE): 405 em vez de um SSE que nunca fecha
   app.on(["GET", "DELETE"], "/mcp", (c) => {
