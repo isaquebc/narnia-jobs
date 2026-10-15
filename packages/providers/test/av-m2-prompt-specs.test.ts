@@ -30,7 +30,7 @@ function capture() {
 }
 
 describe("registro dos prompts estruturados", () => {
-  it("9 operações, nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
+  it("12 operações (F06: + 3 da vaga), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
     const ops = Object.keys(STRUCTURED_PROMPTS).sort();
     expect(ops).toEqual(
       [
@@ -41,6 +41,9 @@ describe("registro dos prompts estruturados", () => {
         "checkProposals",
         "extractFacts",
         "pickFiles",
+        "postingDuplicate",
+        "postingExtract",
+        "postingMerge",
         "readDocument",
         "synthesizeRun",
       ].sort(),

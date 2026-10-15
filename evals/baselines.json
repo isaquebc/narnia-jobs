@@ -34,5 +34,38 @@
       "graders": 1
     },
     "updatedAt": "2026-10-15T00:24:50.510Z"
+  },
+  "narnia-posting-duplicate": {
+    "scores": {
+      "cobertura_da_referencia": 1,
+      "idioma": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 1
+    },
+    "versionId": "b57df168df6effd8eeb0993e3791171b3e223a210b2079c4b9289709b8eeed3f",
+    "commit": "c609a8e",
+    "updatedAt": "2026-10-15T00:46:55.826Z"
+  },
+  "narnia-posting-extract": {
+    "scores": {
+      "cobertura_da_referencia": 0.963,
+      "json_schema": 1,
+      "padrao_de_entrega": 0.833,
+      "sem_anos_inventados": 1
+    },
+    "versionId": "6311e7e66acc61a42af9df02ad0d6555e2e92059d32e0f20e76715f5aa05774a",
+    "commit": "c609a8e",
+    "updatedAt": "2026-10-15T00:48:21.702Z"
+  },
+  "narnia-posting-merge": {
+    "scores": {
+      "cobertura_da_referencia": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 1,
+      "sem_anos_inventados": 1
+    },
+    "versionId": "338cd33d4fbd065be3caf009ca2da256564a1ad93271b519f7a4c32755550688",
+    "commit": "c609a8e",
+    "updatedAt": "2026-10-15T00:48:21.702Z"
   }
 }

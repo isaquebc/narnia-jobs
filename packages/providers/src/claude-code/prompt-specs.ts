@@ -3,6 +3,7 @@ import {
   CHAT_OUTPUT_JSON_SCHEMAS,
   EXTRACTION_JSON_SCHEMAS,
   INGEST_OUTPUT_JSON_SCHEMAS,
+  POSTING_OUTPUT_JSON_SCHEMAS,
   toJsonSchema,
 } from "@narnia-jobs/shared";
 import type {
@@ -13,6 +14,9 @@ import type {
   CheckProposalsInput,
   ExtractFactsInput,
   PickFilesInput,
+  PostingDuplicateInput,
+  PostingExtractInput,
+  PostingMergeInput,
   ReadDocumentInput,
   SynthesizeRunInput,
 } from "../provider";
@@ -146,6 +150,36 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: CHAT_OUTPUT_JSON_SCHEMAS.chatTitle,
     tools: [],
   }),
+  postingExtract: spec("postingExtract", {
+    name: "narnia-posting-extract",
+    description: "F06: campos e palavras-chave de uma vaga a partir do texto (modelo barato).",
+    file: FILE("posting-extract"),
+    userTemplate: "<vaga>\n{{text}}\n</vaga>",
+    defaultModel: "haiku",
+    jsonSchema: POSTING_OUTPUT_JSON_SCHEMAS.postingExtract,
+    tools: [],
+  }),
+  postingMerge: spec("postingMerge", {
+    name: "narnia-posting-merge",
+    description:
+      "F06-6: junta a heurística local e a extração do modelo, com a origem de cada campo.",
+    file: FILE("posting-merge"),
+    userTemplate:
+      "<vaga>\n{{text}}\n</vaga>\n\n<heuristica>\n{{heuristic_json}}\n</heuristica>\n\n<modelo>\n{{model_json}}\n</modelo>",
+    defaultModel: "haiku",
+    jsonSchema: POSTING_OUTPUT_JSON_SCHEMAS.postingMerge,
+    tools: [],
+  }),
+  postingDuplicate: spec("postingDuplicate", {
+    name: "narnia-posting-duplicate",
+    description: "F06-9: as duas vagas com o mesmo hash são a mesma? Certeza e diferenças.",
+    file: FILE("posting-duplicate"),
+    userTemplate:
+      "<vaga_salva>\n{{saved_json}}\n</vaga_salva>\n\n<vaga_nova>\n{{incoming_json}}\n</vaga_nova>",
+    defaultModel: "haiku",
+    jsonSchema: POSTING_OUTPUT_JSON_SCHEMAS.postingDuplicate,
+    tools: [],
+  }),
 };
 
 const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
@@ -182,6 +216,16 @@ export const structuredPromptVars = {
   }),
   checkProposals: (i: CheckProposalsInput) => ({ items_json: JSON.stringify(i.items, null, 1) }),
   chatTitle: (i: ChatTitleInput) => ({ message: i.message }),
+  postingExtract: (i: PostingExtractInput) => ({ text: i.text }),
+  postingMerge: (i: PostingMergeInput) => ({
+    text: i.text,
+    heuristic_json: JSON.stringify(i.heuristic, null, 1),
+    model_json: JSON.stringify(i.extracted, null, 1),
+  }),
+  postingDuplicate: (i: PostingDuplicateInput) => ({
+    saved_json: JSON.stringify(i.saved, null, 1),
+    incoming_json: JSON.stringify(i.incoming, null, 1),
+  }),
 } satisfies Record<StructuredOperation, (input: never) => Record<string, string>>;
 
 /** Troca `{{nome}}` pelas variáveis numa passada só (conteúdo com chaves não é reinterpretado). */

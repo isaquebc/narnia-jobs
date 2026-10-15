@@ -16,4 +16,7 @@ export const PROMPTS = {
   synthesizeRun: () => loadPrompt("synthesize-run"),
   checkProposals: () => loadPrompt("check-proposals"),
   chatTitle: () => loadPrompt("chat-title"),
+  postingExtract: () => loadPrompt("posting-extract"),
+  postingMerge: () => loadPrompt("posting-merge"),
+  postingDuplicate: () => loadPrompt("posting-duplicate"),
 };

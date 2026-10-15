@@ -11,6 +11,11 @@ import {
   PickFilesOutputSchema,
   SynthesizeRunOutputSchema,
 } from "./schemas/ingest-output";
+import {
+  PostingDuplicateOutputSchema,
+  PostingExtractOutputSchema,
+  PostingMergeOutputSchema,
+} from "./schemas/posting";
 
 /**
  * JSON Schema para `outputFormat: { type: "json_schema", schema }` do Agent SDK.
@@ -43,4 +48,11 @@ export const INGEST_OUTPUT_JSON_SCHEMAS = {
 
 export const CHAT_OUTPUT_JSON_SCHEMAS = {
   chatTitle: toJsonSchema(ChatTitleOutputSchema),
+} as const;
+
+/** Saídas das chamadas da F06 (extração, merge e duplicata da vaga). */
+export const POSTING_OUTPUT_JSON_SCHEMAS = {
+  postingExtract: toJsonSchema(PostingExtractOutputSchema),
+  postingMerge: toJsonSchema(PostingMergeOutputSchema),
+  postingDuplicate: toJsonSchema(PostingDuplicateOutputSchema),
 } as const;

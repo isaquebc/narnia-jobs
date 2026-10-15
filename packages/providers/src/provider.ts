@@ -9,6 +9,10 @@ import type {
   FactProposal,
   PickFilesOutput,
   PlanUsage,
+  PostingDuplicateOutput,
+  PostingExtractOutput,
+  PostingFields,
+  PostingMergeOutput,
   ReadDocumentOutput,
   RepoReport,
   SynthesizeRunOutput,
@@ -129,6 +133,25 @@ export interface ChatTitleInput {
   model: string;
 }
 
+/** F06 §2.1: extração da vaga pelo modelo barato, a partir do texto da vaga (sem a heurística, F06-6). */
+export interface PostingExtractInput {
+  text: string;
+  model: string;
+}
+/** F06-6: merge feito por outro agente; o texto da vaga decide quando a heurística e o modelo discordam. */
+export interface PostingMergeInput {
+  text: string;
+  heuristic: { fields: Partial<PostingFields>; keywords: Array<{ term: string; section: string }> };
+  extracted: PostingExtractOutput;
+  model: string;
+}
+/** F06-9: as duas vagas com o mesmo hash de identidade, resumidas (campos preenchidos e a JD). */
+export interface PostingDuplicateInput {
+  saved: { fields: Partial<PostingFields>; jdText: string | null };
+  incoming: { fields: Partial<PostingFields>; jdText: string | null };
+  model: string;
+}
+
 /** Avaliações no Phoenix (M1): chamada simples, sem tools, usada pela ponte da assinatura. */
 export interface CompleteInput {
   system: string;
@@ -169,6 +192,10 @@ export interface Provider {
   checkProposals(input: CheckProposalsInput): Promise<ProviderResult<CheckProposalsOutput>>;
   /** Tema da conversa do chat a partir da primeira mensagem (haiku por padrão, 2026-10-13). */
   chatTitle(input: ChatTitleInput): Promise<ProviderResult<ChatTitleOutput>>;
+  /** F06: extração da vaga (Haiku), merge com a heurística (Haiku) e comparação de duplicata (Haiku). */
+  postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>>;
+  postingMerge(input: PostingMergeInput): Promise<ProviderResult<PostingMergeOutput>>;
+  postingDuplicate(input: PostingDuplicateInput): Promise<ProviderResult<PostingDuplicateOutput>>;
   /**
    * F03 §2.4: diagnóstico do plano (assinatura e uso das janelas). Nunca gasta tokens; `null` quando o plano não se
    * aplica (API key, terceiros) ou não há dado.

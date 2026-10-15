@@ -11,6 +11,10 @@ import type {
   ExtractFactsOutput,
   PickFilesOutput,
   PlanUsage,
+  PostingDuplicateOutput,
+  PostingExtractOutput,
+  PostingFields,
+  PostingMergeOutput,
   ReadDocumentOutput,
   SynthesizeRunOutput,
 } from "@narnia-jobs/shared";
@@ -29,6 +33,9 @@ import {
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
+  type PostingDuplicateInput,
+  type PostingExtractInput,
+  type PostingMergeInput,
   type Provider,
   ProviderError,
   type ProviderResult,
@@ -57,6 +64,9 @@ export type MockOperation =
   | "synthesizeRun"
   | "checkProposals"
   | "chatTitle"
+  | "postingExtract"
+  | "postingMerge"
+  | "postingDuplicate"
   | "complete"
   | "openChat";
 
@@ -602,6 +612,118 @@ export class MockProvider implements Provider {
     };
   }
 
+  /**
+   * Extração previsível para testes (F06): título na 1ª linha, empresa e cliente pelos rótulos "Empresa:"/"Cliente:"
+   * (ou o trecho antes de "·" na 2ª linha), role e senioridade por palavras do título, termos conhecidos como
+   * obrigatórios. O real lê a vaga inteira.
+   */
+  async postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>> {
+    await this.gate("postingExtract");
+    const lines = input.text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const label = (re: RegExp) => re.exec(input.text)?.[1]?.trim() ?? null;
+    const second = lines[1]?.split("·")[0]?.trim() || null;
+    const title = lines[0] && lines[0].length <= 90 ? lines[0] : null;
+    const t = input.text.toLowerCase();
+    const fields: PostingFields = {
+      ...EMPTY_POSTING_FIELDS,
+      company: label(/(?:empresa|company)\s*:\s*([^\n·|]+)/i) ?? second,
+      client: label(/(?:cliente|client)\s*:\s*([^\n·|]+)/i),
+      title,
+      role: /back-?end/.test(t) ? "backend" : /front-?end/.test(t) ? "frontend" : null,
+      seniority: /s[eê]nior|senior/.test(t) ? "senior" : /pleno/.test(t) ? "pleno" : null,
+      workMode: /remot/.test(t)
+        ? "remote"
+        : /h[ií]brid/.test(t)
+          ? "hybrid"
+          : /presencial/.test(t)
+            ? "onsite"
+            : null,
+      contractType: /\bclt\b/.test(t) ? "clt" : /\bpj\b/.test(t) ? "pj" : null,
+    };
+    const keywords = MOCK_POSTING_TERMS.filter((k) => t.includes(k.toLowerCase())).map((term) => ({
+      term,
+      section: "required" as const,
+    }));
+    return this.result({ fields, keywords }, input.text, input.model);
+  }
+
+  /** Merge previsível: o valor do modelo vence quando existe; origem `both` quando os dois concordam. */
+  async postingMerge(input: PostingMergeInput): Promise<ProviderResult<PostingMergeOutput>> {
+    await this.gate("postingMerge");
+    const h = input.heuristic.fields as Partial<Record<keyof PostingFields, unknown>>;
+    const m = input.extracted.fields as Record<keyof PostingFields, unknown>;
+    const fields = { ...EMPTY_POSTING_FIELDS } as Record<keyof PostingFields, unknown>;
+    const fieldSources: PostingMergeOutput["fieldSources"] = [];
+    const filled = (v: unknown) =>
+      v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0);
+    for (const k of Object.keys(EMPTY_POSTING_FIELDS) as Array<keyof PostingFields>) {
+      if (k === "jdText") continue;
+      const hv = h[k];
+      const mv = m[k];
+      if (filled(mv)) {
+        fields[k] = mv;
+        fieldSources.push({
+          field: k,
+          source: JSON.stringify(hv) === JSON.stringify(mv) ? "both" : "model",
+        });
+      } else if (filled(hv)) {
+        fields[k] = hv;
+        fieldSources.push({ field: k, source: "heuristic" });
+      }
+    }
+    const byTerm = new Map<string, PostingMergeOutput["keywords"][number]>();
+    for (const k of input.heuristic.keywords)
+      byTerm.set(k.term, {
+        term: k.term,
+        section: (["required", "nice", "other"].includes(k.section)
+          ? k.section
+          : "other") as "required",
+        source: "heuristic",
+      });
+    for (const k of input.extracted.keywords) {
+      const cur = byTerm.get(k.term);
+      byTerm.set(k.term, cur ? { ...cur, source: "both" } : { ...k, source: "model" });
+    }
+    return this.result(
+      { fields: fields as PostingFields, fieldSources, keywords: [...byTerm.values()] },
+      input.text,
+      input.model,
+    );
+  }
+
+  /** Duplicata previsível: JD igual (sem espaços e caixa) = mesma vaga com 95%; diferente = 55%, com as diferenças. */
+  async postingDuplicate(
+    input: PostingDuplicateInput,
+  ): Promise<ProviderResult<PostingDuplicateOutput>> {
+    await this.gate("postingDuplicate");
+    const norm = (t: string | null) => (t ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+    const same = norm(input.saved.jdText) === norm(input.incoming.jdText);
+    const a = input.saved.fields as Record<string, unknown>;
+    const b = input.incoming.fields as Record<string, unknown>;
+    const show = (v: unknown) => (v === null || v === undefined ? "não informado" : String(v));
+    const differences = [...new Set([...Object.keys(a), ...Object.keys(b)])]
+      .filter((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null))
+      .slice(0, 8)
+      .map((field) => ({ field, saved: show(a[field]), incoming: show(b[field]) }));
+    if (!same && norm(input.saved.jdText) && norm(input.incoming.jdText))
+      differences.unshift({ field: "descrição", saved: "texto anterior", incoming: "texto novo" });
+    return this.result(
+      {
+        sameJob: same || differences.length <= 1,
+        confidence: same ? 95 : 55,
+        differences,
+        rationale: same
+          ? "Mesma descrição da vaga salva."
+          : "Mesma empresa e cargo, mas a descrição mudou; confira as diferenças.",
+      },
+      JSON.stringify(input),
+      input.model,
+    );
+  }
+
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {
     await this.gate("buildDigest");
     return this.result(
@@ -730,6 +852,47 @@ export function mockChatScript(
 /** Resposta fixa do recrutador especializado no mock (o real roda o subagente). */
 const MOCK_SPECIALIST_REPORT =
   "Conclusão: aderência alta ao perfil, com evidências em experiências de backend (experience). Lacuna: nenhuma métrica de liderança.";
+
+/** Vaga vazia (F06): todos os campos, nada preenchido. */
+const EMPTY_POSTING_FIELDS: PostingFields = {
+  company: null,
+  client: null,
+  title: null,
+  role: null,
+  seniority: null,
+  city: null,
+  state: null,
+  country: null,
+  workMode: null,
+  contractType: null,
+  currency: null,
+  salaryMin: null,
+  salaryMax: null,
+  salaryPeriod: null,
+  benefits: [],
+  responsibilities: [],
+  skillsRequired: [],
+  skillsNice: [],
+  companySummary: null,
+  postingUrl: null,
+  companyUrl: null,
+  jdText: null,
+  publishedAt: null,
+};
+
+/** Termos que a extração do mock reconhece (o real lê a vaga inteira). */
+const MOCK_POSTING_TERMS = [
+  "Node.js",
+  "TypeScript",
+  "PostgreSQL",
+  "Kubernetes",
+  "AWS",
+  "Java",
+  "Kafka",
+  "React",
+  "Python",
+  "Docker",
+];
 
 /** Marcador do roteiro: troca pelo id da fonte mais recente antes de chamar `research_apply`. */
 const LATEST_RESEARCH = "__fonte_mais_recente__";

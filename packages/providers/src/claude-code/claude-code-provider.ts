@@ -25,6 +25,13 @@ import {
   type PickFilesOutput,
   PickFilesOutputSchema,
   type PlanUsage,
+  POSTING_OUTPUT_JSON_SCHEMAS,
+  type PostingDuplicateOutput,
+  PostingDuplicateOutputSchema,
+  type PostingExtractOutput,
+  PostingExtractOutputSchema,
+  type PostingMergeOutput,
+  PostingMergeOutputSchema,
   type ReadDocumentOutput,
   ReadDocumentOutputSchema,
   type SynthesizeRunOutput,
@@ -59,6 +66,9 @@ import {
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
+  type PostingDuplicateInput,
+  type PostingExtractInput,
+  type PostingMergeInput,
   type Provider,
   ProviderError,
   type ProviderResult,
@@ -801,6 +811,39 @@ export class ClaudeCodeProvider implements Provider {
       CHAT_OUTPUT_JSON_SCHEMAS.chatTitle,
       ChatTitleOutputSchema,
       "chatTitle",
+    );
+  }
+
+  postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>> {
+    return this.single(
+      renderStructuredPrompt("postingExtract", input),
+      input.model,
+      PROMPTS.postingExtract(),
+      POSTING_OUTPUT_JSON_SCHEMAS.postingExtract,
+      PostingExtractOutputSchema,
+      "postingExtract",
+    );
+  }
+
+  postingMerge(input: PostingMergeInput): Promise<ProviderResult<PostingMergeOutput>> {
+    return this.single(
+      renderStructuredPrompt("postingMerge", input),
+      input.model,
+      PROMPTS.postingMerge(),
+      POSTING_OUTPUT_JSON_SCHEMAS.postingMerge,
+      PostingMergeOutputSchema,
+      "postingMerge",
+    );
+  }
+
+  postingDuplicate(input: PostingDuplicateInput): Promise<ProviderResult<PostingDuplicateOutput>> {
+    return this.single(
+      renderStructuredPrompt("postingDuplicate", input),
+      input.model,
+      PROMPTS.postingDuplicate(),
+      POSTING_OUTPUT_JSON_SCHEMAS.postingDuplicate,
+      PostingDuplicateOutputSchema,
+      "postingDuplicate",
     );
   }
 

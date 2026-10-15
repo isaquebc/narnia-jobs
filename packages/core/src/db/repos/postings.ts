@@ -9,6 +9,7 @@ import {
   type PostingContactInput,
   PostingContactSchema,
   type PostingCreate,
+  type PostingDuplicateCheck,
   type PostingFieldName,
   type PostingNote,
   PostingNoteSchema,
@@ -87,6 +88,7 @@ function mapPosting(r: Row): Posting {
     fieldSources: json(r.field_sources_json, {}),
     preAnalysis: json(r.pre_analysis_json, null),
     rawPath: r.raw_path ?? null,
+    duplicate: "duplicate_json" in r ? json(r.duplicate_json, null) : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   });
@@ -112,6 +114,7 @@ export interface PostingsRepo {
   setStatus(id: string, status: PostingStatus): void;
   setPreAnalysis(id: string, preAnalysis: unknown): void;
   setRawPath(id: string, path: string | null): void;
+  setDuplicate(id: string, check: PostingDuplicateCheck | null): void;
   remove(id: string): void;
 }
 
@@ -199,6 +202,12 @@ export function postingsRepo(db: Db): PostingsRepo {
     },
     setRawPath(id, path) {
       q("update posting set raw_path = ? where id = ?").run(path, id);
+    },
+    setDuplicate(id, check) {
+      q("update posting set duplicate_json = ? where id = ?").run(
+        check === null ? null : JSON.stringify(check),
+        id,
+      );
     },
     remove(id) {
       q("delete from posting where id = ?").run(id);

@@ -1,5 +1,7 @@
 import {
+  buildPreAnalysis,
   confirmPostingNote,
+  decideDuplicate,
   editPostingNote,
   type NoteEditResult,
   type Repos,
@@ -8,19 +10,48 @@ import {
 import {
   PostingContactInputSchema,
   PostingCreateSchema,
+  PostingFieldsSchema,
   PostingNoteInputSchema,
   PostingPatchSchema,
 } from "@narnia-jobs/shared";
 import { Hono } from "hono";
+import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
+import type { FetchPostingOptions } from "../postings/fetch";
+import type { QueueAdapter } from "../queue";
+import { enqueueExtraction, intakePosting } from "../services/postings";
 import { validate } from "./validate";
+
+const IntakeSchema = z
+  .object({
+    text: z.string().max(100_000).optional(),
+    url: z.url().optional(),
+    fields: PostingFieldsSchema.partial().optional(),
+  })
+  .refine(
+    (v) => Boolean(v.text?.trim() || v.url || v.fields),
+    "Informe o texto, o link ou algum dado da vaga.",
+  );
+const DuplicateDecisionSchema = z.object({ action: z.enum(["update", "new", "cancel"]) });
+const INTAKE_STATUS = {
+  text_too_short: 422,
+  empty: 400,
+  invalid_url: 400,
+  extract_failed: 422,
+} as const;
 
 /**
  * Vagas (F06 §2.7, M2): CRUD da vaga, contatos e notas. A extração (M4) e a análise (M5) entram depois. Toda escrita
  * emite `posting.updated`; a nota pendente do recrutador (F06-17) vira pendência em Pendências e na bandeja.
  */
-export function postingsRoutes(deps: { repos: Repos; bus?: EventBus }) {
+export function postingsRoutes(deps: {
+  repos: Repos;
+  bus?: EventBus;
+  queue?: QueueAdapter;
+  dataDir?: string;
+  fetchOptions?: FetchPostingOptions;
+}) {
   const app = new Hono();
   const { repos } = deps;
   const touched = (postingId: string) => deps.bus?.emit({ type: "posting.updated", postingId });
@@ -44,6 +75,63 @@ export function postingsRoutes(deps: { repos: Repos; bus?: EventBus }) {
     return c.json({ posting }, 201);
   });
 
+  // entrada pelo texto ou pelo link (F06 §2.1): heurística na hora, extração pelo modelo na fila
+  app.post("/api/postings/intake", validate("json", IntakeSchema), async (c) => {
+    if (!deps.queue || !deps.dataDir)
+      return apiError(c, 503, "queue_unavailable", "Fila indisponível");
+    const b = c.req.valid("json");
+    const r = await intakePosting(
+      {
+        repos,
+        queue: deps.queue,
+        dataDir: deps.dataDir,
+        bus: deps.bus,
+        fetchOptions: deps.fetchOptions,
+      },
+      { text: b.text ?? null, url: b.url ?? null, fields: b.fields ?? {} },
+    );
+    if (!r.ok)
+      return apiError(
+        c,
+        (INTAKE_STATUS as Record<string, 400 | 422>)[r.code] ?? 422,
+        r.code,
+        r.message,
+      );
+    return c.json({ posting: r.posting, job: r.job }, 201);
+  });
+
+  // decisão do modal de duplicata (F06-9)
+  app.post(
+    "/api/postings/:id/duplicate-decision",
+    validate("json", DuplicateDecisionSchema),
+    (c) => {
+      const id = c.req.param("id");
+      const p = repos.postings.get(id);
+      if (!p) return notFound(c);
+      if (!p.duplicate || p.duplicate.decision !== null)
+        return apiError(c, 409, "no_pending_duplicate", "Esta vaga não tem duplicata pendente.");
+      const r = decideDuplicate(repos, id, c.req.valid("json").action);
+      if (r.keptId) touched(r.keptId);
+      if (r.removedId) touched(r.removedId);
+      return c.json(r);
+    },
+  );
+
+  // refazer a extração (depois de editar a JD, ou depois de erro)
+  app.post("/api/postings/:id/extract", async (c) => {
+    if (!deps.queue || !deps.dataDir)
+      return apiError(c, 503, "queue_unavailable", "Fila indisponível");
+    const p = repos.postings.get(c.req.param("id"));
+    if (!p) return notFound(c);
+    if (!p.jdText) return apiError(c, 422, "no_text", "A vaga não tem descrição para extrair.");
+    const job = await enqueueExtraction(
+      { repos, queue: deps.queue, dataDir: deps.dataDir, bus: deps.bus },
+      p,
+    );
+    touched(p.id);
+    return c.json({ job }, 202);
+  });
+
   app.get("/api/postings/:id", (c) => {
     const posting = repos.postings.get(c.req.param("id"));
     if (!posting) return notFound(c);
@@ -60,7 +148,16 @@ export function postingsRoutes(deps: { repos: Repos; bus?: EventBus }) {
   app.patch("/api/postings/:id", validate("json", PostingPatchSchema), (c) => {
     const id = c.req.param("id");
     if (!repos.postings.get(id)) return notFound(c);
-    const posting = repos.postings.update(id, c.req.valid("json"), { source: "user" });
+    const patch = c.req.valid("json");
+    let posting = repos.postings.update(id, patch, { source: "user" });
+    // JD editada pelo usuário: a heurística refaz a pré-análise na hora (sem tokens); a extração é sob pedido
+    if (patch.jdText !== undefined && posting.jdText) {
+      repos.postings.setPreAnalysis(
+        id,
+        buildPreAnalysis(repos, posting.jdText, posting).preAnalysis,
+      );
+      posting = repos.postings.get(id) ?? posting;
+    }
     touched(id);
     return c.json({ posting });
   });

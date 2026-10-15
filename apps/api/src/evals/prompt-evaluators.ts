@@ -134,6 +134,10 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
     },
   ],
   chatTitle: (op) => [schemaRule(op), lang(["title"]), coverage(1)],
+  // F06: sem anos inventados e com os termos esperados (nada de cidade, moeda ou faixa que a vaga não diz)
+  postingExtract: (op) => [schemaRule(op), years(["text"]), coverage(0.8)],
+  postingMerge: (op) => [schemaRule(op), years(["text"]), coverage(0.75)],
+  postingDuplicate: (op) => [schemaRule(op), lang(["rationale"]), coverage(1)],
 };
 
 export const PROMPTS_WITH_EVALUATORS = Object.keys(RULES) as StructuredOperation[];

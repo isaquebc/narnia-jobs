@@ -6,6 +6,9 @@ import type {
   CheckProposalsInput,
   ExtractFactsInput,
   PickFilesInput,
+  PostingDuplicateInput,
+  PostingExtractInput,
+  PostingMergeInput,
   ReadDocumentInput,
   StructuredOperation,
   SynthesizeRunInput,
@@ -29,6 +32,9 @@ type Input<Op extends StructuredOperation> = Omit<
     synthesizeRun: SynthesizeRunInput;
     checkProposals: CheckProposalsInput;
     chatTitle: ChatTitleInput;
+    postingExtract: PostingExtractInput;
+    postingMerge: PostingMergeInput;
+    postingDuplicate: PostingDuplicateInput;
   }[Op],
   "model"
 >;
@@ -176,6 +182,75 @@ const HISTORY: Omit<AnalyzeProfilesProviderInput, "model"> = {
   digests: [],
   existingProfiles: [],
   dismissedTitles: [],
+};
+
+/** Vagas fictícias da F06 (Acme Pay, Globex, Initech são inventadas). */
+const JD_CONSULTORIA = `Desenvolvedor(a) Backend Sênior
+Empresa: Globex Consultoria · Cliente: Initech Bank
+São Paulo - SP · Híbrido (3 dias no escritório) · CLT
+Faixa: R$ 15.000 a R$ 20.000 por mês
+
+Sobre a empresa
+A Globex Consultoria implanta sistemas financeiros para bancos.
+
+Responsabilidades:
+- Desenvolver microsserviços em Java 17 com Spring Boot
+- Participar de code review
+
+Requisitos:
+- 5+ anos com Java e Spring
+- Kafka e PostgreSQL
+- Inglês avançado
+
+Diferenciais:
+- AWS
+- Terraform
+
+Benefícios:
+- Vale refeição
+- Plano de saúde`;
+
+const JD_REMOTA = `Senior Backend Engineer (Remote, LATAM)
+Acme Pay builds payment infrastructure.
+
+What you'll do
+* Build services in Go and Node.js
+
+What you need
+* 6+ years with backend systems
+* PostgreSQL and Kubernetes
+
+Nice to have
+* Rust
+
+Compensation: USD 6,000 - 8,000 / month, contractor`;
+
+const JD_MINIMA = `Vaga para pessoa desenvolvedora frontend com React e TypeScript. Envie o currículo.`;
+
+const HEURISTIC_CONSULTORIA = {
+  fields: {
+    title: "Desenvolvedor(a) Backend Sênior",
+    company: "Globex Consultoria",
+    client: "Initech Bank",
+    seniority: "senior" as const,
+    role: "backend" as const,
+    city: "São Paulo",
+    state: "SP",
+    workMode: "hybrid" as const,
+    contractType: "clt" as const,
+    currency: "BRL",
+    salaryMin: 15000,
+    salaryMax: 20000,
+    benefits: ["Vale refeição", "Plano de saúde"],
+  },
+  keywords: [
+    { term: "Java", section: "required" },
+    { term: "Kafka", section: "required" },
+    { term: "PostgreSQL", section: "required" },
+    { term: "AWS", section: "nice" },
+    // erro de propósito: a heurística marcou Terraform como obrigatório
+    { term: "Terraform", section: "required" },
+  ],
 };
 
 export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[] } = {
@@ -422,6 +497,210 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
           "Estou cansado do meu time, as reuniões não acabam e meu gestor não me escuta. Será que é hora de procurar outra empresa?",
       },
       reference: { expected: ["emprego"], forbidden: ["cansado", "reuniões"] },
+    },
+  ],
+  postingExtract: [
+    {
+      id: "consultoria-completa",
+      description:
+        "Vaga de consultoria com cliente, local, contrato, faixa, seções e benefícios: tudo que está escrito, nada a mais.",
+      input: { text: JD_CONSULTORIA },
+      reference: {
+        expected: [
+          "Globex Consultoria",
+          "Initech Bank",
+          '"backend"',
+          '"senior"',
+          '"hybrid"',
+          '"clt"',
+          '"BRL"',
+          "15000",
+          "20000",
+          "Vale refeição",
+          "Terraform",
+          '"nice"',
+        ],
+      },
+    },
+    {
+      id: "remota-em-ingles",
+      description: "Vaga em inglês, remota, em dólar, contractor (PJ); Rust é diferencial.",
+      input: { text: JD_REMOTA },
+      reference: {
+        expected: [
+          "Acme Pay",
+          '"remote"',
+          '"USD"',
+          "6000",
+          "8000",
+          '"pj"',
+          "PostgreSQL",
+          "Kubernetes",
+          "Rust",
+        ],
+      },
+    },
+    {
+      id: "vaga-minima",
+      description: "Vaga quase sem dados: nada de cidade, empresa, faixa ou moeda inventadas.",
+      input: { text: JD_MINIMA },
+      reference: {
+        expected: ["React", "TypeScript", '"frontend"'],
+        forbidden: ["São Paulo", '"BRL"', '"USD"', '"remote"'],
+      },
+    },
+  ],
+  postingMerge: [
+    {
+      id: "terraform-diferencial",
+      description:
+        "Heurística erra a seção do Terraform e o modelo acerta; o texto decide (diferencial). Campos iguais saem como both.",
+      input: {
+        text: JD_CONSULTORIA,
+        heuristic: HEURISTIC_CONSULTORIA,
+        extracted: {
+          fields: {
+            company: "Globex Consultoria",
+            client: "Initech Bank",
+            title: "Desenvolvedor(a) Backend Sênior",
+            role: "backend",
+            seniority: "senior",
+            city: "São Paulo",
+            state: "SP",
+            country: "BR",
+            workMode: "hybrid",
+            contractType: "clt",
+            currency: "BRL",
+            salaryMin: 15000,
+            salaryMax: 20000,
+            salaryPeriod: "monthly",
+            benefits: ["Vale refeição", "Plano de saúde"],
+            responsibilities: [
+              "Desenvolver microsserviços em Java 17 com Spring Boot",
+              "Participar de code review",
+            ],
+            skillsRequired: ["5+ anos com Java e Spring", "Kafka e PostgreSQL", "Inglês avançado"],
+            skillsNice: ["AWS", "Terraform"],
+            companySummary: "A Globex Consultoria implanta sistemas financeiros para bancos.",
+            postingUrl: null,
+            companyUrl: null,
+            jdText: null,
+            publishedAt: null,
+          },
+          keywords: [
+            { term: "Java", section: "required" },
+            { term: "Spring", section: "required" },
+            { term: "Kafka", section: "required" },
+            { term: "PostgreSQL", section: "required" },
+            { term: "Terraform", section: "nice" },
+            { term: "AWS", section: "nice" },
+          ],
+        },
+      },
+      reference: {
+        expected: [
+          '{"field":"company","source":"both"}',
+          '{"term":"Terraform","section":"nice"',
+          '"term":"Spring"',
+          '"salaryPeriod":"monthly"',
+        ],
+      },
+    },
+    {
+      id: "modelo-inventou-cidade",
+      description: "O modelo preencheu uma cidade que a vaga não diz: o merge descarta.",
+      input: {
+        text: JD_MINIMA,
+        heuristic: {
+          fields: { role: "frontend" as const },
+          keywords: [
+            { term: "React", section: "required" },
+            { term: "TypeScript", section: "required" },
+          ],
+        },
+        extracted: {
+          fields: {
+            company: null,
+            client: null,
+            title: null,
+            role: "frontend",
+            seniority: null,
+            city: "São Paulo",
+            state: null,
+            country: null,
+            workMode: "remote",
+            contractType: null,
+            currency: null,
+            salaryMin: null,
+            salaryMax: null,
+            salaryPeriod: null,
+            benefits: [],
+            responsibilities: [],
+            skillsRequired: ["React", "TypeScript"],
+            skillsNice: [],
+            companySummary: null,
+            postingUrl: null,
+            companyUrl: null,
+            jdText: null,
+            publishedAt: null,
+          },
+          keywords: [
+            { term: "React", section: "required" },
+            { term: "TypeScript", section: "required" },
+          ],
+        },
+      },
+      reference: {
+        expected: ['{"field":"role","source":"both"}', '"term":"React"'],
+        forbidden: ["São Paulo", '"remote"'],
+      },
+    },
+  ],
+  postingDuplicate: [
+    {
+      id: "mesma-vaga-reescrita",
+      description:
+        "Mesma vaga com o texto reescrito e a faixa atualizada: é a mesma, com certeza alta.",
+      input: {
+        saved: {
+          fields: HEURISTIC_CONSULTORIA.fields,
+          jdText: JD_CONSULTORIA,
+        },
+        incoming: {
+          fields: { ...HEURISTIC_CONSULTORIA.fields, salaryMax: 22000 },
+          jdText: JD_CONSULTORIA.replace("R$ 20.000", "R$ 22.000").replace(
+            "Participar de code review",
+            "Revisar código do time",
+          ),
+        },
+      },
+      reference: { expected: ['"sameJob":true'] },
+    },
+    {
+      id: "outra-vaga-mesmo-titulo",
+      description:
+        "Mesmo título e empresa, mas outro produto, presencial em outra cidade e outra stack: é outra vaga.",
+      input: {
+        saved: { fields: HEURISTIC_CONSULTORIA.fields, jdText: JD_CONSULTORIA },
+        incoming: {
+          fields: {
+            ...HEURISTIC_CONSULTORIA.fields,
+            city: "Recife",
+            state: "PE",
+            workMode: "onsite" as const,
+          },
+          jdText: `Desenvolvedor(a) Backend Sênior
+Empresa: Globex Consultoria · Cliente: Initech Bank
+Recife - PE · Presencial · CLT
+
+Responsabilidades:
+- Manter o sistema legado de cobrança em COBOL e .NET
+
+Requisitos:
+- COBOL, .NET e SQL Server`,
+        },
+      },
+      reference: { expected: ['"sameJob":false'] },
     },
   ],
 };

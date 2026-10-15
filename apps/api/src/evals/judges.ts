@@ -33,6 +33,14 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
   synthesizeRun: { relatorios: "input.reports", metricas: "input.metrics_table", resposta: OUTPUT },
   checkProposals: { itens: "input.items_json", referencia: "reference", resposta: OUTPUT },
   chatTitle: { mensagem: "input.message", resposta: OUTPUT },
+  postingExtract: { vaga: "input.text", resposta: OUTPUT },
+  postingMerge: {
+    vaga: "input.text",
+    heuristica: "input.heuristic_json",
+    modelo: "input.model_json",
+    resposta: OUTPUT,
+  },
+  postingDuplicate: { salva: "input.saved_json", nova: "input.incoming_json", resposta: OUTPUT },
 };
 
 export const JUDGE_SYSTEM =

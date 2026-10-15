@@ -1,4 +1,9 @@
-import { INGEST_TASKS, type StageJobData, type TaskJobData } from "@narnia-jobs/core";
+import {
+  INGEST_TASKS,
+  POSTING_TASKS,
+  type StageJobData,
+  type TaskJobData,
+} from "@narnia-jobs/core";
 import {
   githubPrepare,
   githubRepo,
@@ -9,6 +14,7 @@ import {
 import { setRunStatus } from "./ingest/status";
 import type { WorkerDeps } from "./pipeline";
 import { analyzeProfiles } from "./processors/analyze-profiles";
+import { postingExtract } from "./processors/posting-extract";
 
 /**
  * Jobs de tarefa (F02 §2.9-1): fora da cadeia de ingestão, despachados por `data.kind === "task"`.
@@ -43,6 +49,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [INGEST_TASKS.githubSynthesis]: githubSynthesis,
   [INGEST_TASKS.reconcile]: ingestReconcile,
   [INGEST_TASKS.reviewCheck]: ingestReviewCheck,
+  [POSTING_TASKS.extract]: postingExtract,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

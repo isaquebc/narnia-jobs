@@ -101,6 +101,18 @@ export const POSTING_FIELD_NAMES = Object.keys(PostingFieldsSchema.shape) as Pos
 /** Campos que identificam a vaga (F06-2, F06-9): sem a data de publicação. */
 export const POSTING_IDENTITY_FIELDS = ["company", "client", "title", "role"] as const;
 
+/** Resultado da comparação de duplicata (F06-9) e a decisão do usuário no modal. */
+export const PostingDuplicateCheckSchema = z.object({
+  candidateId: IdSchema,
+  sameJob: z.boolean(),
+  confidence: z.number().int().min(0).max(100),
+  differences: z.array(z.object({ field: z.string(), saved: z.string(), incoming: z.string() })),
+  rationale: z.string(),
+  checkedAt: IsoDateTimeSchema,
+  decision: z.enum(["update", "new", "cancel"]).nullable(),
+});
+export type PostingDuplicateCheck = z.infer<typeof PostingDuplicateCheckSchema>;
+
 export const PostingSchema = PostingFieldsSchema.extend({
   id: IdSchema,
   status: PostingStatusSchema,
@@ -110,6 +122,8 @@ export const PostingSchema = PostingFieldsSchema.extend({
   preAnalysis: z.unknown().nullable(),
   /** Snapshot do HTML buscado pela URL (M4), relativo à pasta de dados. */
   rawPath: z.string().nullable(),
+  /** Comparação com a vaga salva de mesmo hash (F06-9); null sem candidata. */
+  duplicate: PostingDuplicateCheckSchema.nullable(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
 });
@@ -174,3 +188,112 @@ export const PostingNoteSchema = z.object({
 export type PostingNote = z.infer<typeof PostingNoteSchema>;
 
 export const PostingNoteInputSchema = z.object({ body: Text });
+
+/* ---------- pré-análise (heurística local, M3) ---------- */
+
+export const EVIDENCE_KINDS = [
+  "experience",
+  "achievement",
+  "project",
+  "skill",
+  "education",
+  "language",
+] as const;
+export const EvidenceKindSchema = z.enum(EVIDENCE_KINDS);
+export type EvidenceKind = z.infer<typeof EvidenceKindSchema>;
+
+/** Evidência de um fato do usuário (F06 §2.0: o id só é único junto com o tipo). */
+export const EvidenceRefSchema = z.object({
+  kind: EvidenceKindSchema,
+  id: IdSchema,
+  label: z.string(),
+});
+export type EvidenceRef = z.infer<typeof EvidenceRefSchema>;
+
+export const KeywordSectionSchema = z.enum(["required", "nice", "other"]);
+
+export const PreAnalysisKeywordSchema = z.object({
+  term: z.string(),
+  category: z.string(),
+  section: KeywordSectionSchema,
+  count: z.number().int().min(0),
+  /** Quem achou o termo na vaga (F06-6): heurística, modelo ou os dois. */
+  source: FieldSourceSchema,
+  /** Fatos do usuário que têm o termo (dicionário ou busca FTS); vazio = sem evidência local. */
+  evidence: z.array(EvidenceRefSchema),
+});
+export type PreAnalysisKeyword = z.infer<typeof PreAnalysisKeywordSchema>;
+
+export const RiskTypeSchema = z.enum([
+  "seniority",
+  "location",
+  "work_mode",
+  "contract",
+  "salary",
+  "language",
+]);
+export type RiskType = z.infer<typeof RiskTypeSchema>;
+
+export const PostingRiskSchema = z.object({
+  type: RiskTypeSchema,
+  description: z.string(),
+  source: z.enum(["heuristic", "model"]),
+});
+export type PostingRisk = z.infer<typeof PostingRiskSchema>;
+
+export const PreAnalysisSchema = z.object({
+  version: z.literal(1),
+  keywords: z.array(PreAnalysisKeywordSchema),
+  /** Termos com cara de tecnologia fora do dicionário (revisão e ampliação do dicionário). */
+  ngrams: z.array(z.string()),
+  sectionsDetected: z.boolean(),
+  yearsMin: z.number().int().nullable(),
+  /** Obrigatórios com evidência / obrigatórios (0–1); null sem obrigatórios. */
+  coverage: z.number().min(0).max(1).nullable(),
+  /** Riscos por perfil não arquivado (preferências de cada um). */
+  risksByProfile: z.record(z.string(), z.array(PostingRiskSchema)),
+  createdAt: IsoDateTimeSchema,
+});
+export type PreAnalysis = z.infer<typeof PreAnalysisSchema>;
+
+/* ---------- saídas dos modelos (M4) ---------- */
+
+/** Palavra-chave que o modelo achou na vaga, com a seção (obrigatório, diferencial, outro). */
+export const ModelKeywordSchema = z.object({
+  term: z.string().min(1),
+  section: KeywordSectionSchema,
+});
+
+/** Extração da vaga pelo modelo barato (F06-5: Haiku), independente da heurística (F06-6). */
+export const PostingExtractOutputSchema = z.object({
+  fields: PostingFieldsSchema,
+  keywords: z.array(ModelKeywordSchema),
+});
+export type PostingExtractOutput = z.infer<typeof PostingExtractOutputSchema>;
+
+/**
+ * Merge da heurística com a extração do modelo (F06-6), feito por outro agente: campos finais, a origem de cada um e
+ * as palavras-chave com quem as achou. Origem em lista (schema de saída estruturada não tem chave dinâmica).
+ */
+export const PostingMergeOutputSchema = z.object({
+  fields: PostingFieldsSchema,
+  fieldSources: z.array(
+    z.object({
+      field: z.enum(POSTING_FIELD_NAMES as [PostingFieldName, ...PostingFieldName[]]),
+      source: z.enum(["heuristic", "model", "both"]),
+    }),
+  ),
+  keywords: z.array(ModelKeywordSchema.extend({ source: z.enum(["heuristic", "model", "both"]) })),
+});
+export type PostingMergeOutput = z.infer<typeof PostingMergeOutputSchema>;
+
+/** Comparação de duas vagas com o mesmo hash de identidade (F06-9): mesma vaga? com que certeza? o que muda? */
+export const PostingDuplicateOutputSchema = z.object({
+  sameJob: z.boolean(),
+  confidence: z.number().int().min(0).max(100),
+  differences: z.array(
+    z.object({ field: z.string().min(1), saved: z.string(), incoming: z.string() }),
+  ),
+  rationale: z.string().min(1),
+});
+export type PostingDuplicateOutput = z.infer<typeof PostingDuplicateOutputSchema>;

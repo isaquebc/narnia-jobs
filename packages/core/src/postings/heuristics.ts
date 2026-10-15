@@ -15,7 +15,8 @@ export type KeywordSection = "required" | "nice" | "other";
 
 export interface HeuristicKeyword {
   term: string;
-  category: TermCategory;
+  /** Categoria do dicionário; `other` para termo que só o modelo trouxe. */
+  category: TermCategory | "other";
   section: KeywordSection;
   count: number;
 }

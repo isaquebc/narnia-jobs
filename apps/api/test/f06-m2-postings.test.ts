@@ -120,3 +120,101 @@ describe("F06/M2 · /api/postings", () => {
     ).toBe(404);
   });
 });
+
+const JD_LONG = `Desenvolvedor(a) Backend Sênior
+Empresa: Globex Consultoria · Cliente: Initech Bank
+São Paulo - SP · Híbrido · CLT
+
+Requisitos:
+- 5+ anos com Java e Spring
+- Kafka e PostgreSQL
+- Docker e Kubernetes
+
+Diferenciais:
+- AWS`;
+
+describe("F06/M4 · entrada da vaga e duplicata", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("texto: cria com a heurística, pré-análise instantânea e a extração na fila", async () => {
+    t = makeTestApp();
+    seedFixture(t.repos, "engineer");
+    const r = await t.api("/api/postings/intake", json({ text: JD_LONG }));
+    expect(r.status).toBe(201);
+    const b = (await r.json()) as {
+      posting: { id: string; status: string; title: string; preAnalysis: { keywords: unknown[] } };
+      job: { type: string } | null;
+    };
+    expect(b.posting).toMatchObject({
+      status: "extracting",
+      title: "Desenvolvedor(a) Backend Sênior",
+    });
+    expect(b.posting.preAnalysis.keywords.length).toBeGreaterThan(3);
+    expect(t.queue.tasks.map((x) => [x.queue, x.type, x.payload?.postingId])).toEqual([
+      ["extract", "posting.extract", b.posting.id],
+    ]);
+  });
+
+  it("texto curto demais: 422 orientando a colar a descrição ou preencher os campos", async () => {
+    t = makeTestApp();
+    const r = await t.api("/api/postings/intake", json({ text: "vaga backend" }));
+    expect(r.status).toBe(422);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe("text_too_short");
+    // só campos: rascunho, sem extração
+    const d = await t.api(
+      "/api/postings/intake",
+      json({ fields: { company: "Nubank", role: "backend" } }),
+    );
+    expect(d.status).toBe(201);
+    expect(((await d.json()) as { job: unknown }).job).toBeNull();
+  });
+
+  it("URL interna é recusada antes de qualquer busca (anti-SSRF)", async () => {
+    t = makeTestApp();
+    const r = await t.api(
+      "/api/postings/intake",
+      json({ url: "http://127.0.0.1:3100/api/postings" }),
+    );
+    expect(r.status).toBe(422);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe("blocked_host");
+  });
+
+  it("decisão da duplicata: só com comparação pendente; update junta na salva", async () => {
+    t = makeTestApp();
+    const saved = t.repos.postings.create({ company: "Itaú", title: "Dev" });
+    const incoming = t.repos.postings.create({ company: "Itaú", title: "Dev", city: "Recife" });
+    expect(
+      (await t.api(`/api/postings/${incoming.id}/duplicate-decision`, json({ action: "update" })))
+        .status,
+    ).toBe(409);
+    t.repos.postings.setDuplicate(incoming.id, {
+      candidateId: saved.id,
+      sameJob: true,
+      confidence: 90,
+      differences: [],
+      rationale: "x",
+      checkedAt: "2026-10-14T00:00:00.000Z",
+      decision: null,
+    });
+    const r = await t.api(
+      `/api/postings/${incoming.id}/duplicate-decision`,
+      json({ action: "update" }),
+    );
+    expect(await r.json()).toEqual({ keptId: saved.id, removedId: incoming.id });
+    expect(t.repos.postings.get(saved.id)?.city).toBe("Recife");
+  });
+
+  it("editar a JD refaz a pré-análise na hora; reextrair enfileira de novo", async () => {
+    t = makeTestApp();
+    seedFixture(t.repos, "engineer");
+    const p = t.repos.postings.create({ company: "Acme", jdText: "texto antigo sem termos" });
+    const r = await t.api(`/api/postings/${p.id}`, json({ jdText: JD_LONG }, "PATCH"));
+    const b = (await r.json()) as {
+      posting: { preAnalysis: { keywords: Array<{ term: string }> } };
+    };
+    expect(b.posting.preAnalysis.keywords.map((k) => k.term)).toContain("Kafka");
+    expect((await t.api(`/api/postings/${p.id}/extract`, { method: "POST" })).status).toBe(202);
+    expect(t.queue.tasks.at(-1)?.type).toBe("posting.extract");
+  });
+});
