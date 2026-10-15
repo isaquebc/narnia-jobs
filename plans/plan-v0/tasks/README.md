@@ -22,7 +22,7 @@ Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo
 Onda 1  F01
 Onda 2  F02 ──► F03 ──► F04   (decisão do dono, 2026-10-09: F03 antes da F04; o botão "Clarificar" fica desabilitado até a F04)
 Onda 3  F10
-Onda 4  F05   F06 ──► F07  (features; F05 e F06 em paralelo)
+Onda 4  F06 ──► F05 ──► F07  (features; o dono pôs a F06 antes da F05 em 2026-10-14)
 Onda 5  F09   F08
 Onda 6  F11
 ```
@@ -54,8 +54,8 @@ Não existe corte fixo de MVP: o release é decisão do dono do projeto quando a
 - Quando uma task muda algo dos documentos 02–05, atualiza-os no mesmo PR e registra em `§8`.
 
 ## Pontos de integração entre tasks (acordados na escrita dos escopos)
-- **`facts_version`** (F01 §3): contador em `settings` incrementado em toda escrita de fato, por um único ponto do `core`. F02 invalida `profile.card_json` a partir dele; F06 usa na chave do cache de análise; F10 incrementa ao editar fatos.
-- **`application.create_minimal`**: F06 entrega como stub para ligar análise a uma candidatura; F07 substitui pela implementação completa e migra os registros.
+- **`facts_version`** (F01 §3): contador em `settings` incrementado em toda escrita de fato, por um único ponto do `core`. F02 invalida `profile.card_json` a partir dele; F06 guarda na análise para avisar que ela envelheceu (F06-10); F10 incrementa ao editar fatos.
+- **Candidatura**: a F06 não cria candidatura (F06-7: salvar a vaga não é se candidatar); o alerta de candidatura repetida fica "em breve" (F06-11). A F07 cria a candidatura a partir da vaga salva (`posting`).
 - **Tools MCP `profile.*`**: definidas em F02, servidas pelo servidor MCP entregue em F04. F02 as expõe por REST até F04 existir.
 - **Sessão de clarificação**: botão em F01/F03, sessão e skill em F04.
 - **`usage_event`**: gravação começa em F01 (origem `narnia`); coletor dos logs do Claude Code e tela completa em F10.

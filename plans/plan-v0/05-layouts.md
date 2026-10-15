@@ -174,6 +174,8 @@ Selo por fato: ● verificado · ◐ extraído (não confirmado). Filtro "mostra
 
 ## L6 · Feature: Analisar vaga
 
+> Atualizado na F06 (2026-10-15): a análise roda numa conversa própria do recrutador ("contratante/cliente - role") e o resultado fica na **página da vaga** (`/vagas/$id`), com todos os campos editáveis, a origem de cada dado, contatos, notas e o modal de duplicata. A lista fica em **Vagas** (menu › Geral). O esboço abaixo é o original; a referência é `tasks/F06-analisar-vaga.md` §4.
+
 ```
 ┌─ Vaga ────────────────────────┬─ Resultado ───────────────────────────────┐
 │ [ cole a descrição ou URL ]   │ Fit geral: 72%  ▇▇▇▇▇▇▇▁▁▁                │

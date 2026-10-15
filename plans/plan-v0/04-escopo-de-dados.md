@@ -118,9 +118,10 @@ Finalidade: o agente e as features leem o registro em vez de abrir o arquivo; o 
 | Candidatura | perfil, empresa, cargo, URL/descrição da vaga, origem, status, datas de cada etapa (UTC), contatos, notas, documentos gerados |
 | Evento de calendário | candidatura, etapa (entrevista, prova, retorno), data/hora, fuso, link da chamada, `google_event_id` quando sincronizado, ou `.ics` gerado |
 | Documento gerado | tipo (CV, carta, mensagem), perfil, candidatura (opcional), versão, conteúdo Markdown, parâmetros usados, tokens gastos |
-| Análise de vaga | candidatura, fit, lacunas, palavras-chave, perguntas prováveis |
+| Vaga (F06) | contratante, cliente, cargo, role, senioridade, local, modelo, contratação, moeda e faixa, benefícios, responsabilidades, skills obrigatórias e diferenciais, resumo da empresa, links, descrição, data de publicação, origem de cada campo, pré-análise, duplicata; contatos e notas (edição do recrutador em nota do usuário espera confirmação) |
+| Análise de vaga | vaga, fit por perfil, recomendado, atende (com evidência), lacunas, riscos, palavras-chave, perguntas prováveis, estudos, melhorias no CV, `facts_version` e versão da vaga (validade) |
 | Sessão de entrevista | candidatura, tipo, modo (voz/texto), turnos (pergunta, resposta transcrita, feedback), duração, tokens, resumo final. **Áudio não é armazenado**, só a transcrição |
-| Sessão de chat | perfil, mensagens, tools chamadas, uso de tokens |
+| Sessão de chat | perfil em foco (opcional: o recrutador é global desde a F06), categoria, vaga (conversa da análise), mensagens, tools chamadas, uso de tokens |
 
 ---
 

@@ -94,6 +94,7 @@ Nada disso vive no repositório. `.gitignore` inclui `*.sqlite*`, `uploads/`, `e
 | `skills/perfil` | `/narnia:perfil <nome>` → `profile.switch` e recarrega o cartão | pequeno |
 | `skills/ingerir` | `/narnia:ingerir cv|github|linkedin --profundidade rapida|equilibrada|profunda` | ver §6 |
 | `skills/gerar-cv`, `analisar-vaga`, `entrevista`, `candidaturas` | uma skill por feature, cada uma dizendo quais tools usar | só quando invocada |
+| `agents/recrutador-especializado.md` (F06) | subagente do recrutador geral, chamado com um perfil (aderência a vaga, estudos, CV); no modo A pela opção `agents` do SDK, dentro do turno | quando o recrutador geral delega |
 | `hooks/hooks.json` | `SessionStart`: lê perfil ativo e injeta cartão (~300 tokens) + lembrete de persona | ~350 tokens por sessão |
 | `.mcp.json` | `{ "narnia-jobs": { "type": "http", "url": "http://127.0.0.1:3100/mcp" } }` | 0 |
 

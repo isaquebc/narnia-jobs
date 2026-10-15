@@ -115,7 +115,7 @@ Cada feature declara `dataScopes` (quais fatias dos dados precisa) e ganha só e
 | # | Feature | Entrada | Saída | Dados que carrega |
 |---|---------|---------|-------|-------------------|
 | 1 | Gerador de CV | perfil + (opcional) descrição da vaga + **template** (3 padrão ou enviado pelo usuário) | PDF gerado no servidor com padrão visual do template (+ DOCX), versões salvas | identidade, experiências, projetos, skills, educação |
-| 2 | Análise de vaga | descrição da vaga colada/URL | fit %, lacunas, perguntas prováveis, palavras-chave ATS | cartão do perfil, skills, experiências |
+| 2 | Análise de vaga | descrição da vaga colada/URL, no Chat ou em Vagas (F06) | vaga salva e editável; fit por perfil e o recomendado, lacunas, riscos, perguntas prováveis, palavras-chave ATS, estudos e melhorias no CV, numa conversa própria | cartões de todos os perfis, skills, experiências (recrutador especializado por perfil) |
 | 3 | Rastreador de candidaturas | manual + saída da #2 | kanban (interesse → aplicado → entrevista → oferta/recusa), notas; **entrevistas viram eventos no Google Calendar** quando a conta Google está conectada (MVP: link "adicionar ao calendário" + `.ics`, sem autenticação) | candidaturas, calendário (MCP do Google) |
 | 4 | Simulador de entrevista **por voz** | vaga (da #3) + tipo (técnica/comportamental/sistema) | conversa falada mãos livres (microfone ativo, detecção de fala, resposta do Claude em voz), transcrição, feedback por resposta, resumo; modo texto como fallback | perfil, candidatura, experiências |
 | 5 | Carta de apresentação / mensagem a recrutador | candidatura | texto curto no idioma do perfil | cartão do perfil, candidatura |
