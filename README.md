@@ -19,7 +19,7 @@ Projeto **open source**: clone, rode localmente e use a assinatura da IA que pre
 
 ## Uso
 
-Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS; Docker Engine + Compose v2 no Linux). Nada mais é instalado no host: a aplicação roda em quatro containers (web, api, worker, redis).
+Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS; Docker Engine + Compose v2 no Linux). Nada mais é instalado no host: a aplicação roda em cinco containers (web, api, worker, redis e browser, o Chromium headless que lê vagas por link quando a página precisa de JS ou tem banner de cookies).
 
 ```bash
 git clone <este repositório> && cd narnia-jobs-helpper
@@ -69,13 +69,14 @@ Menu › **Geral** › **Chat**. O recrutador é **global**: conhece a sua carre
 
 ### Vagas
 
-Cole uma vaga (ou o link dela) no **Chat** ou em **Vagas** (menu › Geral). A vaga é sempre salva (salvar não é se candidatar):
+Cole uma vaga (ou o link dela) no **Chat** ou em **Vagas** (menu › Geral). A vaga é sempre salva (salvar não é se candidatar). Pelo link, o servidor lê a página; se ela depende de JavaScript ou de aceitar cookies, abre num navegador headless isolado (serviço `browser`); sites que exigem login ou bloqueiam robôs (LinkedIn, por exemplo) pedem para colar o texto.
 
 - **Na hora, sem tokens**, uma heurística local extrai cargo, senioridade, role, local, contrato, moeda, faixa, benefícios, requisitos e diferenciais, e procura cada palavra-chave da vaga nos seus dados (cobertura dos obrigatórios e riscos para cada perfil, como "vaga híbrida e perfil só remoto").
 - **Em segundo plano**, um modelo barato (Haiku por padrão) extrai a vaga de novo e um segundo agente junta as duas extrações. Na página da vaga, cada campo mostra de onde veio: heurística, modelo, os dois concordando, ou você. O que você edita nunca é sobrescrito.
 - Vaga com a mesma empresa, cliente, cargo e role de uma já salva abre um **modal com o diff** e a certeza de ser a mesma vaga: atualizar a salva, salvar como nova ou descartar.
-- **A análise** roda numa conversa própria, com o título "contratante/cliente - role": o recrutador compara a vaga com todos os seus perfis pelo especializado de cada um, e grava o fit por perfil, o recomendado, o que você atende (cada item ligado a um fato seu), as lacunas (só depois de buscar e não achar), riscos, palavras-chave que faltam, perguntas prováveis, o que estudar e o que melhorar no currículo. Se os seus dados ou a vaga mudarem depois, a página avisa e oferece **Reanalisar** (nada é refeito sozinho, para não gastar tokens).
-- **Página da vaga:** todos os campos e a descrição editáveis, contatos (com quem você falou, por LinkedIn, WhatsApp ou e-mail) e notas. Quando o recrutador altera uma nota sua, a mudança espera a sua confirmação na bandeja (**Aguardando você**) e em Pendências. "Criar CV para esta vaga" e o alerta de candidatura repetida chegam com as próximas entregas.
+- **A análise** roda numa conversa própria, com o título "contratante/cliente - role": o recrutador compara a vaga com todos os seus perfis pelo especializado de cada um, e grava o fit por perfil, o recomendado, o que você atende (cada item ligado a um fato seu), as lacunas (só depois de buscar e não achar), riscos, palavras-chave que faltam, perguntas prováveis, o que estudar e o que melhorar no currículo. Se os seus dados ou a vaga mudarem depois, a página avisa e oferece **Reanalisar** (nada é refeito sozinho, para não gastar tokens; a extração do modelo terminando depois da análise não conta como mudança). A bandeja mostra a análise em andamento e, quando ela fica pronta, o link para a vaga.
+- **Página da vaga:** todos os campos e a descrição editáveis, contatos (com quem você falou, por LinkedIn, WhatsApp ou e-mail) e notas. Quando o recrutador altera uma nota sua, a mudança espera a sua confirmação na bandeja (**Aguardando você**) e em Pendências. Se você já registrou outra vaga da mesma empresa com o mesmo role, a página mostra **Vagas parecidas** com os links. "Criar CV para esta vaga" e o alerta de candidatura repetida chegam com as próximas entregas.
+- **Busca** na página Vagas por empresa, cliente, cargo, role ou nome de contato.
 - **Configurações › Modelos** escolhe o modelo do Claude de cada tarefa (extração, junção, comparação de vaga repetida e análise).
 
 ### Recrutador no terminal (Claude Code, modo B)

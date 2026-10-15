@@ -113,14 +113,14 @@ describe("menu: conversas como subitens do Chat", () => {
     expect(names()).not.toContain("Bem antiga");
   });
 
-  it("a conversa aberta não tem mais a fileira de conversas no topo; o título é 'Recrutador <perfil>'", async () => {
+  it("a conversa aberta não tem mais a fileira de conversas no topo; o título é só 'Recrutador' (2026-10-15)", async () => {
     const api = chatApi({
       listChatSessions: vi.fn(async () => ({
         sessions: [session("s1", { title: "Carreira" }), session("s2", { title: "Outra" })],
       })),
     });
     renderApp({ api: api as never, initialUrl: "/chat/s1" });
-    expect(await screen.findByRole("heading", { level: 1, name: "Recrutador Eng" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "Recrutador" })).toBeVisible();
     expect(await screen.findByRole("heading", { level: 2, name: "Carreira" })).toBeVisible();
     expect(screen.queryByRole("navigation", { name: "Conversas" })).toBeNull();
     // renomear continua na conversa aberta

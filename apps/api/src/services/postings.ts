@@ -44,7 +44,8 @@ export async function intakePosting(
     if (!page.ok) return page;
     text = page.text;
     html = page.html;
-    if (page.siteName && !fields.company) fields = { ...fields, company: page.siteName };
+    const company = page.company ?? page.siteName;
+    if (company && !fields.company) fields = { ...fields, company };
   }
   if (text && text.length < MIN_JD_CHARS)
     return {

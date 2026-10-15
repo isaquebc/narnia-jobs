@@ -91,6 +91,7 @@ function mapPosting(r: Row): Posting {
     duplicate: "duplicate_json" in r ? json(r.duplicate_json, null) : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    contentUpdatedAt: r.content_updated_at ?? r.created_at,
   });
 }
 
@@ -126,8 +127,22 @@ export function postingsRepo(db: Db): PostingsRepo {
       const now = nowUtc();
       const source = opts.source ?? "user";
       const sources: Record<string, FieldSource> = { ...(input.fieldSources ?? {}) };
-      const cols = ["id", "status", "identity_hash", "created_at", "updated_at"];
-      const values: unknown[] = [id, opts.status ?? "draft", postingIdentityHash(input), now, now];
+      const cols = [
+        "id",
+        "status",
+        "identity_hash",
+        "created_at",
+        "updated_at",
+        "content_updated_at",
+      ];
+      const values: unknown[] = [
+        id,
+        opts.status ?? "draft",
+        postingIdentityHash(input),
+        now,
+        now,
+        now,
+      ];
       for (const f of POSTING_FIELD_NAMES) {
         const v = input[f];
         if (v === undefined) continue;
@@ -183,8 +198,18 @@ export function postingsRepo(db: Db): PostingsRepo {
         sets.push("identity_hash = ?");
         values.push(postingIdentityHash(next));
       }
+      const now = nowUtc();
       sets.push("field_sources_json = ?", "updated_at = ?");
-      values.push(JSON.stringify(sources), nowUtc());
+      values.push(JSON.stringify(sources), now);
+      // conteúdo (validade da análise): edição do usuário ou JD nova; o que a extração preenche não conta
+      const touched = POSTING_FIELD_NAMES.filter((f) => f in patch && patch[f] !== undefined);
+      if (
+        touched.includes("jdText") ||
+        touched.some((f) => (opts.sources?.[f] ?? opts.source ?? "user") === "user")
+      ) {
+        sets.push("content_updated_at = ?");
+        values.push(now);
+      }
       db.prepare(`update posting set ${sets.join(", ")} where id = ?`).run(
         ...(values as never[]),
         id,

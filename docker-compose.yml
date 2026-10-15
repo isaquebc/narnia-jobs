@@ -58,6 +58,8 @@ services:
       - PORT=3100
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 deixa só metadados nos rastros
+      - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # vaga por URL que precisa de navegador (vazio desliga)
+    networks: [default, browser]
     ports:
       - "127.0.0.1:${NARNIA_OAUTH_PORT-8089}:8089"      # callback OAuth do Google Calendar (F07); porta fixa
     healthcheck:
@@ -79,6 +81,22 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+
+  # Chromium headless da busca de vaga por URL (2026-10-15): só na rede `browser`, junto do api; sem volumes nem portas
+  browser:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: browser
+    image: narnia-jobs/browser
+    restart: unless-stopped
+    init: true
+    networks: [browser]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
 
   redis:
     image: redis:7-alpine
@@ -116,6 +134,9 @@ services:
       - "127.0.0.1:${NARNIA_PHOENIX_PORT:-6006}:6006"
     volumes:
       - phoenix-data:/mnt/data
+
+networks:
+  browser:   # api ↔ navegador; o navegador não enxerga redis, worker nem web
 
 volumes:
   claude-auth:

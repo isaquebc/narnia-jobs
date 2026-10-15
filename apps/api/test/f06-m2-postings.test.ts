@@ -50,6 +50,29 @@ describe("F06/M2 · /api/postings", () => {
     expect(d.duplicates).toEqual([a.id]);
   });
 
+  it("busca por texto (?q=) e vagas parecidas no detalhe (correções 2026-10-15)", async () => {
+    t = makeTestApp();
+    const a = t.repos.postings.create({ company: "Accenture", client: "Itaú", role: "backend" });
+    const b = t.repos.postings.create({ company: "Nubank", role: "backend" });
+    t.repos.postingContacts.add(b.id, { name: "Joana Prado", origin: "linkedin" });
+    const list = async (q: string) =>
+      (
+        (await (await t.api(`/api/postings?q=${encodeURIComponent(q)}`)).json()) as {
+          postings: Array<{ id: string }>;
+        }
+      ).postings.map((p) => p.id);
+    expect(await list("joana")).toEqual([b.id]);
+    expect(await list("itau")).toEqual([a.id]);
+    expect(await list("")).toEqual([b.id, a.id]);
+    const detail = async (id: string) =>
+      ((await (await t.api(`/api/postings/${id}`)).json()) as { related: Array<{ id: string }> })
+        .related;
+    // só uma vaga dessa empresa: nada de alerta
+    expect(await detail(a.id)).toEqual([]);
+    const c = t.repos.postings.create({ company: "Itaú", role: "backend" });
+    expect((await detail(a.id)).map((p) => p.id)).toEqual([c.id]);
+  });
+
   it("contatos: adicionar, editar, recusar telefone inválido e remover", async () => {
     t = makeTestApp();
     const p = t.repos.postings.create({ company: "Nubank" });

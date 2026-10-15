@@ -486,7 +486,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     getFileDigest: (id: string) =>
       request<{ digest: FileDigest | null }>(`/api/files/${encodeURIComponent(id)}/digest`),
     // F06 · vagas
-    listPostings: () => request<{ postings: Posting[] }>("/api/postings"),
+    listPostings: (q?: string) =>
+      request<{ postings: Posting[] }>(
+        q ? `/api/postings?q=${encodeURIComponent(q)}` : "/api/postings",
+      ),
     getPosting: (id: string) => request<PostingDetail>(`/api/postings/${encodeURIComponent(id)}`),
     intakePosting: (body: { text?: string; url?: string; fields?: PostingPatch }) =>
       request<{ posting: Posting; job: Job | null }>("/api/postings/intake", json(body)),
@@ -564,6 +567,8 @@ export interface PostingDetail {
   contacts: PostingContact[];
   notes: PostingNote[];
   duplicates: string[];
+  /** Outras vagas da mesma empresa com o mesmo role (alerta da página). */
+  related?: Posting[];
 }
 /** Análise gravada com a validade (F06-10) e os rótulos das evidências. */
 export interface PostingAnalysisView {

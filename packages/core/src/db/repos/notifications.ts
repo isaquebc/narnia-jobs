@@ -48,7 +48,10 @@ export interface NotificationsRepo {
 }
 
 /** Tipos informativos (FX-3): não contam no sino e se resolvem ao abrir o assunto ou após `INFORMATIONAL_TTL_DAYS`. */
-export const INFORMATIONAL_KINDS: readonly NotificationKind[] = ["ingestion.done"];
+export const INFORMATIONAL_KINDS: readonly NotificationKind[] = [
+  "ingestion.done",
+  "posting.analysis_done",
+];
 export const INFORMATIONAL_TTL_DAYS = 7;
 
 function map(r: Row): Notification {

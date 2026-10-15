@@ -126,6 +126,11 @@ export const PostingSchema = PostingFieldsSchema.extend({
   duplicate: PostingDuplicateCheckSchema.nullable(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
+  /**
+   * Última mudança de conteúdo (edição do usuário ou texto da vaga novo): é com ela que a análise envelhece (F06-10).
+   * Status e campos preenchidos pela extração não contam.
+   */
+  contentUpdatedAt: IsoDateTimeSchema,
 });
 export type Posting = z.infer<typeof PostingSchema>;
 

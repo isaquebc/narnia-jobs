@@ -17,8 +17,9 @@ import { postingWho, statusTone } from "./PostingsPage";
 
 /**
  * Página da vaga (F06 §1.3, M6): duplicata pendente (F06-9), análise do recrutador com validade (F06-10), pré-análise
- * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. "Criar CV" e o alerta de
- * candidatura repetida ficam "em breve" (F05, F06-11).
+ * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. "Criar CV" fica "em breve" (F05);
+ * o alerta de vagas parecidas (mesma empresa e role) só aparece quando existe outra vaga assim (correção 2026-10-15;
+ * o de candidatura repetida chega com as candidaturas, F06-11/F07).
  */
 export function PostingPage({
   postingId,
@@ -44,7 +45,7 @@ export function PostingPage({
   });
   if (detail.isError) return <ErrorState error={detail.error} />;
   if (!detail.data) return <p className="text-sm text-muted-fg">…</p>;
-  const { posting, contacts, notes } = detail.data;
+  const { posting, contacts, notes, related = [] } = detail.data;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -98,10 +99,22 @@ export function PostingPage({
           else if (r.removedId === postingId) void navigate({ to: "/vagas" });
         }}
       />
-      <Alert tone="info" className="flex items-center justify-between gap-2">
-        <span>{t("postings.analysis.applicationAlert")}</span>
-        <Badge>{t("nav.soon", { task: "F07" })}</Badge>
-      </Alert>
+      {related.length > 0 ? (
+        <section aria-label={t("postings.related")}>
+          <Alert tone="warn" className="flex flex-col gap-1">
+            <span>{t("postings.relatedText", { count: related.length })}</span>
+            <ul className="flex flex-col gap-0.5 text-sm">
+              {related.map((r) => (
+                <li key={r.id}>
+                  <NavLink to={`/vagas/${r.id}`} className="underline">
+                    {postingWho(r)} · {r.title ?? t(`postings.role.${r.role}` as TKey)}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </Alert>
+        </section>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <AnalysisCard postingId={postingId} analyses={analyses.data?.analyses ?? []} />
         <PreAnalysisCard pre={posting.preAnalysis as PreAnalysis | null} />

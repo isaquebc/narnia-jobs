@@ -564,6 +564,8 @@ export const ptBR = {
       snapshots_over_cap: "Snapshots acima do teto",
       ingestion_awaiting_confirmation: "Aguardando confirmação da estimativa",
       ingestion_stuck: "Ingestões paradas",
+      posting_note_pending: "Notas de vaga para confirmar",
+      posting_analysis_done: "Análises de vaga prontas",
     },
   },
   ingestion: {
@@ -1024,7 +1026,6 @@ export const ptBR = {
   },
   chat: {
     title: "Recrutador",
-    titleProfile: "Recrutador {profile}",
     recruiterName: "Recrutador {profile} {seniority}",
     seniority: { senior: "Sênior", pleno: "Pleno" },
     sessions: "Conversas",
@@ -1154,6 +1155,12 @@ export const ptBR = {
     saving: "Salvando…",
     createdAt: "Salva em {date}",
     noCompany: "Empresa não informada",
+    search: "Buscar vagas",
+    searchHint: "Empresa, cliente, cargo, role ou contato",
+    searchEmpty: "Nenhuma vaga encontrada para “{q}”.",
+    related: "Vagas parecidas",
+    relatedText:
+      "Você já registrou {count} vaga da mesma empresa com o mesmo role. O alerta de candidatura repetida chega com as candidaturas (F07).",
     status: {
       draft: "Rascunho",
       extracting: "Extraindo…",
@@ -1272,7 +1279,6 @@ export const ptBR = {
       cv: "O que melhorar no currículo",
       seniority: "Senioridade",
       createCv: "Criar CV para esta vaga",
-      applicationAlert: "Alerta de candidatura repetida (mesma empresa e role)",
       history: "Análises anteriores: {count}",
     },
     riskType: {
@@ -1341,6 +1347,10 @@ export const ptBR = {
     waiting: "Aguardando você",
     noteChange: "Alteração de nota em {posting}",
     review: "revisar",
+    analyses: "Análises de vaga",
+    analyzing: "Analisando {title}",
+    openChat: "abrir conversa",
+    viewAnalysis: "ver análise",
   },
 } as const;
 

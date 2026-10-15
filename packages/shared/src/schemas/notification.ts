@@ -20,6 +20,8 @@ export const NOTIFICATION_KINDS = [
   "ingestion.stuck",
   /** O recrutador quer alterar uma nota escrita pelo usuário numa vaga (F06-17): espera confirmação. */
   "posting.note_pending",
+  /** Análise de vaga gravada pelo recrutador (correção 2026-10-15): aparece na bandeja até ser vista. Informativa. */
+  "posting.analysis_done",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

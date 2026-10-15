@@ -14,6 +14,7 @@ import type { z } from "zod";
 import type { Repos } from "../db";
 import type { JobAnalysisRecord } from "../db/repos/postings";
 import { editPostingNote } from "./notes";
+import { searchPostings } from "./search";
 
 /**
  * Handlers das tools da vaga e da análise (F06 §2.4). O que depende da api (busca por URL, fila, conversa nova) entra
@@ -113,15 +114,39 @@ function brief(pre: PreAnalysis | null, profileId: string | null) {
   };
 }
 
+/**
+ * "Análise pronta" (correção 2026-10-15): a análise roda numa conversa, fora da fila, então a bandeja fica sabendo por
+ * esta notificação informativa (uma aberta por vaga; uma reanálise volta a marcá-la como não vista).
+ */
+export function notifyPostingAnalysisDone(
+  repos: Repos,
+  posting: Posting,
+): { notification: Notification; created: boolean } {
+  const ev = repos.notifications.upsert({
+    kind: "posting.analysis_done",
+    subjectKind: "posting",
+    subjectId: posting.id,
+    title: `Análise pronta: ${postingSessionTitle(posting)}`,
+    actionUrl: postingUrl(posting.id),
+    severity: "info",
+  });
+  if (ev.created) return ev;
+  return {
+    notification: repos.notifications.markUnread(ev.notification.id) ?? ev.notification,
+    created: false,
+  };
+}
+
 /** Envelheceu (F06-10)? Fatos do usuário ou a vaga mudaram depois da análise. */
 export function analysisStale(
   repos: Repos,
   record: Pick<JobAnalysisRecord, "factsVersion" | "postingUpdatedAt">,
-  posting: Pick<Posting, "updatedAt">,
+  posting: Pick<Posting, "contentUpdatedAt">,
 ): { facts: boolean; posting: boolean } {
   return {
     facts: repos.settings.getFactsVersion() > record.factsVersion,
-    posting: posting.updatedAt > record.postingUpdatedAt,
+    // só mudança de conteúdo (usuário ou JD nova): status e extração terminando depois não envelhecem
+    posting: posting.contentUpdatedAt > record.postingUpdatedAt,
   };
 }
 
@@ -259,19 +284,7 @@ export function createPostingTools(
       };
     }),
     "posting.search": wrap("posting.search", (i) => {
-      const q = (i.query ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
-      const all = repos.postings.list();
-      const hits = q
-        ? all.filter((p) =>
-            [p.company, p.client, p.title, p.role]
-              .filter(Boolean)
-              .join(" ")
-              .normalize("NFD")
-              .replace(/\p{M}/gu, "")
-              .toLowerCase()
-              .includes(q),
-          )
-        : all;
+      const hits = searchPostings(repos, i.query ?? "");
       return {
         items: hits.slice(0, i.limit ?? 10).map((p) => ({ id: p.id, line: postingLine(p) })),
       };
@@ -359,12 +372,13 @@ export function createPostingTools(
         analysis,
         recommendedProfileId: analysis.recommendedProfileId,
         factsVersion: repos.settings.getFactsVersion(),
-        postingUpdatedAt: p.updatedAt,
+        postingUpdatedAt: p.contentUpdatedAt,
         models: s ? [s.model] : [],
         usage: null,
         chatSessionId: s?.id ?? null,
       });
       ctx.ports.changed?.(p.id);
+      ctx.ports.notified?.([notifyPostingAnalysisDone(repos, p)]);
       return { analysisId: record.id, url: postingUrl(p.id) };
     }),
     "analysis.get": wrap("analysis.get", (i) => {

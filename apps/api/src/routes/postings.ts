@@ -8,6 +8,8 @@ import {
   type NoteEditResult,
   type Repos,
   rejectPostingNote,
+  relatedPostings,
+  searchPostings,
 } from "@narnia-jobs/core";
 import {
   JobAnalysisSchema,
@@ -42,6 +44,7 @@ const INTAKE_STATUS = {
   empty: 400,
   invalid_url: 400,
   extract_failed: 422,
+  blocked_page: 422,
 } as const;
 
 /**
@@ -70,7 +73,10 @@ export function postingsRoutes(deps: {
   const notFound = (c: Parameters<typeof apiError>[0]) =>
     apiError(c, 404, "posting_not_found", "Vaga não encontrada");
 
-  app.get("/api/postings", (c) => c.json({ postings: repos.postings.list() }));
+  // busca por texto (empresa, cliente, cargo, role, contatos); sem `q`, todas
+  app.get("/api/postings", (c) =>
+    c.json({ postings: searchPostings(repos, c.req.query("q") ?? "") }),
+  );
 
   app.post("/api/postings", validate("json", PostingCreateSchema), (c) => {
     const posting = repos.postings.create(c.req.valid("json"), { source: "user" });
@@ -145,6 +151,8 @@ export function postingsRoutes(deps: {
       duplicates: posting.identityHash
         ? repos.postings.findByIdentity(posting.identityHash, posting.id).map((p) => p.id)
         : [],
+      // outras vagas da mesma empresa com o mesmo role (alerta da página, F06-11)
+      related: relatedPostings(repos, posting),
     });
   });
 

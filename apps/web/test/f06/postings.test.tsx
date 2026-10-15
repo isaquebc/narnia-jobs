@@ -69,12 +69,51 @@ describe("F06/M6 · Vagas", () => {
     expect(screen.getByText("Cobertura dos obrigatórios: 100%")).toBeInTheDocument();
     expect(screen.getByText("Vaga híbrida; perfil só remoto.")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Criar CV para esta vaga" })[0]).toBeDisabled();
-    expect(screen.getByText(/Alerta de candidatura repetida/)).toBeInTheDocument();
+    // sem outra vaga da mesma empresa e role, nada de alerta (correção 2026-10-15)
+    expect(screen.queryByText(/mesma empresa/)).toBeNull();
     const client = within(form).getByLabelText("Empresa cliente (onde vai trabalhar)");
     await userEvent.clear(client);
     await userEvent.type(client, "Initech Brasil");
     await userEvent.click(within(form).getByRole("button", { name: "Salvar" }));
     expect(patchPosting).toHaveBeenCalledWith("v1", { client: "Initech Brasil" });
+  });
+
+  it("vaga parecida já registrada: alerta com o link para ela", async () => {
+    renderApp({
+      api: api({
+        getPosting: vi.fn(async (id: string) => ({
+          posting: posting(id),
+          contacts: [],
+          notes: [],
+          duplicates: [],
+          related: [posting("v7", { title: "Outra vaga backend" })],
+        })),
+      }) as never,
+      initialUrl: "/vagas/v1",
+    });
+    const alert = await screen.findByRole("region", { name: "Vagas parecidas" });
+    expect(alert).toHaveTextContent("Você já registrou 1 vaga da mesma empresa com o mesmo role");
+    expect(within(alert).getByRole("link", { name: /Outra vaga backend/ })).toHaveAttribute(
+      "href",
+      "/vagas/v7",
+    );
+  });
+
+  it("busca por texto: filtra pelo servidor (empresa, cliente, role, contato)", async () => {
+    const listPostings = vi.fn(async (q?: string) => ({
+      postings: q ? [posting("v1")] : [posting("v1"), posting("v2", { company: "Nubank" })],
+    }));
+    renderApp({ api: api({ listPostings }) as never, initialUrl: "/vagas" });
+    const list = await screen.findByRole("list", { name: "Vagas" });
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Buscar vagas" }), "joana");
+    await waitFor(() => expect(listPostings).toHaveBeenLastCalledWith("joana"));
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(1));
+    listPostings.mockResolvedValue({ postings: [] });
+    await userEvent.clear(screen.getByRole("searchbox", { name: "Buscar vagas" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Buscar vagas" }), "zzz");
+    await waitFor(() => expect(listPostings).toHaveBeenLastCalledWith("zzz"));
+    expect(await screen.findByText("Nenhuma vaga encontrada para “zzz”.")).toBeInTheDocument();
   });
 
   it("draftPatch: listas por linha, números, moeda maiúscula e vazio = null", () => {
@@ -161,6 +200,70 @@ describe("F06/M6 · Vagas", () => {
     await userEvent.click(screen.getAllByRole("button", { name: "Reanalisar" })[0] as HTMLElement);
     expect(analyzePosting).toHaveBeenCalledWith("v1");
     await waitFor(() => expect(router.state.location.pathname).toBe("/chat/s9"));
+  });
+
+  it("bandeja: análise em andamento (conversa da vaga trabalhando) e análise pronta, com os links", async () => {
+    renderApp({
+      api: api({
+        listChatSessions: async () => ({
+          sessions: [
+            {
+              id: "s5",
+              profileId: null,
+              category: "job",
+              title: "Globex/Initech - Backend",
+              provider: "mock",
+              providerSessionId: null,
+              model: "sonnet",
+              state: "active",
+              ingestionRunId: null,
+              postingId: "v1",
+              cardHash: null,
+              tokensIn: 0,
+              tokensOut: 0,
+              costUsdEst: 0,
+              createdAt: "2026-10-15T10:00:00.000Z",
+              lastActivityAt: "2026-10-15T10:00:00.000Z",
+              busy: true,
+            },
+          ],
+        }),
+        listNotifications: async () => ({
+          notifications: [
+            {
+              id: "nt1",
+              kind: "posting.analysis_done",
+              subjectKind: "posting",
+              subjectId: "v2",
+              title: "Análise pronta: Nubank - Engineering Manager",
+              body: null,
+              actionUrl: "/vagas/v2",
+              severity: "info",
+              createdAt: "2026-10-15T10:00:00.000Z",
+              readAt: null,
+              dismissedAt: null,
+              resolvedAt: null,
+            },
+          ],
+          unresolved: 0,
+        }),
+      }) as never,
+      initialUrl: "/vagas",
+    });
+    await act(async () => {
+      await userEvent.click(await screen.findByRole("button", { name: "Atividades" }));
+    });
+    const list = await screen.findByRole("list", { name: "Análises de vaga" });
+    expect(list).toHaveTextContent("Analisando Globex/Initech - Backend");
+    expect(within(list).getByRole("link", { name: "abrir conversa" })).toHaveAttribute(
+      "href",
+      "/chat/s5",
+    );
+    expect(list).toHaveTextContent("Análise pronta: Nubank - Engineering Manager");
+    expect(within(list).getByRole("link", { name: "ver análise" })).toHaveAttribute(
+      "href",
+      "/vagas/v2",
+    );
   });
 
   it("bandeja: 'Aguardando você' com a nota pendente e o link para a vaga", async () => {

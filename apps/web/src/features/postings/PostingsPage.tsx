@@ -1,6 +1,6 @@
 import type { Posting } from "@narnia-jobs/shared";
 import { useNavigate } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useApi, useTimezone } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
@@ -107,17 +107,44 @@ function NewPosting() {
   );
 }
 
-/** Vagas (F06 §1.3): todas as vagas analisadas em cards, da mais nova para a mais antiga, e a entrada de uma nova. */
+/** Texto digitado com espera: a busca só vai ao servidor quando a pessoa para de digitar. */
+function useDebounced(value: string, ms = 250): string {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return v;
+}
+
+/**
+ * Vagas (F06 §1.3): todas as vagas analisadas em cards, da mais nova para a mais antiga, a busca por texto (empresa,
+ * cliente, cargo, role ou contato; correção de 2026-10-15) e a entrada de uma nova.
+ */
 export function PostingsPage() {
-  const { postings, isLoading } = usePostings();
+  const [search, setSearch] = useState("");
+  const query = useDebounced(search.trim());
+  const { postings, isLoading } = usePostings(query);
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">{t("postings.title")}</h1>
-        <p className="text-sm text-muted-fg">{t("postings.hint")}</p>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold">{t("postings.title")}</h1>
+          <p className="text-sm text-muted-fg">{t("postings.hint")}</p>
+        </div>
+        <Input
+          type="search"
+          aria-label={t("postings.search")}
+          placeholder={t("postings.searchHint")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full sm:w-72"
+        />
       </div>
       {!isLoading && postings.length === 0 ? (
-        <p className="text-sm text-muted-fg">{t("postings.empty")}</p>
+        <p className="text-sm text-muted-fg">
+          {query ? t("postings.searchEmpty", { q: query }) : t("postings.empty")}
+        </p>
       ) : (
         <ul
           aria-label={t("postings.title")}

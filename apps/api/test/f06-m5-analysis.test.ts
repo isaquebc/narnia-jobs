@@ -66,6 +66,23 @@ describe("F06/M5 · análise da vaga", () => {
     await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === job?.id);
     const saved = t.repos.jobAnalyses.latest(posting?.id as string);
     expect(saved?.chatSessionId).toBe(job?.id);
+    // a bandeja fica sabendo: notificação informativa "Análise pronta" com o link da vaga (correção 2026-10-15)
+    const done = t.repos.notifications.list().find((n) => n.kind === "posting.analysis_done");
+    expect(done).toMatchObject({
+      title: "Análise pronta: Globex Consultoria/Initech Bank - Backend",
+      actionUrl: `/vagas/${posting?.id}`,
+      readAt: null,
+    });
+    expect(
+      t.events.some(
+        (e) => e.type === "notification.created" && e.notification.kind === "posting.analysis_done",
+      ),
+    ).toBe(true);
+    expect(t.repos.notifications.countUnresolved()).toBe(0);
+    // a conversa da vaga nasceu já trabalhando, avisada pelo WS
+    expect(t.events.some((e) => e.type === "chat.session_updated" && e.sessionId === job?.id)).toBe(
+      true,
+    );
     expect((saved?.analysis as JobAnalysis | undefined)?.matches[0]?.evidence[0]?.kind).toBe(
       "skill",
     );
@@ -140,7 +157,7 @@ describe("F06/M5 · análise da vaga", () => {
       analysis: { summary: "s" },
       recommendedProfileId: ids.profileId,
       factsVersion: t.repos.settings.getFactsVersion(),
-      postingUpdatedAt: p.updatedAt,
+      postingUpdatedAt: p.contentUpdatedAt,
       models: ["sonnet"],
       usage: null,
       chatSessionId: null,
@@ -151,6 +168,11 @@ describe("F06/M5 · análise da vaga", () => {
           analyses: Array<{ stale: { facts: boolean; posting: boolean } }>;
         }
       ).analyses[0]?.stale;
+    expect(await view()).toEqual({ facts: false, posting: false });
+    // extração do modelo terminando depois da análise e troca de status não envelhecem (correção 2026-10-15)
+    await new Promise((r) => setTimeout(r, 5));
+    t.repos.postings.update(p.id, { title: "Backend" }, { source: "model" });
+    t.repos.postings.setStatus(p.id, "ready");
     expect(await view()).toEqual({ facts: false, posting: false });
     t.repos.settings.bumpFactsVersion();
     await new Promise((r) => setTimeout(r, 5));

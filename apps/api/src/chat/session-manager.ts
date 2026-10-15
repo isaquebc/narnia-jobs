@@ -305,6 +305,8 @@ export class SessionManager {
       instrucoes: stripFrontmatter(readPluginFile("skills/analisar-vaga/SKILL.md")).trim(),
     });
     this.send(session.id, note, { display: `Análise da vaga ${title}` });
+    // turno já em andamento: a bandeja passa a mostrar "Analisando…" (correção 2026-10-15)
+    this.emitState(session.id, session.state, session.category);
     return this.get(session.id);
   }
 

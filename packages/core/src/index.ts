@@ -46,6 +46,7 @@ export * from "./postings/identity";
 export * from "./postings/ingest";
 export * from "./postings/match";
 export * from "./postings/notes";
+export * from "./postings/search";
 export * from "./postings/tools";
 export * from "./profile/analyze-input";
 export * from "./profile/card";

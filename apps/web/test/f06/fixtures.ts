@@ -71,6 +71,7 @@ export function posting(id: string, partial: Partial<Posting> = {}): Posting {
     duplicate: null,
     createdAt: NOW,
     updatedAt: NOW,
+    contentUpdatedAt: NOW,
     ...partial,
   };
 }

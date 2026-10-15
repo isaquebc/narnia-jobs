@@ -64,14 +64,15 @@ function UserContent({ text }: { text: string }) {
 }
 
 /**
- * Nome do recrutador (pedido do dono, 2026-10-13): o título da página é "Recrutador <perfil>" e o autor das mensagens
- * "Recrutador <perfil> <senioridade do recrutador>" (Sênior por padrão; a persona pode trocar para Pleno).
+ * Nome do recrutador: o título da página é só "Recrutador" (recrutador global, pedido do dono em 2026-10-15) e o autor
+ * das mensagens "Recrutador <perfil> <senioridade do recrutador>" (2026-10-13; Sênior por padrão, a persona pode trocar
+ * para Pleno).
  */
 export function recruiterNames(profile: Pick<Profile, "name" | "personaOverrides"> | null) {
   if (!profile) return { title: t("chat.title"), author: t("chat.recruiter") };
   const seniority = profile.personaOverrides?.recruiterSeniority ?? "senior";
   return {
-    title: t("chat.titleProfile", { profile: profile.name }),
+    title: t("chat.title"),
     author: t("chat.recruiterName", {
       profile: profile.name,
       seniority: t(`chat.seniority.${seniority}` as TKey),

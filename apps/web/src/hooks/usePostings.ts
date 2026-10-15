@@ -1,11 +1,11 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useApi, useWs } from "../app/context";
 
 /** Chaves das vagas (F06): a lista, o detalhe, as análises e as notas esperando confirmação. */
 export const postingKeys = {
   all: ["postings"] as const,
-  list: ["postings", "list"] as const,
+  list: (q = "") => ["postings", "list", q] as const,
   detail: (id: string) => ["postings", "detail", id] as const,
   analyses: (id: string) => ["postings", "analyses", id] as const,
   pendingNotes: ["postings", "pending-notes"] as const,
@@ -21,17 +21,23 @@ function usePostingEvents() {
       if (
         e.type === "posting.updated" ||
         (e.type === "notification.created" && e.notification.kind === "posting.note_pending") ||
-        (e.type === "notification.updated" && e.notification.kind === "posting.note_pending")
+        (e.type === "notification.updated" && e.notification.kind === "posting.note_pending") ||
+        (e.type === "notification.created" && e.notification.kind === "posting.analysis_done")
       )
         void qc.invalidateQueries({ queryKey: postingKeys.all });
     });
   }, [ws, qc]);
 }
 
-export function usePostings() {
+/** Lista das vagas; com `query`, a busca por texto do servidor (a lista anterior fica na tela enquanto carrega). */
+export function usePostings(query = "") {
   const api = useApi();
   usePostingEvents();
-  const q = useQuery({ queryKey: postingKeys.list, queryFn: () => api.listPostings() });
+  const q = useQuery({
+    queryKey: postingKeys.list(query),
+    queryFn: () => api.listPostings(query || undefined),
+    placeholderData: keepPreviousData,
+  });
   return { ...q, postings: q.data?.postings ?? [] };
 }
 

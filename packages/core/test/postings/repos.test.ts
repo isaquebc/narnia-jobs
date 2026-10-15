@@ -54,6 +54,24 @@ describe("F06/M2 core · repositórios da vaga", () => {
     expect(m.fieldSources).toMatchObject({ city: "both", state: "model" });
   });
 
+  it("contentUpdatedAt (correção 2026-10-15): só edição do usuário ou JD nova mudam; modelo e status não", async () => {
+    const r = repos();
+    const p = r.postings.create({ company: "Nubank", jdText: "texto" }, { source: "user" });
+    expect(p.contentUpdatedAt).toBe(p.createdAt);
+    const tick = () => new Promise((ok) => setTimeout(ok, 5));
+    await tick();
+    r.postings.setStatus(p.id, "ready");
+    const m = r.postings.update(p.id, { city: "Recife" }, { source: "model" });
+    expect(m.updatedAt > p.updatedAt).toBe(true);
+    expect(m.contentUpdatedAt).toBe(p.contentUpdatedAt);
+    await tick();
+    const jd = r.postings.update(p.id, { jdText: "outro texto" }, { source: "model" });
+    expect(jd.contentUpdatedAt > p.contentUpdatedAt).toBe(true);
+    await tick();
+    const u = r.postings.update(p.id, { state: "PE" });
+    expect(u.contentUpdatedAt > jd.contentUpdatedAt).toBe(true);
+  });
+
   it("findByIdentity acha as outras vagas com o mesmo hash; lista mais recente primeiro", () => {
     const r = repos();
     const a = r.postings.create({ company: "Itaú", title: "Dev Backend" });

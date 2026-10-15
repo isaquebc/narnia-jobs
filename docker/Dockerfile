@@ -4,10 +4,13 @@
 #   build     -> instala tudo e roda o build (valida o monorepo; o web usa docker/web.Dockerfile)
 #   deps-prod -> node_modules só de produção para api e worker (pnpm install --prod --filter)
 #   runtime   -> api e worker em produção (node:22-slim + git + gh + poppler + tessdata + CLI do Claude embutido no SDK)
+#   browser   -> Chromium headless da busca de vaga por URL (serviço `browser`, rede só com o api; 2026-10-15)
 # As apps rodam a fonte TypeScript com `tsx` (F01-62): os pacotes do workspace exportam fonte TS (F01-28).
 
 ARG PNPM_VERSION=12.9.1
 ARG TESSDATA_BASE=https://tessdata.projectnaptha.com/4.0.0_fast
+# mesma versão do playwright-core do api (apps/api/package.json): cliente e servidor precisam bater
+ARG PLAYWRIGHT_VERSION=1.58.0
 
 FROM node:22-bookworm-slim AS dev
 ARG PNPM_VERSION
@@ -53,6 +56,21 @@ COPY --chown=node:node packages/core/package.json packages/core/
 COPY --chown=node:node packages/shared/package.json packages/shared/
 COPY --chown=node:node packages/providers/package.json packages/providers/
 RUN pnpm install --prod --frozen-lockfile --filter "@narnia-jobs/api..." --filter "@narnia-jobs/worker..."
+
+# Chromium do Debian servido pelo playwright-core (launchServer): o api conecta por NARNIA_BROWSER_WS
+FROM node:22-bookworm-slim AS browser
+ARG PLAYWRIGHT_VERSION
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends chromium fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/browser
+RUN npm init -y >/dev/null \
+ && npm install --omit=dev --no-audit --no-fund playwright-core@${PLAYWRIGHT_VERSION} \
+ && chown -R node:node /opt/browser
+COPY --chown=node:node docker/browser-server.mjs /opt/browser/server.mjs
+USER node
+EXPOSE 3000
+CMD ["node", "/opt/browser/server.mjs"]
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_OPTIONS=--no-warnings=ExperimentalWarning \

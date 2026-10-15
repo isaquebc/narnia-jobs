@@ -4,7 +4,9 @@ import { Activity } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApi, useWs } from "../../app/context";
 import { runHeadline } from "../../features/ingestion/runHeadline";
+import { useChatSessions } from "../../hooks/useChat";
 import { useJobs } from "../../hooks/useJobs";
+import { useNotifications } from "../../hooks/useNotifications";
 import { usePendingNotes } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { Badge } from "../ui/badge";
@@ -120,6 +122,19 @@ function useRunsByStatus(key: string, statuses: RunStatus[]) {
   return runs.data?.runs ?? [];
 }
 
+/**
+ * Análises de vaga (correção 2026-10-15): a análise roda numa conversa do recrutador, não na fila, então a bandeja
+ * mostra as conversas de vaga com turno em andamento e as análises prontas ainda não vistas (notificação
+ * `posting.analysis_done`; abrir pela bandeja marca como vista).
+ */
+function usePostingAnalyses() {
+  const { sessions } = useChatSessions();
+  const { notifications, markRead } = useNotifications("open");
+  const running = sessions.filter((s) => s.category === "job" && s.busy && s.state !== "archived");
+  const done = notifications.filter((n) => n.kind === "posting.analysis_done" && !n.readAt);
+  return { running, done, markRead };
+}
+
 const useStoppedRuns = () => useRunsByStatus("stopped", STOPPED_STATUSES);
 const useRunningRuns = () => useRunsByStatus("running", RUNNING_STATUSES);
 
@@ -129,6 +144,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
   const running = useRunningRuns();
   // "Aguardando você" (F06-17): edições do recrutador em notas do usuário, esperando confirmação
   const waiting = usePendingNotes();
+  const analyses = usePostingAnalyses();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="relative">
@@ -141,7 +157,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
       >
         <Activity size={16} />
         <span data-testid="activity-count" className="text-xs">
-          {activeCount + waiting.length}
+          {activeCount + waiting.length + analyses.running.length}
         </span>
       </Button>
       {open ? (
@@ -168,6 +184,39 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
                     className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
                   >
                     {t("tray.review")}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {analyses.running.length + analyses.done.length > 0 ? (
+            <ul aria-label={t("tray.analyses")} className="mb-2 flex flex-col gap-2">
+              {analyses.running.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+                >
+                  <span>{t("tray.analyzing", { title: s.title })}</span>
+                  <NavLink
+                    to={`/chat/${s.id}`}
+                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                  >
+                    {t("tray.openChat")}
+                  </NavLink>
+                </li>
+              ))}
+              {analyses.done.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-ok/40 p-2 text-sm"
+                >
+                  <span>{n.title}</span>
+                  <NavLink
+                    to={n.actionUrl}
+                    onClick={() => analyses.markRead.mutate(n.id)}
+                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                  >
+                    {t("tray.viewAnalysis")}
                   </NavLink>
                 </li>
               ))}
@@ -219,7 +268,8 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
           {jobs.length === 0 &&
           stopped.length === 0 &&
           running.length === 0 &&
-          waiting.length === 0 ? (
+          waiting.length === 0 &&
+          analyses.running.length + analyses.done.length === 0 ? (
             <p className="text-sm text-muted-fg">{t("activity.empty")}</p>
           ) : (
             <ul className="flex max-h-96 flex-col gap-2 overflow-auto">

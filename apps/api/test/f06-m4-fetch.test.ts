@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fetchPostingPage, isBlockedAddress, robotsAllows } from "../src/postings/fetch";
+import { COOKIE_ACCEPT, requestDecision } from "../src/postings/browser";
+import {
+  extractPosting,
+  fetchPostingPage,
+  isBlockedAddress,
+  robotsAllows,
+} from "../src/postings/fetch";
 
 /** F06/M4 · busca por URL: anti-SSRF, robots.txt, redirects, teto de tamanho e extração sem JS. */
 const ARTICLE = `<!doctype html><html><head><title>Vaga</title>
@@ -149,5 +155,149 @@ describe("F06/M4 · fetchPostingPage", () => {
         timeoutMs: 50,
       }),
     ).toMatchObject({ ok: false, code: "timeout" });
+  });
+});
+
+/** Correção do teste do dono (2026-10-15): página com banner de cookies ou só com JS. */
+const COOKIE_WALL = `<!doctype html><html><head><title>Vaga</title>
+<script type="application/ld+json">${JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "WebPage", name: "Vagas" },
+    {
+      "@type": "JobPosting",
+      title: "Pessoa Desenvolvedora Backend Sênior",
+      hiringOrganization: { "@type": "Organization", name: "Acme Pay" },
+      employmentType: ["FULL_TIME"],
+      jobLocationType: "TELECOMMUTE",
+      jobLocation: {
+        "@type": "Place",
+        address: { addressLocality: "São Paulo", addressRegion: "SP" },
+      },
+      datePosted: "2026-10-01",
+      description: `<p>${"Construímos pagamentos para a América Latina. ".repeat(5)}</p><h3>Requisitos</h3><ul><li>Node.js e TypeScript</li><li>PostgreSQL</li></ul><p>Benefícios:<br>Vale refeição<br>Plano de saúde</p>`,
+    },
+  ],
+})}</script></head>
+<body><div class="cookie">Usamos cookies. <button>Aceitar todos</button></div><div id="root"></div></body></html>`;
+
+describe("F06 · vaga atrás de banner de cookies ou JS (2026-10-15)", () => {
+  it("JSON-LD JobPosting: texto da descrição em linhas, cargo, empresa e local", () => {
+    const r = extractPosting(COOKIE_WALL, "https://vagas.exemplo.com/1");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r).toMatchObject({
+      title: "Pessoa Desenvolvedora Backend Sênior",
+      company: "Acme Pay",
+    });
+    expect(r.text).toContain("Pessoa Desenvolvedora Backend Sênior");
+    expect(r.text).toContain("Empresa: Acme Pay");
+    expect(r.text).toContain("Local: São Paulo - SP · Remoto");
+    expect(r.text).toMatch(/Requisitos\n- Node\.js e TypeScript\n- PostgreSQL/);
+    expect(r.text).toMatch(/Benefícios:\nVale refeição\nPlano de saúde/);
+    expect(r.text).not.toContain("Usamos cookies");
+  });
+
+  it("sem JSON-LD e sem texto: tenta o navegador; o HTML renderizado é extraído", async () => {
+    const { f } = server({ "app.exemplo.com/v": () => new Response(JS_ONLY) });
+    const calls: string[] = [];
+    const r = await fetchPostingPage("https://app.exemplo.com/v", {
+      fetch: f,
+      lookup: publicDns,
+      render: async (url) => {
+        calls.push(url);
+        return { ok: true, html: ARTICLE, url };
+      },
+    });
+    expect(calls).toEqual(["https://app.exemplo.com/v"]);
+    expect(r).toMatchObject({ ok: true, via: "browser" });
+  });
+
+  it("site que recusa o fetch (403) também tenta o navegador; sem navegador, a falha original", async () => {
+    const { f } = server({
+      "bloq.exemplo.com/v": () => new Response("proibido", { status: 403 }),
+    });
+    const ok = await fetchPostingPage("https://bloq.exemplo.com/v", {
+      fetch: f,
+      lookup: publicDns,
+      render: async (url) => ({ ok: true, html: ARTICLE, url }),
+    });
+    expect(ok).toMatchObject({ ok: true, via: "browser" });
+    const failed = await fetchPostingPage("https://bloq.exemplo.com/v", {
+      fetch: f,
+      lookup: publicDns,
+      render: async () => ({ ok: false, message: "navegador fora do ar" }),
+    });
+    expect(failed).toMatchObject({ ok: false, code: "http_error" });
+    expect(
+      await fetchPostingPage("https://bloq.exemplo.com/v", {
+        fetch: f,
+        lookup: publicDns,
+        render: null,
+      }),
+    ).toMatchObject({ ok: false, code: "http_error" });
+  });
+
+  it("página de bloqueio ou captcha não vira vaga", () => {
+    const blocked = `<html><head><title>Blocked - Indeed.com</title></head><body><main><article><h1>Solicitação bloqueada</h1><p>${"O sistema bloqueou você. Se acredita que houve erro, acesse o suporte e informe o código. ".repeat(4)}</p></article></main></body></html>`;
+    expect(extractPosting(blocked, "https://x.com/", "browser")).toMatchObject({
+      ok: false,
+      code: "blocked_page",
+    });
+    const cf = `<html><head><title>Just a moment...</title></head><body><main><article><p>${"Verifying you are human. This may take a few seconds. ".repeat(6)}</p></article></main></body></html>`;
+    expect(extractPosting(cf, "https://x.com/")).toMatchObject({ ok: false, code: "blocked_page" });
+  });
+
+  it("robots.txt e rede interna nunca chegam ao navegador", async () => {
+    const { f } = server({
+      "vagas.exemplo.com/robots.txt": () => new Response("User-agent: *\nDisallow: /\n"),
+    });
+    let called = false;
+    const render = async () => {
+      called = true;
+      return { ok: false as const, message: "x" };
+    };
+    expect(
+      await fetchPostingPage("https://vagas.exemplo.com/1", {
+        fetch: f,
+        lookup: publicDns,
+        render,
+      }),
+    ).toMatchObject({ ok: false, code: "robots" });
+    expect(
+      await fetchPostingPage("http://10.0.0.1/x", { fetch: f, lookup: publicDns, render }),
+    ).toMatchObject({ ok: false, code: "blocked_host" });
+    expect(called).toBe(false);
+  });
+
+  it("navegador: só http(s) público; imagens, mídia e fontes não carregam; data: passa", async () => {
+    const guard = async (u: URL) => (u.hostname === "redis" ? "interno" : null);
+    expect(await requestDecision("https://vagas.exemplo.com/a.js", "script", guard)).toBe(
+      "continue",
+    );
+    expect(await requestDecision("http://redis:6379/", "fetch", guard)).toBe("abort");
+    expect(await requestDecision("https://cdn.exemplo.com/x.png", "image", guard)).toBe("abort");
+    expect(await requestDecision("https://cdn.exemplo.com/f.woff2", "font", guard)).toBe("abort");
+    expect(await requestDecision("file:///etc/passwd", "document", guard)).toBe("abort");
+    expect(await requestDecision("data:text/plain,oi", "other", guard)).toBe("continue");
+  });
+
+  it("botões de aceitar cookies em pt e en", () => {
+    for (const t of [
+      "Aceitar",
+      "Aceitar todos",
+      "Aceitar todos os cookies",
+      "Accept all",
+      "Accept cookies",
+      "Concordo",
+      "I agree",
+      "Allow all",
+      "Permitir todos",
+      "OK",
+      "Entendi",
+    ])
+      expect(COOKIE_ACCEPT.test(t), t).toBe(true);
+    for (const t of ["Recusar", "Configurar cookies", "Candidatar-se", "Reject all"])
+      expect(COOKIE_ACCEPT.test(t), t).toBe(false);
   });
 });
