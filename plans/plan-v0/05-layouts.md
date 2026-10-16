@@ -154,6 +154,8 @@ Selo por fato: ● verificado · ◐ extraído (não confirmado). Filtro "mostra
 
 ## L5 · Feature: Gerar CV
 
+> Atualizado na F05 (2026-10-16): não há tela "Gerar CV" com formulário. O CV do perfil fica em **Perfis › Currículo**, e o da vaga (com a carta) na **página da vaga**, pelo botão **Gerar** (CV · Cover letter). Cada documento é um painel com a prévia das páginas, Baixar PDF, Atualizar (com instruções), Editar, modelo e papel, versões com comparação, o alerta da revisão, a nota ATS, os links que faltam, o score por experiência e skill e o roteiro de entrevista. Sem DOCX. O esboço abaixo é o original; a referência é `tasks/F05-gerar-cv.md` §4.
+
 ```
 ┌─ Parâmetros ──────────────────┬─ Prévia ──────────────────────────────────┐
 │ Perfil: Eng. Software Sênior  │  (prévia renderizada do PDF, template aplicado) │

@@ -9,10 +9,10 @@ Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo
 | [F03-ingestao](F03-ingestao.md) | F3 | GitHub público e privado pelo `gh`, métricas, orçamento ligado ao plano, análise incremental e relatórios, segundo CV/texto com "já lido", reconciliação com conflitos, revisão anti-alucinação, notificações (LinkedIn adiado) | F01, F02 (clarificação entregue na F04) |
 | [F04-chat-recrutador](F04-chat-recrutador.md) | F4 | servidor MCP (`/mcp`), `plugin/`, chat web via Agent SDK (modo A), instalação no Claude Code (modo B), ingestão pela conversa, clarificação pós-ingestão, pesquisa em domínios confiáveis, observabilidade local (Phoenix) | F01, F02, F03 |
 | [F10-gestao-de-dados](F10-gestao-de-dados.md) | F6 | Meus dados completo, exportar/apagar, medidor de uso completo, limpar cache, Configurações, `doctor` | F01, F04 |
-| [F05-gerar-cv](F05-gerar-cv.md) | F5.1 | conteúdo pelo agente + layout no servidor com 3 templates e upload de template, PDF/DOCX, versões | F02, F04 |
+| [F05-gerar-cv](F05-gerar-cv.md) | F5.1 | CV por perfil e por vaga e carta de apresentação, em PDF revisado (Sonnet gera, Haiku revisa), 3 templates e upload de template, versões e edição (sem DOCX, F05-14) | F02, F04, F06 |
 | [F06-analisar-vaga](F06-analisar-vaga.md) | F5.2 | fit, lacunas, riscos, palavras-chave ATS, perguntas prováveis; ponte para CV e entrevista | F02, F04 |
 | [F07-candidaturas](F07-candidaturas.md) | F5.3 | kanban, agenda com link/`.ics`, integração opcional com o MCP oficial do Google Calendar | F04, F06 |
-| [F09-carta-e-linkedin](F09-carta-e-linkedin.md) | F5.5/5.6 | carta/mensagem por candidatura e otimização de LinkedIn | F05, F07 |
+| [F09-carta-e-linkedin](F09-carta-e-linkedin.md) | F5.5/5.6 | mensagem curta a recrutador e otimização de LinkedIn (a carta foi para a F05, F05-21) | F05, F07 |
 | [F08-entrevista-voz](F08-entrevista-voz.md) | F5.4 | entrevista mãos livres com Whisper local + TTS local (padrão de N provedores), só modo A | F04, F07 |
 | [F11-provider-codex](F11-provider-codex.md) | — | segundo provider (Codex) nos modos A e B; exige verificação documental antes de implementar | F04, F10 |
 

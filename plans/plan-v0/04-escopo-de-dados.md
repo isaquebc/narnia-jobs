@@ -116,6 +116,7 @@ Finalidade: o agente e as features leem o registro em vez de abrir o arquivo; o 
 | Entidade | Campos principais |
 |----------|-------------------|
 | Candidatura | perfil, empresa, cargo, URL/descrição da vaga, origem, status, datas de cada etapa (UTC), contatos, notas, documentos gerados |
+| Documento (F05) | CV ou carta por perfil e, opcionalmente, vaga; versões com o conteúdo (JSON, a verdade), o modelo, o papel, o idioma, o estado da geração e da revisão, a nota ATS, a validade (fatos, perfil, vaga) e o caminho do PDF derivado; templates enviados pela pessoa (`.zip`) |
 | Evento de calendário | candidatura, etapa (entrevista, prova, retorno), data/hora, fuso, link da chamada, `google_event_id` quando sincronizado, ou `.ics` gerado |
 | Documento gerado | tipo (CV, carta, mensagem), perfil, candidatura (opcional), versão, conteúdo Markdown, parâmetros usados, tokens gastos |
 | Vaga (F06) | contratante, cliente, cargo, role, senioridade, local, modelo, contratação, moeda e faixa, benefícios, responsabilidades, skills obrigatórias e diferenciais, resumo da empresa, links, descrição, data de publicação, origem de cada campo, pré-análise, duplicata; contatos e notas (edição do recrutador em nota do usuário espera confirmação) |

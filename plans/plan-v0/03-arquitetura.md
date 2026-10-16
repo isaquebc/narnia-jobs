@@ -39,7 +39,7 @@ Vários containers (decisão de 2026-10-07), um núcleo:
 - **worker** (um ou mais): processadores **BullMQ** para ingestão, OCR, extração pelo modelo, clarificação, geração de CV e demais jobs; mesma imagem da api, comando diferente; escala por tipo de fila.
 - **web**: a SPA buildada servida por nginx (em desenvolvimento, Vite com hot reload em container próprio).
 - **redis**: filas BullMQ, eventos de progresso (pub/sub) e locks.
-- serviços futuros por task: `ocr` dedicado se Tesseract pesar, `whisper` (F08), `renderer` com Chromium (F05).
+- serviços futuros por task: `ocr` dedicado se Tesseract pesar, `whisper` (F08). O Chromium da F05 é o serviço `browser` da F06 (rede só com o api e o worker), sem `renderer` separado.
 - **narnia-core**: biblioteca compartilhada (domínio, storage, ingestão determinística, geração de documentos).
 - **plugin/**: pasta instalada no host (modo B) e carregada pelo SDK dentro da api (modo A); seu `.mcp.json` aponta para a URL acima.
 
@@ -272,6 +272,8 @@ no boot do worker: jobs ativos órfãos são retomados pela própria BullMQ (sta
 | Conteúdo | o agente gera o **conteúdo** (JSON no schema do CV: resumo, experiências selecionadas, bullets reescritos) e o servidor faz o **layout**. Separar os dois evita tokens gastos com formatação e garante consistência visual |
 | Saída | `document_version` com PDF, DOCX, JSON de conteúdo, template e parâmetros; prévia em PNG para a UI |
 | Imagem Docker | adiciona Chromium (~300 MB); alternativa menor avaliada e descartada por ora: Typst (binário pequeno, ótimo para CV, mas o usuário teria de escrever templates em Typst) |
+
+**Como ficou (F05, 2026-10-16):** sem DOCX (F05-14) e sem React no servidor: os templates padrão são funções que montam HTML com escape automático, em uma coluna (Clássico, Moderno, Compacto), com as fontes OFL inline. O PDF sai do serviço `browser` (o mesmo da F06) por `page.setContent` com toda a rede bloqueada; o worker entrou na rede `browser`. O conteúdo é gerado em duas partes: o código monta um resumo com os fatos já filtrados e com score de match, o Sonnet escreve só os textos e a origem de cada um, e o código preenche cabeçalho, empresas e datas e confere tudo. Depois, checagens por código (páginas, fonte, margem, sobreposição, links, ATS) e um revisor Haiku que lê as páginas em PNG pela tool `Read`. Templates do usuário em Handlebars, guardados só como `.zip`, com sandbox (JavaScript desligado, rede bloqueada, `sanitize-html`). Detalhes em `tasks/F05-gerar-cv.md` §2.
 
 ## 15 · Medidor de uso e "limpar cache"
 
