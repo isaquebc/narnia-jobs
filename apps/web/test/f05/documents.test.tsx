@@ -434,3 +434,112 @@ describe("F05/M5 · bandeja", () => {
     expect(tray).toHaveTextContent("Não passou na revisão: Carta · Initech");
   });
 });
+
+describe("F05/M6 · edição na tela, modelo e papel, comparação de versões", () => {
+  const templates = async () => ({
+    templates: [
+      { id: "classico", name: "Clássico", origin: "builtin" as const, status: "valid" },
+      { id: "moderno", name: "Moderno", origin: "builtin" as const, status: "valid" },
+    ],
+  });
+
+  it("Editar: muda o resumo, tira uma seção e salva com a versão base", async () => {
+    const editDocument = vi.fn(async () => ready());
+    renderApp({
+      api: api({
+        editDocument,
+        listCvTemplates: templates,
+        listDocuments: vi.fn(async () => ({ documents: [ready()] })),
+      }) as never,
+      initialUrl: "/perfis/p1/curriculo",
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar: Currículo" });
+    const summary = within(dialog).getByRole("textbox", { name: "Resumo" });
+    await userEvent.clear(summary);
+    await userEvent.type(summary, "Resumo novo.");
+    await userEvent.click(within(dialog).getByLabelText("Incluir Experiência"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar e montar de novo" }));
+    await waitFor(() => expect(editDocument).toHaveBeenCalledTimes(1));
+    const [id, body] = editDocument.mock.calls[0] as unknown as [
+      string,
+      { baseVersion: number; cv: { summary: string; sectionsOrder: string[] } },
+    ];
+    expect(id).toBe("d1");
+    expect(body.baseVersion).toBe(1);
+    expect(body.cv.summary).toBe("Resumo novo.");
+    expect(body.cv.sectionsOrder).toEqual(["summary"]);
+  });
+
+  it("trocar o modelo e o papel monta de novo sem gerar", async () => {
+    const changeDocumentLayout = vi.fn(async () => ready());
+    renderApp({
+      api: api({
+        changeDocumentLayout,
+        listCvTemplates: templates,
+        listDocuments: vi.fn(async () => ({ documents: [ready()] })),
+      }) as never,
+      initialUrl: "/perfis/p1/curriculo",
+    });
+    const tpl = await screen.findByLabelText("Modelo");
+    await waitFor(() =>
+      expect(within(tpl).getByRole("option", { name: "Moderno" })).toBeInTheDocument(),
+    );
+    await userEvent.selectOptions(tpl, "moderno");
+    expect(changeDocumentLayout).toHaveBeenCalledWith("d1", { templateId: "moderno" });
+    await userEvent.selectOptions(screen.getByLabelText("Papel"), "Letter");
+    expect(changeDocumentLayout).toHaveBeenCalledWith("d1", { paper: "Letter" });
+  });
+
+  it("versões: origem de cada uma e 'Comparar com a anterior' mostra o diff", async () => {
+    const documentDiff = vi.fn(async () => ({
+      lines: [
+        { op: "=" as const, text: "Eng" },
+        { op: "-" as const, text: "Resumo." },
+        { op: "+" as const, text: "Resumo novo." },
+      ],
+    }));
+    const two = ready(
+      {
+        document: { ...ready().document, currentVersion: 2 },
+        versions: [
+          {
+            id: "v2",
+            version: 2,
+            status: "ready",
+            source: "edit",
+            atsScore: 94,
+            pagesRendered: 2,
+            createdAt: "2026-10-16T13:00:00Z",
+            passed: true,
+          },
+          {
+            id: "v1",
+            version: 1,
+            status: "ready",
+            source: "agent",
+            atsScore: 94,
+            pagesRendered: 2,
+            createdAt: "2026-10-16T12:00:00Z",
+            passed: true,
+          },
+        ],
+      },
+      { version: 2 },
+    );
+    renderApp({
+      api: api({
+        documentDiff,
+        listCvTemplates: templates,
+        listDocuments: vi.fn(async () => ({ documents: [two] })),
+      }) as never,
+      initialUrl: "/perfis/p1/curriculo",
+    });
+    await userEvent.click(await screen.findByText("Versões"));
+    expect(screen.getByText(/v2 · .* · editada/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Comparar com a anterior" }));
+    const dialog = await screen.findByRole("dialog", { name: "v1 → v2" });
+    expect(documentDiff).toHaveBeenCalledWith("d1", 1, 2);
+    expect(await within(dialog).findByText(/\+ Resumo novo\./)).toBeInTheDocument();
+  });
+});

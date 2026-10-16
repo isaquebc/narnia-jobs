@@ -239,3 +239,129 @@ describe("F05/M5 · ênfase por conquista (F02-3, §2.9)", () => {
     );
   });
 });
+
+describe("F05/M6 · edição, troca de modelo e comparação de versões", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  async function readyCv() {
+    const ids = seedFixture(t.repos, "engineer");
+    const r = (await (
+      await t.api("/api/documents", json({ kind: "cv", profileId: ids.profileId }))
+    ).json()) as {
+      documents: Array<{ document: { id: string }; current: { id: string } }>;
+    };
+    const { document, current } = r.documents[0] as (typeof r.documents)[number];
+    const content = {
+      meta: {
+        kind: "cv",
+        locale: "pt-BR",
+        paper: "A4",
+        profileId: ids.profileId,
+        postingId: null,
+        generatedAt: "2026-10-16T12:00:00Z",
+      },
+      header: {
+        name: "Ana",
+        title: "Engenheira",
+        location: null,
+        email: null,
+        phone: null,
+        links: [],
+      },
+      summary: "Resumo original.",
+      experiences: [],
+      skills: [],
+      projects: [],
+      education: [],
+      languages: [],
+      adjacent: [],
+      sectionsOrder: ["summary"],
+      omitted: [],
+      provenance: { factIdsUsed: [], unverifiedFactIds: [] },
+    };
+    t.repos.documents.updateVersion(current.id, { status: "ready", content });
+    return { ids, id: document.id };
+  }
+
+  it("PUT content: versão 2 com o conteúdo editado e cv.render; versão velha dá 409", async () => {
+    t = makeTestApp();
+    const { id } = await readyCv();
+    const draft = {
+      headline: "Engenheira",
+      summary: "Resumo editado.",
+      experiences: [],
+      education: [],
+      skills: [],
+      projects: [],
+      adjacent: [],
+      sectionsOrder: ["summary"],
+    };
+    const r = await t.api(
+      `/api/documents/${id}/content`,
+      json({ baseVersion: 1, cv: draft }, "PUT"),
+    );
+    expect(r.status).toBe(202);
+    expect(
+      ((await r.json()) as { current: { version: number; source: string } }).current,
+    ).toMatchObject({ version: 2, source: "edit" });
+    expect(t.queue.tasks.at(-1)).toMatchObject({
+      type: "cv.render",
+      payload: { cv: { summary: "Resumo editado." } },
+    });
+    t.repos.documents.updateVersion(t.repos.documents.currentVersion(id)?.id as string, {
+      status: "ready",
+    });
+    expect(
+      (await t.api(`/api/documents/${id}/content`, json({ baseVersion: 1, cv: draft }, "PUT")))
+        .status,
+    ).toBe(409);
+  });
+
+  it("PATCH modelo e papel: re-render sem o gerador; modelo desconhecido 404; lista de modelos", async () => {
+    t = makeTestApp();
+    const { id } = await readyCv();
+    const r = await t.api(
+      `/api/documents/${id}`,
+      json({ templateId: "compacto", paper: "Letter" }, "PATCH"),
+    );
+    expect(r.status).toBe(202);
+    expect(
+      ((await r.json()) as { document: { templateId: string; paper: string } }).document,
+    ).toMatchObject({ templateId: "compacto", paper: "Letter" });
+    expect(t.queue.tasks.at(-1)).toMatchObject({ type: "cv.render" });
+    t.repos.documents.updateVersion(t.repos.documents.currentVersion(id)?.id as string, {
+      status: "ready",
+    });
+    expect(
+      (await t.api(`/api/documents/${id}`, json({ templateId: "nao-existe" }, "PATCH"))).status,
+    ).toBe(404);
+    const list = (await (await t.api("/api/cv-templates")).json()) as {
+      templates: Array<{ id: string; name: string; origin: string }>;
+    };
+    expect(list.templates.map((x) => x.id)).toEqual(["classico", "moderno", "compacto"]);
+  });
+
+  it("diff entre versões: linhas que saíram e entraram", async () => {
+    t = makeTestApp();
+    const { id } = await readyCv();
+    const v1 = t.repos.documents.getVersion(id, 1);
+    const v2 = t.repos.documents.addVersion(id, {
+      source: "edit",
+      instructions: null,
+      factsVersion: 0,
+      postingUpdatedAt: null,
+      profileHash: "h",
+    });
+    t.repos.documents.updateVersion(v2.id, {
+      status: "ready",
+      content: { ...(v1?.content as object), summary: "Resumo novo." },
+    });
+    const d = (await (await t.api(`/api/documents/${id}/diff?from=1&to=2`)).json()) as {
+      lines: Array<{ op: string; text: string }>;
+    };
+    expect(d.lines).toContainEqual({ op: "-", text: "Resumo original." });
+    expect(d.lines).toContainEqual({ op: "+", text: "Resumo novo." });
+    expect((await t.api(`/api/documents/${id}/diff?from=1&to=9`)).status).toBe(404);
+  });
+});

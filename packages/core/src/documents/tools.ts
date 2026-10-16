@@ -9,16 +9,14 @@ import {
 import type { z } from "zod";
 import type { Repos } from "../db";
 import type { DocumentRecord } from "../db/repos/documents";
-import { profileHash } from "./brief";
+import { contentToDraft, DocumentEditError, editDocument } from "./edit";
 import { documentUrl } from "./notify";
 import {
   DocumentRequestError,
   documentStale,
   type EnqueueDocumentTask,
-  isVersionActive,
   requestDocument,
 } from "./request";
-import { DOCUMENT_TASKS } from "./tasks";
 
 /**
  * Handlers das tools do CV (F05 §2.8). `cv.generate` usa o mesmo pedido do botão; idioma não coberto não é erro: volta
@@ -58,31 +56,10 @@ function line(repos: Repos, doc: DocumentRecord) {
 }
 
 /** Conteúdo montado → o formato que o recrutador edita (o mesmo do gerador). */
-export function contentToCvDraft(c: CvContent): CvDraft {
-  return {
-    headline: c.header.title,
-    summary: c.summary,
-    experiences: c.experiences.map((e) => ({
-      factId: e.factId,
-      title: e.title,
-      location: e.location,
-      bullets: e.bullets,
-      tech: e.tech,
-    })),
-    education: c.education.map((e) => ({ factId: e.factId, course: e.course, degree: e.degree })),
-    skills: c.skills.map((g) => ({
-      label: g.label,
-      items: g.items.map((i) => ({ name: i.name, factIds: i.factIds })),
-    })),
-    projects: c.projects.map((p) => ({ factId: p.factId, description: p.description ?? p.name })),
-    adjacent: c.adjacent,
-    sectionsOrder: c.sectionsOrder,
-  };
-}
-
-export function contentToLetterDraft(c: CoverLetterContent): CoverLetterDraft {
-  return { greeting: c.greeting, paragraphs: c.paragraphs };
-}
+export const contentToCvDraft = (c: CvContent): CvDraft =>
+  (contentToDraft(c) as { cv: CvDraft }).cv;
+export const contentToLetterDraft = (c: CoverLetterContent): CoverLetterDraft =>
+  (contentToDraft(c) as { letter: CoverLetterDraft }).letter;
 
 export function createCvTools(repos: Repos, ctx: { ports: CvToolPorts }): CvToolHandlers {
   const wrap = <N extends CvToolName>(
@@ -169,41 +146,24 @@ export function createCvTools(repos: Repos, ctx: { ports: CvToolPorts }): CvTool
       };
     }),
     "cv.edit": wrap("cv.edit", async (i) => {
-      const doc = must(i.documentId);
-      const current = repos.documents.currentVersion(doc.id);
-      if (current && isVersionActive(current))
-        throw new CvToolError("busy", "Este documento está sendo gerado agora; espere terminar.");
-      if (doc.currentVersion !== i.baseVersion)
-        throw new CvToolError(
-          "conflict",
-          `A versão atual é a ${doc.currentVersion}, não a ${i.baseVersion}: leia de novo com cv.get antes de alterar.`,
-        );
-      const draft =
-        doc.kind === "cv" ? (i.cv ? { cv: i.cv } : null) : i.letter ? { letter: i.letter } : null;
-      if (!draft)
-        throw new CvToolError(
-          "missing_content",
-          doc.kind === "cv" ? "Mande o CV em `cv`." : "Mande a carta em `letter`.",
-        );
-      const profile = repos.profiles.get(doc.profileId);
-      const posting = doc.postingId ? repos.postings.get(doc.postingId) : null;
-      const version = repos.documents.addVersion(doc.id, {
-        source: "recruiter",
-        instructions: null,
-        factsVersion: repos.settings.getFactsVersion(),
-        postingUpdatedAt: posting?.contentUpdatedAt ?? null,
-        profileHash: profile
-          ? profileHash(profile, repos.emphasis.list(profile.id))
-          : (current?.profileHash ?? ""),
-      });
-      await ctx.ports.enqueue({
-        queue: "extract",
-        type: DOCUMENT_TASKS.render,
-        key: doc.id,
-        payload: { documentId: doc.id, versionId: version.id, ...draft },
-        profileId: doc.profileId,
-      });
-      const updated = repos.documents.get(doc.id) as DocumentRecord;
+      must(i.documentId);
+      try {
+        await editDocument(repos, ctx.ports.enqueue, {
+          documentId: i.documentId,
+          baseVersion: i.baseVersion,
+          cv: i.cv,
+          letter: i.letter,
+          source: "recruiter",
+        });
+      } catch (e) {
+        if (e instanceof DocumentEditError)
+          throw new CvToolError(
+            e.code,
+            e.code === "conflict" ? `${e.message} Leia de novo com cv.get.` : e.message,
+          );
+        throw e;
+      }
+      const updated = repos.documents.get(i.documentId) as DocumentRecord;
       ctx.ports.changed?.(updated, "queued");
       return line(repos, updated);
     }),

@@ -19,7 +19,10 @@ test("F06/E2E-02 vaga pela página: colar, extrair, ver a origem de cada campo, 
   await expect(form.getByText("heurística + modelo").first()).toBeVisible();
   await expect(page.getByText(/Cobertura dos obrigatórios/)).toBeVisible();
   // F05: o "Criar CV" virou o menu "Gerar" (CV · Cover letter)
-  await expect(page.getByRole("button", { name: "Gerar" })).toHaveAttribute("aria-haspopup", "menu");
+  await expect(page.getByRole("button", { name: "Gerar" })).toHaveAttribute(
+    "aria-haspopup",
+    "menu",
+  );
   // edição: cliente e JD
   const client = form.getByLabel("Empresa cliente (onde vai trabalhar)");
   await client.fill("Initech Brasil");

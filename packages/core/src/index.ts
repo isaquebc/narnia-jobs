@@ -11,6 +11,7 @@ export * from "./documents/ats";
 export * from "./documents/brief";
 export * from "./documents/browser";
 export * from "./documents/checks";
+export * from "./documents/edit";
 export * from "./documents/header";
 export * from "./documents/inspect";
 export * from "./documents/labels";

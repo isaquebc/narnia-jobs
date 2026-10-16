@@ -1,5 +1,5 @@
-import type { CvContent, CvLinkKind } from "@narnia-jobs/shared";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { CoverLetterFormat, CvContent, CvLinkKind, Paper } from "@narnia-jobs/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useId, useState } from "react";
 import { useApi, useTimezone } from "../../app/context";
 import { Alert } from "../../components/ui/alert";
@@ -8,11 +8,12 @@ import { Button, buttonClass } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { CopyButton } from "../../components/ui/copy-button";
 import { Dialog } from "../../components/ui/dialog";
-import { Input, Textarea } from "../../components/ui/input";
+import { Input, Select, Textarea } from "../../components/ui/input";
 import { documentKeys, isDocumentActive } from "../../hooks/useDocuments";
 import { type TKey, t } from "../../i18n";
 import type { DocumentView } from "../../lib/api";
 import { formatDate } from "../../lib/format";
+import { ContentEditor } from "./ContentEditor";
 
 /**
  * Painel de um CV ou carta (F05 §4): etapa enquanto gera, prévia das páginas, "Baixar PDF", "Atualizar" com instruções,
@@ -30,6 +31,8 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
   const qc = useQueryClient();
   const tz = useTimezone();
   const [updating, setUpdating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [comparing, setComparing] = useState<number | null>(null);
   const { document: doc, current } = view;
   const kindLabel = t(`documents.kinds.${doc.kind}` as TKey);
   const active = isDocumentActive(current?.status);
@@ -93,6 +96,11 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
               {t("documents.download")}
             </a>
           ) : null}
+          {current?.content && !active ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+              {t("documents.edit")}
+            </Button>
+          ) : null}
           <Button type="button" size="sm" disabled={active} onClick={() => setUpdating(true)}>
             {t("documents.update")}
           </Button>
@@ -107,6 +115,7 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
         </div>
       </div>
 
+      {current?.content && !active ? <LayoutControls view={view} /> : null}
       {current?.status === "error" ? (
         <Alert tone="danger" role="alert">
           <strong>{t("documents.errorTitle")}:</strong> {current.error}
@@ -174,7 +183,8 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
             {view.versions.map((v) => (
               <li key={v.id} className="flex flex-wrap items-center gap-2">
                 <span>
-                  {t("documents.versionLine", { n: v.version, date: formatDate(v.createdAt, tz) })}
+                  {t("documents.versionLine", { n: v.version, date: formatDate(v.createdAt, tz) })}{" "}
+                  · {t(`documents.sourceLabels.${v.source}` as TKey)}
                 </span>
                 <Badge tone={v.passed ? "ok" : v.passed === false ? "warn" : "neutral"}>
                   {t(`documents.status.${v.status}` as TKey)}
@@ -184,6 +194,15 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
                     PDF
                   </a>
                 ) : null}
+                {v.version > 1 ? (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => setComparing(v.version)}
+                  >
+                    {t("documents.compare")}
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -191,7 +210,121 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
       ) : null}
 
       <UpdateDialog view={view} open={updating} onOpenChange={setUpdating} />
+      {editing ? <ContentEditor view={view} open onOpenChange={setEditing} /> : null}
+      {comparing ? (
+        <DiffDialog documentId={doc.id} to={comparing} onClose={() => setComparing(null)} />
+      ) : null}
     </Card>
+  );
+}
+
+function LayoutControls({ view }: { view: DocumentView }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const ids = useId();
+  const templates = useQuery({ queryKey: ["cv-templates"], queryFn: () => api.listCvTemplates() });
+  const change = useMutation({
+    mutationFn: (body: { templateId?: string; paper?: Paper; format?: CoverLetterFormat }) =>
+      api.changeDocumentLayout(view.document.id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: documentKeys.all }),
+  });
+  const doc = view.document;
+  return (
+    <div className="flex flex-wrap items-end gap-3 text-sm">
+      {doc.kind === "cv" || doc.format === "pdf" ? (
+        <>
+          <label className="flex flex-col gap-1" htmlFor={`${ids}-template`}>
+            {t("documents.template")}
+            <Select
+              id={`${ids}-template`}
+              className="h-8 w-40"
+              value={doc.templateId}
+              disabled={change.isPending}
+              onChange={(e) => change.mutate({ templateId: e.target.value })}
+            >
+              {(templates.data?.templates ?? [{ id: doc.templateId, name: doc.templateId }]).map(
+                (tp) => (
+                  <option key={tp.id} value={tp.id}>
+                    {tp.name}
+                  </option>
+                ),
+              )}
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1" htmlFor={`${ids}-paper`}>
+            {t("documents.paper")}
+            <Select
+              id={`${ids}-paper`}
+              className="h-8 w-28"
+              value={doc.paper}
+              disabled={change.isPending}
+              onChange={(e) => change.mutate({ paper: e.target.value as Paper })}
+            >
+              <option value="A4">A4</option>
+              <option value="Letter">Letter</option>
+            </Select>
+          </label>
+        </>
+      ) : null}
+      {doc.kind === "cover_letter" ? (
+        <label className="flex flex-col gap-1" htmlFor={`${ids}-format`}>
+          {t("documents.format")}
+          <Select
+            id={`${ids}-format`}
+            className="h-8 w-48"
+            value={doc.format}
+            disabled={change.isPending}
+            onChange={(e) => change.mutate({ format: e.target.value as CoverLetterFormat })}
+          >
+            <option value="pdf">{t("documents.formats.pdf")}</option>
+            <option value="text">{t("documents.formats.text")}</option>
+          </Select>
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
+function DiffDialog({
+  documentId,
+  to,
+  onClose,
+}: {
+  documentId: string;
+  to: number;
+  onClose: () => void;
+}) {
+  const api = useApi();
+  const diff = useQuery({
+    queryKey: ["documents", "diff", documentId, to],
+    queryFn: () => api.documentDiff(documentId, to - 1, to),
+  });
+  const lines = (diff.data?.lines ?? []).map((l, i) => ({ ...l, at: i }));
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => (o ? null : onClose())}
+      wide
+      title={t("documents.compareTitle", { from: to - 1, to })}
+    >
+      <ul className="flex flex-col gap-0.5 font-mono text-xs" aria-label={t("documents.compare")}>
+        {lines.map((l) => (
+          <li
+            key={`${l.at}-${l.op}`}
+            className={
+              l.op === "+"
+                ? "bg-ok/15"
+                : l.op === "-"
+                  ? "bg-danger/15 line-through"
+                  : "text-muted-fg"
+            }
+          >
+            {l.op === "=" ? "  " : `${l.op} `}
+            {l.text}
+          </li>
+        ))}
+      </ul>
+    </Dialog>
   );
 }
 

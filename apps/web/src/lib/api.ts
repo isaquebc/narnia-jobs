@@ -9,8 +9,10 @@ import type {
   ChatSession,
   ChatSettingsDto,
   CoverLetterContent,
+  CoverLetterDraft,
   CoverLetterFormat,
   CvContent,
+  CvDraft,
   CvLinkKind,
   CvLocale,
   CvReview,
@@ -577,6 +579,30 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       id: string,
       body: { instructions?: string | null; acceptLanguage?: boolean },
     ) => request<DocumentView>(`/api/documents/${encodeURIComponent(id)}/regenerate`, json(body)),
+    editDocument: (
+      id: string,
+      body: { baseVersion: number; cv?: CvDraft; letter?: CoverLetterDraft },
+    ) =>
+      request<DocumentView>(`/api/documents/${encodeURIComponent(id)}/content`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    changeDocumentLayout: (
+      id: string,
+      body: { templateId?: string; paper?: Paper; format?: CoverLetterFormat },
+    ) =>
+      request<DocumentView>(`/api/documents/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    documentDiff: (id: string, from: number, to: number) =>
+      request<{ lines: Array<{ op: "=" | "+" | "-"; text: string }> }>(
+        `/api/documents/${encodeURIComponent(id)}/diff?from=${from}&to=${to}`,
+      ),
+    listCvTemplates: () =>
+      request<{
+        templates: Array<{ id: string; name: string; origin: "builtin" | "user"; status: string }>;
+      }>("/api/cv-templates"),
     deleteDocument: (id: string) =>
       request<null>(`/api/documents/${encodeURIComponent(id)}`, { method: "DELETE" }),
     /** Endereços para `<a download>` e `<img>`: a sessão vai pelo cookie (mesma origem). */

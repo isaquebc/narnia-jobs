@@ -1,14 +1,29 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
+  BUILTIN_TEMPLATES,
+  changeDocumentLayout,
+  DocumentEditError,
+  type DocumentRecord,
   DocumentRequestError,
   type DocumentView,
+  documentDiff,
   documentView,
+  editDocument,
   type Repos,
   type RequestDocumentInput,
   requestDocument,
 } from "@narnia-jobs/core";
-import { CoverLetterFormatSchema, DocumentKindSchema, IdSchema } from "@narnia-jobs/shared";
+import {
+  type CoverLetterContent,
+  CoverLetterDraftSchema,
+  CoverLetterFormatSchema,
+  type CvContent,
+  CvDraftSchema,
+  DocumentKindSchema,
+  IdSchema,
+  PaperSchema,
+} from "@narnia-jobs/shared";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -34,6 +49,31 @@ const GenerateSchema = z.object({
   /** CV da vaga com a carta junto (F05-21). */
   withCoverLetter: z.boolean().optional(),
 });
+const EditSchema = z.object({
+  baseVersion: z.number().int().min(1),
+  cv: CvDraftSchema.optional(),
+  letter: CoverLetterDraftSchema.optional(),
+});
+const LayoutSchema = z
+  .object({
+    templateId: z.string().min(1).max(64).optional(),
+    paper: PaperSchema.optional(),
+    format: CoverLetterFormatSchema.optional(),
+  })
+  .refine((v) => v.templateId || v.paper || v.format, "Informe o modelo, o papel ou o formato.");
+
+const EDIT_STATUS: Record<DocumentEditError["code"], ContentfulStatusCode> = {
+  document_not_found: 404,
+  template_not_found: 404,
+  conflict: 409,
+  busy: 409,
+  missing_content: 400,
+};
+function editErrorResponse(c: Context, e: unknown) {
+  if (e instanceof DocumentEditError) return apiError(c, EDIT_STATUS[e.code], e.code, e.message);
+  throw e;
+}
+
 const RegenerateSchema = z.object({
   instructions: z.string().max(2000).nullable().optional(),
   acceptLanguage: z.boolean().optional(),
@@ -170,6 +210,62 @@ export function documentsRoutes(deps: {
       return requestErrorResponse(c, e);
     }
   });
+
+  // M6: edição na tela (nova versão por cv.render, sem o gerador)
+  app.put("/api/documents/:id/content", validate("json", EditSchema), async (c) => {
+    const body = c.req.valid("json");
+    try {
+      await editDocument(repos, enqueue, {
+        documentId: c.req.param("id"),
+        ...body,
+        source: "edit",
+      });
+    } catch (e) {
+      return editErrorResponse(c, e);
+    }
+    const view = documentView(repos, repos.documents.get(c.req.param("id")) as DocumentRecord);
+    announce(view);
+    return c.json(view, 202);
+  });
+
+  // M6: trocar modelo, papel ou formato da carta (re-render do conteúdo atual, sem tokens do gerador)
+  app.patch("/api/documents/:id", validate("json", LayoutSchema), async (c) => {
+    try {
+      await changeDocumentLayout(repos, enqueue, {
+        documentId: c.req.param("id"),
+        ...c.req.valid("json"),
+      });
+    } catch (e) {
+      return editErrorResponse(c, e);
+    }
+    const view = documentView(repos, repos.documents.get(c.req.param("id")) as DocumentRecord);
+    announce(view);
+    return c.json(view, 202);
+  });
+
+  // M6: comparar versões (F05-9, diff de texto)
+  app.get("/api/documents/:id/diff", (c) => {
+    const doc = repos.documents.get(c.req.param("id"));
+    const from = doc ? repos.documents.getVersion(doc.id, Number(c.req.query("from"))) : null;
+    const to = doc ? repos.documents.getVersion(doc.id, Number(c.req.query("to"))) : null;
+    if (!from?.content || !to?.content) return notFound(c);
+    return c.json({
+      lines: documentDiff(
+        from.content as CvContent | CoverLetterContent,
+        to.content as CvContent | CoverLetterContent,
+      ),
+    });
+  });
+
+  app.get("/api/cv-templates", (c) =>
+    c.json({
+      templates: BUILTIN_TEMPLATES.map((t) => ({
+        ...t,
+        origin: "builtin" as const,
+        status: "valid" as const,
+      })),
+    }),
+  );
 
   app.get("/api/documents/:id/versions/:n", (c) => {
     const found = versionOf(c);
