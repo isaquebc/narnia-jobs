@@ -2,7 +2,7 @@
 
 Entregável 5 do plan-v0. Cobre a feature **#1** de `../02-fluxos-do-usuario.md §F5` e a arquitetura de `../03-arquitetura.md §14`: o agente gera o **conteúdo** do currículo em JSON, o servidor faz o **layout** a partir de templates e entrega PDF com bom padrão visual. É a peça fundamental do sistema (decisão 7 de `../06-decisoes-em-aberto.md`).
 
-Status: **em escopo, replanejada pelo dono em 2026-10-15** (requisitos em §1.1, revisão contra o código em §2.0, decisões novas F05-10 a F05-23 em §5). Nada implementado. Plano reescrito em 2026-10-16 depois da última revisão contra o código (§2 a §7); só F05-23 em aberto.
+Status: **em escopo, replanejada pelo dono em 2026-10-15** (requisitos em §1.1, revisão contra o código em §2.0, decisões novas F05-10 a F05-23 em §5). Nada implementado. Plano reescrito em 2026-10-16 depois da última revisão contra o código (§2 a §7); todas as decisões fechadas; M1 em andamento.
 
 > O texto original (2026-10-07 e 2026-10-11) fica como referência. Onde ele conflita com §1.1, §1.2 e §2.0, valem estas seções.
 
@@ -131,7 +131,7 @@ edição inline / cv.edit / troca de template: nova versão a partir de validati
 ### 2.4 Links (F05-19)
 - Cabeçalho: e-mail (`mailto:`), WhatsApp (`https://wa.me/<E.164 só dígitos>`), LinkedIn e GitHub (reconhecidos pelo domínio em `user.links`; GitHub cai para o `owner` dos repositórios ingeridos), portfólio (link com rótulo de portfólio ou o primeiro link restante).
 - Link ausente não entra; a tela avisa qual falta, com atalho para cadastrar.
-- Checagem (código): o link do PDF (anotações do PDF por `unpdf`) bate com os dados; `mailto:` com e-mail válido; WhatsApp com telefone válido (`libphonenumber-js`); http(s) responde (HEAD, e GET se o HEAD for recusado, timeout de 8 s, anti-SSRF a cada redirecionamento). Resposta 999/403 de sites que bloqueiam robôs (LinkedIn) segue a regra de F05-23.
+- Checagem (código): o link do PDF (anotações do PDF por `unpdf`) bate com os dados; `mailto:` com e-mail válido; WhatsApp com telefone válido (`libphonenumber-js`); http(s) responde (HEAD, e GET se o HEAD for recusado, timeout de 8 s, anti-SSRF a cada redirecionamento). Regra de F05-23: domínio que resolve e resposta diferente de 404 = funciona (inclui 999/403 de sites que bloqueiam robôs, como o LinkedIn).
 
 ### 2.5 ATS (F05-20)
 - Leitura (30%): texto extraído do PDF na ordem, títulos de seção reconhecíveis no idioma, contato encontrado, nenhum texto só em imagem, datas num formato padrão.
@@ -252,7 +252,7 @@ F05-2 fechada pelo código; F05-6 sai com F05-14; F05-7 fecha com F05-13; F05-1,
 | F05-20 | Aderência a ATS (mínimo 90%, F05-13) | termos da vaga sobre todos os pedidos · só sobre os que têm evidência | **Fechada (dono, 2026-10-16): o CV nunca mente; tudo bate com os dados da pessoa.** Nota = leitura do PDF (30%: texto extraível na ordem, títulos de seção reconhecíveis, contato, sem texto em imagem nem tabela que embaralha, datas padrão) + termos da vaga (70%: exigidos pesam mais), contados **só sobre os termos com evidência** nos dados. Lacunas reais não derrubam a nota e aparecem num aviso separado. **Experiência adjacente vale:** se a vaga pede um termo que a pessoa não tem (ex.: Kubernetes) e ela tem um próximo com evidência (ex.: Docker), o CV destaca o próximo com o nome verdadeiro, sem nunca escrever o termo que falta; o revisor reprova qualquer termo da vaga sem evidência |
 | F05-21 | Carta de apresentação / cover letter | — | **Requisito do dono (2026-10-16): opcional.** Pode ser gerada **junto com o CV da vaga** (opção "gerar carta junto") ou **sozinha**. Na página da vaga, o botão "Criar CV" vira um botão **"Gerar"** com menu: **CV** ou **Cover letter**. Fala do que a vaga exige, do que a pessoa cobre (com evidência) e do que não cobre, mostrando abertura para aprender o que falta (contratação com 100% de aderência é rara). Mesma regra do CV: nada inventado, adjacências com o nome verdadeiro. A carta sai da F09 e entra aqui (F09 fica com LinkedIn e mensagem curta a recrutador) |
 | F05-22 | Detalhes da carta | — | **Fechada (dono, 2026-10-16).** Dois formatos: **texto livre** (para colar em e-mail ou formulário, com botão copiar) ou **PDF** (mesmo visual e cabeçalho do CV, com os links), à escolha da pessoa. **Idioma sempre o da vaga.** Revisão no mesmo ciclo do CV (Haiku: fatos, invenção, links e, no PDF, layout; uma regeração automática; reprovou de novo → alerta e novas tentativas pelo botão; sem nota de ATS). Versões e validade como o CV. Estrutura proposta e não contestada: 250 a 400 palavras em quatro blocos (por que a vaga; o que cobre com 2 ou 3 destaques; as 2 ou 3 lacunas principais com a adjacência e a abertura para aprender; fechamento). O recrutador gera e altera a carta pelo chat, como o CV |
-| F05-23 | Link que bloqueia robôs | reprovar · aviso sem reprovar | **Em aberto.** O LinkedIn responde 999 (ou 403) a qualquer acesso automático, mesmo com o perfil existindo; "o link funciona" não é verificável por robô ali. Proposta: link vindo dos dados, com formato válido (`linkedin.com/in/<id>`) e resposta 999/403 de domínio conhecido por bloquear robôs = **"existe, não verificável automaticamente"** (aviso na tela, não reprova); 404, DNS ou timeout reprovam |
+| F05-23 | Link que bloqueia robôs | reprovar · aviso sem reprovar | **Fechada (dono, 2026-10-16): domínio existe (DNS resolve) e a página não responde 404 = o link funciona.** Vale para os sites que bloqueiam robôs (LinkedIn responde 999/403 mesmo com o perfil existindo): status de bloqueio, ou sem resposta, contam como funcionando quando o domínio existe; DNS que não resolve ou 404 reprovam |
 
 ## 6 · O que precisa estar coberto para o F05 funcionar
 
@@ -308,7 +308,7 @@ Com os perfis reais do dono e vagas reais (pt-BR e en-US): CV do perfil e da vag
 |-------|-----------|
 | CV inventa conquista ou termo da vaga | `factIds` obrigatórios, validação de termos sem evidência, revisor, avaliadores e gate |
 | Haiku perde defeito visual | checagens por código para fonte, espaçamento e páginas; avaliação local com PDFs quebrados de propósito; números ao dono antes de mudar o modelo |
-| Link "não funciona" por bloqueio a robôs (LinkedIn) | regra de F05-23 |
+| Link "não funciona" por bloqueio a robôs (LinkedIn) | F05-23: domínio que resolve e resposta diferente de 404 bastam |
 | Template do usuário malicioso | sanitização, JS desligado, rede toda bloqueada, zip-slip, limite de tamanho |
 | Chromium ocupado ou fora do ar | fila `documents` com concorrência 1, timeout, `error` com "tentar de novo" |
 | Custo do ciclo (até 2 gerações e 2 revisões) | Haiku na revisão, checagens por código antes, coalescência, uso registrado por chamada |
@@ -330,4 +330,5 @@ Com os perfis reais do dono e vagas reais (pt-BR e en-US): CV do perfil e da vag
 | 2026-10-16 | — | **F05-21 e F05-22 fechadas (dono):** carta junto do CV da vaga ou sozinha, pelo botão "Gerar" (CV · Cover letter) na página da vaga; formatos texto livre ou PDF; idioma sempre o da vaga; revisão, versões e validade como o CV. |
 | 2026-10-16 | — | **F05-17 e F05-18 fechadas (dono):** um CV e uma carta por vaga e perfil, perfil recomendado por padrão; validade marcada como "desatualizado". Dono pediu uma última revisão contra o código antes da implementação. |
 | 2026-10-16 | — | **Última revisão contra o código (dono pediu antes de implementar).** §2 a §7 reescritos: assets e fontes inline (o Chromium não vê arquivos do worker), worker na rede `browser` com `playwright-core`, revisor Haiku pela tool `Read` nos PNGs (o provider não recebe imagem; a ponte do Phoenix descarta imagem → avaliação local), guard anti-SSRF no core, idioma da vaga por `detectLanguage`, GitHub por `user.links`/repositórios, e2e com o `browser`, backup dos templates, menu novo na web, quadro de conquistas. F05-1, 3, 4, 5 e 9 com padrão adotado; F05-8 superada; F05-23 (link que bloqueia robôs) em aberto. Marcos M1 a M8 em §6.0. |
+| 2026-10-16 | — | **F05-23 fechada (dono):** domínio que resolve e página sem 404 = link funcionando. Todas as decisões fechadas; início do M1. |
 (Preencher durante a implementação: datas, prévias dos templates, resultados do teste manual, decisões tomadas.)
