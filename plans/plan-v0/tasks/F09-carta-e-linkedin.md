@@ -4,6 +4,8 @@ Entregável 9 do plan-v0. Cobre as features **5** (carta de apresentação / men
 
 Status: **em escopo** (2026-10-07). Nada implementado.
 
+> **2026-10-16 (dono):** a carta de apresentação / cover letter foi para a F05 (F05-21), junto do CV da vaga. Esta task fica com a otimização de LinkedIn e a mensagem curta a recrutador (e-mail curto, InMail); onde o texto abaixo fala da carta formal, vale a F05.
+
 ---
 
 ## 1 · Objetivo e resultado esperado

@@ -1,8 +1,10 @@
 # F05 · Gerar CV
 
-Entregável 5 do plan-v0. Cobre a feature **#1** de `../02-fluxos-do-usuario.md §F5` e a arquitetura de `../03-arquitetura.md §14`: o agente gera o **conteúdo** do currículo em JSON, o servidor faz o **layout** a partir de templates e entrega PDF/DOCX com bom padrão visual. É a peça fundamental do sistema (decisão 7 de `../06-decisoes-em-aberto.md`).
+Entregável 5 do plan-v0. Cobre a feature **#1** de `../02-fluxos-do-usuario.md §F5` e a arquitetura de `../03-arquitetura.md §14`: o agente gera o **conteúdo** do currículo em JSON, o servidor faz o **layout** a partir de templates e entrega PDF com bom padrão visual. É a peça fundamental do sistema (decisão 7 de `../06-decisoes-em-aberto.md`).
 
-Status: **em escopo** (2026-10-07). Nada implementado.
+Status: **em escopo, replanejada pelo dono em 2026-10-15** (requisitos em §1.1, revisão contra o código em §2.0, decisões novas F05-10 a F05-23 em §5). Nada implementado. Plano reescrito em 2026-10-16 depois da última revisão contra o código (§2 a §7); só F05-23 em aberto.
+
+> O texto original (2026-10-07 e 2026-10-11) fica como referência. Onde ele conflita com §1.1, §1.2 e §2.0, valem estas seções.
 
 ---
 
@@ -14,20 +16,38 @@ Com o onboarding concluído (F01) e o recrutador funcionando (F04), a pessoa con
 2. ver a estimativa de tokens, disparar a geração e acompanhá-la como job em segundo plano;
 3. receber uma prévia renderizada do PDF fiel ao template, editar o conteúdo inline (texto dos bullets, ordem das seções, o que incluir) e re-renderizar sem gastar tokens;
 4. ver quais fatos **não verificados** entraram no documento e resolver antes de exportar;
-5. exportar PDF e DOCX, salvar como versão ligada ao perfil (e à candidatura, se houver) e reabrir qualquer versão depois;
+5. exportar o PDF (sem DOCX, F05-14), salvar como versão ligada ao perfil (e à candidatura, se houver) e reabrir qualquer versão depois;
 6. subir um template próprio em `.zip`, vê-lo validado e pré-visualizado, e usá-lo como qualquer template padrão;
 7. no modo B (terminal), pedir `/narnia-jobs:gerar-cv` e receber o link da UI web com a prévia pronta.
+
+### 1.1 · Requisitos do dono (2026-10-15)
+| # | Requisito |
+|---|-----------|
+| R1 | Um currículo **por perfil**. A pessoa pode regerar pelo recrutador (no chat) ou por um botão. |
+| R2 | Um currículo **para a vaga**, gerado depois da análise (na conversa e no cartão da análise) ou na página da vaga. |
+| R3 | O CV do perfil fica ligado ao perfil (link para o perfil). |
+| R4 | O CV da vaga fica salvo ligado à vaga. |
+| R5 | Na página do perfil, a pessoa vê o currículo daquele perfil. |
+| R6 | Todo currículo tem um botão "Atualizar" e mostra a data da última versão gerada. |
+| R7 | A entrega é em **PDF**, e um **agente de revisão** confere o PDF gerado. |
+
+### 1.2 · Efeito no plano anterior
+- **Entrada:** sai a tela "Gerar CV" com formulário de parâmetros como ponto de partida. A geração nasce do perfil (aba nova na página do perfil), da vaga (página da vaga e cartão da análise) e do recrutador (tool no chat).
+- **Ligação com a vaga:** o CV da vaga liga em `posting` (F06), não em candidatura. A F07 vai ligar candidatura a vaga e CV depois (F06-7: salvar a vaga não é se candidatar).
+- **Botão no chat:** o "Criar CV para esta vaga" já existe desabilitado no chat (`PostingLinks`) e na página da vaga; passa a funcionar, e o `ui.suggest_action` (F04-6) continua no escopo para as sugestões do recrutador.
+- **Revisão:** entra um agente revisor do PDF, que não existia no plano (F05-13).
+- **Escopo do plano anterior (F05-14, dono):** tudo continua (três templates, templates do usuário, edição inline, comparar versões, `ui.suggest_action`), **menos o DOCX**: a entrega é só PDF.
 
 ### Dentro do escopo
 - Schema de dados do CV em `packages/shared/cv-schema` (zod → JSON Schema) usado por agente, templates e validador de templates.
 - Skill `plugin/skills/gerar-cv` + tools `document.*` no servidor MCP (F04).
-- Motor de renderização no `api`: 3 templates padrão como componentes React → HTML estático; templates do usuário em Handlebars; PDF por Chromium headless (Playwright) no container; DOCX via `docx`; PNG de prévia.
+- Motor de renderização (no core, usado pelo worker; §2.6): 3 templates padrão como componentes React → HTML estático; templates do usuário em Handlebars; PDF pelo serviço `browser` (§2.6); PNG de prévia. Sem DOCX (F05-14).
 - Upload, validação, sandbox e gestão de templates do usuário.
 - Versionamento (`document`, `document_version`), edição inline com re-render, exportação.
 - Job `cv.generate` (modelo) e job `cv.render` (sem modelo), ambos na bandeja de atividades.
 - Página L5 de `../05-layouts.md`.
 - **Dois modos de geração (requisito do dono, 2026-10-11):** **sem vaga alvo** (CV do perfil, destacando pela relevância da F02) e **com vaga alvo** (lê a vaga/`JobAnalysis` da F06 e destaca o que ela pede: palavras-chave, conquistas aderentes, ordem das experiências); disponível pela tela e pelo chat (F04).
-- **Todo arquivo gerado é salvo** (`document_version` com PDF, DOCX e prévia; nada é descartável); gerar para uma vaga cria/atualiza a candidatura da F07 ligando vaga + CV.
+- **Todo arquivo gerado é salvo** (`document_version` com PDF e prévia; nada é descartável); o CV da vaga liga na vaga (`posting`); a F07 liga candidatura, vaga e CV depois.
 - **Botões de ação no chat (F04-6, movido da F04):** tool `ui.suggest_action({ action, label, params })` validada pelo servidor (ação existe, parâmetros no schema, ids do usuário) → botão na mensagem do chat que abre a feature já preenchida; no terminal (modo B) a tool devolve um link. Primeira ação: "Gerar CV para esta vaga".
 
 ### Fora do escopo (e para onde vai)
@@ -41,109 +61,160 @@ Com o onboarding concluído (F01) e o recrutador funcionando (F04), a pessoa con
 
 ## 2 · Arquitetura deste entregável
 
-### 2.1 Separação conteúdo × layout
-```
-parâmetros ─► skill gerar-cv (agente, Sonnet) ─► cv_content.json (schema CvContent) ─► document.save_content
-                                                       │
-                      template (padrão ou usuário) + cv_content.json ─► renderer (sem modelo) ─► HTML ─► PDF (Chromium) · DOCX (docx) · PNG (prévia)
-```
-- O agente **nunca** escreve HTML, Markdown ou formatação; só preenche `CvContent`. Isso corta tokens e garante consistência visual.
-- O renderer é determinístico: mesmo JSON + mesmo template = mesmo PDF (testável por snapshot).
-- Re-render após edição inline não chama o modelo.
+> Reescrita em 2026-10-16 depois da última revisão contra o código, pedida pelo dono antes da implementação. Vale este texto; o plano de 2026-10-07 ficou só no histórico do git.
 
-### 2.2 `CvContent` (resumo do schema em `packages/shared/cv-schema`)
+### 2.0 · Revisão contra o código (2026-10-15 e 2026-10-16)
+| Plano anterior | Código hoje | Consequência |
+|----------------|-------------|--------------|
+| Playwright Chromium dentro do container do api (F05-2) | serviço `browser` da F06 (Chromium do Debian, `launchServer`, rede `browser` só com o api, `NARNIA_BROWSER_WS`); `page.pdf` e capturas funcionam por `chromium.connect` | o PDF sai do mesmo serviço; o **worker entra na rede `browser`** (F05-12) e ganha `playwright-core` 1.58.0 (mesma versão da imagem) |
+| Assets do template por `file://` | o Chromium roda em outro container, sem volumes | **tudo inline** no HTML (`data:`): fontes, imagens e CSS; `page.setContent` com toda requisição abortada, menos `data:` |
+| Fontes embutidas (F05-3) | imagem `browser` só com `fonts-liberation`; não existe pacote Debian do Source Serif 4 | fontes OFL **versionadas no repositório** (`woff2`) e inline em `@font-face`; a imagem não muda |
+| Categoria de sessão `feature:cv` | não existe | geração por tarefa estruturada (F05-11); o recrutador usa tools `cv.*` nas categorias de carreira e `job` |
+| `application.get` (F07) | a vaga é `posting`, análise em `job_analysis` (`latest`, `analysisStale`) | o CV da vaga lê a vaga, `preAnalysis.keywords` (exigido · desejável) e a análise mais recente |
+| Idioma da vaga | `posting` não tem idioma; `detectLanguage(text)` → `pt`/`en` | idioma da vaga = `detectLanguage(jdText)`; desconhecido → idioma do perfil |
+| `CvContent.certifications[]` | sem tabela de certificações | fora desta entrega; contato de `user` (nome, e-mail, telefone E.164, cidade, `links`) |
+| Link do GitHub | o login do `gh` não é guardado | GitHub de `user.links` (domínio `github.com`); sem ele, o `owner` dos repositórios ingeridos |
+| Ênfase por conquista (§2.4b) | backend pronto (`achievement` em `profile_emphasis`); o quadro da web só mostra 5 tipos ("conquistas só em F05") | falta a parte web do quadro |
+| Visão no provider | chamada estruturada só aceita texto; leitura de PDF pelo modelo já existe com a tool `Read` (`readDocument`) | revisor Haiku lê os PNGs das páginas e o texto pela tool `Read` numa pasta temporária, como o `readDocument`; PNGs por `renderPdfPages` (pdftoppm, já no worker) |
+| Avaliação de prompt com imagem | a ponte da assinatura no Phoenix descarta blocos que não são texto; prompts com tools ficam fora de `evals prompts` | o gerador e a carta entram no `evals prompts --gate`; o revisor tem dataset de texto no Phoenix e avaliação local com imagens (`evals cv-review`, como `evals pdf`), ambas no gate |
+| Anti-SSRF no worker | `hostGuard`/`checkHost` vivem em `apps/api/src/postings/fetch.ts` | movem para `packages/core/src/net/guard.ts`; o api reimporta; o checador de links usa a mesma regra a cada redirecionamento |
+| Progresso da tarefa | `job` guarda só tipo e percentual; a nota não é gravada | as etapas da geração ficam em `cv_version.status`, com o evento WS `cv.updated` |
+| Arquivos e downloads | não há rota binária; auth aceita o cookie `narnia_token` | `<img>` e `<a download>` mesmo-origem funcionam pelo cookie; rotas devolvem `application/pdf` e `image/png` |
+| Backup | SQLite + `uploads/` | `backupTemplates` para os templates do usuário; os PDFs são derivados (`content_json` no banco) e não entram |
+| e2e | `start.sh e2e` sobe `web api worker redis`; o api tem `NARNIA_BROWSER_WS=` vazio | o e2e passa a subir o `browser` (renderer real, como o plano pedia); o api segue sem busca de vaga por navegador no e2e |
+| Menu suspenso na web | não há componente (só o seletor de perfil feito à mão) | `Menu` novo em `components/ui` (teclado, Esc, clique fora) para o "Gerar" |
+
+### 2.1 Pipeline
+```
+gatilho: botão Gerar/Atualizar · recrutador (cv.generate) · botão no chat
+   │  api: perfil + vaga? + tipo (cv | cover_letter) + instruções? ; checa o idioma (F05-16):
+   │       idioma pedido fora dos idiomas da pessoa → 409 language_not_covered → "continuar" reenvia com acceptLanguage
+   ▼
+tarefa cv.generate (worker, fila documents, id por documento: coalesce)
+   collecting  user + perfil + fatos com score (ênfases, conquistas, ocultos fora) + [vaga, keywords, análise]
+               score de match por experiência e skill (F05-15); seleção ≤ 2 páginas; ocultas → roteiro de entrevista
+   generating  Sonnet, JSON CvContent | CoverLetterContent (models.cv_generate)
+   validating  schema; todo fact_id existe; termo da vaga sem evidência no texto = erro (F05-20)
+   rendering   template → HTML inline → browser (setContent, rede bloqueada) → PDF ; pdftoppm → PNGs
+   checking    código: páginas ≤ 2, fonte mínima, espaçamento, quebras, links (existem nos dados + HTTP), ATS ≥ 90
+   reviewing   Haiku (models.cv_review), tool Read nos PNGs + texto + CvContent + fatos → apontamentos
+   ├─ aprovado ─────────────────────────────────────────► ready
+   ├─ reprovado (1ª) → retrying: gera de novo com os apontamentos → rendering…
+   └─ reprovado (2ª) ───────────────────────────────────► ready_with_issues (alerta com os apontamentos)
+edição inline / cv.edit / troca de template: nova versão a partir de validating (sem o gerador)
+```
+- O modelo **nunca** escreve HTML; só preenche o JSON. O render é determinístico (mesmo JSON + template = mesmo HTML).
+- Checagens por código antes do Haiku: o que é medível (links, páginas, fonte, espaçamento, ATS) não gasta tokens nem depende da leitura do modelo; o resultado entra no prompt do revisor e no alerta.
+- Cada clique em "Atualizar" é um ciclo novo (gera → revisa → no máximo uma regeração automática).
+
+### 2.2 Schemas (`packages/shared/src/schemas/cv.ts`)
 | Bloco | Campos |
 |-------|--------|
-| `meta` | `locale`, `pages` (1/2), `paper` (A4/Letter), `profile_id`, `application_id?`, `generated_at` (UTC) |
-| `header` | nome, título-alvo, cidade/país, e-mail, telefone (formatado para o mercado), links |
-| `summary` | 3–5 linhas |
-| `experiences[]` | empresa, cargo, período, local, bullets[] (cada bullet com `fact_ids[]`), tech[] |
-| `projects[]`, `education[]`, `certifications[]`, `skills[]` (agrupadas), `languages[]`, `extras[]` | |
-| `sections_order[]` | ordem e inclusão das seções |
-| `provenance` | `fact_ids_used[]`, `unverified_fact_ids[]` |
-Cada bullet e cada item carregam `fact_ids` para rastrear a origem e marcar não verificados.
+| `meta` | `kind` (cv · cover_letter), `locale` (pt-BR · en-US), `paper` (A4 · Letter), `profileId`, `postingId?`, `generatedAt` |
+| `header` | nome, título-alvo, cidade/país, e-mail, telefone (formatado para o mercado), `links[]` `{kind: email · whatsapp · linkedin · github · portfolio · other, url, label}` |
+| `summary` | 3 a 5 linhas |
+| `experiences[]` | empresa, cargo, período, local, `bullets[]` `{text, factIds[]}`, `tech[]`, `matchScore` |
+| `skills[]` (grupos com `matchScore` por skill), `projects[]`, `education[]`, `languages[]` | todo item com `factIds[]` |
+| `adjacent[]` | `{asked, shown, factIds}`: termo da vaga sem evidência × experiência próxima mostrada com o nome verdadeiro (F05-20) |
+| `sectionsOrder[]` | ordem e inclusão |
+| `omitted[]` | experiências ocultas `{factId, reason, matchScore}` = **roteiro para aprofundar na entrevista** |
+| `provenance` | `factIdsUsed[]`, `unverifiedFactIds[]` |
+| `CoverLetterContent` | `header` (o mesmo), `greeting`, `paragraphs[]` `{role: why · covers · gaps · closing, text, factIds[]}`, `signature`; 250 a 400 palavras |
+| `CvReview` | `passed`, `issues[]` `{area: links · relevance · hallucination · facts · layout · ats · language · pages, severity, message, where}`, `atsScore`, `checks` (resultado das checagens por código) |
 
-### 2.3 Skill `gerar-cv` e tools MCP
-| Tool | Função |
-|------|--------|
-| `profile.get_card` (F04) | cartão do perfil |
-| `experience.list/get`, `project.list/get`, `skill.list`, `education.list` (F04) | matéria-prima, por fatias |
-| `application.get(id)` (F07) | descrição da vaga quando informada; antes de F07, a vaga vem como texto no parâmetro |
-| `document.save_content(params, cv_content)` | valida contra o schema, cria `document` + `document_version` (status `content_ready`) e enfileira `cv.render` |
-| `document.list(profile)`, `document.get(id, version?)` | reabrir versões |
-| `template.list()` | nomes, idiomas e restrições (ex.: template suporta 1 página) |
-A skill instrui: usar só fatos existentes, priorizar conquistas com métrica, adaptar ao idioma/mercado do perfil, respeitar `pages`, preencher `provenance`, e nunca inventar. Em modo A a UI chama a skill por sessão de categoria `feature:cv`; em modo B o usuário invoca `/narnia-jobs:gerar-cv` e recebe o link da prévia.
+### 2.3 Score de match e seleção (F05-15, F05-20)
+- **CV do perfil:** score = relevância da F02 (`scoreFacts`, com as ênfases de experiência e conquista).
+- **CV da vaga:** score por experiência = requisitos da análise atendidos com evidência nela (`matches[].evidence`, pelo peso do requisito: exigido > desejável) + keywords da vaga nas tecnologias e conquistas dela (`matchKeywords`) + relevância da F02. Skills: o mesmo, por skill.
+- Entram as experiências exigidas pela vaga, na ordem do score, até caber em 2 páginas; em carreira longa, as de score baixo vão para `omitted[]` com o motivo. Ocultas pela pessoa (ênfase) nunca entram, nem no roteiro.
+- O score aparece na tela do CV (por experiência e skill), não no PDF.
 
-### 2.4 Renderer (no `api`, pacote `apps/api/src/documents/`)
+### 2.4 Links (F05-19)
+- Cabeçalho: e-mail (`mailto:`), WhatsApp (`https://wa.me/<E.164 só dígitos>`), LinkedIn e GitHub (reconhecidos pelo domínio em `user.links`; GitHub cai para o `owner` dos repositórios ingeridos), portfólio (link com rótulo de portfólio ou o primeiro link restante).
+- Link ausente não entra; a tela avisa qual falta, com atalho para cadastrar.
+- Checagem (código): o link do PDF (anotações do PDF por `unpdf`) bate com os dados; `mailto:` com e-mail válido; WhatsApp com telefone válido (`libphonenumber-js`); http(s) responde (HEAD, e GET se o HEAD for recusado, timeout de 8 s, anti-SSRF a cada redirecionamento). Resposta 999/403 de sites que bloqueiam robôs (LinkedIn) segue a regra de F05-23.
+
+### 2.5 ATS (F05-20)
+- Leitura (30%): texto extraído do PDF na ordem, títulos de seção reconhecíveis no idioma, contato encontrado, nenhum texto só em imagem, datas num formato padrão.
+- Termos (70%): keywords da vaga (`preAnalysis.keywords`, exigido pesa 2, desejável 1) **com evidência nos fatos**, presentes no texto do PDF (normalização do dicionário da F06). No CV do perfil, os termos são as skills destacadas e os termos do cargo-alvo (`targetTerms` da F02).
+- Nota < 90 reprova; lacunas reais não contam e aparecem no aviso "a vaga pede X, Y, Z sem registro nos seus dados".
+
+### 2.6 Render
 | Peça | Decisão |
 |------|---------|
-| Templates padrão | componentes React (`templates/classico`, `moderno`, `compacto`) renderizados com `renderToStaticMarkup`; CSS próprio por template com variáveis (`--accent`, fontes); i18n dos rótulos ("Experiência"/"Experience") por `locale` |
-| Templates do usuário | `.zip` com `template.html` (Handlebars), `style.css`, `manifest.json` (`name`, `version`, `locales[]`, `pages[]`, `paper[]`, `variables_required[]`, `accent_options[]`), `preview.png`; extraído para `/data/templates/<id>/` |
-| Sandbox | HTML sanitizado (`sanitize-html` com allowlist), **sem `<script>`**, sem `@import`/`url()` externos no CSS, sem fontes remotas; Chromium abre com rede desabilitada (`route` bloqueando tudo exceto `file://` dos assets do template) |
-| PDF | Playwright Chromium headless no container, `page.pdf({ format: paper, printBackground: true, preferCSSPageSize: true })`; timeout 30 s; uma instância de browser reutilizada, páginas isoladas |
-| DOCX | gerado por `docx` a partir do mesmo `CvContent` com um mapeamento por template (estilos de parágrafo, cores); fidelidade "próxima", não idêntica ao PDF |
-| Prévia | PNG da página 1 (`page.screenshot`) + contagem de páginas; se exceder `pages`, aviso "ultrapassou N páginas" com sugestão de cortar |
-| Fontes | embutidas na imagem (`Inter`, `Source Serif 4`, `IBM Plex Mono`, licenças OFL) para render reproduzível nos 3 SOs |
-| Saídas | `/data/exports/<document_id>/<version>/cv.pdf`, `cv.docx`, `content.json`, `preview.png`, `render.html` |
+| Onde | `packages/core/src/documents/` (o worker usa o core): templates, HTML, checagens; cliente do navegador em `packages/core/src/documents/browser.ts` (`playwright-core`) |
+| Templates padrão | **Clássico, Moderno, Compacto** como componentes React (`renderToStaticMarkup`, `react`/`react-dom` 19.3.0 no core, `jsx: react-jsx`); rótulos por locale; uma coluna, texto real (bom para ATS) |
+| Templates do usuário | `.zip` com `template.html` (Handlebars, helpers `date`, `join`, `t`), `style.css`, `manifest.json`, `preview.png`, fontes `woff2` e imagens; ≤ 5 MB; validados por `sanitize-html` (sem `<script>`, `on*`, `@import`, `url()` externo), zip-slip bloqueado; assets inline |
+| Navegador | contexto novo por render, `javaScriptEnabled: false` para templates do usuário, toda requisição abortada menos `data:`, WebSocket fechado |
+| PDF | `page.pdf({ format: paper, printBackground: true, preferCSSPageSize: true })`, timeout 30 s |
+| Prévia | PNG por página (`pdftoppm`, 110 dpi) |
+| Arquivos | `<data>/documents/<documentId>/v<n>/{cv.pdf, render.html, pages/<p>.png}`; templates em `<data>/templates/<id>/` |
 
-### 2.4b Ênfase por conquista (decisão F02-3, 2026-10-08: **obrigatória em F05**)
-F02 entrega ênfases por experiência e já aceita `fact_kind = achievement` em `profile_emphasis`. F05 completa: no quadro de ênfases do perfil, cada experiência expande suas conquistas com destacar/normal/ocultar e ordem própria; a skill `gerar-cv` recebe só as conquistas não ocultas, com as destacadas primeiro, e o `CvContent` guarda o id da conquista de origem de cada bullet para o diff entre versões. Testes: conquista oculta nunca aparece no `CvContent`; destacada aparece antes; cartão do perfil (F02) usa a mesma ordem.
+### 2.7 Tarefas e fila
+| Tarefa | Modelo | Etapas (`cv_version.status`) |
+|--------|--------|-------------------------------|
+| `cv.generate` | Sonnet + Haiku | `collecting` → `generating` → `validating` → `rendering` → `checking` → `reviewing` → (`retrying`) → `ready` · `ready_with_issues` · `error` |
+| `cv.render` | Haiku (revisão) | edição inline, `cv.edit` ou troca de template: `validating` → `rendering` → `checking` → `reviewing` → `ready` · `ready_with_issues` |
+| `template.validate` | — | `unzip` → `sanitize` → `render_sample` → `valid` · `invalid` |
+- Fila nova `documents` (concorrência padrão 1: um Chromium por vez), id por documento (`taskJobId`) para coalescer.
+- Infraestrutura de jobs caros (§2.5 antigo, mantida): coalescência por chave; conflito tipado (edição sobre versão que não é a atual → 409 e oferta de refazer); página **`/processos`** (ativos, pendentes e recentes, cancelar e repetir; o indicador da bandeja mostra a fila); **concorrência por fila em Configurações**, aplicada em tempo de execução.
+- Notificações: `cv.ready` (informativa) e `cv.review_failed` (aviso, com os apontamentos); bandeja com a seção "Currículos".
 
-### 2.5 Jobs
-| Job | Modelo? | Etapas persistidas |
-|-----|---------|--------------------|
-| `cv.generate` | sim (Sonnet por padrão) | `collecting` → `generating` → `validating` → `saved` |
-| `cv.render` | não | `html` → `pdf` → `docx` → `preview` → `done` |
-| `template.validate` | não | `unzip` → `sanitize` → `render_sample` → `done` |
-Todos aparecem na bandeja de atividades (F01). Edição inline cria nova `document_version` e enfileira só `cv.render`.
+### 2.8 Tools MCP e agentes
+| Tool | Função |
+|------|--------|
+| `cv.generate({kind, profileId, postingId?, instructions?, acceptLanguage?, withCoverLetter?})` | dispara a tarefa (mesmo caminho do botão); devolve `documentId`, versão e link |
+| `cv.get({documentId \| profileId+postingId?, kind})` | conteúdo da versão atual, status, revisão, validade |
+| `cv.edit({documentId, baseVersion, content})` | o recrutador altera o CV pronto: nova versão por `cv.render` (sem o gerador); mesma validação de `factIds` |
+| `cv.list({profileId?, postingId?})` | documentos e versões |
+| `ui.suggest_action({action, label, params})` | botão validado na mensagem do chat (ação existe, parâmetros no schema, ids existem); no modo B devolve link. Ações: `cv.generate`, `cover_letter.generate`, `cv.open` |
+- Persona `recrutador.md` (seção Vagas e regra 7) e skill nova `plugin/skills/gerar-cv` (modo B: `/narnia-jobs:gerar-cv` → link). Mudam prompts: gate do chat.
+- Prompts estruturados novos: `narnia-cv-generate`, `narnia-cover-letter-generate` (Sonnet) e `narnia-cv-review` (Haiku), com mock, dataset, avaliadores (schema, `no-invented-years`, `supporting-ids`, termos sem evidência) e juiz.
 
-**Infraestrutura de jobs caros (sugestão do dono em 2026-10-08, ao decidir F02-1; entra aqui porque F05 é a primeira task com jobs longos e repetíveis):**
-- **Coalescência por chave**: jobs com id determinístico por alvo (`cv.render:<document_id>`, `cv.generate:<profile_id>`); uma atualização nova para o mesmo alvo substitui a pendente em vez de enfileirar outra (BullMQ: job id fixo + `removeOnComplete`; se o job já está ativo, enfileira um único "próximo" e descarta os intermediários).
-- **Conflito**: quando duas atualizações do mesmo alvo não podem ser fundidas (por exemplo, edição inline de uma versão que já foi substituída), o job falha com erro tipado e a UI mostra ao usuário, com a opção de refazer sobre a versão atual.
-- **Página de processos em segundo plano** (`/processos`): lista de jobs ativos, pendentes e recentes, com cancelar e repetir; o indicador do cabeçalho (bandeja do F01) passa a mostrar também o tamanho da fila.
-- **Escala de workers**: concorrência por fila configurável em Configurações (F10), aplicada em tempo de execução (`worker.concurrency`), porque roda na máquina do usuário e o custo é da própria máquina.
+### 2.9 Ênfase por conquista (F02-3, obrigatória em F05)
+No quadro de ênfases do perfil, cada experiência expande as conquistas com destacar · normal · ocultar e ordem; o gerador recebe só as não ocultas, destacadas primeiro; o `CvContent` guarda o id da conquista de cada bullet.
 
-### 2.6 API
+### 2.10 API
 | Método e rota | Função |
 |---------------|--------|
-| `POST /api/documents/cv` | parâmetros → cria job `cv.generate` (modo A: abre sessão da skill) |
-| `GET /api/documents?profile=` · `GET /api/documents/:id` · `GET /api/documents/:id/versions/:v` | listar e abrir |
-| `PUT /api/documents/:id/content` | edição inline → nova versão + `cv.render` |
-| `GET /api/documents/:id/versions/:v/(pdf|docx|preview.png)` | download/prévia |
-| `POST /api/templates` (zip) · `GET /api/templates` · `DELETE /api/templates/:id` · `GET /api/templates/:id/preview.png` | templates do usuário |
-| `GET /api/documents/estimate?profile=&pages=` | estimativa de tokens antes de gerar |
+| `GET /api/cvs?profileId=&postingId=&kind=` | documentos com a última versão, status e validade |
+| `POST /api/cvs` | gera (perfil, vaga?, tipo, instruções?, `acceptLanguage?`, `withCoverLetter?`, `templateId?`, `format` da carta) → 202 com o documento; 409 `language_not_covered` |
+| `POST /api/cvs/:id/regenerate` | "Atualizar" (instruções?) |
+| `GET /api/cvs/:id` · `GET /api/cvs/:id/versions/:n` | documento, versões, revisão, roteiro, scores |
+| `PUT /api/cvs/:id/content` | edição inline com `baseVersion` (409 se não é a atual) |
+| `PATCH /api/cvs/:id` | template, papel, formato da carta → só re-render |
+| `GET /api/cvs/:id/versions/:n/pdf` · `/pages/:p.png` · `/text` | PDF, prévia e texto da carta |
+| `GET /api/cvs/:id/diff?from=&to=` | diff de texto entre versões |
+| `DELETE /api/cvs/:id` | apaga o documento e os arquivos |
+| `POST /api/cv-templates` (zip) · `GET` · `DELETE /:id` · `GET /:id/preview.png` | templates do usuário |
+| `GET /api/processes` · `POST /api/processes/:id/cancel` · `/retry` · `PUT /api/settings/workers` | página `/processos` e concorrência |
 
 ---
 
-## 3 · Dados deste entregável
-
+## 3 · Dados deste entregável (migração `0015_documents.sql`)
 | Tabela | Colunas principais |
 |--------|--------------------|
-| `document` | `id`, `profile_id`, `application_id?`, `type` (cv), `title`, `current_version`, `created_at`, `updated_at` (UTC) |
-| `document_version` | `id`, `document_id`, `version`, `template_id`, `params_json` (locale, pages, paper, accent, model), `content_json` (CvContent), `content_source` (agent/edit), `status` (content_ready/rendering/rendered/error), `pages_rendered`, `pdf_path`, `docx_path`, `preview_path`, `unverified_fact_ids_json`, `usage_json?`, `job_id?`, `created_at` |
-| `cv_template` | `id`, `name`, `origin` (builtin/user), `engine` (react/handlebars), `path`, `manifest_json`, `preview_path`, `status` (valid/invalid), `validation_errors_json?`, `created_at` |
-| `fact_source` (F01) | ganha `kind = document` para rastrear "usado no documento X" (opcional, só leitura) |
+| `document` | `id`, `kind` (cv · cover_letter), `profile_id` (cascade), `posting_id?` (cascade), `template_id`, `paper`, `locale`, `format` (pdf · text, só carta), `current_version`, `created_at`, `updated_at`; únicos parciais: um por (kind, perfil) sem vaga e um por (kind, perfil, vaga) |
+| `document_version` | `id`, `document_id`, `version`, `source` (agent · edit · recruiter · template), `instructions?`, `template_id`, `locale`, `content_json`, `status` (§2.7), `attempts`, `review_json`, `ats_score?`, `pages_rendered?`, `pdf_path?`, `text?` (carta em texto), `facts_version`, `posting_updated_at?`, `profile_updated_at`, `job_id?`, `usage_json?`, `error?`, `created_at` |
+| `cv_template` | `id`, `name`, `origin` (builtin · user), `engine` (react · handlebars), `path?`, `manifest_json`, `preview_path?`, `status` (validating · valid · invalid), `validation_errors_json?`, `created_at` |
+| `settings` | `models.cv_generate` (sonnet), `models.cv_review` (haiku), `workers.concurrency.<fila>` |
 
-Regras:
-- `content_json` é a verdade; PDF/DOCX são derivados e podem ser regenerados (`cv.render`) a qualquer momento, inclusive após atualizar um template.
-- Apagar um template do usuário não apaga versões já renderizadas; a versão guarda `template_id` e o `render.html` congelado.
-- Tamanho máximo do `.zip`: 5 MB; só `html`, `css`, `png`, `jpg`, `svg`, `json` dentro.
+Regras: `content_json` é a verdade e o PDF é derivado (refeito por `cv.render`); apagar um template do usuário não apaga versões (guardam `render.html`); validade = `facts_version`, `profile.updated_at` (inclui ênfases) e `posting.content_updated_at` posteriores à versão.
 
 ---
 
 ## 4 · Layouts deste entregável
-
-Referência: `../05-layouts.md` L5. Componentes a construir:
-
-| Tela | Componentes | Estados a cobrir |
-|------|-------------|------------------|
-| Gerar CV (L5) | `CvParamsForm` (perfil, candidatura/vaga opcional, idioma, páginas, papel, acento), `TemplatePicker` (cards com prévia, padrão + usuário, "+ enviar"), `EstimateBadge`, botão "Gerar" | sem documentos · estimando · gerando (job) · erro |
-| Prévia | `PdfPreview` (PNG por página, zoom), `PagesWarning`, `UnverifiedBanner` ("2 fatos não verificados usados" com lista e link para verificar em Meus dados) | renderizando · rendered · ultrapassou páginas · com não verificados |
-| Edição inline | `ContentEditor` (seções reordenáveis, incluir/excluir, bullets editáveis, rastro `fact_ids`), botão "Re-renderizar" | editando · re-render em andamento · conflito (versão nova criada por outra sessão) |
-| Versões | `VersionList` (v1…vN com data no fuso do usuário, template, origem agente/edição), "comparar" simples (diff de texto) | 1 versão · várias · versão com erro |
-| Exportar | botões PDF/DOCX, "salvar na candidatura" | pronto · indisponível (render com erro) |
-| Templates (Config) | `TemplateUpload` (zip), `TemplateCard` (válido/inválido com erros), prévia, excluir | válido · inválido · em validação |
-| Modo B | resposta textual da skill com resumo do conteúdo + link `http://127.0.0.1:<porta>/cv/<id>` | — |
+| Tela | Componentes | Estados |
+|------|-------------|---------|
+| Perfil › **Currículo** (aba nova) | `CvPanel` do CV do perfil; lista dos CVs e cartas de vaga feitos com o perfil (link para a vaga) | sem CV ("Gerar") · gerando (etapa) · pronto · com alerta · desatualizado · erro |
+| Página da vaga | botão **"Gerar"** com menu (CV · Cover letter); diálogo com perfil (recomendado por padrão), "gerar carta junto", formato da carta, instruções; seção "Currículos e cartas" | sem documentos · idioma não coberto (continuar · parar) · gerando · pronto |
+| `CvPanel` | prévia PNG por página, "Baixar PDF", **"Atualizar"** (instruções opcionais), "gerado em <data no fuso>", status, **alerta da revisão** com os apontamentos, selo "desatualizado", nota ATS, links faltando, banner de não verificados, score por experiência e skill, **roteiro de entrevista** (ocultas), experiências adjacentes, versões (lista, abrir, comparar), template e papel | os de §2.7 |
+| Carta | texto com "Copiar" ou prévia do PDF, mesmos controles | idem |
+| Edição inline | `ContentEditor`: seções reordenáveis, incluir · excluir, bullets editáveis mantendo `factIds`, "Re-renderizar" | editando · re-render · conflito |
+| Chat | "Criar CV para esta vaga" passa a funcionar; botões de `ui.suggest_action` e de `cv_*` (link do documento) | — |
+| Bandeja | seção "Currículos": gerando (etapa), pronto, não passou na revisão | — |
+| Configurações | Modelos (`cv_generate`, `cv_review`), Templates (upload, válido · inválido, prévia, excluir), Concorrência dos processos | — |
+| `/processos` | lista de jobs com cancelar e repetir | vazio · ativos · erro |
+| Perfil › Ênfases | conquistas por experiência | — |
 
 ---
 
@@ -151,91 +222,112 @@ Referência: `../05-layouts.md` L5. Componentes a construir:
 
 | # | Decisão | Opções | Padrão proposto |
 |---|---------|--------|-----------------|
-| F05-1 | Motor de template do usuário | Handlebars · EJS · Liquid | **Handlebars** (sem JS arbitrário, helpers controlados: `date`, `join`, `t`) |
-| F05-2 | Chromium na imagem | Playwright Chromium no mesmo container (+~300 MB) · container separado de render · `wkhtmltopdf` | **mesmo container** (um serviço; o tamanho é aceito em `03 §14`) |
-| F05-3 | Fontes | embutidas (Inter, Source Serif 4, IBM Plex Mono) · fontes do sistema · permitir fontes no zip do usuário | **embutidas** + permitir `.woff2` dentro do zip, referenciadas por caminho relativo |
-| F05-4 | Sandbox dos templates do usuário | sanitize-html allowlist + rede bloqueada · iframe sandbox só na prévia · sem sandbox | **allowlist + rede bloqueada** no Chromium |
-| F05-5 | Papel | por mercado do perfil (BR/EU → A4, US → Letter) · sempre A4 · escolha manual | **por mercado com override** manual |
-| F05-6 | Fidelidade do DOCX | mapeamento por template · DOCX genérico único · não gerar DOCX | **mapeamento por template** para os 3 padrão; templates do usuário recebem o DOCX genérico |
-| F05-7 | Modelo da geração | Sonnet · Haiku | **Sonnet** (qualidade de texto importa; medir em 6.4) |
-| F05-8 | Estimativa de 1 página | cortar automaticamente (modelo regenera mais curto) · só avisar · escala de fonte no CSS | **avisar + oferecer "regerar mais curto"** |
-| F05-9 | Comparar versões | diff de texto do `CvContent` · diff visual de PNG · nenhum | **diff de texto** |
+| F05-1 | Motor de template do usuário | Handlebars · EJS · Liquid | **Padrão adotado (2026-10-16): Handlebars** (sem JS arbitrário; helpers `date`, `join`, `t`) |
+| F05-2 | Chromium | — | **Fechada pelo código:** serviço `browser` da F06, com o worker na rede (F05-12) |
+| F05-3 | Fontes | — | **Padrão adotado (2026-10-16): Inter, Source Serif 4 e IBM Plex Mono (OFL) versionadas e inline em `@font-face`**; `woff2` do zip do usuário também inline (§2.0: o Chromium não acessa arquivos do worker) |
+| F05-4 | Sandbox dos templates do usuário | — | **Padrão adotado (2026-10-16): `sanitize-html` com allowlist, JS desligado e toda rede bloqueada** (só `data:`) |
+| F05-5 | Papel | — | **Padrão adotado (2026-10-16): pelo mercado do perfil** (BR/EU → A4, US → Letter), com troca na tela |
+| F05-6 | Fidelidade do DOCX | — | **Sai (F05-14, dono, 2026-10-15): sem DOCX; a entrega é só PDF.** |
+| F05-7 | Modelo da geração | Sonnet · Haiku | **Fechada com F05-13 (dono, 2026-10-16): Sonnet gera, Haiku revisa** |
+| F05-8 | Passou do tamanho | — | **Superada por F05-13 e F05-15:** a checagem de páginas reprova acima de 2 e a regeração automática encurta |
+| F05-9 | Comparar versões | — | **Padrão adotado (2026-10-16): diff de texto do conteúdo** |
 
 ---
 
+### 5.1 · Decisões do replanejamento (2026-10-15)
+F05-2 fechada pelo código; F05-6 sai com F05-14; F05-7 fecha com F05-13; F05-1, F05-3, F05-4, F05-5 e F05-9 com padrão adotado na revisão de 2026-10-16; F05-8 superada.
+
+| # | Decisão | Opções | Padrão proposto |
+|---|---------|--------|-----------------|
+| F05-10 | Histórico | sobrescrever o CV · guardar versões e mostrar a última | **Fechada por F05-14 (2026-10-15): guardar versões**; a tela mostra a última com a data, lista as anteriores e compara (F05-9) |
+| F05-11 | Como o conteúdo é gerado | tarefa estruturada no worker (JSON `CvContent`, sem conversa) · conversa com o recrutador (sessão `job`, como a análise) | **Fechada (dono, 2026-10-15): a geração é a mesma pelo botão e pelo chat** (tarefa estruturada `cv.generate` no worker, com instruções livres opcionais). A diferença do chat: o recrutador já tem todos os dados da pessoa e da vaga e pode **alterar o CV depois de pronto** a pedido. Tools: `cv.generate` (dispara, com instruções), `cv.get` (lê o conteúdo e o estado da versão atual) e `cv.edit` (aplica alterações no `CvContent` → nova versão, re-render e revisão, sem regerar tudo). Edição pelo recrutador obedece à mesma regra do gerador: só fatos existentes, `fact_ids` em cada bullet |
+| F05-12 | Onde o PDF é montado | worker entra na rede `browser` · o api monta (o worker chama o api) | **Padrão técnico adotado (2026-10-15): o worker entra na rede `browser`** (geração e re-render já são tarefas do worker); o api continua lá para a busca de vagas |
+| F05-13 | Agente de revisão | o que confere · modelo · o que fazer quando reprova | **Fechada (dono, 2026-10-15 e 2026-10-16).** Sonnet gera (`models.cv_generate`) e Haiku revisa (`models.cv_review`). A revisão confere: (1) **links**: todo link clicável do PDF existe nos dados e responde (checagem HTTP no servidor, com o anti-SSRF da F06); (2) **relevância das experiências**: as do PDF e as ocultas batem com o score de match (F05-15); (3) **alucinação e fatos**: nada inventado nem distorcido (empresa, cargo, datas, números das conquistas) contra o `CvContent` e os fatos; (4) **layout**: tamanho de fonte, espaçamento, quebra de linha e quebra de página errada (pela imagem de cada página e pelas posições do texto no PDF); (5) **aderência a ATS de no mínimo 90%** (F05-20). Contato, idioma e páginas também. Reprovou → **uma** regeração automática com os apontamentos. Reprovou de novo → entrega com **alerta visível** ("não passou na revisão" com os apontamentos) e a pessoa tenta de novo **quantas vezes quiser** pelo botão |
+| F05-14 | Escopo desta entrega | o plano anterior inteiro · só o que o dono pediu | **Fechada (dono, 2026-10-15): o plano anterior continua inteiro, menos o DOCX.** Ficam os três templates, os templates do usuário em `.zip` com sandbox, a edição inline com re-render, comparar versões e o `ui.suggest_action`, somados aos requisitos R1 a R7. F05-6 sai (sem DOCX) |
+| F05-15 | Tamanho e seleção | sempre 1 página · 1 ou 2 por escolha · pelo tamanho da carreira | **Fechada (dono, 2026-10-16): máximo de 2 páginas, independente da experiência** (o conteúdo decide entre 1 e 2). O CV é um relatório breve dos principais destaques e skills. **Seleção por score de match:** cada experiência recebe um score (no CV da vaga, contra os requisitos da vaga e a análise; no CV do perfil, a relevância da F02); entram as exigidas pela vaga, na ordem do score. **Skills destacadas seguem o mesmo padrão** (score por skill). Em carreira longa, as experiências menos relevantes ficam **ocultas** no PDF e viram um **roteiro para aprofundar na entrevista** (lista guardada na versão do CV, com o motivo, visível na tela e disponível para o recrutador e para a F08). O score aparece na tela do CV, não no PDF (interpretação, a confirmar) |
+| F05-16 | Idioma | `profile.doc_locale` sempre · idioma da vaga no CV da vaga | **Fechada (dono, 2026-10-16): o CV da vaga sai no idioma da vaga**; o do perfil, no `doc_locale` do perfil. Se o currículo da pessoa não cobre o idioma (o idioma não está entre os idiomas dela, ou o nível declarado é baixo), **a pessoa é acionada antes de gerar** e escolhe continuar ou parar (na tela, um diálogo; no chat, o recrutador pergunta). A tradução muda só o texto do CV, nunca os fatos |
+| F05-17 | CV da vaga e perfis | um CV por vaga com o perfil recomendado da análise · um por vaga e perfil | **Fechada (dono, 2026-10-16): um CV (e uma carta) por vaga e perfil.** O "Gerar" usa o perfil recomendado da análise mais recente (sem análise, o perfil ativo) e deixa trocar antes de gerar. A página da vaga lista os CVs e cartas da vaga (perfil, data da última versão, "Atualizar", alerta da revisão); a aba do currículo no perfil mostra o CV do perfil e lista os CVs de vaga feitos com ele, com link para a vaga |
+| F05-18 | Validade | regerar sozinho quando os fatos mudam · marcar "desatualizado" | **Fechada (dono, 2026-10-16, junto com F05-22): marcar "desatualizado"** quando os fatos, o perfil ou a vaga mudam depois da versão, sem regerar sozinho (como F06-10) |
+| F05-19 | Links no CV | — | **Requisito do dono (2026-10-16):** o cabeçalho traz links clicáveis no PDF para **portfólio, GitHub e LinkedIn** (de `user.links_json`, reconhecidos pelo domínio ou rótulo; o GitHub também da conta ligada na F03), **e-mail** (`mailto:`) e **WhatsApp** (`https://wa.me/<telefone E.164 só dígitos>`). Link que não existe nos dados não entra; a tela do CV avisa qual falta, com atalho para cadastrar. O revisor confere que os links do PDF batem com os dados. Templates do usuário recebem os mesmos links como variáveis |
+| F05-20 | Aderência a ATS (mínimo 90%, F05-13) | termos da vaga sobre todos os pedidos · só sobre os que têm evidência | **Fechada (dono, 2026-10-16): o CV nunca mente; tudo bate com os dados da pessoa.** Nota = leitura do PDF (30%: texto extraível na ordem, títulos de seção reconhecíveis, contato, sem texto em imagem nem tabela que embaralha, datas padrão) + termos da vaga (70%: exigidos pesam mais), contados **só sobre os termos com evidência** nos dados. Lacunas reais não derrubam a nota e aparecem num aviso separado. **Experiência adjacente vale:** se a vaga pede um termo que a pessoa não tem (ex.: Kubernetes) e ela tem um próximo com evidência (ex.: Docker), o CV destaca o próximo com o nome verdadeiro, sem nunca escrever o termo que falta; o revisor reprova qualquer termo da vaga sem evidência |
+| F05-21 | Carta de apresentação / cover letter | — | **Requisito do dono (2026-10-16): opcional.** Pode ser gerada **junto com o CV da vaga** (opção "gerar carta junto") ou **sozinha**. Na página da vaga, o botão "Criar CV" vira um botão **"Gerar"** com menu: **CV** ou **Cover letter**. Fala do que a vaga exige, do que a pessoa cobre (com evidência) e do que não cobre, mostrando abertura para aprender o que falta (contratação com 100% de aderência é rara). Mesma regra do CV: nada inventado, adjacências com o nome verdadeiro. A carta sai da F09 e entra aqui (F09 fica com LinkedIn e mensagem curta a recrutador) |
+| F05-22 | Detalhes da carta | — | **Fechada (dono, 2026-10-16).** Dois formatos: **texto livre** (para colar em e-mail ou formulário, com botão copiar) ou **PDF** (mesmo visual e cabeçalho do CV, com os links), à escolha da pessoa. **Idioma sempre o da vaga.** Revisão no mesmo ciclo do CV (Haiku: fatos, invenção, links e, no PDF, layout; uma regeração automática; reprovou de novo → alerta e novas tentativas pelo botão; sem nota de ATS). Versões e validade como o CV. Estrutura proposta e não contestada: 250 a 400 palavras em quatro blocos (por que a vaga; o que cobre com 2 ou 3 destaques; as 2 ou 3 lacunas principais com a adjacência e a abertura para aprender; fechamento). O recrutador gera e altera a carta pelo chat, como o CV |
+| F05-23 | Link que bloqueia robôs | reprovar · aviso sem reprovar | **Em aberto.** O LinkedIn responde 999 (ou 403) a qualquer acesso automático, mesmo com o perfil existindo; "o link funciona" não é verificável por robô ali. Proposta: link vindo dos dados, com formato válido (`linkedin.com/in/<id>`) e resposta 999/403 de domínio conhecido por bloquear robôs = **"existe, não verificável automaticamente"** (aviso na tela, não reprova); 404, DNS ou timeout reprovam |
+
 ## 6 · O que precisa estar coberto para o F05 funcionar
 
-### 6.1 Pré-requisitos e dependências
-1. **F01**: jobs, bandeja, `usage_event`, perfil com dados obrigatórios, i18n, tempo.
-2. **F04**: servidor MCP em `/mcp`, `plugin/` com skills, sessões de chat (modo A), tools `profile.*`/`experience.*`/`skill.*`/`education.*`.
-3. **F03** desejável, não obrigatório: mais fatos (GitHub) tornam o CV melhor; o F05 funciona só com o CV ingerido em F01.
-4. **F07** opcional: ligação com candidatura; antes dele, a vaga é texto no parâmetro.
-5. Ordem interna: schema `CvContent` → renderer com os 3 templates (sem modelo, testável cedo) → tools/skill → página L5 → templates do usuário → DOCX.
+### 6.0 Marcos
+Cada marco fecha com lint, typecheck, testes e e2e verdes na instância `claude`, commit local e aviso ao dono para `promote` (com `make dev-down && make dev` quando mudarem dependências, composes ou imagem). Prompt novo ou alterado passa pelo gate real (F06-14) antes do commit.
+1. **M1 · Render sem modelo.** Schemas (`cv.ts`), migração 0015 e repos; guard anti-SSRF no core; template Clássico (React, fontes inline); worker na rede `browser` com `playwright-core`; PDF e PNGs; checagens por código (páginas, fonte, espaçamento, quebras, links, ATS); e2e sobe o `browser`.
+2. **M2 · Geração.** Coleta com score de match (experiências, skills, conquistas, ocultas → roteiro), idioma, prompts `narnia-cv-generate` e `narnia-cover-letter-generate`, tarefa `cv.generate` na fila `documents`, mock, dataset, avaliadores, juiz e gate.
+3. **M3 · Revisão.** `narnia-cv-review` (Haiku, `Read` nos PNGs), ciclo com uma regeração automática, `ready_with_issues`, notificações `cv.ready`/`cv.review_failed`, avaliação local com imagens e gate.
+4. **M4 · API, MCP e chat.** Rotas, tools `cv.*` e `ui.suggest_action`, persona e skill `gerar-cv` (gate do chat), links das tools no chat, modelos por tarefa.
+5. **M5 · Web.** Aba Currículo, "Gerar" na vaga, `CvPanel`, carta (texto e PDF), idioma não coberto, bandeja, quadro de conquistas.
+6. **M6 · Versões e edição.** Lista e diff de versões, edição inline com re-render, Moderno e Compacto, troca de template e papel.
+7. **M7 · Templates do usuário e processos.** Upload `.zip`, validação no worker, sandbox, backup dos templates; `/processos` e concorrência por fila.
+8. **M8 · Fechamento.** e2e completos, modo B, README, CLAUDE.md e `../03`–`../05`.
 
-### 6.2 Testes unitários (Vitest) · obrigatórios
-**`packages/shared`**
-- `cv-schema`: aceita fixtures válidas pt-BR/en-US; rejeita bullet sem `fact_ids`, `pages` fora de {1,2}, seção desconhecida em `sections_order`; JSON Schema estável (snapshot).
+### 6.1 Pré-requisitos
+F01 (jobs, bandeja, uso, i18n, tempo), F02 (relevância, ênfases), F03 (fatos), F04 (MCP, chat, plugin), F06 (vaga, análise, keywords, serviço `browser`). F07 não é pré-requisito: o CV da vaga liga na vaga.
 
-**`apps/api` (documents)**
-- Renderer HTML: para cada template padrão × locale × pages, o HTML gerado é snapshot estável; rótulos traduzidos; telefone formatado por mercado; datas no formato do locale.
-- Handlebars: helpers permitidos funcionam; helper não registrado falha com erro claro; template sem `variables_required` presentes é rejeitado na validação.
-- Sanitização: `<script>`, `onload=`, `@import`, `url(http…)` são removidos/rejeitados; `url(./img.png)` relativo é mantido.
-- Validação de zip: faltando `manifest.json` → inválido; arquivo `.js` dentro → inválido; > 5 MB → rejeitado; zip-slip (`../`) → rejeitado.
-- PDF: com Chromium real em CI, gera PDF com N páginas para fixtures conhecidas (1 página para a fixture curta, 2 para a longa); `pages_rendered` correto; timeout gera `status = error` com mensagem.
-- DOCX: gera arquivo válido (abre com `mammoth` e contém nome, empresa e 1º bullet).
-- Jobs: `cv.generate` com provider mock → `document_version(content_ready)` → `cv.render` enfileirado automaticamente; edição inline cria versão N+1 e **não** chama o provider.
-- `UnverifiedBanner` dados: `unverified_fact_ids_json` calculado a partir de `provenance` × `verified` dos fatos.
-- Rotas: 404 documento inexistente; 409 ao editar versão que não é a atual; 400 template inválido; 403 ao baixar PDF de outra versão sem token.
+### 6.2 Testes unitários (Vitest)
+- **shared:** schemas aceitam fixtures pt-BR e en-US; rejeitam bullet sem `factIds`, seção desconhecida, carta fora de 250–400 palavras; JSON Schema estável.
+- **core/documents:** HTML por template × locale (snapshot), rótulos traduzidos, telefone por mercado, links (`mailto:`, `wa.me`, LinkedIn, GitHub, portfólio; ausente não entra); ATS (leitura e termos, só com evidência, adjacente não conta como o termo); score de match e seleção (exigidas primeiro, ocultas pela pessoa nunca entram, carreira longa → `omitted`); checagem de termo sem evidência; links (dados × PDF, HTTP com guard, redirect para IP interno barrado); layout (fonte mínima, espaçamento, > 2 páginas); validade.
+- **core (Chromium real na instância):** PDF da fixture curta = 1 página, longa = 2; rede bloqueada (template com `url(http…)` não carrega); timeout → `error`.
+- **templates do usuário:** helpers permitidos; helper desconhecido falha; `<script>`, `on*`, `@import`, `url(http…)` rejeitados; `url(./img.png)` vira `data:`; sem `manifest.json`, `.js` dentro, > 5 MB e zip-slip → inválido.
+- **worker:** `cv.generate` com mock → `ready`; revisão reprova uma vez → regenera com os apontamentos → `ready`; reprova duas → `ready_with_issues` + `cv.review_failed`; edição inline → nova versão sem chamar o gerador; coalescência por documento.
+- **providers:** `cvGenerate`, `coverLetterGenerate`, `cvReview` (spec, schema, mock).
+- **api:** rotas (404, 409 de `baseVersion`, 409 `language_not_covered`, download com cookie), tools `cv.*` e `ui.suggest_action` (ação ou id inválido recusado), `postingLinks` com `cvId`.
+- **web:** aba Currículo (estados), "Gerar" com menu e diálogo (perfil recomendado, carta junto, idioma não coberto), `CvPanel` (data no fuso, alerta, desatualizado, ATS, roteiro, versões), carta (copiar), `ContentEditor`, bandeja, Configurações, `/processos`, quadro de conquistas.
 
-**`apps/web`**
-- `CvParamsForm`: defaults por perfil (locale, papel por mercado), validação, estimativa atualiza ao mudar `pages`.
-- `TemplatePicker`: lista padrão + usuário, desabilita template que não suporta o locale/pages escolhidos com explicação.
-- `ContentEditor`: reordenar seções, incluir/excluir, editar bullet mantém `fact_ids`; "Re-renderizar" envia `PUT` e mostra progresso do job.
-- `PdfPreview`: pagina entre PNGs, mostra aviso de páginas excedidas.
-- `VersionList`: datas no fuso do usuário; selecionar versão troca prévia e downloads.
+### 6.3 Testes e2e (Playwright, mock + renderer real)
+- **f05-01 CV do perfil:** aba Currículo → Gerar → bandeja → prévia → PDF baixa com ≤ 2 páginas → v1 com data.
+- **f05-02 CV e carta da vaga:** vaga analisada → Gerar › CV com "carta junto" → os dois na seção da vaga, ligados ao perfil recomendado; carta em texto copia.
+- **f05-03 revisão:** mock reprova duas vezes → alerta com os apontamentos → "Atualizar" → mock aprova → alerta some.
+- **f05-04 idioma:** vaga em inglês, perfil sem inglês → diálogo → parar não gera; continuar gera em en-US.
+- **f05-05 edição inline e versões:** editar bullet e excluir Projetos → v2 sem a seção, v1 intacta, diff mostra a mudança, provider não chamado.
+- **f05-06 templates:** trocar para Moderno sem tokens; enviar zip válido → usar; zip com `<script>` → rejeitado com o motivo.
+- **f05-07 chat:** recrutador gera o CV da vaga e altera um bullet (`cv.edit`) → botão do documento na mensagem; ação inválida não vira botão.
+- **f05-08 desatualizado:** alterar um fato → selo "desatualizado" no CV.
+- **f05-09 persistência:** reiniciar api e worker → versões, PDFs e templates continuam.
+- **f05-10 processos:** `/processos` lista a geração; cancelar e repetir.
 
-### 6.3 Testes e2e (Playwright, Chromium) · obrigatórios
-Rodam contra o compose com `NARNIA_PROVIDER=mock` (o mock devolve um `CvContent` fixo para o perfil de fixture; o renderer é real).
-- **E2E-01 gerar com template Clássico**: abrir Gerar CV → defaults → Gerar → job na bandeja → prévia aparece → PDF baixa e tem 1 página → versão v1 listada.
-- **E2E-02 trocar template sem gastar tokens**: selecionar Moderno → "Re-renderizar" → nova versão sem chamada ao provider (contador do mock inalterado) → prévia muda.
-- **E2E-03 edição inline**: editar um bullet e excluir a seção "Projetos" → re-render → PDF não contém a seção; v2 criada; v1 intacta.
-- **E2E-04 não verificados**: fixture com 2 fatos não verificados usados → banner lista os dois → clicar leva a Meus dados; após verificar (F10 mock ou endpoint de teste) e re-render, banner some.
-- **E2E-05 template do usuário válido**: enviar `fixtures/templates/minimal.zip` → validado → prévia gerada → disponível no picker → gerar CV com ele.
-- **E2E-06 template do usuário inválido**: zip com `<script>` → rejeitado com mensagem listando o motivo.
-- **E2E-07 2 páginas e aviso**: fixture longa com `pages = 1` → aviso "ultrapassou" → "regerar mais curto" cria v2 com 1 página (mock devolve versão curta).
-- **E2E-08 en-US e Letter**: perfil com mercado US → papel Letter e rótulos em inglês no PDF (texto extraído com `unpdf`).
-- **E2E-09 ligar à candidatura** (após F07): gerar a partir do cartão de uma candidatura → documento aparece no cartão.
-- **E2E-10 modo B**: `claude -p "/narnia-jobs:gerar-cv" --plugin-dir plugin/` contra o container (mock) → resposta contém link da prévia → link abre a página com v1.
-- **E2E-11 persistência**: `docker compose down/up` → versões, PDFs e templates do usuário continuam disponíveis.
-
-- **E2E-x CV com vaga alvo**: vaga analisada (F06) → "Gerar CV para esta vaga" → `CvContent` destaca as palavras-chave da vaga e ordena as experiências aderentes → arquivo salvo → candidatura da F07 mostra vaga + CV.
-- **E2E-y botão no chat**: o recrutador sugere "Gerar CV para esta vaga" via `ui.suggest_action` → botão aparece na mensagem → clique abre a tela já preenchida; ação inválida (id de outro usuário) é recusada e não vira botão.
-
-### 6.4 Teste manual com provider real (antes de fechar F05)
-Com 3 perfis reais (pt-BR backend, en-US backend, pt-BR gestão): gerar com os 3 templates, 1 e 2 páginas; registrar tokens reais × estimativa, taxa de edição inline necessária, se o conteúdo inventou algo (deve ser zero), legibilidade do PDF impresso, abertura do DOCX no Word/LibreOffice/Google Docs. Decide F05-7 e ajusta a skill.
+### 6.4 Teste manual com provider real (antes de fechar)
+Com os perfis reais do dono e vagas reais (pt-BR e en-US): CV do perfil e da vaga nos 3 templates, carta em texto e PDF; tokens, tempo, nota ATS, apontamentos da revisão, nada inventado, links clicáveis no PDF, PDF impresso legível. O dono aprova visualmente os 3 templates (prévias em §8).
 
 ### 6.5 Definição de pronto
-- Testes de 6.2 e 6.3 verdes na CI (CI instala Chromium do Playwright); cobertura ≥ 80 % em `documents/` e `cv-schema`.
-- Os 3 templates padrão aprovados visualmente pelo dono do projeto (prévias anexadas em §8).
-- Imagem Docker builda nos 3 SOs e o PDF gerado em cada um é idêntico (hash do `render.html` + páginas) para a fixture.
-- Documentação do formato de template do usuário (`docs` do repositório) com exemplo mínimo.
-- `../03`, `../04`, `../05` atualizados com o que mudou.
+- §6.2 e §6.3 verdes; cobertura ≥ 80% em `core/src/documents` e nos schemas.
+- Gate verde para os prompts novos e alterados.
+- Zero fato inventado e zero termo da vaga sem evidência no teste manual.
+- README, CLAUDE.md, `../03`, `../04`, `../05` e o formato de template do usuário documentados.
 
 ---
 
 ## 7 · Riscos específicos
 | Risco | Mitigação |
 |-------|-----------|
-| Chromium aumenta a imagem e o tempo de build | camada separada no Dockerfile com cache; `--only-shell`/chromium headless shell |
-| Template do usuário malicioso (exfiltração, JS) | allowlist, rede bloqueada no Chromium, sem JS, zip-slip bloqueado, tamanho limitado |
-| Conteúdo gerado inventa conquistas | skill proíbe, `provenance` obrigatória: bullet sem `fact_ids` falha na validação do schema |
-| Render diferente entre SOs | fontes embutidas, Chromium fixado pela versão do Playwright, teste de hash em CI |
-| DOCX feio em templates do usuário | DOCX genérico claramente rotulado "versão editável"; PDF é a saída principal |
-| Documento longo estoura 1 página sem o modelo perceber | contagem real de páginas pós-render + "regerar mais curto" |
+| CV inventa conquista ou termo da vaga | `factIds` obrigatórios, validação de termos sem evidência, revisor, avaliadores e gate |
+| Haiku perde defeito visual | checagens por código para fonte, espaçamento e páginas; avaliação local com PDFs quebrados de propósito; números ao dono antes de mudar o modelo |
+| Link "não funciona" por bloqueio a robôs (LinkedIn) | regra de F05-23 |
+| Template do usuário malicioso | sanitização, JS desligado, rede toda bloqueada, zip-slip, limite de tamanho |
+| Chromium ocupado ou fora do ar | fila `documents` com concorrência 1, timeout, `error` com "tentar de novo" |
+| Custo do ciclo (até 2 gerações e 2 revisões) | Haiku na revisão, checagens por código antes, coalescência, uso registrado por chamada |
+| Worker na rede do navegador | o navegador continua sem enxergar redis e web; documentado no compose |
 
 ## 8 · Registro de execução
 | Data | Marco | O que aconteceu |
 |------|-------|-----------------|
 | 2026-10-11 | — | **Plano incrementado (dono):** modos sem/com vaga alvo, todo arquivo salvo, ligação com a candidatura (F07) e os botões de ação no chat (`ui.suggest_action`), movidos da F04-6; testes e2e correspondentes. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** o agente gera CV **sem vaga alvo** (perfil puro) e/ou **com vaga alvo**, destacando o que a vaga pede; **todo arquivo gerado é salvo** (versões, PDF/DOCX); quando o CV é feito para uma vaga, a vaga e o CV ficam ligados numa candidatura (F07); geração disponível também pelo chat (F04). |
+| 2026-10-15 | — | **Replanejamento (dono):** requisitos R1 a R7 (§1.1): CV por perfil e por vaga, ligados ao perfil e à vaga, aba no perfil, botão Atualizar com a data, PDF com agente de revisão. Revisão contra o código (§2.0) e decisões F05-10 a F05-18 (§5.1) em aberto. |
+| 2026-10-15 | — | **F05-14 fechada (dono):** nada do plano anterior foi cancelado; só o DOCX sai. F05-10 fecha junto (versões guardadas). |
+| 2026-10-15 | — | **F05-11 fechada (dono):** botão e chat geram do mesmo jeito (tarefa `cv.generate`); pelo chat o recrutador, com acesso a todos os dados e à vaga, também altera o CV pronto (`cv.edit`). F05-12 segue o padrão técnico (worker na rede `browser`). |
+| 2026-10-15 | — | **F05-13 fechada (dono):** revisor com texto e imagem das páginas; uma regeração automática; se reprovar, alerta visível com os apontamentos e novas tentativas ilimitadas pelo botão. |
+| 2026-10-16 | — | **F05-13 ajustada (dono):** Sonnet gera e Haiku revisa, com o mesmo ciclo (uma regeração automática, alerta e novas tentativas pelo botão). |
+| 2026-10-16 | — | **F05-15 fechada (dono):** máximo 2 páginas; CV breve com os principais destaques e skills. **F05-19 (requisito novo):** links para portfólio, GitHub, LinkedIn, e-mail e WhatsApp. |
+| 2026-10-16 | — | **F05-15 e F05-16 fechadas, F05-13 ampliada (dono):** máximo 2 páginas sempre; experiências e skills por score de match, as menos relevantes ocultas viram roteiro de entrevista; CV no idioma da vaga, com a pessoa acionada quando não cobre o idioma; revisão de links (existem e respondem), relevância, alucinação, fatos, layout e ATS ≥ 90%. |
+| 2026-10-16 | — | **F05-20 fechada (dono):** CV nunca mente; ATS ≥ 90% sobre os termos com evidência; experiência adjacente (Docker para Kubernetes) entra com o nome verdadeiro. **F05-21 (requisito novo):** carta de apresentação / cover letter opcional, com o que cobre e o que falta e abertura para aprender; sai da F09. |
+| 2026-10-16 | — | **F05-21 e F05-22 fechadas (dono):** carta junto do CV da vaga ou sozinha, pelo botão "Gerar" (CV · Cover letter) na página da vaga; formatos texto livre ou PDF; idioma sempre o da vaga; revisão, versões e validade como o CV. |
+| 2026-10-16 | — | **F05-17 e F05-18 fechadas (dono):** um CV e uma carta por vaga e perfil, perfil recomendado por padrão; validade marcada como "desatualizado". Dono pediu uma última revisão contra o código antes da implementação. |
+| 2026-10-16 | — | **Última revisão contra o código (dono pediu antes de implementar).** §2 a §7 reescritos: assets e fontes inline (o Chromium não vê arquivos do worker), worker na rede `browser` com `playwright-core`, revisor Haiku pela tool `Read` nos PNGs (o provider não recebe imagem; a ponte do Phoenix descarta imagem → avaliação local), guard anti-SSRF no core, idioma da vaga por `detectLanguage`, GitHub por `user.links`/repositórios, e2e com o `browser`, backup dos templates, menu novo na web, quadro de conquistas. F05-1, 3, 4, 5 e 9 com padrão adotado; F05-8 superada; F05-23 (link que bloqueia robôs) em aberto. Marcos M1 a M8 em §6.0. |
 (Preencher durante a implementação: datas, prévias dos templates, resultados do teste manual, decisões tomadas.)

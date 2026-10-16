@@ -23,6 +23,7 @@ Com F01 e F04 prontos (F05 e F06 enriquecem), a pessoa consegue:
 - Tabelas `application`, `application_event`, `contact`, `calendar_link`; migração do stub `application.create_minimal` de F06.
 - Skill `plugin/skills/candidaturas` + tools `application.*` e `calendar.*` (locais) no MCP (F04).
 - Kanban com drag-and-drop, cartão detalhado, agenda, lembretes na UI, funil.
+- **Alerta de candidatura repetida (F06-11, herdado da F06):** na análise e na página da vaga, avisar quando já existe candidatura para a mesma empresa e role; a F06 entregou só "Vagas parecidas" (vagas salvas, não candidaturas).
 - Exportação de evento: link `calendar.google.com/calendar/render?action=TEMPLATE…` e arquivo `.ics` (RFC 5545) gerados no servidor.
 - Integração opcional com o MCP oficial do Google Calendar: comando `narnia-jobs google connect`, detecção de "conectado", uso condicional pela skill.
 - Página L7 de `../05-layouts.md`.
