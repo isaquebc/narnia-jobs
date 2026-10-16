@@ -25,3 +25,30 @@ test("F05/E2E-03 revisão: reprova duas vezes → alerta com os apontamentos; At
     .toBe("ready");
   await expect(alert).toHaveCount(0);
 });
+
+test("F05/E2E-03b revisão: 'Tentar de novo' no alerta refaz e aprova; a página da prévia abre em tela cheia", async ({
+  page,
+}) => {
+  const { ids } = await freshStart("engineer");
+  await api("/api/_test/mock", { method: "POST", body: JSON.stringify({ cvReviewFailures: 2 }) });
+  await generate({ kind: "cv", profileId: ids.profileId });
+  await waitDocuments({ profileId: ids.profileId });
+  await login(page, `/perfis/${ids.profileId}/curriculo`);
+  const alert = page.getByRole("alert", { name: "Não passou na revisão" });
+  await alert.getByRole("button", { name: "Tentar de novo" }).click();
+  await expect
+    .poll(async () => (await documents({ profileId: ids.profileId }))[0]?.current, {
+      timeout: 60_000,
+    })
+    .toMatchObject({ version: 2, status: "ready" });
+  await expect(alert).toHaveCount(0);
+  await page.getByRole("button", { name: "Ampliar a página 1" }).click();
+  const viewer = page.getByRole("dialog", { name: /^Página 1 de \d+$/ });
+  await expect(viewer.getByRole("img", { name: "Página 1" })).toBeVisible();
+  const box = await viewer.boundingBox();
+  const vp = page.viewportSize();
+  expect(box?.width).toBe(vp?.width);
+  expect(box?.height).toBe(vp?.height);
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
+});

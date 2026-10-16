@@ -583,7 +583,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ documents: DocumentView[] }>("/api/documents", json(body)),
     regenerateDocument: (
       id: string,
-      body: { instructions?: string | null; acceptLanguage?: boolean },
+      body: { instructions?: string | null; acceptLanguage?: boolean; fixIssues?: boolean },
     ) => request<DocumentView>(`/api/documents/${encodeURIComponent(id)}/regenerate`, json(body)),
     editDocument: (
       id: string,

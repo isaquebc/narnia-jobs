@@ -2,10 +2,12 @@ import {
   checkVerdicts,
   cvFactIds,
   cvNoGapTerms,
+  cvSourceTitles,
   type EvalParams,
   type EvalResult,
   jsonSchema,
   language,
+  letterWordCount,
   literalQuotes,
   noInventedYears,
   pickFilesLimits,
@@ -99,6 +101,26 @@ const cvGaps: Rule = {
   impl: cvNoGapTerms as Rule["impl"],
 };
 
+const cvTitles: Rule = {
+  name: "cargos_como_nos_dados",
+  description:
+    "F05: dados no idioma do documento, cargo, curso e grau iguais aos dados; em outro idioma, traduzidos (nota pela fração).",
+  module: "cv-honesty",
+  fn: "cvSourceTitles",
+  config: null,
+  impl: cvSourceTitles as Rule["impl"],
+};
+
+const letterWords: Rule = {
+  name: "tamanho_da_carta",
+  description:
+    "F05-21: a carta tem de 250 a 400 palavras somando os parágrafos (a montagem regera fora disso).",
+  module: "cv-honesty",
+  fn: "letterWordCount",
+  config: null,
+  impl: letterWordCount as Rule["impl"],
+};
+
 const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = {
   readDocument: (op) => [schemaRule(op), coverage(0.8)],
   extractFacts: (op) => [schemaRule(op), quotes(["text"]), years(["text"]), coverage(0.8)],
@@ -162,6 +184,7 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
     schemaRule(op),
     cvIds,
     cvGaps,
+    cvTitles,
     lang(["summary", "text", "label"]),
     coverage(0.75),
   ],
@@ -170,6 +193,7 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
     schemaRule(op),
     cvIds,
     cvGaps,
+    letterWords,
     lang(["greeting", "text"]),
     coverage(0.5),
   ],

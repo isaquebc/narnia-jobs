@@ -14,6 +14,7 @@ import { type TKey, t } from "../../i18n";
 import type { DocumentView } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { ContentEditor } from "./ContentEditor";
+import { PageViewer } from "./PageViewer";
 
 /**
  * Painel de um CV ou carta (F05 §4): etapa enquanto gera, prévia das páginas, "Baixar PDF", "Atualizar" com instruções,
@@ -33,6 +34,7 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
   const [updating, setUpdating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [comparing, setComparing] = useState<number | null>(null);
+  const [zoomed, setZoomed] = useState<number | null>(null);
   const { document: doc, current } = view;
   const kindLabel = t(`documents.kinds.${doc.kind}` as TKey);
   const active = isDocumentActive(current?.status);
@@ -40,6 +42,28 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
     mutationFn: () => api.deleteDocument(doc.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: documentKeys.all }),
   });
+  // refaz pelo gerador com os apontamentos da versão atual (revisão reprovada ou erro), sem pedir instruções
+  const retry = useMutation({
+    mutationFn: () =>
+      api.regenerateDocument(doc.id, { instructions: null, acceptLanguage: true, fixIssues: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: documentKeys.all }),
+  });
+  const retryButton = (
+    <Button
+      type="button"
+      size="sm"
+      className="mt-2"
+      disabled={retry.isPending}
+      onClick={() => retry.mutate()}
+    >
+      {t("documents.retry")}
+    </Button>
+  );
+  const pageUrls = current?.pagesRendered
+    ? Array.from({ length: current.pagesRendered }, (_, i) =>
+        api.documentPageUrl(doc.id, current.version, i + 1),
+      )
+    : [];
   const errors = current?.review?.issues.filter((i) => i.severity === "error") ?? [];
   const warnings = current?.review?.issues.filter((i) => i.severity === "warning") ?? [];
   const staleWhy = view.stale
@@ -118,7 +142,10 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
       {current?.content && !active ? <LayoutControls view={view} /> : null}
       {current?.status === "error" ? (
         <Alert tone="danger" role="alert">
-          <strong>{t("documents.errorTitle")}:</strong> {current.error}
+          <p>
+            <strong>{t("documents.errorTitle")}:</strong> {current.error}
+          </p>
+          {retryButton}
         </Alert>
       ) : null}
       {current?.status === "ready_with_issues" ? (
@@ -132,8 +159,10 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
               </li>
             ))}
           </ul>
+          {retryButton}
         </Alert>
       ) : null}
+      {retry.isError ? <Alert tone="danger">{(retry.error as Error).message}</Alert> : null}
       {view.missingLinks.length > 0 ? <MissingLinks kinds={view.missingLinks} /> : null}
       {unverified > 0 ? (
         <Alert tone="info">{t("documents.unverified", { count: unverified })}</Alert>
@@ -149,17 +178,28 @@ export function DocumentPanel({ view, title }: { view: DocumentView; title?: Rea
           </div>
         </div>
       ) : null}
-      {current?.pagesRendered ? (
+      {pageUrls.length ? (
         <div className="flex flex-wrap gap-3">
-          {Array.from({ length: current.pagesRendered }, (_, i) => i + 1).map((n) => (
-            <img
-              key={n}
-              src={api.documentPageUrl(doc.id, current.version, n)}
-              alt={t("documents.page", { n })}
-              className="w-full max-w-[420px] rounded border border-border bg-white shadow-sm"
-            />
+          {pageUrls.map((src, i) => (
+            <button
+              key={src}
+              type="button"
+              className="w-full max-w-[420px] cursor-zoom-in rounded border border-border bg-white shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              aria-label={t("documents.zoomPage", { n: i + 1 })}
+              onClick={() => setZoomed(i + 1)}
+            >
+              <img src={src} alt={t("documents.page", { n: i + 1 })} className="w-full rounded" />
+            </button>
           ))}
         </div>
+      ) : null}
+      {zoomed && pageUrls.length ? (
+        <PageViewer
+          pages={pageUrls}
+          page={Math.min(zoomed, pageUrls.length)}
+          onPageChange={setZoomed}
+          onClose={() => setZoomed(null)}
+        />
       ) : null}
 
       {warnings.length ? (

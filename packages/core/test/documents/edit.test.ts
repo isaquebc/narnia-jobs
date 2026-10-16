@@ -121,6 +121,79 @@ describe("F05/M6 core · edição e versões", () => {
     ).rejects.toMatchObject({ code: "template_not_found" });
   });
 
+  it("voltar a um modelo já montado com o mesmo conteúdo reaproveita a versão, sem montar de novo", async () => {
+    const s = setup();
+    const v2 = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    s.r.documents.updateVersion(v2.id, { status: "ready", content: CV_SHORT });
+    const back = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "classico",
+    });
+    expect(back).toMatchObject({ version: 1, templateId: "classico" });
+    expect(s.r.documents.get(s.doc.id)).toMatchObject({
+      templateId: "classico",
+      currentVersion: 1,
+    });
+    expect(s.enqueued).toHaveLength(1);
+    // de novo para o Moderno: a v2 volta a ser a atual
+    const again = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    expect(again).toMatchObject({ version: 2 });
+    expect(s.r.documents.get(s.doc.id)?.currentVersion).toBe(2);
+    expect(s.enqueued).toHaveLength(1);
+    expect(s.r.documents.listVersions(s.doc.id)).toHaveLength(2);
+    // com a v1 atual de novo, a próxima versão continua numerada depois da maior (v3)
+    await changeDocumentLayout(s.r, s.enqueue, { documentId: s.doc.id, templateId: "classico" });
+    const v3 = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "compacto",
+    });
+    expect(v3.version).toBe(3);
+  });
+
+  it("conteúdo diferente (editado depois) ou versão com erro: monta de novo", async () => {
+    const s = setup();
+    const v2 = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    s.r.documents.updateVersion(v2.id, {
+      status: "ready",
+      content: { ...CV_SHORT, summary: "Resumo editado no Moderno." },
+    });
+    const back = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "classico",
+    });
+    expect(back.version).toBe(3);
+    expect(s.enqueued).toHaveLength(2);
+  });
+
+  it("versão do modelo que deu erro não é reaproveitada", async () => {
+    const s = setup();
+    const v2 = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    s.r.documents.updateVersion(v2.id, { status: "error", content: CV_SHORT });
+    const back = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "classico",
+    });
+    expect(back.version).toBe(1);
+    const again = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    expect(again.version).toBe(3);
+    expect(s.enqueued).toHaveLength(2);
+  });
+
   it("texto do documento e diff por linha entre versões", () => {
     const a = documentText(CV_SHORT);
     expect(a).toContain("Reduziu a latência p95 do checkout de 800 ms para 300 ms.");

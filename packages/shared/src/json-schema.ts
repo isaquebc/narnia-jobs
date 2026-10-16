@@ -61,6 +61,6 @@ export const POSTING_OUTPUT_JSON_SCHEMAS = {
 /** Saídas do gerador da F05 (conteúdo do CV e da carta; o código monta o resto). */
 export const CV_OUTPUT_JSON_SCHEMAS = {
   cvGenerate: toJsonSchema(CvDraftSchema),
-  coverLetterGenerate: toJsonSchema(CoverLetterDraftSchema),
+  coverLetterGenerate: toJsonSchema(CoverLetterDraftSchema.required({ headline: true })),
   cvReview: toJsonSchema(CvReviewOutputSchema),
 } as const;

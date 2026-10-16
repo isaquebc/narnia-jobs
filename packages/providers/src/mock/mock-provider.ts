@@ -924,6 +924,7 @@ export class MockProvider implements Provider {
     };
     const ach = b.experiences.flatMap((e) => e.achievements).slice(0, 2);
     const draft: CoverLetterDraft = {
+      headline: b.profile.targetTitle,
       greeting: en ? `Dear ${company} team,` : `Olá, time da ${company},`,
       paragraphs: [
         {

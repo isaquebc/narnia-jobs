@@ -113,6 +113,8 @@ export function assembleCv(
   );
   const used: EvidenceId[] = [];
 
+  // dados já no idioma do documento: cargo, local e curso como estão (o gerador só traduz quando o idioma muda)
+  const sameLanguage = brief.sourceLocale === brief.locale;
   const experiences: CvContent["experiences"] = [];
   for (const d of draft.experiences) {
     const b = brief.experiences.find((e) => e.id === d.factId);
@@ -131,10 +133,14 @@ export function assembleCv(
       factId: b.id,
       company: b.company,
       // cargo e local no idioma do documento (o revisor confere que dizem o mesmo que os dados)
-      title: d.title,
+      title: sameLanguage ? b.title : d.title,
       start: b.start,
       end: b.current ? null : b.end,
-      location: fact.location ? (d.location ?? fact.location) : null,
+      location: fact.location
+        ? sameLanguage
+          ? fact.location
+          : (d.location ?? fact.location)
+        : null,
       bullets: d.bullets,
       tech: d.tech,
       matchScore: b.matchScore,
@@ -219,7 +225,7 @@ export function assembleCv(
   const translated = new Map(draft.education.map((t) => [t.factId, t]));
   const education = brief.education.map((e) => {
     const f = facts.education.get(e.id);
-    const t = translated.get(e.id);
+    const t = sameLanguage ? undefined : translated.get(e.id);
     return {
       factId: e.id,
       institution: e.institution,
@@ -276,7 +282,8 @@ export function assembleCoverLetter(
   );
   const content: CoverLetterContent = {
     meta: { kind: "cover_letter", ...ctx.meta },
-    header: ctx.header,
+    // título no idioma da carta (o cargo-alvo do perfil pode estar escrito em outro)
+    header: draft.headline ? { ...ctx.header, title: draft.headline } : ctx.header,
     greeting: draft.greeting,
     paragraphs: draft.paragraphs,
     signature: ctx.header.name,

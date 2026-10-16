@@ -112,7 +112,7 @@ export function contentToDraft(
 ): { cv: CvDraft } | { letter: CoverLetterDraft } {
   if (content.meta.kind === "cover_letter") {
     const l = content as CoverLetterContent;
-    return { letter: { greeting: l.greeting, paragraphs: l.paragraphs } };
+    return { letter: { headline: l.header.title, greeting: l.greeting, paragraphs: l.paragraphs } };
   }
   const c = content as CvContent;
   return {
@@ -156,12 +156,42 @@ export async function changeDocumentLayout(
   const content = current?.content as CvContent | CoverLetterContent | null | undefined;
   if (!content)
     throw new DocumentEditError("missing_content", "Ainda não há conteúdo para montar de novo.");
-  repos.documents.update(doc.id, {
+  const next = repos.documents.update(doc.id, {
     ...(input.templateId ? { templateId: input.templateId } : {}),
     ...(input.paper ? { paper: input.paper } : {}),
     ...(input.format && doc.kind === "cover_letter" ? { format: input.format } : {}),
   });
-  return newRenderVersion(repos, enqueue, doc.id, "template", contentToDraft(content));
+  const draft = contentToDraft(content);
+  // já montado nesse modelo, papel e formato com o mesmo conteúdo: volta a ser a atual, sem montar nem revisar de novo
+  const same = sameLayoutVersion(repos, next, draft);
+  if (same) {
+    repos.documents.setCurrent(doc.id, same.version);
+    return same;
+  }
+  return newRenderVersion(repos, enqueue, doc.id, "template", draft);
+}
+
+const FINISHED = new Set(["ready", "ready_with_issues"]);
+
+function sameLayoutVersion(
+  repos: Repos,
+  doc: { id: string; templateId: string; paper: Paper; format: "pdf" | "text" },
+  draft: ReturnType<typeof contentToDraft>,
+): DocumentVersionRecord | null {
+  const key = JSON.stringify(draft);
+  return (
+    repos.documents
+      .listVersions(doc.id)
+      .find(
+        (v) =>
+          FINISHED.has(v.status) &&
+          v.content !== null &&
+          v.templateId === doc.templateId &&
+          v.paper === doc.paper &&
+          v.format === doc.format &&
+          JSON.stringify(contentToDraft(v.content as CvContent | CoverLetterContent)) === key,
+      ) ?? null
+  );
 }
 
 /** Texto do documento, uma linha por item (base do diff). */

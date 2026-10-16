@@ -51,6 +51,8 @@ export interface RequestDocumentInput {
   templateId?: string | undefined;
   format?: CoverLetterFormat | undefined;
   source?: DocumentVersionSource | undefined;
+  /** "Tentar de novo": o gerador já começa com os erros da revisão da versão atual (como na regeração automática). */
+  fixIssues?: boolean | undefined;
 }
 
 const LETTER_MARKETS = new Set(["US", "CA"]);
@@ -84,6 +86,12 @@ export async function requestDocument(
     );
 
   let doc = repos.documents.find(input.kind, profile.id, posting?.id ?? null);
+  const previousIssues =
+    input.fixIssues && doc
+      ? (repos.documents.currentVersion(doc.id)?.review?.issues ?? [])
+          .filter((i) => i.severity === "error")
+          .map(({ area, message, where }) => ({ area, message, where: where ?? null }))
+      : [];
   const locale = documentLocale(profile, posting);
   if (!input.acceptLanguage) {
     const cover = languageCoverage(
@@ -130,7 +138,11 @@ export async function requestDocument(
     queue: "extract",
     type: DOCUMENT_TASKS.generate,
     key: doc.id,
-    payload: { documentId: doc.id, versionId: version.id },
+    payload: {
+      documentId: doc.id,
+      versionId: version.id,
+      ...(previousIssues.length ? { previousIssues } : {}),
+    },
     profileId: profile.id,
   });
   return { document: repos.documents.get(doc.id) as DocumentRecord, version, created };

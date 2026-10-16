@@ -247,9 +247,19 @@ export function buildCvBrief(
       hasEvidence: evidenced(k.term),
     }));
 
+  const sourceText = [
+    ...included.flatMap((x) => [
+      x.e.title,
+      x.e.summary ?? "",
+      ...x.achievements.map((a) => a.text),
+    ]),
+    ...facts.education.flatMap((e) => [e.course ?? "", e.degree ?? ""]),
+  ].join(" \n ");
+  const detected = detectLanguage(sourceText);
   const brief: CvBrief = {
     kind: input.kind,
     locale: input.locale,
+    sourceLocale: detected === "pt" ? "pt-BR" : detected === "en" ? "en-US" : null,
     maxPages: 2,
     profile: {
       name: user?.fullName ?? user?.displayName ?? profile.name,
@@ -257,6 +267,7 @@ export function buildCvBrief(
       seniority: profile.seniority,
       area: profile.area,
       pitch: profile.pitch ?? null,
+      yearsExperience: completeYears(facts.experiences, now),
     },
     posting: posting
       ? {
@@ -329,4 +340,20 @@ export function buildCvBrief(
     list.filter((f) => !f.verified).map((f) => ({ kind, id: f.id })),
   );
   return { brief, atsTerms, unverified };
+}
+
+/** Anos completos desde o início da primeira experiência (o gerador usa este número e não calcula outro). */
+function completeYears(
+  experiences: Array<{ startDate?: string | null }>,
+  now: Date,
+): number | null {
+  const first = experiences
+    .map((e) => e.startDate)
+    .filter((d): d is string => Boolean(d))
+    .sort()[0];
+  if (!first) return null;
+  const [y, m] = first.split("-").map(Number);
+  if (!y) return null;
+  const months = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1 - (y * 12 + (m || 1));
+  return Math.max(0, Math.floor(months / 12));
 }

@@ -69,6 +69,45 @@ describe("F05/M4 core · pedido de documento", () => {
     expect(again.version.version).toBe(2);
   });
 
+  it("'Tentar de novo' (fixIssues): leva os erros da revisão da versão atual para o gerador", async () => {
+    const s = setup();
+    const a = await requestDocument(s.r, s.enqueue, {
+      kind: "cv",
+      profileId: s.ids.profileId,
+      postingId: null,
+    });
+    s.r.documents.updateVersion(a.version.id, {
+      status: "ready_with_issues",
+      review: {
+        passed: false,
+        atsScore: 80,
+        issues: [
+          { area: "ats", severity: "error", message: "ATS de 80%.", where: null },
+          { area: "layout", severity: "warning", message: "Página 2 curta.", where: "p. 2" },
+        ],
+      },
+    });
+    const b = await requestDocument(s.r, s.enqueue, {
+      kind: "cv",
+      profileId: s.ids.profileId,
+      postingId: null,
+      fixIssues: true,
+    });
+    expect(s.enqueued[1]?.payload).toEqual({
+      documentId: b.document.id,
+      versionId: b.version.id,
+      previousIssues: [{ area: "ats", message: "ATS de 80%.", where: null }],
+    });
+    // sem fixIssues, o "Atualizar" começa do zero
+    s.r.documents.updateVersion(b.version.id, { status: "ready" });
+    await requestDocument(s.r, s.enqueue, {
+      kind: "cv",
+      profileId: s.ids.profileId,
+      postingId: null,
+    });
+    expect(s.enqueued[2]?.payload).not.toHaveProperty("previousIssues");
+  });
+
   it("pedido com uma geração em andamento devolve a mesma versão (sem enfileirar de novo)", async () => {
     const s = setup();
     const a = await requestDocument(s.r, s.enqueue, {

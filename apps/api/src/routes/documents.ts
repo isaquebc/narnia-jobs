@@ -82,6 +82,7 @@ function editErrorResponse(c: Context, e: unknown) {
 const RegenerateSchema = z.object({
   instructions: z.string().max(2000).nullable().optional(),
   acceptLanguage: z.boolean().optional(),
+  fixIssues: z.boolean().optional(),
 });
 
 const REQUEST_STATUS: Record<DocumentRequestError["code"], ContentfulStatusCode> = {
@@ -207,6 +208,7 @@ export function documentsRoutes(deps: {
         postingId: doc.postingId,
         instructions: body.instructions ?? null,
         acceptLanguage: body.acceptLanguage,
+        fixIssues: body.fixIssues,
       });
       const view = documentView(repos, repos.documents.get(doc.id) ?? doc);
       announce(view);

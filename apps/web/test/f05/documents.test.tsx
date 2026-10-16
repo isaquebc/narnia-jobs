@@ -277,6 +277,82 @@ describe("F05/M5 · Perfil › Currículo", () => {
     });
   });
 
+  it("não passou na revisão: 'Tentar de novo' no alerta refaz usando os apontamentos", async () => {
+    const regenerateDocument = vi.fn(async () => ready());
+    const failed = ready(
+      {},
+      {
+        status: "ready_with_issues",
+        attempts: 2,
+        review: {
+          passed: false,
+          atsScore: 81,
+          issues: [{ area: "ats", severity: "error", message: "ATS de 81%.", where: null }],
+        },
+      },
+    );
+    renderApp({
+      api: api({
+        regenerateDocument,
+        listDocuments: vi.fn(async () => ({ documents: [failed] })),
+      }) as never,
+      initialUrl: "/perfis/p1/curriculo",
+    });
+    const alert = await screen.findByRole("alert", { name: "Não passou na revisão" });
+    await userEvent.click(within(alert).getByRole("button", { name: "Tentar de novo" }));
+    expect(regenerateDocument).toHaveBeenCalledWith("d1", {
+      instructions: null,
+      acceptLanguage: true,
+      fixIssues: true,
+    });
+  });
+
+  it("erro na geração: 'Tentar de novo' no alerta", async () => {
+    const regenerateDocument = vi.fn(async () => ready());
+    renderApp({
+      api: api({
+        regenerateDocument,
+        listDocuments: vi.fn(async () => ({
+          documents: [
+            ready({}, { status: "error", error: "Navegador indisponível.", pagesRendered: null }),
+          ],
+        })),
+      }) as never,
+      initialUrl: "/perfis/p1/curriculo",
+    });
+    const alert = await screen.findByText(/Navegador indisponível/);
+    await userEvent.click(
+      within(alert.closest("[role=alert]") as HTMLElement).getByRole("button", {
+        name: "Tentar de novo",
+      }),
+    );
+    expect(regenerateDocument).toHaveBeenCalledWith("d1", {
+      instructions: null,
+      acceptLanguage: true,
+      fixIssues: true,
+    });
+  });
+
+  it("prévia: clicar na página abre em tela cheia, com anterior e próxima", async () => {
+    renderApp({
+      api: api({ listDocuments: vi.fn(async () => ({ documents: [ready()] })) }) as never,
+      initialUrl: "/perfis/p1/curriculo",
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Ampliar a página 1" }));
+    const viewer = await screen.findByRole("dialog", { name: "Página 1 de 2" });
+    expect(within(viewer).getByRole("img", { name: "Página 1" })).toHaveAttribute(
+      "src",
+      "/api/documents/d1/versions/1/pages/1",
+    );
+    expect(within(viewer).getByRole("button", { name: "Página anterior" })).toBeDisabled();
+    await userEvent.click(within(viewer).getByRole("button", { name: "Próxima página" }));
+    expect(await screen.findByRole("dialog", { name: "Página 2 de 2" })).toBeInTheDocument();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(await screen.findByRole("dialog", { name: "Página 1 de 2" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("gerando: mostra a etapa e o Atualizar fica desligado", async () => {
     renderApp({
       api: api({

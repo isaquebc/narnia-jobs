@@ -1,4 +1,12 @@
-import type { CvLink, CvLinkKind, Link } from "@narnia-jobs/shared";
+import type {
+  CoverLetterContent,
+  CvContent,
+  CvLink,
+  CvLinkKind,
+  CvReviewIssue,
+  Link,
+} from "@narnia-jobs/shared";
+import type { LinkStatus } from "./link-check";
 
 /**
  * Links do cabeçalho do CV (F05-19): e-mail (`mailto:`), WhatsApp (`wa.me`), LinkedIn e GitHub pelo domínio dos links
@@ -76,4 +84,41 @@ export function buildHeaderLinks(
 export function missingHeaderLinks(links: CvLink[]): CvLinkKind[] {
   const have = new Set(links.map((l) => l.kind));
   return HEADER_LINK_KINDS.filter((k) => !have.has(k));
+}
+
+/**
+ * Link morto nos dados (F05-23: 404/410 ou domínio que não existe) fica fora do PDF: o do cabeçalho sai, o projeto
+ * continua sem o link. Cada um vira aviso para a pessoa corrigir nos dados; não é erro, porque o gerador não tem como
+ * consertar um dado e a regeração seria gasta à toa. Cada endereço é conferido uma vez.
+ */
+export async function pruneDeadLinks<T extends CvContent | CoverLetterContent>(
+  content: T,
+  check: (url: string) => Promise<LinkStatus>,
+): Promise<{ content: T; issues: CvReviewIssue[] }> {
+  const cv = content.meta.kind === "cv" ? (content as CvContent) : null;
+  const urls = [
+    ...content.header.links.map((l) => l.url),
+    ...(cv?.projects.flatMap((p) => (p.url ? [p.url] : [])) ?? []),
+  ];
+  const dead = new Map<string, string>();
+  for (const url of new Set(urls)) {
+    const s = await check(url);
+    if (!s.ok) dead.set(url, s.reason);
+  }
+  if (dead.size === 0) return { content, issues: [] };
+  const issues: CvReviewIssue[] = [...dead].map(([url, reason]) => ({
+    area: "links",
+    severity: "warning",
+    message: `${reason} O link ficou fora do PDF: corrija nos seus dados e use Atualizar.`,
+    where: url,
+  }));
+  const header = { ...content.header, links: content.header.links.filter((l) => !dead.has(l.url)) };
+  const out = cv
+    ? {
+        ...cv,
+        header,
+        projects: cv.projects.map((p) => (p.url && dead.has(p.url) ? { ...p, url: null } : p)),
+      }
+    : { ...content, header };
+  return { content: out as T, issues };
 }

@@ -214,6 +214,11 @@ export type CvReview = z.infer<typeof CvReviewSchema>;
 export interface CvBrief {
   kind: DocumentKind;
   locale: CvLocale;
+  /**
+   * Idioma em que os dados estão escritos (pelas conquistas, cargos e formação), `null` quando não dá para saber. Igual a
+   * `locale`: cargo, local e curso saem como nos dados, sem tradução.
+   */
+  sourceLocale: CvLocale | null;
   maxPages: 2;
   profile: {
     name: string;
@@ -221,6 +226,8 @@ export interface CvBrief {
     seniority: string;
     area: string;
     pitch: string | null;
+    /** Anos completos desde a primeira experiência (calculado pelo código; `null` sem datas). */
+    yearsExperience: number | null;
   };
   posting: null | {
     company: string | null;
@@ -302,6 +309,8 @@ export const CvDraftSchema = z.object({
 export type CvDraft = z.infer<typeof CvDraftSchema>;
 
 export const CoverLetterDraftSchema = z.object({
+  /** Cargo-alvo no idioma da carta (título do cabeçalho); o gerador sempre manda, a edição pode omitir. */
+  headline: Text.optional(),
   greeting: Text,
   paragraphs: z
     .array(

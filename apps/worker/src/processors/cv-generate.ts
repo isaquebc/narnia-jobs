@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   ATS_MIN_SCORE,
+  aliasBriefIds,
   assembleCoverLetter,
   assembleCv,
   atsScore,
@@ -23,6 +24,7 @@ import {
   linkIssues,
   notifyDocumentResult,
   type PdfInspection,
+  pruneDeadLinks,
   type RenderPdfResult,
   readTemplateZip,
   recordUsage,
@@ -114,10 +116,23 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
     (data.payload.letter as CoverLetterDraft | undefined) ??
     null;
   const maxAttempts = edit ? 1 : DOCUMENT_MAX_ATTEMPTS;
+  // cada link é conferido uma vez por tarefa (as tentativas repetem os mesmos endereços)
+  const linkCache = new Map<string, Promise<LinkStatus>>();
+  const linkStatus = (url: string) => {
+    let s = linkCache.get(url);
+    if (!s) {
+      s = docs.checkLink(url);
+      linkCache.set(url, s);
+    }
+    return s;
+  };
   try {
     await set("collecting", { jobId: ctx.jobId });
     const header = buildCvHeader(repos, doc.profileId, doc.locale);
-    let previous: CvBrief["previousIssues"] = [];
+    // "Tentar de novo" pela tela: os apontamentos da versão anterior já valem na primeira tentativa
+    let previous: CvBrief["previousIssues"] = Array.isArray(data.payload.previousIssues)
+      ? (data.payload.previousIssues as CvBrief["previousIssues"])
+      : [];
     let last: {
       content: Doc;
       review: CvReview;
@@ -155,7 +170,8 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         });
       else if (edit) assembled = assembleCv(repos, brief, edit as CvDraft, { meta, header });
       else if (doc.kind === "cover_letter") {
-        const r = await deps.provider.coverLetterGenerate({ brief, model: genModel });
+        const ids = aliasBriefIds(brief);
+        const r = await deps.provider.coverLetterGenerate({ brief: ids.brief, model: genModel });
         usage.push(
           recordUsage(
             repos,
@@ -167,12 +183,13 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
             }),
           ),
         );
-        assembled = assembleCoverLetter(brief, r.output, {
+        assembled = assembleCoverLetter(brief, ids.restoreLetter(r.output), {
           meta: { ...meta, postingId: doc.postingId ?? "", format: doc.format },
           header,
         });
       } else {
-        const r = await deps.provider.cvGenerate({ brief, model: genModel });
+        const ids = aliasBriefIds(brief);
+        const r = await deps.provider.cvGenerate({ brief: ids.brief, model: genModel });
         usage.push(
           recordUsage(
             repos,
@@ -184,7 +201,7 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
             }),
           ),
         );
-        assembled = assembleCv(repos, brief, r.output, { meta, header });
+        assembled = assembleCv(repos, brief, ids.restoreCv(r.output), { meta, header });
       }
       await set("validating", { content: assembled.content });
       const finalAttempt = attempt === maxAttempts;
@@ -204,6 +221,9 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         };
         continue;
       }
+      // link morto nos dados sai do PDF com um aviso (não reprova: o gerador não conserta um dado)
+      const pruned = await pruneDeadLinks(assembled.content, linkStatus);
+      assembled = { content: pruned.content, issues: [...assembled.issues, ...pruned.issues] };
       const rendered = await renderAndCheck(
         deps,
         docs,
@@ -212,6 +232,7 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         assembled.content,
         atsTerms,
         brief,
+        linkStatus,
       );
       const issues = [...assembled.issues, ...rendered.issues];
       // revisão do Haiku (F05-13): quando o código já reprovou, só na última tentativa (a regeração vem de qualquer jeito)
@@ -241,10 +262,14 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         );
         issues.push(...rv.output.issues);
       }
+      // o revisor às vezes repete uma checagem do código: o mesmo apontamento aparece uma vez
+      const unique = issues.filter(
+        (x, i) => issues.findIndex((y) => y.area === x.area && y.message === x.message) === i,
+      );
       const review: CvReview = {
-        passed: errorsOf(issues).length === 0,
+        passed: errorsOf(unique).length === 0,
         atsScore: rendered.atsScore,
-        issues,
+        issues: unique,
       };
       last = {
         content: assembled.content,
@@ -254,7 +279,7 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         text: rendered.text,
       };
       if (review.passed) break;
-      previous = errorsOf(issues).map(({ area, message, where }) => ({ area, message, where }));
+      previous = errorsOf(unique).map(({ area, message, where }) => ({ area, message, where }));
     }
     const final = last as NonNullable<typeof last>;
     const status: DocumentVersionStatus = final.review.passed ? "ready" : "ready_with_issues";
@@ -317,6 +342,7 @@ async function renderAndCheck(
   content: Doc,
   atsTerms: ReturnType<typeof buildCvBrief>["atsTerms"],
   brief: CvBrief,
+  checkLink: (url: string) => Promise<LinkStatus>,
 ): Promise<{
   issues: CvReviewIssue[];
   atsScore: number | null;
@@ -364,7 +390,7 @@ async function renderAndCheck(
     ...(cv?.projects.flatMap((p) => (p.url ? [p.url] : [])) ?? []),
   ];
   const statuses = new Map<string, LinkStatus>();
-  for (const url of [...new Set(expected)]) statuses.set(url, await docs.checkLink(url));
+  for (const url of [...new Set(expected)]) statuses.set(url, await checkLink(url));
   issues.push(...linkIssues(insp, expected, statuses));
   let ats: number | null = null;
   if (cv) {

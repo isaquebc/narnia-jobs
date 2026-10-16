@@ -160,3 +160,19 @@ describe("F05 shared · revisão", () => {
     ).toBe(false);
   });
 });
+
+describe("F05 · título da carta no idioma dela", () => {
+  it("o gerador da carta devolve o headline (obrigatório na saída do modelo); edição sem ele continua válida", async () => {
+    const { CV_OUTPUT_JSON_SCHEMAS } = await import("../src/json-schema");
+    const { CoverLetterDraftSchema } = await import("../src/schemas/cv");
+    expect(
+      (CV_OUTPUT_JSON_SCHEMAS.coverLetterGenerate as { required?: string[] }).required,
+    ).toContain("headline");
+    const paragraphs = [
+      { role: "why", text: "a", factIds: [] },
+      { role: "covers", text: "b", factIds: [] },
+      { role: "closing", text: "c", factIds: [] },
+    ];
+    expect(CoverLetterDraftSchema.safeParse({ greeting: "Oi", paragraphs }).success).toBe(true);
+  });
+});

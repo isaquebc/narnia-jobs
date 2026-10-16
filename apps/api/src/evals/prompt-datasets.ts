@@ -1,3 +1,4 @@
+import { aliasBriefIds } from "@narnia-jobs/core";
 import type {
   AnalyzeProfilesProviderInput,
   AnalyzeRepoInput,
@@ -17,6 +18,7 @@ import type {
 } from "@narnia-jobs/providers";
 import { STRUCTURED_PROMPTS, structuredPromptVars } from "@narnia-jobs/providers";
 import type { CvContent } from "@narnia-jobs/shared";
+import { CV_BRIEF_PT_TARGET_EN } from "./cv-brief-fixtures";
 
 /**
  * Datasets dos prompts estruturados (M3): exemplos fictícios, com as entradas tipadas como o provider as recebe; as
@@ -312,6 +314,7 @@ const CV_EXPERIENCES: CvGenerateInput["brief"]["experiences"] = [
 const cvBrief = (o: Partial<CvGenerateInput["brief"]>): CvGenerateInput["brief"] => ({
   kind: "cv",
   locale: "pt-BR",
+  sourceLocale: "pt-BR",
   maxPages: 2,
   profile: {
     name: "Ana Maria Exemplo",
@@ -319,6 +322,7 @@ const cvBrief = (o: Partial<CvGenerateInput["brief"]>): CvGenerateInput["brief"]
     seniority: "senior",
     area: "backend",
     pitch: "Backend de pagamentos com foco em performance.",
+    yearsExperience: 9,
   },
   posting: null,
   experiences: CV_EXPERIENCES,
@@ -549,6 +553,53 @@ const CV_DATASETS = {
       },
       reference: { expected: ['"id":"a3"', "4 pessoas"], forbidden: ["10 pessoas"] },
     },
+    {
+      id: "cv-pt-alvo-em-ingles",
+      description:
+        "CV do perfil em pt-BR, sem vaga, com o cargo-alvo escrito em inglês: o título do cabeçalho sai em português e os cargos e o curso exatamente como nos dados (o revisor reprovava cargo em inglês).",
+      input: {
+        brief: cvBrief({
+          profile: {
+            name: "Ana Maria Exemplo",
+            targetTitle: "Senior Backend Engineer",
+            seniority: "senior",
+            area: "backend",
+            pitch: null,
+            yearsExperience: 9,
+          },
+        }),
+      },
+      reference: {
+        expected: [
+          '"title":"Engenheira de Software Sênior"',
+          '"title":"Desenvolvedora Backend"',
+          '"course":"Ciência da Computação"',
+        ],
+        forbidden: [
+          '"headline":"Senior Backend Engineer"',
+          '"title":"Senior Software Engineer"',
+          '"title":"Backend Developer"',
+        ],
+      },
+    },
+    {
+      id: "cv-pt-alvo-em-ingles-real",
+      description:
+        "O mesmo caso com o resumo real da instância de testes (4 experiências, 20 skills, projetos): cargos como nos dados e cabeçalho em português.",
+      // como o gerador recebe: ids curtos (aliasBriefIds)
+      input: { brief: aliasBriefIds(CV_BRIEF_PT_TARGET_EN).brief },
+      reference: {
+        expected: [
+          '"title":"Engenheira de Software Sênior"',
+          '"title":"Engenheira de Software Pleno"',
+        ],
+        forbidden: [
+          '"headline":"Senior Backend Engineer"',
+          '"title":"Senior Software Engineer"',
+          '"title":"Mid-level Software Engineer"',
+        ],
+      },
+    },
   ],
   coverLetterGenerate: [
     {
@@ -564,6 +615,61 @@ const CV_DATASETS = {
         }),
       },
       reference: { expected: ["Initech", '"role":"gaps"', '"id":"a1"', "300 ms"] },
+    },
+    {
+      id: "carta-en-titulo-traduzido",
+      description:
+        "Carta em inglês com o cargo-alvo do perfil em português: o título do cabeçalho (headline) sai em inglês (o revisor reprovava a carta por idioma).",
+      input: {
+        brief: cvBrief({
+          kind: "cover_letter",
+          locale: "en-US",
+          posting: { ...VAGA_INITECH, required: ["Node.js", "PostgreSQL"], analysis: null },
+        }),
+      },
+      reference: {
+        expected: ['"headline":"Senior Software Engineer"', "Initech", '"role":"covers"'],
+        forbidden: ['"headline":"Engenheira de Software Sênior"'],
+      },
+    },
+    {
+      id: "carta-pt-corrige-sem-encurtar",
+      description:
+        "Carta pt-BR com o cargo-alvo do perfil em inglês, depois de a revisão reprovar o termo em inglês no texto: corrige sem passar de 250 palavras para baixo (a correção encolhia a carta para 235).",
+      input: {
+        brief: cvBrief({
+          kind: "cover_letter",
+          profile: {
+            name: "Ana Maria Exemplo",
+            targetTitle: "Senior Backend Engineer",
+            seniority: "senior",
+            area: "backend",
+            pitch: null,
+            yearsExperience: 9,
+          },
+          posting: {
+            ...VAGA_INITECH,
+            company: "Nubank",
+            title: "Engenheira de Software Sênior - Plataforma",
+            required: ["Node.js", "PostgreSQL"],
+            nice: ["Redis"],
+            responsibilities: ["Evoluir a plataforma de pagamentos", "Mentorar engenheiros"],
+            analysis: null,
+          },
+          previousIssues: [
+            {
+              area: "language",
+              message:
+                "Termo em inglês em texto português: 'Senior Backend Engineer' deve estar traduzido.",
+              where: "Parágrafo 1 (why)",
+            },
+          ],
+        }),
+      },
+      reference: {
+        expected: ["Nubank", '"role":"covers"', '"id":"a1"'],
+        forbidden: ["Senior Backend Engineer"],
+      },
     },
     {
       id: "carta-pt",

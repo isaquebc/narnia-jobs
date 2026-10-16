@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cvFactIds, cvNoGapTerms } from "../../src/evals/prompt-evaluators";
+import {
+  cvFactIds,
+  cvNoGapTerms,
+  cvSourceTitles,
+  letterWordCount,
+} from "../../src/evals/prompt-evaluators";
 
 /** F05/M2 · avaliadores de honestidade do CV e da carta no Phoenix. */
 const brief = JSON.stringify({
@@ -86,5 +91,113 @@ describe("F05/M2 · idioma do CV pelo resumo", async () => {
         { fields: ["summary"] },
       ).label,
     ).toBe("passou");
+  });
+});
+
+describe("F05 · cargos e formação como nos dados quando o idioma é o mesmo", () => {
+  const ptBrief = (locale: string) =>
+    JSON.stringify({
+      locale,
+      sourceLocale: "pt-BR",
+      experiences: [
+        { id: "e1", title: "Engenheira de Software Sênior" },
+        { id: "e2", title: "Desenvolvedora Backend" },
+      ],
+      education: [{ id: "ed1", course: "Ciência da Computação", degree: "Bacharelado" }],
+    });
+  const out = (
+    t1: string,
+    t2: string,
+    course = "Ciência da Computação",
+    degree = "Bacharelado",
+  ) => ({
+    experiences: [
+      { factId: "e1", title: t1 },
+      { factId: "e2", title: t2 },
+    ],
+    education: [{ factId: "ed1", course, degree }],
+  });
+
+  it("pt-BR com dados em pt-BR: cada cargo e curso igual ao dado; nota pela fração", () => {
+    const ok = cvSourceTitles({
+      output: out("Engenheira de Software Sênior", "Desenvolvedora Backend"),
+      input: { brief_json: ptBrief("pt-BR") },
+    });
+    expect(ok).toMatchObject({ label: "passou", score: 1 });
+    const bad = cvSourceTitles({
+      output: out("Senior Software Engineer", "Desenvolvedora Backend", "Computer Science"),
+      input: { brief_json: ptBrief("pt-BR") },
+    });
+    expect(bad.label).toBe("falhou");
+    expect(bad.score).toBe(0.5);
+    expect(bad.explanation).toMatch(/Senior Software Engineer/);
+    expect(bad.explanation).toMatch(/Computer Science/);
+  });
+
+  it("idioma diferente: cargo e curso copiados em português num CV em inglês contam como erro", () => {
+    expect(
+      cvSourceTitles({
+        output: out(
+          "Senior Software Engineer",
+          "Backend Developer",
+          "Computer Science",
+          "Bachelor's degree",
+        ),
+        input: { brief_json: ptBrief("en-US") },
+      }),
+    ).toMatchObject({ label: "passou", score: 1 });
+    const bad = cvSourceTitles({
+      output: out(
+        "Engenheira de Software Sênior",
+        "Backend Developer",
+        "Computer Science",
+        "Bachelor's degree",
+      ),
+      input: { brief_json: ptBrief("en-US") },
+    });
+    expect(bad.label).toBe("falhou");
+    expect(bad.explanation).toMatch(/Engenheira de Software Sênior/);
+    // nome que não muda entre idiomas (Tech Lead) não conta
+    expect(
+      cvSourceTitles({
+        output: { experiences: [{ factId: "e1", title: "Tech Lead" }] },
+        input: {
+          brief_json: JSON.stringify({
+            locale: "en-US",
+            sourceLocale: "pt-BR",
+            experiences: [{ id: "e1", title: "Tech Lead" }],
+          }),
+        },
+      }).label,
+    ).toBe("passou");
+  });
+
+  it("idioma dos dados desconhecido: não se aplica", () => {
+    expect(
+      cvSourceTitles({
+        output: out("x", "y"),
+        input: { brief_json: JSON.stringify({ locale: "pt-BR", sourceLocale: null }) },
+      }).label,
+    ).toBe("passou");
+  });
+});
+
+describe("F05 · tamanho da carta", () => {
+  const letter = (...sizes: number[]) => ({
+    paragraphs: sizes.map((n, i) => ({
+      role: ["why", "covers", "gaps", "closing"][i],
+      text: "palavra ".repeat(n).trim(),
+    })),
+  });
+
+  it("de 250 a 400 palavras somando os parágrafos passa; fora disso falha com a contagem", () => {
+    expect(letterWordCount({ output: letter(80, 120, 70, 40) })).toMatchObject({
+      label: "passou",
+      score: 1,
+    });
+    const short = letterWordCount({ output: letter(58, 85, 65, 27) });
+    expect(short).toMatchObject({ label: "falhou", score: 0 });
+    expect(short.explanation).toMatch(/235/);
+    expect(letterWordCount({ output: letter(150, 150, 100, 50) }).label).toBe("falhou");
   });
 });

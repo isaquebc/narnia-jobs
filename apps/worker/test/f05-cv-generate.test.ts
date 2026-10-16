@@ -5,6 +5,7 @@ import {
   analyzePostingText,
   createRepos,
   type DocumentRecord,
+  type LinkStatus,
   matchKeywords,
   migrate,
   openDatabase,
@@ -13,7 +14,7 @@ import {
   seedFixture,
 } from "@narnia-jobs/core";
 import { MockProvider } from "@narnia-jobs/providers";
-import type { CvBrief, WsEvent } from "@narnia-jobs/shared";
+import type { CvBrief, CvReviewOutput, WsEvent } from "@narnia-jobs/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import type { WorkerDeps } from "../src/pipeline";
 import { processTask } from "../src/tasks";
@@ -50,7 +51,13 @@ function fakeInspect(pagesFor: () => number) {
   };
 }
 
-function harness(opts: { pages?: () => number; provider?: MockProvider } = {}) {
+function harness(
+  opts: {
+    pages?: () => number;
+    provider?: MockProvider;
+    checkLink?: (url: string) => Promise<LinkStatus>;
+  } = {},
+) {
   const db = openDatabase(":memory:");
   migrate(db);
   const repos: Repos = createRepos(db);
@@ -94,7 +101,7 @@ function harness(opts: { pages?: () => number; provider?: MockProvider } = {}) {
       browserWs: "ws://fake",
       render: async (html) => ({ ok: true, pdf: Buffer.from(html), blocked: [] }),
       inspect: fakeInspect(opts.pages ?? (() => 1)),
-      checkLink: async () => ({ ok: true }),
+      checkLink: opts.checkLink ?? (async () => ({ ok: true })),
       pages: async () => [],
     },
   };
@@ -159,6 +166,12 @@ describe("F05/M2 worker · cv.generate", () => {
     expect(done?.review?.passed).toBe(true);
     expect(done?.atsScore).toBeGreaterThanOrEqual(90);
     expect(h.briefs[0]?.instructions).toBe("Destaque a liderança");
+    // o gerador recebe ids curtos; o conteúdo guardado tem os ids reais dos fatos
+    expect(h.briefs[0]?.experiences[0]?.id).toBe("e1");
+    const real =
+      (done?.content as { experiences: Array<{ factId: string }> } | undefined)?.experiences ?? [];
+    expect(real.length).toBeGreaterThan(0);
+    expect(real.every((e) => h.repos.facts.experiences.get(e.factId))).toBe(true);
     const content = done?.content as {
       header: { links: Array<{ kind: string }> };
       experiences: unknown[];
@@ -202,6 +215,70 @@ describe("F05/M2 worker · cv.generate", () => {
       expect.objectContaining({ area: "layout", message: expect.stringMatching(/sobreposto/) }),
     );
     expect(h.repos.usageEvents.list().filter((u) => u.category === "cv.review")).toHaveLength(2);
+  });
+
+  it("'Tentar de novo': os apontamentos da versão anterior já entram na primeira tentativa", async () => {
+    h = harness();
+    const { doc, v } = newDoc(h);
+    const previousIssues = [{ area: "ats", message: "ATS de 80%.", where: null }];
+    await processTask(
+      {
+        kind: "task",
+        type: "cv.generate",
+        key: doc.id,
+        payload: { documentId: doc.id, versionId: v.id, previousIssues },
+      },
+      { jobId: `task__cv.generate__${doc.id}`, progress: async () => {} },
+      h.deps,
+    );
+    expect(h.briefs[0]?.previousIssues).toEqual(previousIssues);
+  });
+
+  it("link morto nos dados: fica fora do PDF, vira aviso e não gasta a regeração", async () => {
+    const checked: string[] = [];
+    h = harness({
+      checkLink: async (u) => {
+        checked.push(u);
+        return u.includes("linkedin")
+          ? { ok: false, reason: `A página ${u} não existe (404).` }
+          : { ok: true };
+      },
+    });
+    const { doc, v } = newDoc(h);
+    await run(h, doc.id, v.id);
+    const done = h.repos.documents.versionById(v.id);
+    expect(done).toMatchObject({ status: "ready", attempts: 1 });
+    const content = done?.content as { header: { links: Array<{ kind: string }> } };
+    expect(content.header.links.map((l) => l.kind)).toEqual(["email", "whatsapp"]);
+    expect(done?.review?.issues).toContainEqual(
+      expect.objectContaining({
+        area: "links",
+        severity: "warning",
+        where: expect.stringContaining("linkedin"),
+      }),
+    );
+    expect(checked.filter((u) => u.includes("linkedin"))).toHaveLength(1);
+  });
+
+  it("apontamento repetido pelo revisor aparece uma vez só", async () => {
+    const provider = new MockProvider();
+    h = harness({ provider });
+    const review = provider.cvReview.bind(provider);
+    const twice: CvReviewOutput["issues"][number] = {
+      area: "layout",
+      severity: "error",
+      message: "Texto sobreposto no cabeçalho.",
+      where: "página 1",
+    };
+    provider.cvReview = async (i) => {
+      const r = await review(i);
+      return { ...r, output: { passed: false, issues: [twice, { ...twice, where: null }] } };
+    };
+    const { doc, v } = newDoc(h);
+    await run(h, doc.id, v.id);
+    const issues = h.repos.documents.versionById(v.id)?.review?.issues ?? [];
+    expect(issues.filter((x) => x.message === twice.message)).toHaveLength(1);
+    expect(h.briefs[1]?.previousIssues.filter((x) => x.message === twice.message)).toHaveLength(1);
   });
 
   it("o revisor reprova duas vezes: alerta 'não passou na revisão' com o apontamento", async () => {

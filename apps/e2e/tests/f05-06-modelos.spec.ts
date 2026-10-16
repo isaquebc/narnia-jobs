@@ -4,7 +4,7 @@ import { documents, generate, waitDocuments } from "../helpers/documents";
 import { freshStart } from "../helpers/ingest";
 import { login } from "../helpers/profiles";
 
-test("F05/E2E-06 modelos: trocar para Moderno sem gerar; modelo enviado válido é usado; com <script> é recusado com o motivo", async ({
+test("F05/E2E-06 modelos: trocar para Moderno sem gerar; voltar a um modelo já montado reaproveita a versão; modelo enviado válido é usado; com <script> é recusado com o motivo", async ({
   page,
 }) => {
   const { ids } = await freshStart("engineer");
@@ -41,4 +41,14 @@ test("F05/E2E-06 modelos: trocar para Moderno sem gerar; modelo enviado válido 
       timeout: 60_000,
     })
     .toMatchObject({ version: 3, status: "ready" });
+  // de volta ao Clássico e ao Moderno: as versões já montadas voltam a ser a atual, sem montar de novo
+  await page.getByLabel("Modelo").selectOption({ label: "Clássico" });
+  await expect
+    .poll(async () => (await documents({ profileId: ids.profileId }))[0], { timeout: 30_000 })
+    .toMatchObject({ document: { templateId: "classico", currentVersion: 1 } });
+  await page.getByLabel("Modelo").selectOption({ label: "Moderno" });
+  await expect
+    .poll(async () => (await documents({ profileId: ids.profileId }))[0], { timeout: 30_000 })
+    .toMatchObject({ document: { templateId: "moderno", currentVersion: 2 } });
+  expect((await documents({ profileId: ids.profileId }))[0]?.versions).toHaveLength(3);
 });

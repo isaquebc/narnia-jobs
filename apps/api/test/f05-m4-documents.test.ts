@@ -44,6 +44,23 @@ describe("F05/M4 · /api/documents", () => {
     expect(again.status).toBe(202);
     const view = (await again.json()) as { current: { version: number; instructions: string } };
     expect(view.current).toMatchObject({ version: 2, instructions: "mais curto" });
+    // "Tentar de novo": os erros da revisão da versão atual vão para o gerador
+    t.repos.documents.updateVersion((view.current as unknown as { id: string }).id, {
+      status: "ready_with_issues",
+      review: {
+        passed: false,
+        atsScore: 80,
+        issues: [{ area: "ats", severity: "error", message: "ATS de 80%.", where: null }],
+      },
+    });
+    const retry = await t.api(
+      `/api/documents/${doc.document.id}/regenerate`,
+      json({ acceptLanguage: true, fixIssues: true }),
+    );
+    expect(retry.status).toBe(202);
+    expect(t.queue.tasks.at(-1)?.payload).toMatchObject({
+      previousIssues: [{ area: "ats", message: "ATS de 80%.", where: null }],
+    });
   });
 
   it("vaga em inglês sem inglês: 409 language_not_covered com o idioma; com acceptLanguage gera CV e carta juntos", async () => {

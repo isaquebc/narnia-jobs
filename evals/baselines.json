@@ -60,14 +60,16 @@
       "json_schema": 1,
       "origens_do_resumo": 1,
       "padrao_de_entrega": 1,
+      "tamanho_da_carta": 1,
       "sem_termo_sem_evidencia": 1
     },
-    "versionId": "7c7e97bdfcb1c8e8df2c50ef55006d93db729932687a0e83d9525f303b2b0445",
-    "commit": "91b92f0",
-    "updatedAt": "2026-10-16T15:34:26.549Z"
+    "versionId": "2bd1f15622671bd0e231ef2525a4e9225efc25c3823b96b34a474b0a0749499b",
+    "commit": "15aae49",
+    "updatedAt": "2026-10-16T20:12:53.802Z"
   },
   "narnia-cv-generate": {
     "scores": {
+      "cargos_como_nos_dados": 1,
       "cobertura_da_referencia": 1,
       "idioma": 1,
       "json_schema": 1,
@@ -75,9 +77,9 @@
       "padrao_de_entrega": 1,
       "sem_termo_sem_evidencia": 1
     },
-    "versionId": "6074b8732e8933957ab8798a7f33f323b504380eed95e3a3aee48d7d2fb23de5",
-    "commit": "2697000",
-    "updatedAt": "2026-10-16T15:57:54.865Z"
+    "versionId": "2f5281413a7a0f4ee365d548d0dc0bdbf6d9bf682a869f2d5fc9a084f4343736",
+    "commit": "15aae49",
+    "updatedAt": "2026-10-16T20:00:11.275Z"
   },
   "narnia-cv-review": {
     "scores": {

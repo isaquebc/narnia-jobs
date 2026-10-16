@@ -1399,7 +1399,8 @@ export const ptBR = {
     remove: "Apagar",
     removeConfirm: "Apagar este documento e todas as versões?",
     reviewFailed:
-      "Não passou na revisão automática, mesmo depois de uma regeração. Veja os apontamentos e tente de novo pelo botão Atualizar (pode mandar instruções).",
+      "Não passou na revisão automática, mesmo depois de uma regeração. Veja os apontamentos: Tentar de novo refaz corrigindo exatamente estes pontos; Atualizar deixa mandar instruções.",
+    retry: "Tentar de novo",
     errorTitle: "A geração falhou",
     stale: "Desatualizado",
     staleWhy: {
@@ -1423,6 +1424,11 @@ export const ptBR = {
     unverified: "{count} fato(s) ainda não verificado(s) entrou(aram) neste documento.",
     warnings: "Avisos da revisão",
     page: "Página {n}",
+    zoomPage: "Ampliar a página {n}",
+    pageOf: "Página {n} de {total}",
+    prevPage: "Página anterior",
+    nextPage: "Próxima página",
+    close: "Fechar",
     copy: "Copiar texto",
     details: "Detalhes do conteúdo",
     experiences: "Experiências (score de match)",

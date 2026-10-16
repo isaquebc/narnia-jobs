@@ -6,6 +6,7 @@ export * from "./chat/settings";
 export * from "./chat/tools";
 export * from "./db";
 export * from "./digest";
+export * from "./documents/aliases";
 export * from "./documents/assemble";
 export * from "./documents/ats";
 export * from "./documents/brief";

@@ -123,6 +123,8 @@ export interface DocumentsRepo {
   /** Nova versão (número seguinte), já como a atual do documento; herda template, idioma, papel e formato. */
   addVersion(documentId: string, input: VersionCreate): DocumentVersionRecord;
   getVersion(documentId: string, version: number): DocumentVersionRecord | null;
+  /** Volta uma versão já existente a ser a atual (troca de modelo para um já montado). */
+  setCurrent(documentId: string, version: number): DocumentRecord;
   versionById(id: string): DocumentVersionRecord | null;
   currentVersion(documentId: string): DocumentVersionRecord | null;
   /** Mais recente primeiro. */
@@ -269,7 +271,11 @@ export function documentsRepo(db: Db): DocumentsRepo {
       const doc = must(documentId);
       const id = newId();
       const now = nowUtc();
-      const version = doc.currentVersion + 1;
+      // pela maior versão, não pela atual: a atual pode ter voltado a uma anterior (setCurrent)
+      const max = q("select max(version) as m from document_version where document_id = ?").get(
+        documentId,
+      ) as Row | undefined;
+      const version = Math.max(doc.currentVersion, Number(max?.m ?? 0)) + 1;
       db.exec("begin");
       try {
         q(
@@ -311,6 +317,16 @@ export function documentsRepo(db: Db): DocumentsRepo {
         version,
       ) as Row | undefined;
       return r ? mapVersion(r) : null;
+    },
+    setCurrent(documentId, version) {
+      if (!repo.getVersion(documentId, version))
+        throw new Error(`versão ${version} do documento ${documentId} não existe`);
+      q("update document set current_version = ?, updated_at = ? where id = ?").run(
+        version,
+        nowUtc(),
+        documentId,
+      );
+      return must(documentId);
     },
     versionById(id) {
       const r = q("select * from document_version where id = ?").get(id) as Row | undefined;

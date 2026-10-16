@@ -106,6 +106,49 @@ describe("F05/M2 core · resumo do gerador", () => {
     expect(brief.profile).toMatchObject({ name: "Ana Maria Exemplo" });
   });
 
+  it("anos de experiência calculados pelo código, da primeira experiência até hoje (o gerador não calcula)", () => {
+    const { r, ids } = setup();
+    const first = r.facts.experiences
+      .list()
+      .map((e) => e.startDate)
+      .filter((d): d is string => Boolean(d))
+      .sort()[0] as string;
+    const now = new Date("2026-10-16T00:00:00Z");
+    const { brief } = buildCvBrief(
+      r,
+      {
+        kind: "cv",
+        profileId: ids.profileId,
+        postingId: null,
+        locale: "pt-BR",
+        instructions: null,
+        previousIssues: [],
+      },
+      now,
+    );
+    const [y, m] = first.split("-").map(Number) as [number, number];
+    const expected = Math.floor((2026 * 12 + 10 - (y * 12 + (m || 1))) / 12);
+    expect(brief.profile.yearsExperience).toBe(expected);
+  });
+
+  it("idioma dos dados (sourceLocale): detectado pelo texto das conquistas, cargos e formação", () => {
+    const { r, ids } = setup();
+    const input = {
+      kind: "cv" as const,
+      profileId: ids.profileId,
+      postingId: null,
+      instructions: null,
+      previousIssues: [],
+    };
+    expect(buildCvBrief(r, { ...input, locale: "pt-BR" }).brief.sourceLocale).toBe("pt-BR");
+    expect(buildCvBrief(r, { ...input, locale: "en-US" }).brief.sourceLocale).toBe("pt-BR");
+    for (const a of r.facts.achievements.list())
+      r.facts.achievements.update(a.id, {
+        text: "Led the migration of the payments service to the new platform with the team",
+      });
+    expect(buildCvBrief(r, { ...input, locale: "pt-BR" }).brief.sourceLocale).toBe("en-US");
+  });
+
   it("CV da vaga: requisitos com evidência pesam no score, lacunas listadas (Kafka), Kubernetes não é lacuna", () => {
     const { r, ids } = setup();
     const posting = postingFor(r);

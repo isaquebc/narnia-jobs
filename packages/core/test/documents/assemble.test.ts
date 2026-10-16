@@ -5,7 +5,7 @@ import { assembleCoverLetter, assembleCv } from "../../src/documents/assemble";
 import { buildCvBrief } from "../../src/documents/brief";
 import { seedFixture } from "../../src/testing/profile-fixtures";
 
-function setup() {
+function setup(locale: "pt-BR" | "en-US" = "pt-BR") {
   const db = openDatabase(":memory:");
   migrate(db);
   const r = createRepos(db);
@@ -14,7 +14,7 @@ function setup() {
     kind: "cv",
     profileId: ids.profileId,
     postingId: null,
-    locale: "pt-BR",
+    locale,
     instructions: null,
     previousIssues: [],
   });
@@ -121,8 +121,31 @@ describe("F05/M2 core · montagem do CV", () => {
     expect(msgs).toMatch(/Rust/);
   });
 
+  it("dados no idioma do documento: cargo, local e curso saem exatamente como nos dados, mesmo se o gerador traduzir", () => {
+    const s = setup("pt-BR");
+    expect(s.brief.sourceLocale).toBe("pt-BR");
+    const d = draftFor(s.brief);
+    const ed = s.brief.education[0] as { id: string; course: string | null };
+    d.experiences[0] = {
+      ...(d.experiences[0] as CvDraft["experiences"][number]),
+      title: "Senior Software Engineer",
+      location: "Remote",
+    };
+    d.education = [{ factId: ed.id, course: "Computer Science", degree: "Bachelor's degree" }];
+    const { content } = assembleCv(s.r, s.brief, d, {
+      meta: meta(s.ids.profileId),
+      header: { name: "Ana", title: "", location: null, email: null, phone: null, links: [] },
+    });
+    const acme = s.r.facts.experiences.get(s.brief.experiences[0]?.id as string);
+    expect(content.experiences[0]).toMatchObject({
+      title: s.brief.experiences[0]?.title,
+      location: acme?.location ?? null,
+    });
+    expect(content.education[0]?.course).toBe(ed.course);
+  });
+
   it("CV em inglês: cargo-alvo, cargo, local e curso traduzidos pelo gerador; empresa, datas e instituição dos dados", () => {
-    const s = setup();
+    const s = setup("en-US");
     const d = draftFor(s.brief);
     const ed = s.brief.education[0] as { id: string };
     d.headline = "Senior Software Engineer";
@@ -234,6 +257,14 @@ describe("F05/M2 core · montagem da carta", () => {
     });
     expect(ok.issues).toEqual([]);
     expect(ok.content.signature).toBe("Ana Maria Exemplo");
+    // sem headline (edição antiga): o cargo-alvo dos dados; com headline, o traduzido pelo gerador
+    expect(ok.content.header.title).toBe("Eng");
+    const en = assembleCoverLetter(
+      s.brief,
+      { ...draft, headline: "Senior Software Engineer" },
+      { meta: { ...meta(s.ids.profileId), postingId: "v1", format: "text" }, header },
+    );
+    expect(en.content.header.title).toBe("Senior Software Engineer");
     const short = assembleCoverLetter(
       s.brief,
       { ...draft, paragraphs: draft.paragraphs.slice(0, 2) },
