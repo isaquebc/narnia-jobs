@@ -15,9 +15,11 @@ import { formatDate } from "../../lib/format";
 import { GithubConnectCard } from "../ingestion/github/GithubConnectCard";
 import { bytesLabel } from "../ingestion/units";
 import { ChatSettingsSection } from "./ChatSettingsSection";
+import { CvTemplatesSection } from "./CvTemplatesSection";
 import { EvalsSettingsSection } from "./EvalsSettingsSection";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { PluginSettingsSection } from "./PluginSettingsSection";
+import { WorkerSettingsSection } from "./WorkerSettingsSection";
 
 const GB = 1024 ** 3;
 const DEPTHS = ["quick", "balanced", "deep"] as const;
@@ -205,6 +207,8 @@ export function SettingsPage() {
       <GithubConnectCard />
       <ChatSettingsSection />
       <ModelSettingsSection />
+      <CvTemplatesSection />
+      <WorkerSettingsSection />
       <PluginSettingsSection />
       <EvalsSettingsSection />
       {form ? (

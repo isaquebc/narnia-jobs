@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BUILTIN_TEMPLATES,
   changeDocumentLayout,
+  DOCUMENT_TASKS,
   DocumentEditError,
   type DocumentRecord,
   DocumentRequestError,
@@ -10,9 +11,13 @@ import {
   documentDiff,
   documentView,
   editDocument,
+  isBuiltinTemplate,
   type Repos,
   type RequestDocumentInput,
   requestDocument,
+  TEMPLATE_ZIP_MAX_BYTES,
+  userTemplatePreview,
+  userTemplateZip,
 } from "@narnia-jobs/core";
 import {
   type CoverLetterContent,
@@ -234,6 +239,9 @@ export function documentsRoutes(deps: {
       await changeDocumentLayout(repos, enqueue, {
         documentId: c.req.param("id"),
         ...c.req.valid("json"),
+        // padrão ou enviado e já validado (F05-4)
+        templateExists: (id) =>
+          isBuiltinTemplate(id) || repos.cvTemplates.get(id)?.status === "valid",
       });
     } catch (e) {
       return editErrorResponse(c, e);
@@ -257,15 +265,70 @@ export function documentsRoutes(deps: {
     });
   });
 
+  // M7: templates padrão + os enviados pela pessoa (validados no worker; só os válidos montam documentos)
   app.get("/api/cv-templates", (c) =>
     c.json({
-      templates: BUILTIN_TEMPLATES.map((t) => ({
-        ...t,
-        origin: "builtin" as const,
-        status: "valid" as const,
-      })),
+      templates: [
+        ...BUILTIN_TEMPLATES.map((t) => ({
+          ...t,
+          origin: "builtin" as const,
+          status: "valid" as const,
+          validationErrors: [] as string[],
+          hasPreview: false,
+        })),
+        ...repos.cvTemplates.list().map((t) => ({
+          id: t.id,
+          name: t.name,
+          origin: "user" as const,
+          status: t.status,
+          validationErrors: t.validationErrors,
+          hasPreview: Boolean(t.previewPath),
+        })),
+      ],
     }),
   );
+
+  app.post("/api/cv-templates", async (c) => {
+    const body = await c.req.parseBody();
+    const file = body.file;
+    if (!(file instanceof File))
+      return apiError(c, 400, "file_required", "Envie o .zip do modelo no campo file.");
+    if (file.size > TEMPLATE_ZIP_MAX_BYTES)
+      return apiError(c, 413, "file_too_large", "O arquivo passa de 5 MB.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!(bytes[0] === 0x50 && bytes[1] === 0x4b))
+      return apiError(c, 400, "not_zip", "O arquivo precisa ser um .zip.");
+    const name = file.name.replace(/\.zip$/i, "").slice(0, 60) || "Modelo enviado";
+    const tpl = repos.cvTemplates.create({ name, engine: "handlebars", path: "", manifest: {} });
+    mkdirSync(join(deps.dataDir, "templates"), { recursive: true });
+    writeFileSync(join(deps.dataDir, userTemplateZip(tpl.id)), bytes);
+    await enqueue({
+      queue: "extract",
+      type: DOCUMENT_TASKS.validateTemplate,
+      key: tpl.id,
+      payload: { templateId: tpl.id },
+    });
+    return c.json({ template: repos.cvTemplates.get(tpl.id) }, 202);
+  });
+
+  app.get("/api/cv-templates/:id/preview", (c) => {
+    const tpl = repos.cvTemplates.get(c.req.param("id"));
+    const path = tpl?.previewPath ? join(deps.dataDir, tpl.previewPath) : null;
+    if (!path || !existsSync(path)) return apiError(c, 404, "not_found", "Prévia não encontrada");
+    return c.body(readFileSync(path), 200, {
+      "content-type": "image/png",
+      "cache-control": "private, max-age=60",
+    });
+  });
+
+  app.delete("/api/cv-templates/:id", (c) => {
+    const tpl = repos.cvTemplates.get(c.req.param("id"));
+    if (!tpl) return apiError(c, 404, "not_found", "Modelo não encontrado");
+    repos.cvTemplates.remove(tpl.id);
+    for (const p of [userTemplateZip(tpl.id), userTemplatePreview(tpl.id)])
+      rmSync(join(deps.dataDir, p), { force: true });
+    return c.body(null, 204);
+  });
 
   app.get("/api/documents/:id/versions/:n", (c) => {
     const found = versionOf(c);

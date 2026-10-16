@@ -365,3 +365,105 @@ describe("F05/M6 · edição, troca de modelo e comparação de versões", () =>
     expect((await t.api(`/api/documents/${id}/diff?from=1&to=9`)).status).toBe(404);
   });
 });
+
+describe("F05/M7 · templates do usuário (/api/cv-templates)", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  const upload = (bytes: Uint8Array, name = "modelo.zip") => {
+    const form = new FormData();
+    form.append("file", new Blob([bytes]), name);
+    return t.api("/api/cv-templates", { method: "POST", body: form });
+  };
+
+  it("envia o .zip: guarda, cria em validação e enfileira template.validate; lista junto dos padrão; apaga", async () => {
+    t = makeTestApp();
+    const r = await upload(new Uint8Array([0x50, 0x4b, 3, 4, 1, 2]));
+    expect(r.status).toBe(202);
+    const { template } = (await r.json()) as { template: { id: string; status: string } };
+    expect(template.status).toBe("validating");
+    expect(t.queue.tasks.at(-1)).toMatchObject({
+      type: "template.validate",
+      payload: { templateId: template.id },
+    });
+    const list = (await (await t.api("/api/cv-templates")).json()) as {
+      templates: Array<{ id: string; origin: string; status: string }>;
+    };
+    expect(list.templates.map((x) => x.origin)).toEqual(["builtin", "builtin", "builtin", "user"]);
+    expect((await t.api(`/api/cv-templates/${template.id}`, { method: "DELETE" })).status).toBe(
+      204,
+    );
+    expect(
+      ((await (await t.api("/api/cv-templates")).json()) as { templates: unknown[] }).templates,
+    ).toHaveLength(3);
+  });
+
+  it("recusa arquivo acima de 5 MB e o que não é .zip", async () => {
+    t = makeTestApp();
+    expect((await upload(new Uint8Array(5 * 1024 * 1024 + 1))).status).toBe(413);
+    expect((await upload(new Uint8Array([1, 2, 3]), "x.txt")).status).toBe(400);
+  });
+
+  it("documento pode usar um template enviado só depois de válido", async () => {
+    t = makeTestApp();
+    const ids = seedFixture(t.repos, "engineer");
+    const tpl = t.repos.cvTemplates.create({
+      name: "Meu",
+      engine: "handlebars",
+      path: "",
+      manifest: {},
+    });
+    const r = (await (
+      await t.api("/api/documents", json({ kind: "cv", profileId: ids.profileId }))
+    ).json()) as {
+      documents: Array<{ document: { id: string }; current: { id: string } }>;
+    };
+    const { document, current } = r.documents[0] as (typeof r.documents)[number];
+    t.repos.documents.updateVersion(current.id, {
+      status: "ready",
+      content: {
+        meta: { kind: "cv" },
+        header: { title: "x" },
+        summary: "s",
+        experiences: [],
+        education: [],
+        skills: [],
+        projects: [],
+        adjacent: [],
+        sectionsOrder: ["summary"],
+      },
+    });
+    expect(
+      (await t.api(`/api/documents/${document.id}`, json({ templateId: tpl.id }, "PATCH"))).status,
+    ).toBe(404);
+    t.repos.cvTemplates.update(tpl.id, { status: "valid" });
+    expect(
+      (await t.api(`/api/documents/${document.id}`, json({ templateId: tpl.id }, "PATCH"))).status,
+    ).toBe(202);
+  });
+});
+
+describe("F05/M7 · Configurações › concorrência dos processos", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("GET com padrão e limites; PUT grava o que veio; fora de 1 a 4 é 400", async () => {
+    t = makeTestApp();
+    const g = (await (await t.api("/api/settings/workers")).json()) as {
+      concurrency: Record<string, number>;
+      min: number;
+      max: number;
+    };
+    expect(g).toEqual({
+      concurrency: { ingest: 2, ocr: 1, extract: 2 },
+      defaults: { ingest: 2, ocr: 1, extract: 2 },
+      min: 1,
+      max: 4,
+    });
+    const p = await t.api("/api/settings/workers", json({ extract: 3 }, "PUT"));
+    expect(((await p.json()) as { concurrency: Record<string, number> }).concurrency.extract).toBe(
+      3,
+    );
+    expect((await t.api("/api/settings/workers", json({ ocr: 9 }, "PUT"))).status).toBe(400);
+  });
+});

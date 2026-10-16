@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   ATS_MIN_SCORE,
@@ -24,13 +24,16 @@ import {
   notifyDocumentResult,
   type PdfInspection,
   type RenderPdfResult,
+  readTemplateZip,
   recordUsage,
   renderDocumentHtml,
   renderPdf,
   renderPdfPages,
+  renderUserTemplate,
   resolveModel,
   sectionLabel,
   usageFromSdkResult,
+  userTemplateZip,
 } from "@narnia-jobs/core";
 import type {
   CoverLetterContent,
@@ -63,7 +66,7 @@ type Doc = CvContent | CoverLetterContent;
 
 const errorsOf = (issues: CvReviewIssue[]) => issues.filter((i) => i.severity === "error");
 
-function documentDeps(deps: WorkerDeps): Required<DocumentDeps> {
+export function documentDeps(deps: WorkerDeps): Required<DocumentDeps> {
   const d: DocumentDeps = deps.documents ?? { browserWs: process.env.NARNIA_BROWSER_WS || null };
   return {
     browserWs: d.browserWs,
@@ -281,6 +284,31 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
   }
 };
 
+/** HTML do documento: template padrão, ou o do usuário (válido e feito para o tipo); senão, o Clássico. */
+function documentHtml(
+  deps: WorkerDeps,
+  doc: DocumentRecord,
+  content: Doc,
+): { html: string; userTemplate: boolean } {
+  if (!isBuiltinTemplate(doc.templateId) && content.meta.kind === "cv") {
+    const tpl = deps.repos.cvTemplates.get(doc.templateId);
+    if (tpl?.status === "valid") {
+      try {
+        const read = readTemplateZip(readFileSync(join(deps.dataDir, userTemplateZip(tpl.id))));
+        if (read.ok && read.template.manifest.kinds.includes("cv"))
+          return {
+            html: renderUserTemplate(read.template, content as CvContent, doc.paper),
+            userTemplate: true,
+          };
+      } catch {
+        // arquivo sumiu: cai no Clássico
+      }
+    }
+  }
+  const builtin = isBuiltinTemplate(doc.templateId) ? doc.templateId : "classico";
+  return { html: renderDocumentHtml(content, builtin), userTemplate: false };
+}
+
 async function renderAndCheck(
   deps: WorkerDeps,
   docs: Required<DocumentDeps>,
@@ -318,9 +346,9 @@ async function renderAndCheck(
       pageFiles: [],
       pdfText: letterText ?? "",
     };
-  const templateId = isBuiltinTemplate(doc.templateId) ? doc.templateId : "classico";
-  const html = renderDocumentHtml(content, templateId);
-  const r = await docs.render(html, doc.paper, true);
+  const { html, userTemplate } = documentHtml(deps, doc, content);
+  // template do usuário: JavaScript desligado (F05-4); os padrão usam JS só para esperar as fontes
+  const r = await docs.render(html, doc.paper, !userTemplate);
   if (!r.ok) throw new Error(`Não consegui montar o PDF: ${r.message}`);
   const file = doc.kind === "cv" ? "cv.pdf" : "carta.pdf";
   writeFileSync(join(abs, file), r.pdf);

@@ -198,3 +198,27 @@ describe("detecção de banco recriado (F03-fix L1 item 2)", () => {
     expect(detectFreshDatabase({ db, backupDir: null, logsDir: join(root, "logs") })).toBeNull();
   });
 });
+
+describe("F05/M7 · backup dos templates de CV enviados", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { backupTemplates } = await import("../../src/db/backup");
+
+  it("copia só os .zip que faltam (a prévia é derivada)", () => {
+    const data = mkdtempSync(join(tmpdir(), "narnia-tpl-data-"));
+    const bk = mkdtempSync(join(tmpdir(), "narnia-tpl-bk-"));
+    try {
+      mkdirSync(join(data, "templates"));
+      writeFileSync(join(data, "templates/t1.zip"), "zip");
+      writeFileSync(join(data, "templates/t1.png"), "png");
+      expect(backupTemplates(data, bk)).toBe(1);
+      expect(existsSync(join(bk, "templates/t1.zip"))).toBe(true);
+      expect(existsSync(join(bk, "templates/t1.png"))).toBe(false);
+      expect(backupTemplates(data, bk)).toBe(0);
+    } finally {
+      rmSync(data, { recursive: true, force: true });
+      rmSync(bk, { recursive: true, force: true });
+    }
+  });
+});

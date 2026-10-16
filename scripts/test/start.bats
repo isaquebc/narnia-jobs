@@ -235,6 +235,16 @@ fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
   [[ "$(cat "$TMP/data/uploads/bbb.pdf")" == "ja" ]]
 }
 
+@test "restore_files devolve os templates de CV enviados (F05) que faltam, sem sobrescrever" {
+  mkdir -p "$TMP/data/templates" "$TMP/b/templates"
+  printf 'backup' > "$TMP/b/narnia-boot-x.sqlite"
+  printf 'zip1' > "$TMP/b/templates/t1.zip"; printf 'zip2-backup' > "$TMP/b/templates/t2.zip"
+  printf 'zip2-atual' > "$TMP/data/templates/t2.zip"
+  restore_files "$TMP/data" "$TMP/b" "$TMP/b/narnia-boot-x.sqlite" STAMP
+  [[ "$(cat "$TMP/data/templates/t1.zip")" == "zip1" ]]
+  [[ "$(cat "$TMP/data/templates/t2.zip")" == "zip2-atual" ]]
+}
+
 # --- regressão 2026-10-10: instância do dono subiu com imagem antiga (sem gh) e volume gh-auth com dono root ---------
 
 docker_spy() { # substitui o docker por um registrador de chamadas em $TMP/calls

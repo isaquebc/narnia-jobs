@@ -78,7 +78,8 @@ const FACT_REPO: Record<z.infer<typeof TestFactKindSchema>, keyof Repos["facts"]
 };
 
 /** Pastas derivadas dos uploads que o reset apaga (os dados do usuário em si estão no SQLite). */
-const RESET_DIRS = ["uploads", "readings", "digests"];
+// F05: documentos gerados (PDFs e prévias) e templates enviados também saem no reset do e2e e da instância claude
+const RESET_DIRS = ["uploads", "readings", "digests", "documents", "templates"];
 
 export function providerRoutes(deps: {
   provider: Provider;

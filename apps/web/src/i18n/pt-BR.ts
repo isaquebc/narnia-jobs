@@ -40,6 +40,25 @@ export const ptBR = {
     chatMore: "Ver todas ({count})",
     chatLess: "Ver menos",
     postings: "Vagas",
+    processes: "Processos",
+  },
+  processes: {
+    title: "Processos em segundo plano",
+    hint: "Tudo o que roda sem você esperar: leitura de arquivos, análise do GitHub, extração de vagas, geração de currículos.",
+    running: "Em andamento e na fila",
+    recent: "Recentes",
+    empty: "Nada rodando agora.",
+    trayLink: "Ver todos os processos",
+    settings: "Processos simultâneos",
+    settingsHint:
+      "Quantos jobs de cada fila rodam juntos nesta máquina. Mais rápido, mas usa mais memória e mais da sua cota do modelo ao mesmo tempo.",
+    queues: {
+      ingest: "Leitura e comparação",
+      ocr: "OCR",
+      extract: "Modelo (extração, vagas, currículos)",
+    },
+    default: "padrão: {n}",
+    saved: "Salvo; vale em até 15 segundos.",
   },
   shell: {
     noProfile: "Sem perfil ainda",
@@ -1460,6 +1479,16 @@ export const ptBR = {
       pages: "Páginas",
       contact: "Contato",
     },
+  },
+  cvTemplates: {
+    title: "Modelos de currículo",
+    hint: "Os três modelos do narnia-jobs e os seus. Envie um .zip com template.html (Handlebars), style.css e manifest.json, mais imagens e fontes (até 5 MB). Sem scripts nem nada externo: o modelo monta com tudo bloqueado.",
+    upload: "Enviar modelo (.zip)",
+    builtin: "padrão",
+    status: { validating: "validando", valid: "válido", invalid: "inválido" },
+    remove: "Apagar modelo",
+    removeConfirm: "Apagar este modelo? Os documentos já montados com ele continuam guardados.",
+    preview: "Prévia de {name}",
   },
   models: {
     title: "Modelos por tarefa",

@@ -137,6 +137,18 @@ Describe "Backups e restore (F03-fix L1)" {
     Get-Content -Raw (Join-Path $b "narnia-before-restore-STAMP.sqlite-wal") | Should -Be "wal"
     Get-Content -Raw (Join-Path $d "uploads/aaa.pdf") | Should -Be "cv"
   }
+
+  It "Restore-Files devolve os templates de CV enviados (F05) que faltam, sem sobrescrever" {
+    $d = Join-Path $script:Tmp "tdata"; $b = Join-Path $script:Tmp "tbk"
+    New-Item -ItemType Directory -Force -Path (Join-Path $d "templates"), (Join-Path $b "templates") | Out-Null
+    Set-Content -NoNewline -Path (Join-Path $b "narnia-boot-x.sqlite") -Value "backup"
+    Set-Content -NoNewline -Path (Join-Path $b "templates/t1.zip") -Value "zip1"
+    Set-Content -NoNewline -Path (Join-Path $b "templates/t2.zip") -Value "zip2-backup"
+    Set-Content -NoNewline -Path (Join-Path $d "templates/t2.zip") -Value "zip2-atual"
+    Restore-Files $d $b (Join-Path $b "narnia-boot-x.sqlite") "STAMP"
+    Get-Content -Raw (Join-Path $d "templates/t1.zip") | Should -Be "zip1"
+    Get-Content -Raw (Join-Path $d "templates/t2.zip") | Should -Be "zip2-atual"
+  }
 }
 
 Describe "Regressão 2026-10-10: imagem antiga e volume do gh com dono root" {

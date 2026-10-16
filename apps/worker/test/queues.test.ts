@@ -26,3 +26,22 @@ describe("M1/worker createQueues", () => {
     expect(QUEUE_NAMES).toEqual(["ingest", "ocr", "extract"]);
   });
 });
+
+describe("F05/M7 · concorrência em tempo de execução", async () => {
+  const { applyConcurrency } = await import("../src/worker");
+  it("aplica o que está em Configurações, menos as filas fixadas por quem chamou", () => {
+    const workers = [
+      { name: "ingest", concurrency: 2 },
+      { name: "ocr", concurrency: 1 },
+      { name: "extract", concurrency: 2 },
+    ];
+    expect(applyConcurrency(workers, { ingest: 2, ocr: 3, extract: 4 }, { extract: 1 })).toEqual([
+      "ocr",
+      "extract",
+    ]);
+    expect(workers.map((w) => w.concurrency)).toEqual([2, 3, 1]);
+    expect(applyConcurrency(workers, { ingest: 2, ocr: 3, extract: 4 }, { extract: 1 })).toEqual(
+      [],
+    );
+  });
+});

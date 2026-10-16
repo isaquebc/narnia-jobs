@@ -336,6 +336,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         json(body),
       ),
     listJobs: () => request<{ jobs: Job[] }>("/api/jobs"),
+    getWorkerSettings: () => request<WorkerSettings>("/api/settings/workers"),
+    putWorkerSettings: (patch: Partial<WorkerSettings["concurrency"]>) =>
+      request<WorkerSettings>("/api/settings/workers", {
+        method: "PUT",
+        body: JSON.stringify(patch),
+      }),
     cancelJob: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}/cancel`, json({})),
     retryJob: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}/retry`, json({})),
     getUsageSummary: () =>
@@ -599,10 +605,19 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ lines: Array<{ op: "=" | "+" | "-"; text: string }> }>(
         `/api/documents/${encodeURIComponent(id)}/diff?from=${from}&to=${to}`,
       ),
-    listCvTemplates: () =>
-      request<{
-        templates: Array<{ id: string; name: string; origin: "builtin" | "user"; status: string }>;
-      }>("/api/cv-templates"),
+    listCvTemplates: () => request<{ templates: CvTemplateView[] }>("/api/cv-templates"),
+    uploadCvTemplate: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<{ template: { id: string; status: string } }>("/api/cv-templates", {
+        method: "POST",
+        body: form,
+      });
+    },
+    deleteCvTemplate: (id: string) =>
+      request<null>(`/api/cv-templates/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    cvTemplatePreviewUrl: (id: string) =>
+      `${base}/api/cv-templates/${encodeURIComponent(id)}/preview`,
     deleteDocument: (id: string) =>
       request<null>(`/api/documents/${encodeURIComponent(id)}`, { method: "DELETE" }),
     /** Endereços para `<a download>` e `<img>`: a sessão vai pelo cookie (mesma origem). */
@@ -710,6 +725,22 @@ export interface DocumentView {
   }>;
   stale: { facts: boolean; profile: boolean; posting: boolean } | null;
   missingLinks: CvLinkKind[];
+}
+/** Configurações › Processos (F05 M7): jobs simultâneos por fila. */
+export interface WorkerSettings {
+  concurrency: { ingest: number; ocr: number; extract: number };
+  defaults: { ingest: number; ocr: number; extract: number };
+  min: number;
+  max: number;
+}
+/** Modelo de currículo (F05 §2.6): os três padrão e os enviados pela pessoa, com a validação. */
+export interface CvTemplateView {
+  id: string;
+  name: string;
+  origin: "builtin" | "user";
+  status: "validating" | "valid" | "invalid";
+  validationErrors: string[];
+  hasPreview: boolean;
 }
 export interface GenerateDocumentBody {
   kind: DocumentKind;

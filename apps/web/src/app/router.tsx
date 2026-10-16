@@ -291,6 +291,16 @@ const postingRoute = createRoute({
     );
   },
 });
+// F05 · processos em segundo plano (sob demanda)
+const ProcessesPage = lazyRouteComponent(
+  () => import("../features/processes/ProcessesPage"),
+  "ProcessesPage",
+);
+const processesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/processos",
+  component: ProcessesPage,
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/configuracoes",
@@ -317,6 +327,7 @@ const routeTree = rootRoute.addChildren([
   repoDetailRoute,
   notificationsRoute,
   settingsRoute,
+  processesRoute,
   postingsRoute,
   postingRoute,
   chatRoute,

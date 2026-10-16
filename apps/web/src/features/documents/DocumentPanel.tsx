@@ -242,13 +242,15 @@ function LayoutControls({ view }: { view: DocumentView }) {
               disabled={change.isPending}
               onChange={(e) => change.mutate({ templateId: e.target.value })}
             >
-              {(templates.data?.templates ?? [{ id: doc.templateId, name: doc.templateId }]).map(
-                (tp) => (
-                  <option key={tp.id} value={tp.id}>
-                    {tp.name}
-                  </option>
-                ),
-              )}
+              {(
+                templates.data?.templates.filter((tp) => tp.status === "valid") ?? [
+                  { id: doc.templateId, name: doc.templateId },
+                ]
+              ).map((tp) => (
+                <option key={tp.id} value={tp.id}>
+                  {tp.name}
+                </option>
+              ))}
             </Select>
           </label>
           <label className="flex flex-col gap-1" htmlFor={`${ids}-paper`}>

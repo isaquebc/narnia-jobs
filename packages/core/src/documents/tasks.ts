@@ -2,7 +2,12 @@
 export const DOCUMENT_TASKS = {
   generate: "cv.generate",
   render: "cv.render",
+  validateTemplate: "template.validate",
 } as const;
+
+/** Template do usuário: o .zip original e a prévia (página 1 do CV de exemplo), relativos à pasta de dados. */
+export const userTemplateZip = (id: string) => `templates/${id}.zip`;
+export const userTemplatePreview = (id: string) => `templates/${id}.png`;
 
 export const DOCUMENT_MODEL_DEFAULTS = {
   cv_generate: "sonnet",

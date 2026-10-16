@@ -147,8 +147,9 @@ resolve_backup_file() {
 }
 
 # restore_files DATA_DIR BACKUP_DIR FILE STAMP -> guarda o banco atual (e o WAL) como narnia-before-restore-STAMP,
-# põe o backup no lugar, apaga WAL/SHM do banco antigo (seriam reaplicados sobre o restaurado) e devolve os uploads
-# que faltam. Só mexe em DATA_DIR/narnia.sqlite*, DATA_DIR/uploads e no próprio arquivo de "antes".
+# põe o backup no lugar, apaga WAL/SHM do banco antigo (seriam reaplicados sobre o restaurado) e devolve os uploads e
+# os templates de CV enviados (F05) que faltam. Só mexe em DATA_DIR/narnia.sqlite*, DATA_DIR/uploads,
+# DATA_DIR/templates e no próprio arquivo de "antes".
 restore_files() {
   local data=$1 bdir=$2 file=$3 stamp=$4 db=$1/narnia.sqlite
   mkdir -p "$data" "$bdir"
@@ -158,14 +159,15 @@ restore_files() {
   fi
   cp "$file" "$db.restoring" && mv -f "$db.restoring" "$db"
   rm -f "$db-wal" "$db-shm"
-  if [[ -d "$bdir/uploads" ]]; then
-    mkdir -p "$data/uploads"
-    local f
-    for f in "$bdir/uploads"/*; do
+  local sub f
+  for sub in uploads templates; do
+    [[ -d "$bdir/$sub" ]] || continue
+    mkdir -p "$data/$sub"
+    for f in "$bdir/$sub"/*; do
       [[ -f "$f" ]] || continue
-      [[ -e "$data/uploads/$(basename "$f")" ]] || cp -p "$f" "$data/uploads/"
+      [[ -e "$data/$sub/$(basename "$f")" ]] || cp -p "$f" "$data/$sub/"
     done
-  fi
+  done
 }
 
 # --- F04 · modo B: plugin no Claude Code do host --------------------------------------------------------------------

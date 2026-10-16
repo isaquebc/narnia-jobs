@@ -48,6 +48,7 @@ import { salaryReferenceRoutes } from "./routes/salary-reference";
 import { snapshotsRoutes } from "./routes/snapshots";
 import { usageRoutes } from "./routes/usage";
 import { userRoutes } from "./routes/user";
+import { workerSettingsRoutes } from "./routes/worker-settings";
 
 export interface AppDeps {
   version: string;
@@ -236,6 +237,7 @@ export function createApp(deps: AppDeps) {
   );
   app.route("/", snapshotsRoutes({ repos: deps.repos, dataDir: deps.dataDir, bus: deps.bus }));
   app.route("/", usageRoutes({ repos: deps.repos }));
+  app.route("/", workerSettingsRoutes({ repos: deps.repos }));
   app.route("/", userRoutes({ repos: deps.repos, bus: deps.bus }));
   app.route("/", profilesRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue }));
   app.route("/", salaryReferenceRoutes({ repos: deps.repos }));

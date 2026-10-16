@@ -106,14 +106,28 @@ export function writeBackup(
 
 /** Copia `<dados>/uploads/*` para `<backups>/uploads/` (nome = sha), só os que faltam. */
 export function backupUploads(dataDir: string, dir: string): number {
-  const src = join(dataDir, "uploads");
+  return copyMissing(dataDir, dir, "uploads");
+}
+
+/** Templates de CV enviados (F05): o `.zip` original de cada um; a prévia e os PDFs são derivados e ficam de fora. */
+export function backupTemplates(dataDir: string, dir: string): number {
+  return copyMissing(dataDir, dir, "templates", (f) => f.endsWith(".zip"));
+}
+
+function copyMissing(
+  dataDir: string,
+  dir: string,
+  sub: string,
+  keep: (f: string) => boolean = () => true,
+): number {
+  const src = join(dataDir, sub);
   if (!existsSync(src)) return 0;
-  const dst = join(dir, "uploads");
+  const dst = join(dir, sub);
   mkdirSync(dst, { recursive: true });
   let copied = 0;
   for (const f of readdirSync(src)) {
     const from = join(src, f);
-    if (!statSync(from).isFile() || existsSync(join(dst, f))) continue;
+    if (!keep(f) || !statSync(from).isFile() || existsSync(join(dst, f))) continue;
     copyFileSync(from, join(dst, f));
     copied++;
   }
@@ -139,7 +153,7 @@ export function backupOnBoot(input: {
   try {
     if (!hasUserData(db)) return { created: null, skipped: "empty" };
     const now = input.now ?? new Date();
-    const uploadsCopied = backupUploads(dataDir, backupDir);
+    const uploadsCopied = backupUploads(dataDir, backupDir) + backupTemplates(dataDir, backupDir);
     const today = `narnia-boot-${now.toISOString().slice(0, 10)}`;
     if (listBackups(backupDir).some((b) => b.file.startsWith(today)))
       return { created: null, skipped: "already_today", uploadsCopied };

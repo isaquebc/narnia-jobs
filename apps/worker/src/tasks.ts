@@ -17,6 +17,7 @@ import type { WorkerDeps } from "./pipeline";
 import { analyzeProfiles } from "./processors/analyze-profiles";
 import { cvGenerate } from "./processors/cv-generate";
 import { postingExtract } from "./processors/posting-extract";
+import { templateValidate } from "./processors/template-validate";
 
 /**
  * Jobs de tarefa (F02 §2.9-1): fora da cadeia de ingestão, despachados por `data.kind === "task"`.
@@ -54,6 +55,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [POSTING_TASKS.extract]: postingExtract,
   [DOCUMENT_TASKS.generate]: cvGenerate,
   [DOCUMENT_TASKS.render]: cvGenerate,
+  [DOCUMENT_TASKS.validateTemplate]: templateValidate,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

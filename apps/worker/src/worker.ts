@@ -12,6 +12,7 @@ import {
   recordPctSample,
   renderPdfPages,
   resolveBackupDir,
+  resolveConcurrency,
   resolveGhRuntime,
   type StageJobData,
   type StageName,
@@ -41,6 +42,8 @@ export interface StartWorkersOptions {
   provider: Provider;
   ocr?: OcrDeps;
   concurrency?: Partial<Record<(typeof QUEUE_NAMES)[number], number>>;
+  /** Intervalo da leitura da concorrência em Configurações (padrão 15 s). */
+  concurrencyPollMs?: number;
   heartbeatMs?: number;
   /** Intervalo do verificador de execuções presas (plano de comunicação C3); 0 desliga. */
   sweepMs?: number;
@@ -57,7 +60,25 @@ export interface StartedWorkers {
 export const wsChannel = (prefix: string) => `${prefix}:ws`;
 export const heartbeatKey = (prefix: string) => `${prefix}:worker:heartbeat`;
 
-const DEFAULT_CONCURRENCY = { ingest: 2, ocr: 1, extract: 2 } as const;
+/**
+ * Concorrência das filas em tempo de execução (F05 M7): o que está em Configurações vale, a não ser que quem chamou
+ * fixou a fila em `opts.concurrency` (testes). Devolve as filas que mudaram.
+ */
+export function applyConcurrency(
+  workers: Array<{ name: string; concurrency: number }>,
+  wanted: Record<string, number>,
+  fixed: Partial<Record<string, number>> = {},
+): string[] {
+  const changed: string[] = [];
+  for (const w of workers) {
+    const n = fixed[w.name] ?? wanted[w.name];
+    if (n !== undefined && w.concurrency !== n) {
+      w.concurrency = n;
+      changed.push(w.name);
+    }
+  }
+  return changed;
+}
 
 export const defaultOcrDeps: OcrDeps = {
   render: (pdfPath, outDir) => renderPdfPages(pdfPath, outDir),
@@ -156,7 +177,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       {
         connection,
         prefix,
-        concurrency: opts.concurrency?.[name] ?? DEFAULT_CONCURRENCY[name],
+        concurrency: opts.concurrency?.[name] ?? resolveConcurrency(repos.settings)[name],
       },
     );
     const ev = { repos, publish };
@@ -263,6 +284,23 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   };
   await beat();
   const timer = setInterval(() => void safely("batimento", beat, log), opts.heartbeatMs ?? 10_000);
+  // Configurações › Processos: a concorrência nova vale sem reiniciar o worker
+  const concurrencyTimer = setInterval(
+    () =>
+      void safely(
+        "concorrência",
+        async () => {
+          const changed = applyConcurrency(
+            workers,
+            resolveConcurrency(repos.settings),
+            opts.concurrency ?? {},
+          );
+          if (changed.length) log(`[worker] concorrência atualizada: ${changed.join(", ")}`);
+        },
+        log,
+      ),
+    opts.concurrencyPollMs ?? 15_000,
+  );
 
   return {
     queues,
@@ -270,6 +308,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
     heartbeat: () => connection.get(heartbeatKey(prefix)),
     close: async () => {
       clearInterval(timer);
+      clearInterval(concurrencyTimer);
       if (sweepTimer) clearInterval(sweepTimer);
       await Promise.all(workers.map((w) => w.close()));
       await Promise.all(queueEvents.map((q) => q.close()));

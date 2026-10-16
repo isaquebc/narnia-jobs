@@ -94,7 +94,7 @@ function Resolve-BackupFile([string] $Dir, [string] $Arg) {
 }
 
 # Guarda o banco atual (e o WAL) como narnia-before-restore-STAMP, põe o backup no lugar, apaga WAL/SHM do banco
-# antigo (seriam reaplicados sobre o restaurado) e devolve os uploads que faltam.
+# antigo (seriam reaplicados sobre o restaurado) e devolve os uploads e os templates de CV enviados (F05) que faltam.
 function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [string] $Stamp) {
   New-Item -ItemType Directory -Force -Path $DataDir, $BackupDir | Out-Null
   $db = Join-Path $DataDir "narnia.sqlite"
@@ -105,10 +105,11 @@ function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [
   Copy-Item $File "$db.restoring" -Force
   Move-Item "$db.restoring" $db -Force
   Remove-Item "$db-wal", "$db-shm" -Force -ErrorAction SilentlyContinue
-  $up = Join-Path $BackupDir "uploads"
-  if (Test-Path $up) {
-    $dst = Join-Path $DataDir "uploads"; New-Item -ItemType Directory -Force -Path $dst | Out-Null
-    foreach ($f in Get-ChildItem -File $up) { if (-not (Test-Path (Join-Path $dst $f.Name))) { Copy-Item $f.FullName $dst } }
+  foreach ($sub in @("uploads", "templates")) {
+    $src = Join-Path $BackupDir $sub
+    if (-not (Test-Path $src)) { continue }
+    $dst = Join-Path $DataDir $sub; New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    foreach ($f in Get-ChildItem -File $src) { if (-not (Test-Path (Join-Path $dst $f.Name))) { Copy-Item $f.FullName $dst } }
   }
 }
 

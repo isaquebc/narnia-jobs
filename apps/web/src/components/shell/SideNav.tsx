@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bell,
   Briefcase,
   Download,
@@ -111,6 +112,11 @@ export function SideNav({ className }: { className?: string }) {
             <li>
               <NavLink to="/pendencias" className={item}>
                 <Bell size={16} /> {t("nav.notifications")}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/processos" className={item}>
+                <Activity size={16} /> {t("nav.processes")}
               </NavLink>
             </li>
             <li>
