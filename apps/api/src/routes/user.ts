@@ -1,10 +1,16 @@
 import { PhoneError, parsePhone, type Repos, trackInvalidation } from "@narnia-jobs/core";
 import { UserUpsertRequestSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
+import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
 import { emitInvalidated } from "./profiles";
 import { validate } from "./validate";
+
+const UserLinkSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  url: z.url().refine((u) => /^https?:\/\//i.test(u), "Só links http(s)."),
+});
 
 /** Identidade e contato (F01 §3): telefone validado no servidor (país + DDD → E.164). */
 export function userRoutes(deps: { repos: Repos; bus: EventBus }) {
@@ -27,6 +33,20 @@ export function userRoutes(deps: { repos: Repos; bus: EventBus }) {
         pronouns: pronouns ?? null,
         region: region ?? null,
       }),
+    );
+    emitInvalidated(deps.bus, flipped);
+    return c.json({ user });
+  });
+  // F05-19: atalho do CV para cadastrar o link que falta (LinkedIn, GitHub, portfólio) sem refazer o cadastro inteiro
+  app.post("/api/user/links", validate("json", UserLinkSchema), (c) => {
+    const link = c.req.valid("json");
+    const current = deps.repos.users.get();
+    if (!current) return apiError(c, 404, "user_not_found", "Cadastro não encontrado");
+    const links = current.links.some((l) => l.url === link.url)
+      ? current.links
+      : [...current.links, link];
+    const { result: user, flipped } = trackInvalidation(deps.repos, () =>
+      deps.repos.users.upsert({ links }),
     );
     emitInvalidated(deps.bus, flipped);
     return c.json({ user });

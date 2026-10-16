@@ -149,6 +149,26 @@ const profilePersonaRoute = createRoute({
     return <PersonaOverrides profileId={id} />;
   },
 });
+// F05 · Perfil › Currículo (sob demanda); `?gerar=1` vem do botão sugerido pelo recrutador
+const LazyProfileCvTab = lazyRouteComponent(
+  () => import("../features/documents/ProfileCvTab"),
+  "ProfileCvTab",
+);
+const profileCvRoute = createRoute({
+  getParentRoute: () => profileRoute,
+  path: "/curriculo",
+  validateSearch: (s: Record<string, unknown>) => ({
+    gerar: s.gerar === "1" || s.gerar === 1 ? "1" : undefined,
+  }),
+  component: function CvTab() {
+    const { id } = profileRoute.useParams();
+    const { gerar } = profileCvRoute.useSearch();
+    const profile = useProfile(id);
+    return profile.data ? (
+      <LazyProfileCvTab profile={profile.data} openGenerate={gerar === "1"} />
+    ) : null;
+  },
+});
 const profileCardRoute = createRoute({
   getParentRoute: () => profileRoute,
   path: "/cartao",
@@ -246,13 +266,29 @@ const postingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/vagas/$id",
   // `?nota=` abre a página com a nota pendente em destaque (link da pendência, F06-17)
+  // F05: `?gerar=cv|cover_letter&perfil=` abre o "Gerar" (botão do recrutador); `?doc=` destaca um documento
   validateSearch: (s: Record<string, unknown>) => ({
     nota: typeof s.nota === "string" ? s.nota : undefined,
+    gerar:
+      s.gerar === "cv" || s.gerar === "cover_letter"
+        ? (s.gerar as "cv" | "cover_letter")
+        : undefined,
+    perfil: typeof s.perfil === "string" ? s.perfil : undefined,
+    doc: typeof s.doc === "string" ? s.doc : undefined,
   }),
   component: function PostingRoute() {
     const { id } = postingRoute.useParams();
-    const { nota } = postingRoute.useSearch();
-    return <PostingPage key={id} postingId={id} noteId={nota} />;
+    const { nota, gerar, perfil, doc } = postingRoute.useSearch();
+    return (
+      <PostingPage
+        key={id}
+        postingId={id}
+        noteId={nota}
+        generate={gerar}
+        generateProfileId={perfil}
+        documentId={doc}
+      />
+    );
   },
 });
 const settingsRoute = createRoute({
@@ -272,6 +308,7 @@ const routeTree = rootRoute.addChildren([
     profilePitchRoute,
     profilePersonaRoute,
     profileCardRoute,
+    profileCvRoute,
   ]),
   ingestionRoute,
   runRoute,

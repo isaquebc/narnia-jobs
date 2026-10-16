@@ -68,7 +68,8 @@ describe("F06/M6 · Vagas", () => {
     expect(within(form).getAllByText("heurística + modelo").length).toBeGreaterThan(0);
     expect(screen.getByText("Cobertura dos obrigatórios: 100%")).toBeInTheDocument();
     expect(screen.getByText("Vaga híbrida; perfil só remoto.")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Criar CV para esta vaga" })[0]).toBeDisabled();
+    // F05: "Criar CV" virou o menu "Gerar" (CV · Cover letter)
+    expect(screen.getByRole("button", { name: "Gerar" })).toHaveAttribute("aria-haspopup", "menu");
     // sem outra vaga da mesma empresa e role, nada de alerta (correção 2026-10-15)
     expect(screen.queryByText(/mesma empresa/)).toBeNull();
     const client = within(form).getByLabelText("Empresa cliente (onde vai trabalhar)");

@@ -7,7 +7,7 @@ import type {
 } from "@narnia-jobs/shared";
 import { type FontFamily, fontFaces, fontName } from "./fonts";
 import { html, raw, type SafeHtml } from "./html";
-import { formatPeriod, sectionLabel } from "./labels";
+import { formatPeriod, languageLevelLabel, sectionLabel } from "./labels";
 
 /**
  * Templates padrão do CV e da carta (F05 §2.6): Clássico, Moderno e Compacto. Mesma estrutura em uma coluna, texto real
@@ -181,7 +181,9 @@ function section(c: CvContent, s: CvSection): SafeHtml | null {
     case "languages":
       return c.languages.length === 0
         ? null
-        : wrap(html`<p>${c.languages.map((l) => `${l.name} (${l.level})`).join(" · ")}</p>`);
+        : wrap(
+            html`<p>${c.languages.map((l) => `${l.name} (${languageLevelLabel(loc, l.level)})`).join(" · ")}</p>`,
+          );
   }
 }
 

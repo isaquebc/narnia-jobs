@@ -183,7 +183,8 @@ describe("F02/M3 api · cartão, ênfases, persona", () => {
     expect(exp?.label.length).toBeGreaterThan(0);
     expect(exp?.relevance?.score).toBeGreaterThanOrEqual(0);
     expect(list.items.some((i) => i.kind === "project")).toBe(true);
-    expect(list.items.some((i) => i.kind === "achievement")).toBe(false);
+    // F05 (§2.9): as conquistas entraram no quadro de ênfases
+    expect(list.items.some((i) => i.kind === "achievement")).toBe(true);
 
     t.events.length = 0;
     const put = await t.api(

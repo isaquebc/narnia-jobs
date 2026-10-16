@@ -181,3 +181,61 @@ describe("F05/M4 · chat: tools do CV no escopo e links na mensagem", async () =
     ).toEqual({});
   });
 });
+
+describe("F05/M5 · POST /api/user/links (atalho do CV para cadastrar o link que falta)", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("acrescenta o link sem mexer no resto; repetido não duplica; só http(s)", async () => {
+    t = makeTestApp();
+    seedFixture(t.repos, "engineer");
+    const r = await t.api(
+      "/api/user/links",
+      json({ label: "LinkedIn", url: "https://www.linkedin.com/in/ana" }),
+    );
+    expect(r.status).toBe(200);
+    await t.api(
+      "/api/user/links",
+      json({ label: "LinkedIn", url: "https://www.linkedin.com/in/ana" }),
+    );
+    expect(t.repos.users.get()?.links).toEqual([
+      { label: "LinkedIn", url: "https://www.linkedin.com/in/ana" },
+    ]);
+    expect(t.repos.users.get()?.email).toBe("ana.exemplo@example.com");
+    expect(
+      (await t.api("/api/user/links", json({ label: "x", url: "javascript:alert(1)" }))).status,
+    ).toBe(400);
+  });
+});
+
+describe("F05/M5 · ênfase por conquista (F02-3, §2.9)", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+
+  it("a lista de ênfases traz as conquistas com a experiência; ocultar uma conquista grava a ênfase", async () => {
+    t = makeTestApp();
+    const ids = seedFixture(t.repos, "engineer");
+    const r = (await (await t.api(`/api/profiles/${ids.profileId}/emphasis`)).json()) as {
+      items: Array<{ kind: string; id: string; label: string; sublabel: string | null }>;
+    };
+    const ach = r.items.filter((i) => i.kind === "achievement");
+    expect(ach.length).toBe(ids.achievementIds.length);
+    expect(ach.find((a) => a.label.startsWith("Reduziu a latência"))).toMatchObject({
+      sublabel: "Acme Pagamentos · Engenheira de Software Sênior",
+    });
+    const put = await t.api(
+      `/api/profiles/${ids.profileId}/emphasis`,
+      json(
+        {
+          items: [{ kind: "achievement", id: ids.achievementIds[0], mode: "hidden", position: 0 }],
+          kinds: ["achievement"],
+        },
+        "PUT",
+      ),
+    );
+    expect(put.status).toBe(200);
+    expect(t.repos.emphasis.list(ids.profileId)).toContainEqual(
+      expect.objectContaining({ factKind: "achievement", mode: "hidden" }),
+    );
+  });
+});

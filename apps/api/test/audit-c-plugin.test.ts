@@ -63,6 +63,8 @@ function sh(
       stderr += String(b);
     });
     child.on("close", (status) => resolve({ status, stdout, stderr }));
+    // o script pode terminar sem ler a entrada: a escrita vira EPIPE, que derrubava a rodada (intermitente, 2026-10-16)
+    child.stdin.on("error", () => {});
     child.stdin.end(input ?? "");
   });
 }

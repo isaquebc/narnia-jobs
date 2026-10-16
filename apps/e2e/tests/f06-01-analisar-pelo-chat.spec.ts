@@ -25,7 +25,11 @@ test("F06/E2E-01 analisar pelo chat: a vaga é salva, a conversa 'contratante/cl
     list.getByText("Análise da vaga Globex Consultoria/Initech Bank - Backend"),
   ).toBeVisible();
   await expect(list.getByText(/Análise gravada/)).toBeVisible();
-  await expect(list.getByRole("button", { name: "Criar CV para esta vaga" })).toBeDisabled();
+  // F05: "Criar CV para esta vaga" abre o Gerar na página da vaga
+  await expect(list.getByRole("link", { name: "Criar CV para esta vaga" })).toHaveAttribute(
+    "href",
+    /\/vagas\/[^/?]+\?gerar=cv$/,
+  );
   // menu de conversas agrupado: a da vaga fica em "Vaga"
   await expect(
     nav

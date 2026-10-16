@@ -42,6 +42,16 @@ function setup() {
           relevance: { score: 0.5, reasons: ["antiga"] },
         },
         {
+          kind: "achievement" as const,
+          id: "a1",
+          mode: "normal" as const,
+          position: null,
+          label: "Reduziu a latência (800 ms → 300 ms)",
+          sublabel: "Acme · Engenheira Sênior",
+          date: "2026-01-01",
+          relevance: null,
+        },
+        {
           kind: "skill" as const,
           id: "s1",
           mode: "hidden" as const,
@@ -79,6 +89,10 @@ describe("EmphasisBoard · modos, ordem por botões, salvar em lote e prévia (F
     expect(await screen.findByText(/Projetos chegam com a ingestão do GitHub/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Skills" }));
     expect(await screen.findByRole("combobox", { name: "Ênfase de PHP" })).toHaveValue("hidden");
+    // F05 §2.9: conquistas com a experiência, para destacar ou ocultar no CV
+    await userEvent.click(screen.getByRole("tab", { name: "Conquistas" }));
+    const conquistas = await screen.findByRole("list", { name: "Conquistas" });
+    expect(conquistas).toHaveTextContent("Acme · Engenheira Sênior");
   });
 
   it("descer o primeiro, mudar o modo e salvar envia o lote; a prévia do cartão recarrega", async () => {
@@ -100,9 +114,10 @@ describe("EmphasisBoard · modos, ordem por botões, salvar em lote e prévia (F
       items: [
         { kind: "experience", id: "e2", mode: "hidden", position: 0 },
         { kind: "experience", id: "e1", mode: "highlight", position: 1 },
+        { kind: "achievement", id: "a1", mode: "normal", position: 0 },
         { kind: "skill", id: "s1", mode: "hidden", position: 0 },
       ],
-      kinds: ["experience", "project", "skill", "education", "language"],
+      kinds: ["experience", "achievement", "project", "skill", "education", "language"],
     });
     expect(await screen.findByText("Ênfases salvas.")).toBeInTheDocument();
     await waitFor(() => expect(fakes.getProfileCard).toHaveBeenCalledTimes(2));

@@ -32,9 +32,10 @@ import { type TKey, t } from "../../i18n";
 import { CardText } from "./CardText";
 
 type Item = EmphasisListResponse["items"][number];
-/** Tipos com aba no F02 (F02-3: conquistas só em F05; F02-9: projetos com aba vazia até F03). */
+/** Tipos com aba (F02-3: conquistas entram na F05, §2.9; F02-9: projetos com aba vazia até F03). */
 const KINDS = [
   "experience",
+  "achievement",
   "project",
   "skill",
   "education",
@@ -171,7 +172,7 @@ export function EmphasisBoard({ profileId }: { profileId: string }) {
       groups[k].map((it, position) => ({ kind: it.kind, id: it.id, mode: it.mode, position })),
     );
     emphasis.save.mutate(
-      // auditoria F02 (3): só os tipos com aba são substituídos; ênfases de outros tipos (conquistas) ficam
+      // auditoria F02 (3): só os tipos com aba são substituídos
       { items, kinds: [...KINDS] },
       {
         onSuccess: () => {

@@ -8,7 +8,14 @@ import type {
   ChatMessage,
   ChatSession,
   ChatSettingsDto,
+  CoverLetterContent,
+  CoverLetterFormat,
+  CvContent,
+  CvLinkKind,
+  CvLocale,
+  CvReview,
   DashboardResponseSchema,
+  DocumentKind,
   EmphasisListResponse,
   EmphasisPutRequest,
   EstimateResponse,
@@ -33,6 +40,7 @@ import type {
   JobAnalysis,
   NotificationsListResponse,
   OnboardingState,
+  Paper,
   PersonaOverrides,
   PersonaResponse,
   PlanUsage,
@@ -335,6 +343,8 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         byModel: Record<string, number>;
       }>("/api/usage/summary"),
     getUser: () => request<{ user: User | null }>("/api/user"),
+    addUserLink: (link: { label: string; url: string }) =>
+      request<{ user: User }>("/api/user/links", json(link)),
     putUser: (body: UserUpsertRequest) =>
       request<{ user: User }>("/api/user", { method: "PUT", body: JSON.stringify(body) }),
     listProfiles: (opts?: { archived?: boolean }) =>
@@ -553,6 +563,27 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     listPendingNotes: () => request<{ notes: PendingNote[] }>("/api/postings-pending-notes"),
     getModelSettings: () =>
       request<{ models: PostingModels; defaults: PostingModels }>("/api/settings/models"),
+    // F05 · CV e carta
+    listDocuments: (filter: { profileId?: string; postingId?: string }) => {
+      const qs = new URLSearchParams(
+        Object.entries(filter).filter((e): e is [string, string] => Boolean(e[1])),
+      ).toString();
+      return request<{ documents: DocumentView[] }>(`/api/documents${qs ? `?${qs}` : ""}`);
+    },
+    getDocument: (id: string) => request<DocumentView>(`/api/documents/${encodeURIComponent(id)}`),
+    generateDocument: (body: GenerateDocumentBody) =>
+      request<{ documents: DocumentView[] }>("/api/documents", json(body)),
+    regenerateDocument: (
+      id: string,
+      body: { instructions?: string | null; acceptLanguage?: boolean },
+    ) => request<DocumentView>(`/api/documents/${encodeURIComponent(id)}/regenerate`, json(body)),
+    deleteDocument: (id: string) =>
+      request<null>(`/api/documents/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Endereços para `<a download>` e `<img>`: a sessão vai pelo cookie (mesma origem). */
+    documentPdfUrl: (id: string, version: number) =>
+      `${base}/api/documents/${encodeURIComponent(id)}/versions/${version}/pdf`,
+    documentPageUrl: (id: string, version: number, page: number) =>
+      `${base}/api/documents/${encodeURIComponent(id)}/versions/${version}/pages/${page}`,
     putModelSettings: (patch: Partial<PostingModels>) =>
       request<{ models: PostingModels; defaults: PostingModels }>("/api/settings/models", {
         method: "PUT",
@@ -588,6 +619,80 @@ export interface PostingAnalysisView {
 export interface PendingNote {
   note: PostingNote;
   posting: { id: string; company: string | null; title: string | null; role: string | null } | null;
+}
+
+/** F05 · documento (CV ou carta), versão atual, lista de versões, validade e links que faltam no cabeçalho. */
+export type DocumentStatus =
+  | "queued"
+  | "collecting"
+  | "generating"
+  | "validating"
+  | "rendering"
+  | "checking"
+  | "reviewing"
+  | "retrying"
+  | "ready"
+  | "ready_with_issues"
+  | "error";
+export interface DocumentRecordView {
+  id: string;
+  kind: DocumentKind;
+  profileId: string;
+  postingId: string | null;
+  templateId: string;
+  paper: Paper;
+  locale: CvLocale;
+  format: CoverLetterFormat;
+  currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface DocumentVersionView {
+  id: string;
+  documentId: string;
+  version: number;
+  source: "agent" | "edit" | "recruiter" | "template";
+  instructions: string | null;
+  templateId: string;
+  locale: CvLocale;
+  paper: Paper;
+  format: CoverLetterFormat;
+  content: CvContent | CoverLetterContent | null;
+  status: DocumentStatus;
+  attempts: number;
+  review: CvReview | null;
+  atsScore: number | null;
+  pagesRendered: number | null;
+  pdfPath: string | null;
+  textBody: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface DocumentView {
+  document: DocumentRecordView;
+  current: DocumentVersionView | null;
+  versions: Array<{
+    id: string;
+    version: number;
+    status: DocumentStatus;
+    source: DocumentVersionView["source"];
+    atsScore: number | null;
+    pagesRendered: number | null;
+    createdAt: string;
+    passed: boolean | null;
+  }>;
+  stale: { facts: boolean; profile: boolean; posting: boolean } | null;
+  missingLinks: CvLinkKind[];
+}
+export interface GenerateDocumentBody {
+  kind: DocumentKind;
+  profileId: string;
+  postingId?: string | null;
+  instructions?: string | null;
+  acceptLanguage?: boolean;
+  format?: CoverLetterFormat;
+  withCoverLetter?: boolean;
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;

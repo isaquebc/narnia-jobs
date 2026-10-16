@@ -7,10 +7,9 @@ import { useApi, useTimezone, useWs } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
+import { Button, buttonClass } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Input, Select, Textarea } from "../../components/ui/input";
-import { Tooltip } from "../../components/ui/tooltip";
 import {
   chatKeys,
   type LiveTool,
@@ -585,16 +584,27 @@ function RunLinks({ runIds }: { runIds: string[] }) {
 }
 
 /**
- * Links da vaga na mensagem (F06): a conversa da análise aberta, a vaga salva e, na mensagem que gravou a análise, o
- * botão "Criar CV para esta vaga" (em breve, F05). Vêm das tools da mensagem, não do texto do modelo (regra 7).
+ * Links da mensagem (F06, F05): a conversa da análise aberta, a vaga salva, o "Criar CV para esta vaga" na mensagem que
+ * gravou a análise, os documentos gerados ou alterados e o botão sugerido pelo recrutador (`ui_suggest_action`, já
+ * validado pelo servidor). Vêm das tools da mensagem, não do texto do modelo (regra 7).
  */
 export function PostingLinks({ message }: { message: Pick<ChatMessage, "toolCalls"> }) {
   const opened = message.toolCalls.flatMap((tc) => (tc.sessionId ? [tc.sessionId] : []));
   const postings = [
     ...new Set(message.toolCalls.flatMap((tc) => (tc.postingId ? [tc.postingId] : []))),
   ];
-  const analyzed = message.toolCalls.some((tc) => tc.name === "analysis_save" && tc.postingId);
-  if (opened.length === 0 && postings.length === 0) return null;
+  const analyzed = message.toolCalls.find(
+    (tc) => tc.name === "analysis_save" && tc.postingId,
+  )?.postingId;
+  const documents = message.toolCalls.flatMap((tc) => tc.documents ?? []);
+  const actions = message.toolCalls.flatMap((tc) => (tc.action ? [tc.action] : []));
+  if (
+    opened.length === 0 &&
+    postings.length === 0 &&
+    documents.length === 0 &&
+    actions.length === 0
+  )
+    return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
       {opened.map((id) => (
@@ -607,15 +617,24 @@ export function PostingLinks({ message }: { message: Pick<ChatMessage, "toolCall
           {t("chat.posting.open")}
         </NavLink>
       ))}
-      {analyzed ? (
-        <Tooltip content={t("nav.soon", { task: "F05" })}>
-          <span>
-            <Button type="button" size="sm" variant="outline" disabled>
-              {t("chat.posting.createCv")}
-            </Button>
-          </span>
-        </Tooltip>
+      {documents.map((d) => (
+        <NavLink key={d.id} to={d.url} className="underline">
+          {t(d.kind === "cv" ? "chat.posting.openCv" : "chat.posting.openLetter")}
+        </NavLink>
+      ))}
+      {analyzed && !actions.length ? (
+        <NavLink
+          to={`/vagas/${analyzed}?gerar=cv`}
+          className={buttonClass({ variant: "outline", size: "sm" })}
+        >
+          {t("chat.posting.createCv")}
+        </NavLink>
       ) : null}
+      {actions.map((a) => (
+        <NavLink key={a.url} to={a.url} className={buttonClass({ variant: "outline", size: "sm" })}>
+          {a.label}
+        </NavLink>
+      ))}
     </div>
   );
 }

@@ -1,15 +1,19 @@
-import type { PreAnalysis } from "@narnia-jobs/shared";
+import type { DocumentKind, PreAnalysis } from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useApi } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button, buttonClass } from "../../components/ui/button";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Menu } from "../../components/ui/menu";
 import { postingKeys, usePosting } from "../../hooks/usePostings";
+import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
+import { GenerateDialog } from "../documents/GenerateDialog";
+import { PostingDocuments } from "../documents/PostingDocuments";
 import { AnalysisCard, PreAnalysisCard } from "./PostingAnalysis";
 import { PostingForm } from "./PostingForm";
 import { ContactsCard, DuplicateDialog, NotesCard } from "./PostingSections";
@@ -18,7 +22,7 @@ import { postingWho, statusTone } from "./PostingsPage";
 /**
  * Página da vaga (F06 §1.3, M6): duplicata pendente (F06-9), análise do recrutador com validade (F06-10), pré-análise
  * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. Link para a vaga oficial (`postingUrl`)
- * junto das ações (2026-10-15). "Criar CV" fica "em breve" (F05);
+ * junto das ações (2026-10-15). "Gerar" (F05) abre CV ou cover letter, e os documentos da vaga ficam na página;
  * o alerta de vagas parecidas (mesma empresa e role) só aparece quando existe outra vaga assim (correção 2026-10-15;
  * o de candidatura repetida chega com as candidaturas, F06-11/F07).
  */
@@ -30,14 +34,24 @@ function isHttpUrl(url: string | null): boolean {
 export function PostingPage({
   postingId,
   noteId,
+  generate,
+  generateProfileId,
+  documentId,
 }: {
   postingId: string;
   noteId?: string | undefined;
+  /** F05: abre o "Gerar" já no tipo pedido (botão sugerido pelo recrutador). */
+  generate?: DocumentKind | undefined;
+  generateProfileId?: string | undefined;
+  /** F05: documento em destaque (link do aviso ou do chat). */
+  documentId?: string | undefined;
 }) {
   const api = useApi();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { detail, analyses } = usePosting(postingId);
+  const { profiles, active } = useProfiles();
+  const [generating, setGenerating] = useState<DocumentKind | null>(generate ?? null);
   const reextract = useMutation({
     mutationFn: () => api.reextractPosting(postingId),
     onSuccess: () => qc.invalidateQueries({ queryKey: postingKeys.all }),
@@ -90,13 +104,14 @@ export function PostingPage({
               {t("postings.reextract")}
             </Button>
           ) : null}
-          <Tooltip content={t("nav.soon", { task: "F05" })}>
-            <span>
-              <Button type="button" size="sm" disabled>
-                {t("postings.analysis.createCv")}
-              </Button>
-            </span>
-          </Tooltip>
+          <Menu
+            label={t("documents.generate")}
+            items={(["cv", "cover_letter"] as const).map((k) => ({
+              id: k,
+              label: t(`documents.menu.${k}`),
+              onSelect: () => setGenerating(k),
+            }))}
+          />
           <Button
             type="button"
             variant="ghost"
@@ -107,6 +122,23 @@ export function PostingPage({
           </Button>
         </div>
       </div>
+      {generating ? (
+        <GenerateDialog
+          key={generating}
+          open
+          onOpenChange={(o) => (o ? null : setGenerating(null))}
+          kind={generating}
+          postingId={postingId}
+          profiles={profiles.map((p) => ({ id: p.id, name: p.name }))}
+          defaultProfileId={
+            generateProfileId ??
+            analyses.data?.analyses[0]?.recommendedProfileId ??
+            active?.id ??
+            null
+          }
+          recommendedProfileId={analyses.data?.analyses[0]?.recommendedProfileId ?? null}
+        />
+      ) : null}
       <DuplicateDialog
         posting={posting}
         onDecided={(r) => {
@@ -135,6 +167,7 @@ export function PostingPage({
         <AnalysisCard postingId={postingId} analyses={analyses.data?.analyses ?? []} />
         <PreAnalysisCard pre={posting.preAnalysis as PreAnalysis | null} />
       </div>
+      <PostingDocuments postingId={postingId} focusId={documentId} />
       <PostingForm posting={posting} />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ContactsCard postingId={postingId} contacts={contacts} />

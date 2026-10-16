@@ -27,6 +27,12 @@ const LABELS: Record<CvLocale, Record<CvSection, string> & { present: string; mo
 
 export const sectionLabel = (locale: CvLocale, s: CvSection) => LABELS[locale][s];
 
+/** Nível do idioma no CV: CEFR como está; "native" no idioma do documento. */
+export function languageLevelLabel(locale: CvLocale, level: string): string {
+  if (level !== "native") return level;
+  return locale === "pt-BR" ? "nativo" : "Native";
+}
+
 /** YYYY, YYYY-MM ou YYYY-MM-DD → "mar 2021" / "Mar 2021" / "2021". */
 export function formatPartialDate(locale: CvLocale, d: string): string {
   const [y, m] = d.split("-");

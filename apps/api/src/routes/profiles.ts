@@ -86,7 +86,14 @@ function personaResponse(profile: ProfileRecord): PersonaResponse {
   };
 }
 
-const KIND_ORDER: EmphasisFactKind[] = ["experience", "project", "skill", "education", "language"];
+const KIND_ORDER: EmphasisFactKind[] = [
+  "experience",
+  "achievement",
+  "project",
+  "skill",
+  "education",
+  "language",
+];
 
 /** Lista de ênfases com os fatos resolvidos (uma linha cada) e a relevância gravada na última reconstrução. */
 function emphasisList(repos: Repos, profileId: string): EmphasisListResponse {
@@ -116,6 +123,21 @@ function emphasisList(repos: Repos, profileId: string): EmphasisListResponse {
       sublabel: e.company,
       date: e.isCurrent ? (e.startDate ?? null) : (e.endDate ?? e.startDate ?? null),
     })),
+    // F05 (§2.9): conquistas com a experiência a que pertencem (ocultar uma tira do CV; destacar põe primeiro)
+    ...f.achievements.list().map((a) => {
+      const exp = f.experiences.get(a.experienceId);
+      return {
+        kind: "achievement" as const,
+        id: a.id,
+        label: a.metric ? `${a.text} (${a.metric})` : a.text,
+        sublabel: exp ? `${exp.company} · ${exp.title}` : null,
+        date: exp
+          ? exp.isCurrent
+            ? (exp.startDate ?? null)
+            : (exp.endDate ?? exp.startDate ?? null)
+          : null,
+      };
+    }),
     ...f.projects.list().map((p) => ({
       kind: "project" as const,
       id: p.id,

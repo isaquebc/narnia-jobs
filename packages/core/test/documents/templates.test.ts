@@ -40,6 +40,16 @@ describe("F05/M1 core · templates padrão", () => {
       expect(renderDocumentHtml(CV_SHORT, t)).toBe(out);
     });
 
+  it("nível nativo do idioma no idioma do documento", () => {
+    const withNative = {
+      ...CV_SHORT,
+      languages: [{ factId: "l0", name: "Português", level: "native" }],
+    };
+    expect(renderDocumentHtml(withNative, "classico")).toContain("Português (nativo)");
+    const en = { ...withNative, meta: { ...withNative.meta, locale: "en-US" as const } };
+    expect(renderDocumentHtml(en, "classico")).toContain("Português (Native)");
+  });
+
   it("en-US em Letter: rótulos e datas em inglês", () => {
     const en = {
       ...CV_SHORT,

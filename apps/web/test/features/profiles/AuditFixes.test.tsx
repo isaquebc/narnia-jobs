@@ -149,6 +149,7 @@ describe("Auditoria F02 (2026-10-08) · web", () => {
     await waitFor(() => expect(fakes.putEmphasis).toHaveBeenCalledTimes(1));
     expect(fakes.putEmphasis.mock.calls[0]?.[1]?.kinds).toEqual([
       "experience",
+      "achievement",
       "project",
       "skill",
       "education",

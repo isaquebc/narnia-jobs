@@ -16,6 +16,8 @@ export const shellApi = {
   listSuggestions: async () => ({ suggestions: [] }),
   getUser: async () => ({ user: null }),
   getBackupSettings: async () => ({ max: 5, enabled: true, latest: null, count: 0 }),
+  // F05: página da vaga e aba do perfil listam os documentos
+  listDocuments: async () => ({ documents: [] }),
   // Configurações › Avaliações (AV-2): Phoenix fora do ar por padrão nos testes
   getEvalsSettings: async () => ({
     bridge: {

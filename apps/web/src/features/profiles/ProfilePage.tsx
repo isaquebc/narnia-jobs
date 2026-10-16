@@ -8,7 +8,7 @@ import { profileKey } from "../../hooks/useProfiles";
 import { t } from "../../i18n";
 import type { ProfileRecord } from "../../lib/api";
 
-const TABS = ["enfases", "narrativa", "recrutador", "cartao"] as const;
+const TABS = ["enfases", "narrativa", "recrutador", "cartao", "curriculo"] as const;
 export type ProfileTab = (typeof TABS)[number];
 
 export function useProfile(id: string) {

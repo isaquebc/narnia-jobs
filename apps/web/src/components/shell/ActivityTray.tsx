@@ -32,6 +32,8 @@ const OTHER_STAGES = [
   "ingest.github.synthesis",
   "profile.analyze",
   "posting.extract",
+  "cv.generate",
+  "cv.render",
   "stalled",
 ];
 
@@ -145,6 +147,18 @@ function usePostingAnalyses() {
   return { running, done, incomplete, count, markRead };
 }
 
+/**
+ * Currículos e cartas (F05-13): a geração aparece como job (etapa "Geração do currículo"); o resultado aparece aqui até
+ * ser visto: "pronto" (`document.ready`, abrir marca como visto) ou "não passou na revisão" (`document.review_failed`,
+ * resolvido quando uma versão nova passa). Tudo conta no número.
+ */
+function useDocumentNotices() {
+  const { notifications, markRead } = useNotifications("open");
+  const ready = notifications.filter((n) => n.kind === "document.ready" && !n.readAt);
+  const failed = notifications.filter((n) => n.kind === "document.review_failed");
+  return { ready, failed, count: ready.length + failed.length, markRead };
+}
+
 const useStoppedRuns = () => useRunsByStatus("stopped", STOPPED_STATUSES);
 const useRunningRuns = () => useRunsByStatus("running", RUNNING_STATUSES);
 
@@ -155,6 +169,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
   // "Aguardando você" (F06-17): edições do recrutador em notas do usuário, esperando confirmação
   const waiting = usePendingNotes();
   const analyses = usePostingAnalyses();
+  const documents = useDocumentNotices();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="relative">
@@ -167,7 +182,7 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
       >
         <Activity size={16} />
         <span data-testid="activity-count" className="text-xs">
-          {activeCount + waiting.length + analyses.count}
+          {activeCount + waiting.length + analyses.count + documents.count}
         </span>
       </Button>
       {open ? (
@@ -246,6 +261,29 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
               ))}
             </ul>
           ) : null}
+          {documents.count > 0 ? (
+            <ul aria-label={t("tray.documents")} className="mb-2 flex flex-col gap-2">
+              {[...documents.failed, ...documents.ready].map((n) => (
+                <li
+                  key={n.id}
+                  className={`flex items-center justify-between gap-2 rounded-md border p-2 text-sm ${
+                    n.kind === "document.ready" ? "border-ok/40" : "border-warn/40"
+                  }`}
+                >
+                  <span>{n.title}</span>
+                  <NavLink
+                    to={n.actionUrl}
+                    onClick={() =>
+                      n.kind === "document.ready" ? documents.markRead.mutate(n.id) : undefined
+                    }
+                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                  >
+                    {t("tray.openDocument")}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {stopped.length > 0 ? (
             <ul aria-label={t("activity.stopped")} className="mb-2 flex flex-col gap-2">
               {stopped.map((run) => {
@@ -293,7 +331,8 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
           stopped.length === 0 &&
           running.length === 0 &&
           waiting.length === 0 &&
-          analyses.count === 0 ? (
+          analyses.count === 0 &&
+          documents.count === 0 ? (
             <p className="text-sm text-muted-fg">{t("activity.empty")}</p>
           ) : (
             <ul className="flex max-h-96 flex-col gap-2 overflow-auto">
