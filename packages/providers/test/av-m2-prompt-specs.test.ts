@@ -30,7 +30,7 @@ function capture() {
 }
 
 describe("registro dos prompts estruturados", () => {
-  it("14 operações (F06: + 3 da vaga; F05: CV e carta), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
+  it("15 operações (F06: + 3 da vaga; F05: CV, carta e revisão), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
     const ops = Object.keys(STRUCTURED_PROMPTS).sort();
     expect(ops).toEqual(
       [
@@ -41,6 +41,7 @@ describe("registro dos prompts estruturados", () => {
         "checkProposals",
         "coverLetterGenerate",
         "cvGenerate",
+        "cvReview",
         "extractFacts",
         "pickFiles",
         "postingDuplicate",

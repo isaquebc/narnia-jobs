@@ -114,7 +114,7 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   doctor | restore ARQ | dev-down                diagnóstico, restauração de backup e derrubar a stack (só desta instância)
   exec CMD [ARGS…] roda um comando no container de dev da instância (ex.: exec pnpm --filter @narnia-jobs/core exec vitest run x)
   evals [chat] [id…] [--strict]  conversas de referência (evals/chat) num banco temporário isolado; Phoenix :${NARNIA_PHOENIX_PORT:-6106}
-  evals prompts|pdf|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, ou tudo (mock = smoke; real só a pedido)
+  evals prompts|pdf|cv-review|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, revisor do CV, ou tudo (mock = smoke; real só a pedido)
   wipe             remove containers, volumes e ./.claude-data da instância
 USAGE
 }
@@ -138,7 +138,7 @@ main() {
       # prompts (Playground pela ponte) | chat | pdf (banco temporário isolado) | all; sem subcomando = chat
       wait_api
       case "${1:-}" in
-        prompts | chat | pdf | all) ;;
+        prompts | chat | pdf | cv-review | all) ;;
         *) set -- chat "$@" ;;
       esac
       "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals "$@" ;;

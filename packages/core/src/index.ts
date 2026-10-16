@@ -16,6 +16,7 @@ export * from "./documents/inspect";
 export * from "./documents/labels";
 export * from "./documents/link-check";
 export * from "./documents/links";
+export * from "./documents/notify";
 export * from "./documents/tasks";
 export * from "./documents/templates";
 export * from "./errors/friendly";

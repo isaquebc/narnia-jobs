@@ -275,13 +275,22 @@ export interface CvBrief {
 }
 
 export const CvDraftSchema = z.object({
+  /** Cargo-alvo no idioma do documento (o mesmo cargo do perfil, traduzido quando preciso). */
+  headline: Text,
   summary: Text,
   experiences: z.array(
     z.object({
       factId: IdSchema,
+      /** Cargo e local como nos dados, traduzidos para o idioma do documento quando preciso (mesmo significado). */
+      title: Text,
+      location: Text.nullable(),
       bullets: z.array(CvBulletSchema).min(1).max(6),
       tech: z.array(Text).max(12),
     }),
+  ),
+  /** Curso e grau no idioma do documento, para cada formação do resumo. */
+  education: z.array(
+    z.object({ factId: IdSchema, course: Text.nullable(), degree: Text.nullable() }),
   ),
   skills: z.array(
     z.object({ label: Text, items: z.array(z.object({ name: Text, factIds: Sourced })).min(1) }),
@@ -306,3 +315,25 @@ export const CoverLetterDraftSchema = z.object({
     .max(5),
 });
 export type CoverLetterDraft = z.infer<typeof CoverLetterDraftSchema>;
+
+/** Saída do revisor (F05-13, Haiku): o que só a leitura acha. Links, páginas, fonte, espaçamento e ATS são do código. */
+export const CV_MODEL_REVIEW_AREAS = [
+  "relevance",
+  "hallucination",
+  "facts",
+  "layout",
+  "language",
+  "contact",
+] as const;
+export const CvReviewOutputSchema = z.object({
+  passed: z.boolean(),
+  issues: z.array(
+    z.object({
+      area: z.enum(CV_MODEL_REVIEW_AREAS),
+      severity: z.enum(["error", "warning"]),
+      message: Text,
+      where: Text.nullable(),
+    }),
+  ),
+});
+export type CvReviewOutput = z.infer<typeof CvReviewOutputSchema>;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ChatTitleOutputSchema } from "./schemas/chat";
-import { CoverLetterDraftSchema, CvDraftSchema } from "./schemas/cv";
+import { CoverLetterDraftSchema, CvDraftSchema, CvReviewOutputSchema } from "./schemas/cv";
 import {
   BuildDigestOutputSchema,
   ExtractFactsOutputSchema,
@@ -62,4 +62,5 @@ export const POSTING_OUTPUT_JSON_SCHEMAS = {
 export const CV_OUTPUT_JSON_SCHEMAS = {
   cvGenerate: toJsonSchema(CvDraftSchema),
   coverLetterGenerate: toJsonSchema(CoverLetterDraftSchema),
+  cvReview: toJsonSchema(CvReviewOutputSchema),
 } as const;

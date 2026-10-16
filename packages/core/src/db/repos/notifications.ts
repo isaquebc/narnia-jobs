@@ -51,6 +51,7 @@ export interface NotificationsRepo {
 export const INFORMATIONAL_KINDS: readonly NotificationKind[] = [
   "ingestion.done",
   "posting.analysis_done",
+  "document.ready",
 ];
 export const INFORMATIONAL_TTL_DAYS = 7;
 

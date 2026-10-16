@@ -79,6 +79,7 @@ export {
   type CompleteInput,
   type CompleteResult,
   type CvGenerateInput,
+  type CvReviewInput,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,

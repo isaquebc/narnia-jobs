@@ -43,6 +43,13 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
   postingDuplicate: { salva: "input.saved_json", nova: "input.incoming_json", resposta: OUTPUT },
   cvGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   coverLetterGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
+  cvReview: {
+    dados: "input.brief_json",
+    conteudo: "input.content_json",
+    texto: "input.pdf_text",
+    referencia: "reference",
+    resposta: OUTPUT,
+  },
 };
 
 export const JUDGE_SYSTEM =

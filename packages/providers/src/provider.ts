@@ -8,6 +8,7 @@ import type {
   CoverLetterDraft,
   CvBrief,
   CvDraft,
+  CvReviewOutput,
   ExtractFactsOutput,
   FactProposal,
   PickFilesOutput,
@@ -160,6 +161,17 @@ export interface CvGenerateInput {
   brief: CvBrief;
   model: string;
 }
+/** F05-13: revisão do documento pronto (Haiku); as páginas em PNG ficam em `dir` e o modelo lê com a tool Read. */
+export interface CvReviewInput {
+  dir: string;
+  pageFiles: string[];
+  brief: CvBrief;
+  content: unknown;
+  pdfText: string;
+  /** Apontamentos das checagens por código (contexto: o revisor não repete). */
+  checks: Array<{ area: string; severity: string; message: string }>;
+  model: string;
+}
 
 /** Avaliações no Phoenix (M1): chamada simples, sem tools, usada pela ponte da assinatura. */
 export interface CompleteInput {
@@ -208,6 +220,8 @@ export interface Provider {
   /** F05: conteúdo do CV e da carta de apresentação (Sonnet). */
   cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>>;
   coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;
+  /** F05-13: revisão do PDF pelas imagens das páginas e pelo texto (Haiku). */
+  cvReview(input: CvReviewInput): Promise<ProviderResult<CvReviewOutput>>;
   /**
    * F03 §2.4: diagnóstico do plano (assinatura e uso das janelas). Nunca gasta tokens; `null` quando o plano não se
    * aplica (API key, terceiros) ou não há dado.

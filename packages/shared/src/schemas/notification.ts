@@ -24,6 +24,10 @@ export const NOTIFICATION_KINDS = [
   "posting.analysis_done",
   /** Conversa da análise que terminou sem gravar a análise (erro, limite ou o modelo parou): abrir a conversa. */
   "posting.analysis_incomplete",
+  /** CV ou carta pronto e aprovado na revisão (F05): aparece na bandeja até ser visto. Informativa. */
+  "document.ready",
+  /** CV ou carta que não passou na revisão depois da regeração automática (F05-13): alerta com os apontamentos. */
+  "document.review_failed",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

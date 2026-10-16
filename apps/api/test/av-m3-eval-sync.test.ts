@@ -117,14 +117,14 @@ describe("sincronização de datasets e avaliadores", () => {
       fetch: px.fetch,
       customProviderId: "CP1",
     });
-    expect(px.datasets.size).toBe(14);
+    expect(px.datasets.size).toBe(15);
     expect(px.evaluators.size).toBe(total);
     expect(r).toEqual({
-      datasets: 14,
+      datasets: 15,
       evaluatorsCreated: total,
       evaluatorsUpdated: 0,
       attached: total,
-      judgesCreated: 14,
+      judgesCreated: 15,
       judgesUpdated: 0,
     });
     const judge = px.calls.find((c) => c.op === "judge");
@@ -186,7 +186,7 @@ describe("sincronização de datasets e avaliadores", () => {
       customProviderId: null,
     });
     expect(again).toEqual({
-      datasets: 14,
+      datasets: 15,
       evaluatorsCreated: 0,
       evaluatorsUpdated: 0,
       attached: 0,
@@ -202,7 +202,7 @@ describe("sincronização de datasets e avaliadores", () => {
       customProviderId: null,
     });
     expect(changed.judgesUpdated).toBe(1);
-    expect(px.calls.filter((c) => c.op === "upload:update")).toHaveLength(28);
+    expect(px.calls.filter((c) => c.op === "upload:update")).toHaveLength(30);
     const e = px.evaluators.get("narnia-check-proposals-json-schema");
     if (e) e.source = "// versão antiga";
     const third = await syncEvaluators({

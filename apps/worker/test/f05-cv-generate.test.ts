@@ -169,7 +169,15 @@ describe("F05/M2 worker · cv.generate", () => {
     const statuses = h.published
       .filter((e) => e.type === "document.updated")
       .map((e) => (e as { status: string }).status);
-    expect(statuses).toEqual(["collecting", "generating", "validating", "ready"]);
+    expect(statuses).toEqual(["collecting", "generating", "validating", "reviewing", "ready"]);
+    // aviso "pronto" na bandeja, com o link da aba do currículo
+    const notice = h.published.find((e) => e.type === "notification.created") as {
+      notification: { kind: string; actionUrl: string };
+    };
+    expect(notice.notification).toMatchObject({
+      kind: "document.ready",
+      actionUrl: `/perfis/${h.ids.profileId}/curriculo`,
+    });
   });
 
   it("reprovou na conferência (3 páginas): regera com os apontamentos e passa", async () => {
@@ -181,6 +189,33 @@ describe("F05/M2 worker · cv.generate", () => {
     expect(done).toMatchObject({ status: "ready", attempts: 2 });
     expect(h.briefs).toHaveLength(2);
     expect(h.briefs[1]?.previousIssues).toContainEqual(expect.objectContaining({ area: "pages" }));
+  });
+
+  it("o revisor reprova uma vez: regera com o apontamento dele e passa", async () => {
+    const provider = new MockProvider();
+    provider.setMode({ cvReviewFailures: 1 });
+    h = harness({ provider });
+    const { doc, v } = newDoc(h);
+    await run(h, doc.id, v.id);
+    expect(h.repos.documents.versionById(v.id)).toMatchObject({ status: "ready", attempts: 2 });
+    expect(h.briefs[1]?.previousIssues).toContainEqual(
+      expect.objectContaining({ area: "layout", message: expect.stringMatching(/sobreposto/) }),
+    );
+    expect(h.repos.usageEvents.list().filter((u) => u.category === "cv.review")).toHaveLength(2);
+  });
+
+  it("o revisor reprova duas vezes: alerta 'não passou na revisão' com o apontamento", async () => {
+    const provider = new MockProvider();
+    provider.setMode({ cvReviewFailures: 2 });
+    h = harness({ provider });
+    const { doc, v } = newDoc(h);
+    await run(h, doc.id, v.id);
+    const done = h.repos.documents.versionById(v.id);
+    expect(done?.status).toBe("ready_with_issues");
+    expect(done?.review?.issues).toContainEqual(
+      expect.objectContaining({ area: "layout", severity: "error" }),
+    );
+    expect(h.repos.notifications.list().map((n) => n.kind)).toEqual(["document.review_failed"]);
   });
 
   it("reprovou duas vezes: pronto com o alerta e os apontamentos guardados", async () => {

@@ -20,6 +20,8 @@ import {
   CV_OUTPUT_JSON_SCHEMAS,
   type CvDraft,
   CvDraftSchema,
+  type CvReviewOutput,
+  CvReviewOutputSchema,
   clip,
   contentTracingEnabled,
   EXTRACTION_JSON_SCHEMAS,
@@ -68,6 +70,7 @@ import {
   type CompleteInput,
   type CompleteResult,
   type CvGenerateInput,
+  type CvReviewInput,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
@@ -699,6 +702,24 @@ export class ClaudeCodeProvider implements Provider {
       },
       ReadDocumentOutputSchema,
       "readDocument",
+    );
+  }
+
+  /** F05-13: o Haiku lê as páginas em PNG com a tool Read (a chamada estruturada só aceita texto). */
+  async cvReview(input: CvReviewInput): Promise<ProviderResult<CvReviewOutput>> {
+    return this.run(
+      renderStructuredPrompt("cvReview", input),
+      {
+        model: input.model,
+        tools: ["Read"],
+        allowedTools: ["Read"],
+        maxTurns: input.pageFiles.length + 3,
+        cwd: input.dir,
+        systemPrompt: PROMPTS.cvReview(),
+        outputFormat: { type: "json_schema", schema: CV_OUTPUT_JSON_SCHEMAS.cvReview },
+      },
+      CvReviewOutputSchema,
+      "cvReview",
     );
   }
 

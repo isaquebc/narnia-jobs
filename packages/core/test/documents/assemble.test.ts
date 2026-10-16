@@ -33,10 +33,14 @@ function draftFor(b: ReturnType<typeof setup>["brief"]): CvDraft {
   const acme = b.experiences[0] as (typeof b.experiences)[number];
   const ach = acme.achievements[0] as (typeof acme.achievements)[number];
   return {
+    headline: "Engenheira de Software Sênior",
     summary: "Engenheira de software com foco em pagamentos.",
+    education: [],
     experiences: [
       {
         factId: acme.id,
+        title: acme.title,
+        location: "Remoto",
         bullets: [
           { text: `${ach.text}, ${ach.metric}.`, factIds: [{ kind: "achievement", id: ach.id }] },
         ],
@@ -100,6 +104,8 @@ describe("F05/M2 core · montagem do CV", () => {
       bullets: [{ text: "Fez algo", factIds: [{ kind: "achievement", id: "nao-existe" }] }],
     };
     d.experiences.push({
+      title: "x",
+      location: null,
       factId: "inventada",
       bullets: [{ text: "x", factIds: [{ kind: "achievement", id: "nao-existe" }] }],
       tech: [],
@@ -113,6 +119,43 @@ describe("F05/M2 core · montagem do CV", () => {
     expect(msgs).toMatch(/nao-existe/);
     expect(msgs).toMatch(/inventada/);
     expect(msgs).toMatch(/Rust/);
+  });
+
+  it("CV em inglês: cargo-alvo, cargo, local e curso traduzidos pelo gerador; empresa, datas e instituição dos dados", () => {
+    const s = setup();
+    const d = draftFor(s.brief);
+    const ed = s.brief.education[0] as { id: string };
+    d.headline = "Senior Software Engineer";
+    d.experiences[0] = {
+      ...(d.experiences[0] as CvDraft["experiences"][number]),
+      title: "Senior Software Engineer",
+      location: "Remote",
+    };
+    d.education = [{ factId: ed.id, course: "Computer Science", degree: "Bachelor's degree" }];
+    const header = {
+      name: "Ana",
+      title: "Engenheira",
+      location: null,
+      email: null,
+      phone: null,
+      links: [],
+    };
+    const { content, issues } = assembleCv(s.r, s.brief, d, {
+      meta: { ...meta(s.ids.profileId), locale: "en-US" },
+      header,
+    });
+    expect(issues).toEqual([]);
+    expect(content.header.title).toBe("Senior Software Engineer");
+    expect(content.experiences[0]).toMatchObject({
+      company: "Acme Pagamentos",
+      title: "Senior Software Engineer",
+      location: "Remote",
+      start: "2023-02",
+    });
+    expect(content.education[0]).toMatchObject({
+      course: "Computer Science",
+      institution: s.brief.education[0]?.institution,
+    });
   });
 
   it("competência traduzida com a origem certa passa; tecnologia trocada não", () => {

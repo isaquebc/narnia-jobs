@@ -130,10 +130,11 @@ export function assembleCv(
     experiences.push({
       factId: b.id,
       company: b.company,
-      title: b.title,
+      // cargo e local no idioma do documento (o revisor confere que dizem o mesmo que os dados)
+      title: d.title,
       start: b.start,
       end: b.current ? null : b.end,
-      location: fact.location ?? null,
+      location: fact.location ? (d.location ?? fact.location) : null,
       bullets: d.bullets,
       tech: d.tech,
       matchScore: b.matchScore,
@@ -215,13 +216,15 @@ export function assembleCv(
       })),
   ];
 
+  const translated = new Map(draft.education.map((t) => [t.factId, t]));
   const education = brief.education.map((e) => {
     const f = facts.education.get(e.id);
+    const t = translated.get(e.id);
     return {
       factId: e.id,
       institution: e.institution,
-      course: e.course,
-      degree: e.degree,
+      course: e.course === null ? null : (t?.course ?? e.course),
+      degree: e.degree === null ? null : (t?.degree ?? e.degree),
       start: f?.startDate ?? null,
       end: f?.endDate ?? null,
     };
@@ -231,7 +234,7 @@ export function assembleCv(
 
   const content: CvContent = {
     meta: { kind: "cv", ...ctx.meta },
-    header: ctx.header,
+    header: { ...ctx.header, title: draft.headline },
     summary: draft.summary,
     experiences,
     skills: skills.filter((g) => g.items.length > 0),

@@ -72,6 +72,19 @@ describe.skipIf(!ws)("F05/M1 core · PDF com Chromium real", () => {
     expect(Math.round(insp.pages[0]?.width ?? 0)).toBe(612);
   });
 
+  it("cabeçalho sobreposto (o caso que o Haiku não viu no gate) é pego pela checagem de posição do texto", async () => {
+    const broken = renderDocumentHtml(CV_SHORT, "classico").replace(
+      "</head>",
+      "<style>.title{margin-top:-20pt}.contact{margin-top:-16pt}</style></head>",
+    );
+    const r = await renderPdf(ws as string, broken, { paper: "A4" });
+    if (!r.ok) throw new Error(r.message);
+    const issues = layoutIssues(await inspectPdf(r.pdf), { headings });
+    expect(issues).toContainEqual(
+      expect.objectContaining({ area: "layout", message: expect.stringMatching(/sobreposto/) }),
+    );
+  });
+
   it("carta em PDF: 1 página sem apontamento", async () => {
     const r = await renderPdf(ws as string, renderDocumentHtml(LETTER, "classico"), {
       paper: "A4",

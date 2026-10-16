@@ -1,14 +1,27 @@
-import { copyFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   initTelemetry,
+  inspectPdf,
   knownFactsText,
   parseEvalCases,
+  renderDocumentHtml,
+  renderPdf,
+  renderPdfPages,
   shutdownTelemetry,
 } from "@narnia-jobs/core";
 import { createProviderFromEnv, type Provider, STRUCTURED_PROMPTS } from "@narnia-jobs/providers";
-import { contentTracingEnabled } from "@narnia-jobs/shared";
+import { type CvContent, contentTracingEnabled } from "@narnia-jobs/shared";
 import { BaselineGate, gateFlags } from "./baseline-file";
 import { syncChatJudge, syncEvaluators } from "./eval-sync";
 import { chatJudge, judgeFor } from "./judges";
@@ -26,6 +39,8 @@ import { openEvalSandbox } from "./sandbox";
  *   regras sem tokens + juiz do recrutador; experimento no dataset `narnia-chat`; rastros no projeto `narnia-evals`;
  * - `evals pdf`: leitura do PDF fictício (`evals/fixtures/cv_text.pdf`) com a tool Read; avaliadores e juiz do dataset
  *   `narnia-read-document`.
+ * - `evals cv-review`: revisor do CV (F05-13) com as imagens reais das páginas: o CV do exemplo vira PDF no serviço
+ *   `browser` (um exemplo com o cabeçalho sobreposto de propósito) e o revisor lê os PNGs com a tool Read.
  * Os dados do usuário nunca entram: o sandbox é apagado no fim.
  */
 const repoRoot = () => fileURLToPath(new URL("../../../../", import.meta.url));
@@ -210,18 +225,126 @@ async function pdf(ctx: Ctx): Promise<number> {
   return failed;
 }
 
+/** Cabeçalho sobreposto de propósito: defeito que só a imagem mostra (o texto extraído continua igual). */
+const BREAK_LAYOUT = "<style>.title{margin-top:-20pt}.contact{margin-top:-16pt}</style></head>";
+
+async function cvReview(ctx: Ctx, gate?: BaselineGate): Promise<number> {
+  const ws = process.env.NARNIA_BROWSER_WS;
+  if (!ws) {
+    console.log("✘ evals cv-review precisa do serviço browser (NARNIA_BROWSER_WS).");
+    return 1;
+  }
+  const examples = PROMPT_DATASETS.cvReview;
+  const rows = datasetRows("cvReview");
+  const model = STRUCTURED_PROMPTS.cvReview.defaultModel;
+  const scores = new Map<string, number[]>();
+  let failed = 0;
+  let errors = 0;
+  const runs: Parameters<typeof recordLocalExperiment>[0]["runs"] = [];
+  for (const [i, example] of examples.entries()) {
+    const dir = mkdtempSync(join(tmpdir(), "narnia-cv-review-"));
+    const startedAt = new Date().toISOString();
+    let output: unknown = null;
+    let error: string | undefined;
+    let pdfText = "";
+    try {
+      let html = renderDocumentHtml(example.input.content as CvContent, "classico");
+      if ((example.reference as { breakLayout?: boolean }).breakLayout)
+        html = html.replace("</head>", BREAK_LAYOUT);
+      const r = await renderPdf(ws, html, { paper: "A4" });
+      if (!r.ok) throw new Error(r.message);
+      writeFileSync(join(dir, "cv.pdf"), r.pdf);
+      mkdirSync(join(dir, "pages"));
+      const pages = await renderPdfPages(join(dir, "cv.pdf"), join(dir, "pages"), { dpi: 110 });
+      pdfText = (await inspectPdf(r.pdf)).text;
+      output = (
+        await ctx.provider.cvReview({
+          ...example.input,
+          dir,
+          pageFiles: pages.map((p) => relative(dir, p)),
+          pdfText,
+          model,
+        })
+      ).output;
+    } catch (e) {
+      error = (e as Error).message;
+      errors++;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const endedAt = new Date().toISOString();
+    const evaluations: LocalEvaluation[] = [];
+    const row = rows[i];
+    if (!error && row) {
+      const evalCtx = {
+        input: { ...row.input, pdf_text: pdfText },
+        output: { messages: [{ role: "assistant", content: JSON.stringify(output) }] },
+        reference: example.reference,
+        metadata: row.metadata,
+      };
+      for (const e of promptEvaluators("cvReview"))
+        evaluations.push({ name: e.name, kind: "CODE", ...e.run(evalCtx) });
+      evaluations.push({
+        kind: "LLM",
+        ...(await judgeLocally(ctx.provider, judgeFor("cvReview"), evalCtx)),
+      });
+    }
+    console.log(
+      `${error ? "✘" : "✔"} revisão do CV (${example.id})${error ? ` · erro: ${error}` : ""}`,
+    );
+    for (const ev of evaluations) {
+      console.log(`    ${mark(ev.score)} ${ev.name}: ${ev.explanation}`);
+      if (ev.score < 1) failed++;
+      scores.set(ev.name, [...(scores.get(ev.name) ?? []), ev.score]);
+    }
+    if (error) failed++;
+    runs.push({
+      exampleId: example.id,
+      output,
+      startedAt,
+      endedAt,
+      ...(error ? { error } : {}),
+      evaluations,
+    });
+  }
+  gate?.record(
+    STRUCTURED_PROMPTS.cvReview.name,
+    Object.fromEntries([...scores].map(([k, v]) => [k, v.reduce((a, b) => a + b, 0) / v.length])),
+    { errors },
+  );
+  if (ctx.phoenix) {
+    await syncEvaluators({ baseUrl: ctx.phoenix, customProviderId: ctx.customProviderId });
+    const exp = await recordLocalExperiment(
+      { dataset: STRUCTURED_PROMPTS.cvReview.name, name: EXP_NAME("revisão do CV"), runs },
+      { baseUrl: ctx.phoenix },
+    );
+    console.log(
+      `Phoenix: experimento ${exp.experimentId} no dataset ${STRUCTURED_PROMPTS.cvReview.name}`,
+    );
+  }
+  return failed;
+}
+
 /**
  * `narnia-jobs evals chat|pdf [ids…] [--strict] [--gate] [--update-baseline]`. No chat, `--gate` compara cada caso com
  * a linha de base de `evals/baselines.json` (F06-14: a persona do recrutador é um prompt como os outros).
  */
-export async function runSandboxEvals(kind: "chat" | "pdf", args: string[]): Promise<number> {
+export async function runSandboxEvals(
+  kind: "chat" | "pdf" | "cv-review",
+  args: string[],
+): Promise<number> {
   const strict = args.includes("--strict");
   const gate = new BaselineGate(gateFlags(args));
   const only = args.filter((a) => !a.startsWith("--"));
   await initTelemetry({ ...process.env, NARNIA_OTEL_PROJECT: "narnia-evals" }, "narnia-evals");
   try {
     const ctx = await context();
-    const failed = kind === "chat" ? await chat(ctx, only, gate) : await pdf(ctx);
+    const failed =
+      kind === "chat"
+        ? await chat(ctx, only, gate)
+        : kind === "pdf"
+          ? await pdf(ctx)
+          : await cvReview(ctx, gate);
     const regressed = gate.finish();
     return (strict && failed > 0) || regressed ? 1 : 0;
   } finally {

@@ -14,6 +14,7 @@ import type {
   ChatTitleInput,
   CheckProposalsInput,
   CvGenerateInput,
+  CvReviewInput,
   ExtractFactsInput,
   PickFilesInput,
   PostingDuplicateInput,
@@ -202,6 +203,17 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: CV_OUTPUT_JSON_SCHEMAS.coverLetterGenerate,
     tools: [],
   }),
+  cvReview: spec("cvReview", {
+    name: "narnia-cv-review",
+    description:
+      "F05-13: revisão do CV ou da carta pelas imagens das páginas (tool Read) e pelo texto do PDF (modelo barato).",
+    file: FILE("cv-review"),
+    userTemplate:
+      "Páginas do documento (imagens nesta pasta; leia cada uma com a ferramenta Read): {{page_files}}\n\n<dados>\n{{brief_json}}\n</dados>\n\n<conteudo>\n{{content_json}}\n</conteudo>\n\n<texto_do_pdf>\n{{pdf_text}}\n</texto_do_pdf>\n\n<checagens_do_sistema>\n{{checks_json}}\n</checagens_do_sistema>",
+    defaultModel: "haiku",
+    jsonSchema: CV_OUTPUT_JSON_SCHEMAS.cvReview,
+    tools: ["Read"],
+  }),
 };
 
 const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
@@ -250,6 +262,13 @@ export const structuredPromptVars = {
   }),
   cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
   coverLetterGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
+  cvReview: (i: CvReviewInput) => ({
+    page_files: i.pageFiles.join(", ") || "(sem imagens: carta em texto)",
+    brief_json: JSON.stringify(i.brief, null, 1),
+    content_json: JSON.stringify(i.content, null, 1),
+    pdf_text: i.pdfText,
+    checks_json: JSON.stringify(i.checks, null, 1),
+  }),
 } satisfies Record<StructuredOperation, (input: never) => Record<string, string>>;
 
 /** Troca `{{nome}}` pelas variáveis numa passada só (conteúdo com chaves não é reinterpretado). */

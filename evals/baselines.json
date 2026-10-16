@@ -75,9 +75,17 @@
       "padrao_de_entrega": 1,
       "sem_termo_sem_evidencia": 1
     },
-    "versionId": "e96ec2b44b5447b93ca8ed53aca9129ac435234c8a40ac0523383e86cf8975cf",
-    "commit": "91b92f0",
-    "updatedAt": "2026-10-16T15:34:26.549Z"
+    "versionId": "6074b8732e8933957ab8798a7f33f323b504380eed95e3a3aee48d7d2fb23de5",
+    "commit": "2697000",
+    "updatedAt": "2026-10-16T15:57:54.865Z"
+  },
+  "narnia-cv-review": {
+    "scores": {
+      "cobertura_da_referencia": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 1
+    },
+    "updatedAt": "2026-10-16T15:59:58.919Z"
   },
   "narnia-posting-duplicate": {
     "scores": {

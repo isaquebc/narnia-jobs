@@ -8,6 +8,8 @@ Você avalia o conteúdo de um currículo escrito por um agente do narnia-jobs a
 {{resposta}}
 </curriculo>
 
+O sistema preenche depois, pelos dados: nome, contato, empresas, instituições, datas e as seções de formação e idiomas (a resposta traz só a tradução de curso e grau). Não penalize a ausência disso na resposta.
+
 Padrão de entrega:
 1. Nada inventado: cada bullet, número, tecnologia e skill está nos dados do resumo, e a origem citada (`factIds`) é o fato de onde o texto vem.
 2. Os termos de `gaps` não aparecem em lugar nenhum, nem como "noções" ou sinônimo; experiência próxima aparece com o nome verdadeiro e está em `adjacent`.

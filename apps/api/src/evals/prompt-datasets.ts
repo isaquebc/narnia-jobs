@@ -5,6 +5,7 @@ import type {
   ChatTitleInput,
   CheckProposalsInput,
   CvGenerateInput,
+  CvReviewInput,
   ExtractFactsInput,
   PickFilesInput,
   PostingDuplicateInput,
@@ -15,6 +16,7 @@ import type {
   SynthesizeRunInput,
 } from "@narnia-jobs/providers";
 import { STRUCTURED_PROMPTS, structuredPromptVars } from "@narnia-jobs/providers";
+import type { CvContent } from "@narnia-jobs/shared";
 
 /**
  * Datasets dos prompts estruturados (M3): exemplos fictícios, com as entradas tipadas como o provider as recebe; as
@@ -38,6 +40,7 @@ type Input<Op extends StructuredOperation> = Omit<
     postingDuplicate: PostingDuplicateInput;
     cvGenerate: CvGenerateInput;
     coverLetterGenerate: CvGenerateInput;
+    cvReview: CvReviewInput;
   }[Op],
   "model"
 >;
@@ -368,6 +371,140 @@ const VAGA_INITECH: NonNullable<CvGenerateInput["brief"]["posting"]> = {
   },
 };
 
+/** Conteúdo de CV fiel aos dados de `cvBrief` (revisor, F05-13). */
+const CV_REVIEW_OK: CvContent = {
+  meta: {
+    kind: "cv",
+    locale: "en-US",
+    paper: "A4",
+    profileId: "p1",
+    postingId: "v1",
+    generatedAt: "2026-10-16T12:00:00Z",
+  },
+  header: {
+    name: "Ana Maria Exemplo",
+    title: "Senior Software Engineer",
+    location: "Campinas, SP",
+    email: "ana.exemplo@example.com",
+    phone: "(11) 98765-4321",
+    links: [
+      { kind: "email", url: "mailto:ana.exemplo@example.com", label: "ana.exemplo@example.com" },
+    ],
+  },
+  summary: "Senior software engineer focused on payment platforms, performance and mentoring.",
+  experiences: [
+    {
+      factId: "e1",
+      company: "Acme Pagamentos",
+      title: "Senior Software Engineer",
+      start: "2021-03",
+      end: null,
+      location: "Remote",
+      bullets: [
+        {
+          text: "Cut checkout p95 latency from 800 ms to 300 ms.",
+          factIds: [{ kind: "achievement", id: "a1" }],
+        },
+        {
+          text: "Led the migration of 40 services to Docker containers with zero downtime.",
+          factIds: [{ kind: "achievement", id: "a2" }],
+        },
+        { text: "Mentored 4 developers.", factIds: [{ kind: "achievement", id: "a3" }] },
+      ],
+      tech: ["Node.js", "PostgreSQL", "Docker"],
+      matchScore: 91,
+    },
+    {
+      factId: "e2",
+      company: "Globex Logística",
+      title: "Backend Developer",
+      start: "2017-01",
+      end: "2021-02",
+      location: null,
+      bullets: [
+        {
+          text: "Built the real-time tracking service (120k events/min).",
+          factIds: [{ kind: "achievement", id: "a4" }],
+        },
+      ],
+      tech: ["Java", "Redis"],
+      matchScore: 64,
+    },
+  ],
+  skills: [
+    {
+      label: "Backend",
+      items: [
+        { name: "Node.js", factIds: [{ kind: "skill", id: "s1" }], matchScore: 95 },
+        { name: "PostgreSQL", factIds: [{ kind: "skill", id: "s2" }], matchScore: 90 },
+        { name: "Docker", factIds: [{ kind: "skill", id: "s3" }], matchScore: 80 },
+      ],
+    },
+  ],
+  projects: [],
+  education: [
+    {
+      factId: "ed1",
+      institution: "Unicamp",
+      course: "Computer Science",
+      degree: "Bachelor's degree",
+      start: null,
+      end: null,
+    },
+  ],
+  languages: [{ factId: "l2", name: "English", level: "C1" }],
+  adjacent: [{ asked: "Kubernetes", shown: "Docker", factIds: [{ kind: "skill", id: "s3" }] }],
+  sectionsOrder: ["summary", "experience", "skills", "education", "languages"],
+  omitted: [],
+  provenance: { factIdsUsed: [], unverifiedFactIds: [] },
+};
+
+const CV_REVIEW_INVENTED: CvContent = {
+  ...CV_REVIEW_OK,
+  experiences: CV_REVIEW_OK.experiences.map((e, i) =>
+    i === 0
+      ? {
+          ...e,
+          bullets: e.bullets.map((b) =>
+            b.text.startsWith("Mentored") ? { ...b, text: "Mentored 10 developers." } : b,
+          ),
+        }
+      : e,
+  ),
+  skills: [
+    {
+      label: "Backend",
+      items: [
+        ...(CV_REVIEW_OK.skills[0] as CvContent["skills"][number]).items,
+        { name: "Kubernetes", factIds: [{ kind: "skill", id: "s3" }], matchScore: 90 },
+      ],
+    },
+  ],
+};
+
+/** Texto aproximado do PDF a partir do conteúdo (o dataset do Phoenix não tem imagens; a avaliação local monta o PDF). */
+function reviewInput(content: CvContent): Omit<CvReviewInput, "model"> {
+  const text = [
+    content.header.name,
+    content.header.title,
+    content.summary,
+    ...content.experiences.flatMap((e) => [
+      `${e.title} · ${e.company}`,
+      ...e.bullets.map((b) => b.text),
+      e.tech.join(", "),
+    ]),
+    ...content.skills.flatMap((g) => [`${g.label}: ${g.items.map((i) => i.name).join(", ")}`]),
+  ].join("\n");
+  return {
+    dir: "",
+    pageFiles: [],
+    brief: cvBrief({ locale: "en-US", posting: VAGA_INITECH, gaps: ["Kubernetes", "Kafka"] }),
+    content,
+    pdfText: text,
+    checks: [],
+  };
+}
+
 const CV_DATASETS = {
   cvGenerate: [
     {
@@ -446,7 +583,29 @@ const CV_DATASETS = {
       reference: { expected: ["Initech", '"role":"covers"', '"id":"a1"'] },
     },
   ],
-} satisfies { [K in "cvGenerate" | "coverLetterGenerate"]: DatasetExample<K>[] };
+  cvReview: [
+    {
+      id: "cv-correto",
+      description: "CV fiel aos dados, layout limpo: aprova sem apontamento de erro.",
+      input: reviewInput(CV_REVIEW_OK),
+      reference: { expected: ['"passed":true'] },
+    },
+    {
+      id: "cv-inventado",
+      description:
+        "CV com número inventado (10 pessoas; os dados dizem 4) e Kubernetes como skill (lacuna da vaga): reprova por alucinação.",
+      input: reviewInput(CV_REVIEW_INVENTED),
+      reference: { expected: ['"passed":false', '"area":"hallucination"'] },
+    },
+    {
+      id: "cv-layout-quebrado",
+      description:
+        "CV fiel aos dados, mas com o cabeçalho sobreposto (só a imagem mostra): reprova por layout. Só na avaliação local com imagens.",
+      input: reviewInput(CV_REVIEW_OK),
+      reference: { expected: ['"passed":false', '"area":"layout"'], breakLayout: true },
+    },
+  ],
+} satisfies { [K in "cvGenerate" | "coverLetterGenerate" | "cvReview"]: DatasetExample<K>[] };
 
 export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[] } = {
   readDocument: [

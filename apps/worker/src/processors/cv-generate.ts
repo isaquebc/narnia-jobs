@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   ATS_MIN_SCORE,
   assembleCoverLetter,
@@ -21,6 +21,7 @@ import {
   type LinkStatus,
   layoutIssues,
   linkIssues,
+  notifyDocumentResult,
   type PdfInspection,
   type RenderPdfResult,
   recordUsage,
@@ -194,6 +195,33 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         brief,
       );
       const issues = [...assembled.issues, ...rendered.issues];
+      // revisão do Haiku (F05-13): quando o código já reprovou, só na última tentativa (a regeração vem de qualquer jeito)
+      if (errorsOf(issues).length === 0 || finalAttempt) {
+        await set("reviewing");
+        await ctx.progress(40 + (attempt - 1) * 45, "reviewing");
+        const reviewModel = model("cv_review");
+        const rv = await deps.provider.cvReview({
+          dir: rendered.dir,
+          pageFiles: rendered.pageFiles,
+          brief,
+          content: assembled.content,
+          pdfText: rendered.pdfText,
+          checks: issues.map(({ area, severity, message }) => ({ area, severity, message })),
+          model: reviewModel,
+        });
+        usage.push(
+          recordUsage(
+            repos,
+            deps.dataDir,
+            usageFromSdkResult(rv.sdk, {
+              category: "cv.review",
+              model: reviewModel,
+              jobId: ctx.jobId,
+            }),
+          ),
+        );
+        issues.push(...rv.output.issues);
+      }
       const review: CvReview = {
         passed: errorsOf(issues).length === 0,
         atsScore: rendered.atsScore,
@@ -208,7 +236,6 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
       };
       if (review.passed) break;
       previous = errorsOf(issues).map(({ area, message, where }) => ({ area, message, where }));
-      if (!finalAttempt) await set("reviewing", { review });
     }
     const final = last as NonNullable<typeof last>;
     const status: DocumentVersionStatus = final.review.passed ? "ready" : "ready_with_issues";
@@ -220,6 +247,11 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
       pagesRendered: final.pages,
       textBody: final.text,
       usage,
+    });
+    const notice = notifyDocumentResult(repos, doc, status === "ready");
+    await deps.publish({
+      type: notice.created ? "notification.created" : "notification.updated",
+      notification: notice.notification,
     });
     return {
       documentId: doc.id,
@@ -247,24 +279,37 @@ async function renderAndCheck(
   pdfPath: string | null;
   pages: number | null;
   text: string | null;
+  /** Pasta da versão (o revisor lê as páginas dali), páginas em PNG relativas a ela e o texto do documento. */
+  dir: string;
+  pageFiles: string[];
+  pdfText: string;
 }> {
   const letter = content.meta.kind === "cover_letter" ? (content as CoverLetterContent) : null;
   const letterText = letter
     ? [letter.greeting, ...letter.paragraphs.map((p) => p.text), letter.signature].join("\n\n")
     : null;
+  const dir = documentVersionDir(doc.id, version.version);
+  const abs = join(deps.dataDir, dir);
+  mkdirSync(join(abs, "pages"), { recursive: true });
   if (doc.kind === "cover_letter" && doc.format === "text")
-    return { issues: [], atsScore: null, pdfPath: null, pages: null, text: letterText };
+    return {
+      issues: [],
+      atsScore: null,
+      pdfPath: null,
+      pages: null,
+      text: letterText,
+      dir: abs,
+      pageFiles: [],
+      pdfText: letterText ?? "",
+    };
   const templateId = isBuiltinTemplate(doc.templateId) ? doc.templateId : "classico";
   const html = renderDocumentHtml(content, templateId);
   const r = await docs.render(html, doc.paper, true);
   if (!r.ok) throw new Error(`Não consegui montar o PDF: ${r.message}`);
-  const dir = documentVersionDir(doc.id, version.version);
-  const abs = join(deps.dataDir, dir);
-  mkdirSync(join(abs, "pages"), { recursive: true });
   const file = doc.kind === "cv" ? "cv.pdf" : "carta.pdf";
   writeFileSync(join(abs, file), r.pdf);
   writeFileSync(join(abs, "render.html"), html);
-  await docs.pages(join(abs, file), join(abs, "pages")).catch(() => []);
+  const pngs = await docs.pages(join(abs, file), join(abs, "pages")).catch(() => [] as string[]);
 
   const insp = await docs.inspect(r.pdf);
   const cv = content.meta.kind === "cv" ? (content as CvContent) : null;
@@ -309,5 +354,8 @@ async function renderAndCheck(
     pdfPath: `${dir}/${file}`,
     pages: insp.pages.length,
     text: letterText,
+    dir: abs,
+    pageFiles: pngs.map((p) => relative(abs, p)),
+    pdfText: insp.text,
   };
 }

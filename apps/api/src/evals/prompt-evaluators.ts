@@ -165,6 +165,7 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
     lang(["summary", "text", "label"]),
     coverage(0.75),
   ],
+  cvReview: (op) => [schemaRule(op), coverage(1)],
   coverLetterGenerate: (op) => [
     schemaRule(op),
     cvIds,

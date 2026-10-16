@@ -49,6 +49,8 @@ const MockModeSchema = z.object({
   unsupportedEvidence: z.boolean().optional(),
   /** F03 §2.4: diagnóstico do plano devolvido pelo mock (null = indisponível). */
   planUsage: PlanUsageSchema.nullable().optional(),
+  /** F05 e2e: quantas revisões de CV seguidas reprovam. */
+  cvReviewFailures: z.number().int().min(0).max(10).optional(),
 });
 
 /** Estado do `gh` falso (F03 e2e): login, rate limit, commit novo por repositório, token do host, fluxo de dispositivo. */

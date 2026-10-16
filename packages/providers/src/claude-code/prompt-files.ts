@@ -21,4 +21,5 @@ export const PROMPTS = {
   postingDuplicate: () => loadPrompt("posting-duplicate"),
   cvGenerate: () => loadPrompt("cv-generate"),
   coverLetterGenerate: () => loadPrompt("cover-letter-generate"),
+  cvReview: () => loadPrompt("cv-review"),
 };

@@ -10,6 +10,7 @@ import type {
   CoverLetterDraft,
   CvBrief,
   CvDraft,
+  CvReviewOutput,
   Evidence,
   ExtractFactsOutput,
   PickFilesOutput,
@@ -33,6 +34,7 @@ import {
   type CompleteInput,
   type CompleteResult,
   type CvGenerateInput,
+  type CvReviewInput,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
@@ -73,6 +75,7 @@ export type MockOperation =
   | "postingDuplicate"
   | "cvGenerate"
   | "coverLetterGenerate"
+  | "cvReview"
   | "complete"
   | "openChat";
 
@@ -91,6 +94,8 @@ export interface MockProviderOptions {
   unsupportedEvidence?: boolean;
   /** Diagnóstico do plano devolvido por `getPlanUsage` (null = indisponível, como API key). */
   planUsage?: PlanUsage | null;
+  /** F05 e2e: quantas revisões de CV seguidas reprovam (o contador desce a cada revisão reprovada). */
+  cvReviewFailures?: number;
   /**
    * Arquivo JSON compartilhado entre processos (api e worker, F01-73): `setMode` grava, toda operação relê.
    * Sem arquivo, o modo fica só em memória.
@@ -166,6 +171,7 @@ const DEFAULT_MODE: MockMode = {
   errors: {},
   unsupportedEvidence: false,
   planUsage: MOCK_PLAN_USAGE,
+  cvReviewFailures: 0,
 };
 
 function definedOnly(patch: MockProviderOptions): Partial<MockMode> {
@@ -871,10 +877,19 @@ export class MockProvider implements Provider {
               factIds: [{ kind: "experience" as const, id: e.id }],
             },
           ];
-      return { factId: e.id, bullets, tech: clean(e.tech).slice(0, 6) };
+      // o mock não traduz: cargo e local como nos dados
+      return {
+        factId: e.id,
+        title: e.title,
+        location: null,
+        bullets,
+        tech: clean(e.tech).slice(0, 6),
+      };
     });
     const skills = clean(b.skills.map((s) => s.name)).slice(0, 12);
     const draft: CvDraft = {
+      headline: b.profile.targetTitle,
+      education: [],
       summary: en
         ? `${b.profile.targetTitle} focused on ${skills.slice(0, 3).join(", ")}.`
         : `${b.profile.targetTitle} com foco em ${skills.slice(0, 3).join(", ")}.`,
@@ -948,6 +963,28 @@ export class MockProvider implements Provider {
       ],
     };
     return this.result(draft, JSON.stringify(b), input.model);
+  }
+
+  /** Revisão previsível (F05-13): aprova, a não ser que o modo peça N reprovações seguidas (`cvReviewFailures`). */
+  async cvReview(input: CvReviewInput): Promise<ProviderResult<CvReviewOutput>> {
+    await this.gate("cvReview");
+    let out: CvReviewOutput = { passed: true, issues: [] };
+    if (this.mode.cvReviewFailures > 0) {
+      this.mode = { ...this.mode, cvReviewFailures: this.mode.cvReviewFailures - 1 };
+      this.persist();
+      out = {
+        passed: false,
+        issues: [
+          {
+            area: "layout",
+            severity: "error",
+            message: "Simulação: texto sobreposto no cabeçalho da página 1.",
+            where: "página 1",
+          },
+        ],
+      };
+    }
+    return this.result(out, input.pdfText, input.model);
   }
 
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {
