@@ -12,6 +12,12 @@ import {
   trustedDomainsRepo,
 } from "./chat";
 import { type DigestsRepo, digestsRepo } from "./digests";
+import {
+  type CvTemplatesRepo,
+  cvTemplatesRepo,
+  type DocumentsRepo,
+  documentsRepo,
+} from "./documents";
 import { type EmphasisRepo, emphasisRepo } from "./emphasis";
 import { type FactSourcesRepo, factSourcesRepo } from "./fact-sources";
 import { type FactsRepo, factsRepo } from "./facts";
@@ -86,6 +92,9 @@ export interface Repos {
   postingContacts: PostingContactsRepo;
   postingNotes: PostingNotesRepo;
   jobAnalyses: JobAnalysesRepo;
+  // F05
+  documents: DocumentsRepo;
+  cvTemplates: CvTemplatesRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -145,11 +154,14 @@ export function createRepos(db: Db): Repos {
     postingContacts: postingContactsRepo(db),
     postingNotes: postingNotesRepo(db),
     jobAnalyses: jobAnalysesRepo(db),
+    documents: documentsRepo(db),
+    cvTemplates: cvTemplatesRepo(db),
   };
 }
 
 export * from "./chat";
 export * from "./digests";
+export * from "./documents";
 export * from "./emphasis";
 export * from "./fact-sources";
 export * from "./facts";

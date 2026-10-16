@@ -71,6 +71,8 @@ services:
       - TESSDATA_PATH=/usr/share/tessdata
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
+      - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # F05: PDF do CV e da carta
+    networks: [default, browser]
     depends_on: [redis]
 
   web:
@@ -81,7 +83,7 @@ services:
       - "127.0.0.1:${NARNIA_DEV_PORT:-5173}:5173"
     depends_on: [api]
 
-  # Chromium headless da busca de vaga por URL (2026-10-15): só na rede `browser`, junto do api
+  # Chromium headless da busca de vaga por URL (F06) e do PDF do CV (F05): só na rede `browser`, com o api e o worker
   browser:
     build:
       context: .
@@ -120,7 +122,7 @@ services:
       - phoenix-data:/mnt/data
 
 networks:
-  browser:   # api ↔ navegador; o navegador não enxerga redis, worker nem web
+  browser:   # api e worker ↔ navegador; o navegador não enxerga redis nem web
 
 volumes:
   node_modules:

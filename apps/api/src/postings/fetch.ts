@@ -1,8 +1,9 @@
-import { lookup as dnsLookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { Readability } from "@mozilla/readability";
+import { type DnsLookup, defaultDnsLookup, urlGuard } from "@narnia-jobs/core";
 import { parseHTML } from "linkedom";
 import { renderInBrowser } from "./browser";
+
+export { isBlockedAddress } from "@narnia-jobs/core";
 
 /**
  * Busca de vaga por URL (F06-3, §2.2): `fetch` nativo (undici), GET único, até 3 redirects conferidos um a um, só
@@ -67,61 +68,14 @@ const BLOCKED_PAGE =
 const MIN_TEXT = 200;
 export const POSTING_USER_AGENT = "narnia-jobs/0.1 (+https://github.com/isaquebc/narnia-jobs)";
 
-/** Endereço que não pode ser buscado a partir do servidor (rede interna, loopback, link-local, multicast). */
-export function isBlockedAddress(ip: string): boolean {
-  const v = isIP(ip);
-  if (v === 4) {
-    const [a = 0, b = 0] = ip.split(".").map(Number);
-    return (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 198 && (b === 18 || b === 19)) ||
-      a >= 224
-    );
-  }
-  if (v === 6) {
-    const s = ip.toLowerCase();
-    if (s === "::" || s === "::1") return true;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(s);
-    if (mapped) return isBlockedAddress(mapped[1] as string);
-    return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(s);
-  }
-  return true;
-}
-
 const fail = (code: FetchFailure, message: string): FetchPostingResult => ({
   ok: false,
   code,
   message,
 });
 
-async function defaultLookup(host: string): Promise<string[]> {
-  return (await dnsLookup(host, { all: true })).map((a) => a.address);
-}
-
-async function checkHost(
-  url: URL,
-  lookup: (h: string) => Promise<string[]>,
-): Promise<string | null> {
-  if (url.protocol !== "http:" && url.protocol !== "https:") return "Só endereços http(s).";
-  if (url.username || url.password) return "Endereço com credenciais não é aceito.";
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost")) return "Endereço local não é aceito.";
-  let addresses: string[];
-  try {
-    addresses = isIP(host) ? [host] : await lookup(host);
-  } catch {
-    return "Não consegui resolver o endereço.";
-  }
-  if (addresses.length === 0 || addresses.some(isBlockedAddress))
-    return "Endereço de rede interna não é aceito.";
-  return null;
-}
+const defaultLookup = defaultDnsLookup;
+const checkHost = (url: URL, lookup: DnsLookup) => urlGuard(lookup)(url);
 
 /** Corpo com teto de bytes: passa do teto = null. */
 async function readCapped(res: Response, maxBytes: number): Promise<string | null> {
@@ -183,9 +137,7 @@ export function robotsAllows(robots: string, path: string, agent = "narnia-jobs"
 }
 
 /** Endereço permitido (anti-SSRF)? null = sim; texto = motivo da recusa. Usado também pelo navegador. */
-export function hostGuard(lookup: (h: string) => Promise<string[]> = defaultLookup) {
-  return (url: URL) => checkHost(url, lookup);
-}
+export const hostGuard = urlGuard;
 
 export async function fetchPostingPage(
   rawUrl: string,

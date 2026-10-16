@@ -277,7 +277,7 @@ $script:E2eProject = if ($env:NARNIA_E2E_PROJECT) { $env:NARNIA_E2E_PROJECT } el
 $script:E2eCompose = @("compose", "-p", $script:E2eProject, "-f", "docker-compose.yml", "-f", "docker-compose.e2e.yml")
 
 function Invoke-E2e([string[]] $Args) { & docker @script:E2eCompose @Args; return $LASTEXITCODE }
-function Invoke-E2eUp { return (Invoke-E2e @("up", "-d", "--wait", "web", "api", "worker", "redis")) }
+function Invoke-E2eUp { return (Invoke-E2e @("up", "-d", "--wait", "web", "api", "worker", "redis", "browser")) }  # browser: PDF do CV (F05)
 function Invoke-Play([string[]] $Args) {
   return (Invoke-E2e (@("--profile", "e2e", "run", "--rm", "--no-deps", "playwright", "./node_modules/.bin/playwright", "test") + $Args))
 }

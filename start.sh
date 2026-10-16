@@ -404,7 +404,7 @@ e2e_env() {
 }
 
 e2e_up() {
-  "${E2E_COMPOSE[@]}" up -d --wait web api worker redis
+  "${E2E_COMPOSE[@]}" up -d --wait web api worker redis browser   # browser: PDF do CV (F05)
 }
 
 # e2e_play ARGS… -> roda o Playwright no container (código de saída preservado)

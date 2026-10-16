@@ -76,13 +76,26 @@ services:
     <<: *app
     init: true   # tini como PID 1: recolhe processos claude mortos (plano de comunicação C3)
     command: ["sh", "-c", "cd /app/apps/worker && exec ./node_modules/.bin/tsx src/main.ts"]
+    environment:
+      - NARNIA_DATA_DIR=/data
+      - NARNIA_BACKUP_DIR=/backups
+      - REDIS_URL=redis://redis:6379
+      - NARNIA_QUEUE_PREFIX=narnia
+      - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - TESSDATA_PATH=/usr/share/tessdata
+      - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
+      - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}
+      - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # F05: PDF do CV e da carta
+    networks: [default, browser]
     depends_on:
       redis:
         condition: service_healthy
       api:
         condition: service_healthy
 
-  # Chromium headless da busca de vaga por URL (2026-10-15): só na rede `browser`, junto do api; sem volumes nem portas
+  # Chromium headless da busca de vaga por URL (F06) e do PDF do CV (F05): só na rede `browser`, com o api e o worker;
+  # sem volumes nem portas
   browser:
     build:
       context: .
@@ -136,7 +149,7 @@ services:
       - phoenix-data:/mnt/data
 
 networks:
-  browser:   # api ↔ navegador; o navegador não enxerga redis, worker nem web
+  browser:   # api e worker ↔ navegador; o navegador não enxerga redis nem web
 
 volumes:
   claude-auth:

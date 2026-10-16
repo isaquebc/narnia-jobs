@@ -16,6 +16,9 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/source-serif-4": "5.3.1",
     "@narnia-jobs/shared": "workspace:*",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/exporter-trace-otlp-proto": "0.223.0",
@@ -23,6 +26,7 @@
     "@opentelemetry/sdk-trace-base": "2.12.0",
     "libphonenumber-js": "1.13.14",
     "mammoth": "1.13.0",
+    "playwright-core": "1.58.0",
     "tesseract.js": "7.0.0",
     "unpdf": "1.8.1",
     "uuid": "14.0.2",
