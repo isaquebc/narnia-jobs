@@ -262,6 +262,40 @@ describe("F05/M2 worker · cv.generate", () => {
     expect(done?.textBody).toContain("Initech");
   });
 
+  it("cv.render (alteração do recrutador): sem o gerador, uma tentativa, conteúdo novo na versão 2", async () => {
+    h = harness();
+    const { doc, v } = newDoc(h);
+    await run(h, doc.id, v.id);
+    const before = h.briefs.length;
+    const content = h.repos.documents.versionById(v.id)?.content as { summary: string };
+    const { contentToCvDraft } = await import("@narnia-jobs/core");
+    const draft = contentToCvDraft(content as never);
+    draft.summary = "Resumo reescrito pelo recrutador.";
+    const v2 = h.repos.documents.addVersion(doc.id, {
+      source: "recruiter",
+      instructions: null,
+      factsVersion: 0,
+      postingUpdatedAt: null,
+      profileHash: "h",
+    });
+    await processTask(
+      {
+        kind: "task",
+        type: "cv.render",
+        key: doc.id,
+        payload: { documentId: doc.id, versionId: v2.id, cv: draft },
+      },
+      { jobId: "j2", progress: async () => {} },
+      h.deps,
+    );
+    expect(h.briefs.length).toBe(before);
+    const done = h.repos.documents.versionById(v2.id);
+    expect(done).toMatchObject({ status: "ready", attempts: 1, version: 2 });
+    expect((done?.content as { summary: string } | undefined)?.summary).toBe(
+      "Resumo reescrito pelo recrutador.",
+    );
+  });
+
   it("modelo fora do ar: versão em erro com a mensagem, sem derrubar a fila", async () => {
     const provider = new MockProvider();
     provider.setMode({ errors: { cvGenerate: "modelo fora do ar" } });

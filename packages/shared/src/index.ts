@@ -4,6 +4,7 @@ export * from "./errors/friendly";
 export * from "./i18n";
 export * from "./json-schema";
 export * from "./mcp/chat";
+export * from "./mcp/cv";
 export * from "./mcp/ingest";
 export * from "./mcp/posting";
 export * from "./mcp/profile";

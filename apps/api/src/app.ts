@@ -29,6 +29,7 @@ import { backupsRoutes } from "./routes/backups";
 import { chatRoutes } from "./routes/chat";
 import { chatSettingsRoutes } from "./routes/chat-settings";
 import { dashboardRoutes } from "./routes/dashboard";
+import { documentsRoutes } from "./routes/documents";
 import { evalsSettingsRoutes } from "./routes/evals-settings";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
@@ -228,6 +229,10 @@ export function createApp(deps: AppDeps) {
   app.route(
     "/",
     postingsRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue, dataDir: deps.dataDir }),
+  );
+  app.route(
+    "/",
+    documentsRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue, dataDir: deps.dataDir }),
   );
   app.route("/", snapshotsRoutes({ repos: deps.repos, dataDir: deps.dataDir, bus: deps.bus }));
   app.route("/", usageRoutes({ repos: deps.repos }));

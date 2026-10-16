@@ -1,6 +1,7 @@
 import {
   CHAT_TOOLS,
   type ChatCategory,
+  CV_TOOLS,
   INGEST_TOOLS,
   POSTING_TOOLS,
   PROFILE_TOOLS,
@@ -24,6 +25,9 @@ const CAREER = [
   // F06: vagas e análises (salvar, completar aos poucos, analisar)
   "posting.",
   "analysis.",
+  // F05: CV e carta (gerar, ler, alterar) e botões sugeridos na mensagem
+  "cv.",
+  "ui.",
   "evidence.",
   "fact.",
   "research.",
@@ -87,6 +91,7 @@ export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
 };
 
 const ALL_TOOLS = [
+  ...Object.keys(CV_TOOLS),
   ...Object.keys(POSTING_TOOLS),
   ...Object.keys(PROFILE_TOOLS),
   ...Object.keys(INGEST_TOOLS),

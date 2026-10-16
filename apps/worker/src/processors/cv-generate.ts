@@ -34,8 +34,10 @@ import {
 } from "@narnia-jobs/core";
 import type {
   CoverLetterContent,
+  CoverLetterDraft,
   CvBrief,
   CvContent,
+  CvDraft,
   CvReview,
   CvReviewIssue,
   Paper,
@@ -103,6 +105,12 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
   const model = (key: DocumentModelKey) =>
     resolveModel(repos.settings, key, DOCUMENT_MODEL_DEFAULTS[key]);
   const usage: unknown[] = [];
+  // cv.render (F05-11): alteração do recrutador (ou edição na tela) chega pronta; uma tentativa, sem o gerador
+  const edit =
+    (data.payload.cv as CvDraft | undefined) ??
+    (data.payload.letter as CoverLetterDraft | undefined) ??
+    null;
+  const maxAttempts = edit ? 1 : DOCUMENT_MAX_ATTEMPTS;
   try {
     await set("collecting", { jobId: ctx.jobId });
     const header = buildCvHeader(repos, doc.profileId, doc.locale);
@@ -114,7 +122,7 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
       pages: number | null;
       text: string | null;
     } | null = null;
-    for (let attempt = 1; attempt <= DOCUMENT_MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (attempt > 1) await set("retrying", { attempts: attempt - 1 });
       const { brief, atsTerms } = buildCvBrief(repos, {
         kind: doc.kind,
@@ -124,8 +132,10 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         instructions: version.instructions,
         previousIssues: previous,
       });
-      await set("generating", { attempts: attempt });
-      await ctx.progress(10 + (attempt - 1) * 45, "generating");
+      if (!edit) {
+        await set("generating", { attempts: attempt });
+        await ctx.progress(10 + (attempt - 1) * 45, "generating");
+      } else repos.documents.updateVersion(version.id, { attempts: 1 });
       const genModel = model("cv_generate");
       const meta = {
         locale: doc.locale,
@@ -135,7 +145,13 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         generatedAt: new Date().toISOString(),
       };
       let assembled: { content: Doc; issues: CvReviewIssue[] };
-      if (doc.kind === "cover_letter") {
+      if (edit && doc.kind === "cover_letter")
+        assembled = assembleCoverLetter(brief, edit as CoverLetterDraft, {
+          meta: { ...meta, postingId: doc.postingId ?? "", format: doc.format },
+          header,
+        });
+      else if (edit) assembled = assembleCv(repos, brief, edit as CvDraft, { meta, header });
+      else if (doc.kind === "cover_letter") {
         const r = await deps.provider.coverLetterGenerate({ brief, model: genModel });
         usage.push(
           recordUsage(
@@ -168,7 +184,7 @@ export const cvGenerate: TaskHandler = async (data, ctx, deps) => {
         assembled = assembleCv(repos, brief, r.output, { meta, header });
       }
       await set("validating", { content: assembled.content });
-      const finalAttempt = attempt === DOCUMENT_MAX_ATTEMPTS;
+      const finalAttempt = attempt === maxAttempts;
       // origem inválida ou termo sem evidência: regera antes de gastar o navegador (na última tentativa, monta mesmo assim)
       if (errorsOf(assembled.issues).length > 0 && !finalAttempt) {
         previous = errorsOf(assembled.issues).map(({ area, message, where }) => ({

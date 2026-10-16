@@ -53,6 +53,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [INGEST_TASKS.reviewCheck]: ingestReviewCheck,
   [POSTING_TASKS.extract]: postingExtract,
   [DOCUMENT_TASKS.generate]: cvGenerate,
+  [DOCUMENT_TASKS.render]: cvGenerate,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

@@ -322,6 +322,8 @@ describe("F06/M6 · Configurações › Modelos", () => {
         posting_merge: "haiku",
         posting_duplicate: "haiku",
         posting_analyze: "sonnet",
+        cv_generate: "sonnet",
+        cv_review: "haiku",
       });
       const put = await t.api("/api/settings/models", json({ posting_analyze: "opus" }, "PUT"));
       expect(

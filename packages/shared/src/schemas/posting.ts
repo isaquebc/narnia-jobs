@@ -314,6 +314,9 @@ export const POSTING_MODEL_KEYS = [
   "posting_merge",
   "posting_duplicate",
   "posting_analyze",
+  // F05-13: Sonnet gera o CV e a carta; Haiku revisa
+  "cv_generate",
+  "cv_review",
 ] as const;
 export const PostingModelsSchema = z.object(
   Object.fromEntries(POSTING_MODEL_KEYS.map((k) => [k, ClaudeModelSchema])) as Record<

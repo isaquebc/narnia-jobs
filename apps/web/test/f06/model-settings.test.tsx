@@ -12,6 +12,8 @@ describe("F06/M6 · Modelos por tarefa", () => {
       posting_merge: "haiku",
       posting_duplicate: "haiku",
       posting_analyze: "sonnet",
+      cv_generate: "sonnet",
+      cv_review: "haiku",
     };
     const putModelSettings = vi.fn(async (p: Record<string, string>) => ({
       models: { ...models, ...p },
@@ -24,7 +26,7 @@ describe("F06/M6 · Modelos por tarefa", () => {
       } as never,
     });
     const analyze = await screen.findByLabelText("Análise da vaga (recrutador)");
-    expect(screen.getByText("padrão: sonnet")).toBeInTheDocument();
+    expect(screen.getAllByText("padrão: sonnet")).toHaveLength(2);
     expect([...(analyze as HTMLSelectElement).options].map((o) => o.value)).toEqual([
       "haiku",
       "sonnet",
@@ -33,5 +35,12 @@ describe("F06/M6 · Modelos por tarefa", () => {
     await userEvent.selectOptions(analyze, "opus");
     expect(putModelSettings).toHaveBeenCalledWith({ posting_analyze: "opus" });
     await waitFor(() => expect(screen.getByText("Modelos salvos.")).toBeInTheDocument());
+    // F05-13: Sonnet gera o currículo e a carta, Haiku revisa
+    expect(
+      (screen.getByLabelText("Geração do currículo e da carta") as HTMLSelectElement).value,
+    ).toBe("sonnet");
+    expect(
+      (screen.getByLabelText("Revisão do currículo e da carta") as HTMLSelectElement).value,
+    ).toBe("haiku");
   });
 });

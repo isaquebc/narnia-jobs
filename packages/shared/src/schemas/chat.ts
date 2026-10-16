@@ -63,6 +63,12 @@ export const ChatToolCallSchema = z.object({
   sessionId: IdSchema.optional(),
   /** F06: vaga criada ou analisada por esta tool (`posting_create`, `analysis_save`). */
   postingId: IdSchema.optional(),
+  /** F05: documentos (CV, carta) criados ou alterados por esta tool (`cv_generate`, `cv_edit`). */
+  documents: z
+    .array(z.object({ id: IdSchema, kind: z.enum(["cv", "cover_letter"]), url: z.string() }))
+    .optional(),
+  /** F05: botão sugerido pelo recrutador (`ui_suggest_action`), já validado pelo servidor. */
+  action: z.object({ label: z.string(), url: z.string() }).optional(),
   /** Chamada feita pelo recrutador especializado (subagente, F06-8), não pelo recrutador da conversa. */
   subagent: z.boolean().optional(),
 });

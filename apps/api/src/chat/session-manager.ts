@@ -1116,7 +1116,38 @@ export function specialistAgents(dir?: string): Record<string, ChatAgentDefiniti
 export function postingLinks(
   name: string,
   output: string,
-): { sessionId?: string; postingId?: string } {
+): {
+  sessionId?: string;
+  postingId?: string;
+  documents?: Array<{ id: string; kind: "cv" | "cover_letter"; url: string }>;
+  action?: { label: string; url: string };
+} {
+  // F05: documentos gerados ou alterados e o botão sugerido (validado pelo servidor; o modelo não escreve botão)
+  if (name === "cv_generate" || name === "cv_edit" || name === "ui_suggest_action") {
+    try {
+      const o = JSON.parse(output) as {
+        documents?: Array<{ documentId?: unknown; kind?: unknown; url?: unknown }>;
+        documentId?: unknown;
+        kind?: unknown;
+        url?: unknown;
+        label?: unknown;
+      };
+      if (name === "ui_suggest_action")
+        return typeof o.label === "string" && typeof o.url === "string" && o.url.startsWith("/")
+          ? { action: { label: o.label, url: o.url } }
+          : {};
+      const docs = (name === "cv_edit" ? [o] : (o.documents ?? [])).flatMap((d) =>
+        typeof d.documentId === "string" &&
+        (d.kind === "cv" || d.kind === "cover_letter") &&
+        typeof d.url === "string"
+          ? [{ id: d.documentId, kind: d.kind as "cv" | "cover_letter", url: d.url }]
+          : [],
+      );
+      return docs.length ? { documents: docs } : {};
+    } catch {
+      return {};
+    }
+  }
   if (!["posting_open_analysis", "posting_create", "analysis_save"].includes(name)) return {};
   try {
     const o = JSON.parse(output) as { sessionId?: unknown; postingId?: unknown; url?: unknown };

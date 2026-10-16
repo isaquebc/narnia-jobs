@@ -29,6 +29,9 @@ interface Ctx {
   /** F06: vaga criada por posting_create e nota do usuário que o recrutador edita. */
   postingId?: string;
   noteId?: string;
+  /** F05: documento gerado por cv_generate e o conteúdo lido por cv_get (para o cv_edit). */
+  documentId?: string;
+  draft?: unknown;
 }
 
 interface Case {
@@ -246,6 +249,68 @@ const CASES: Record<string, Case> = {
   },
   analysis_get: { where: "career", args: (c) => ({ postingId: c.postingId }) },
   posting_open_analysis: { where: "career", args: (c) => ({ postingId: c.postingId }) },
+  // F05: CV (o worker não roda aqui: a versão recebe um conteúdo mínimo para o cv_get e o cv_edit)
+  cv_generate: {
+    where: "career",
+    args: (c) => ({ kind: "cv", profileId: c.ids.profileId, instructions: "liderança" }),
+    after: (c, out) => {
+      const doc = (out as { documents: Array<{ documentId: string }> }).documents[0];
+      if (!doc) throw new Error("cv_generate sem documento");
+      c.documentId = doc.documentId;
+      const v = c.t.repos.documents.currentVersion(doc.documentId);
+      c.t.repos.documents.updateVersion(v?.id as string, {
+        status: "ready",
+        content: {
+          meta: {
+            kind: "cv",
+            locale: "pt-BR",
+            paper: "A4",
+            profileId: c.ids.profileId,
+            postingId: null,
+            generatedAt: "2026-10-16T12:00:00Z",
+          },
+          header: {
+            name: "Ana",
+            title: "Engenheira",
+            location: null,
+            email: null,
+            phone: null,
+            links: [],
+          },
+          summary: "Engenheira backend.",
+          experiences: [],
+          skills: [],
+          projects: [],
+          education: [],
+          languages: [],
+          adjacent: [],
+          sectionsOrder: ["summary"],
+          omitted: [],
+          provenance: { factIdsUsed: [], unverifiedFactIds: [] },
+        },
+      });
+    },
+  },
+  cv_list: { where: "career", args: (c) => ({ profileId: c.ids.profileId }) },
+  cv_get: {
+    where: "career",
+    args: (c) => ({ documentId: c.documentId }),
+    after: (c, out) => {
+      c.draft = (out as { draft: { cv: unknown } }).draft.cv;
+    },
+  },
+  cv_edit: {
+    where: "career",
+    args: (c) => ({ documentId: c.documentId, baseVersion: 1, cv: c.draft }),
+  },
+  ui_suggest_action: {
+    where: "career",
+    args: (c) => ({
+      action: "document.open",
+      label: "Abrir o CV",
+      params: { documentId: c.documentId },
+    }),
+  },
   // mudam o estado global ou da sessão: por último
   session_set_category: { where: "fresh", args: () => ({ category: "ingest" }) },
   profile_switch: { where: "terminal", args: (c) => ({ profileId: c.ids.profileId }) },

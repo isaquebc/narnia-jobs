@@ -1,3 +1,5 @@
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import {
   analysisStale,
   buildPreAnalysis,
@@ -195,6 +197,12 @@ export function postingsRoutes(deps: {
     if (!repos.postings.get(id)) return notFound(c);
     for (const n of repos.postingNotes.list(id))
       repos.notifications.resolveSubject("posting_note", n.id, ["posting.note_pending"]);
+    // CVs e cartas da vaga (F05): as linhas caem em cascata; os arquivos e os avisos saem aqui
+    for (const d of repos.documents.list({ postingId: id })) {
+      repos.notifications.resolveSubject("document", d.id);
+      if (deps.dataDir)
+        rmSync(join(deps.dataDir, "documents", d.id), { recursive: true, force: true });
+    }
     repos.postings.remove(id);
     touched(id);
     return c.body(null, 204);

@@ -236,5 +236,8 @@ export const POSTING_MODEL_DEFAULTS = {
   posting_merge: "haiku",
   posting_duplicate: "haiku",
   posting_analyze: "sonnet",
+  // F05-13 (mesma tela de Modelos): os mesmos padrões de `DOCUMENT_MODEL_DEFAULTS`
+  cv_generate: "sonnet",
+  cv_review: "haiku",
 } as const;
 export type PostingModelKey = keyof typeof POSTING_MODEL_DEFAULTS;

@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
   createChatTools,
+  createCvTools,
   createIngestTools,
   createPostingTools,
   createProfileTools,
@@ -14,6 +15,8 @@ import {
   CHAT_TOOL_JSON_SCHEMAS,
   CHAT_TOOLS,
   type ChatCategory,
+  CV_TOOL_JSON_SCHEMAS,
+  CV_TOOLS,
   clip,
   contentTracingEnabled,
   INGEST_TOOL_JSON_SCHEMAS,
@@ -111,6 +114,23 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
                 notification: ev.notification,
               });
           },
+        },
+      }),
+    ),
+    ...entries(
+      CV_TOOLS,
+      CV_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
+      createCvTools(deps.repos, {
+        ports: {
+          enqueue: (req) => deps.queue.enqueueTask(req),
+          changed: (doc, status) =>
+            deps.bus.emit({
+              type: "document.updated",
+              documentId: doc.id,
+              profileId: doc.profileId,
+              postingId: doc.postingId,
+              status,
+            }),
         },
       }),
     ),
