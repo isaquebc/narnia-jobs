@@ -3,17 +3,17 @@ import { describe, expect, it } from "vitest";
 import { MODEL_IDS, promptCatalog } from "../src/evals/prompt-catalog";
 import { syncPrompts } from "../src/evals/prompt-sync";
 
-/** Avaliações no Phoenix (M2, decisão AV-4): os 25 prompts do repositório versionados no Phoenix (F06-8: + especializado; F06/M4: + 3 da vaga; F06/M5: skill e nota da análise). */
+/** Avaliações no Phoenix (M2, decisão AV-4): os 27 prompts do repositório versionados no Phoenix (F06-8: + especializado; F06/M4: + 3 da vaga; F06/M5: skill e nota da análise; F05: CV e carta). */
 describe("catálogo de prompts", () => {
-  it("25 prompts: 12 estruturados, 2 agentes, 5 notas e 6 skills; nomes únicos narnia-*", () => {
+  it("27 prompts: 14 estruturados, 2 agentes, 5 notas e 6 skills; nomes únicos narnia-*", () => {
     const c = promptCatalog();
-    expect(c).toHaveLength(25);
+    expect(c).toHaveLength(27);
     const kinds = c.reduce<Record<string, number>>((acc, p) => {
       acc[p.kind] = (acc[p.kind] ?? 0) + 1;
       return acc;
     }, {});
-    expect(kinds).toEqual({ structured: 12, agent: 2, note: 5, skill: 6 });
-    expect(new Set(c.map((p) => p.name)).size).toBe(25);
+    expect(kinds).toEqual({ structured: 14, agent: 2, note: 5, skill: 6 });
+    expect(new Set(c.map((p) => p.name)).size).toBe(27);
     for (const p of c) {
       expect(p.name).toMatch(/^narnia-[a-z0-9-]+$/);
       expect(p.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -111,7 +111,7 @@ function fakePhoenix() {
 }
 
 describe("sincronização com o Phoenix", () => {
-  it("primeira vez cria os 25 com a tag production, na ponte e com o commit; depois nada muda", async () => {
+  it("primeira vez cria os 27 com a tag production, na ponte e com o commit; depois nada muda", async () => {
     const px = fakePhoenix();
     const o = {
       baseUrl: "http://phoenix:6006",
@@ -120,7 +120,7 @@ describe("sincronização com o Phoenix", () => {
       commit: "abc1234",
     };
     const first = await syncPrompts(promptCatalog(), o);
-    expect(first.filter((r) => r.action === "created")).toHaveLength(25);
+    expect(first.filter((r) => r.action === "created")).toHaveLength(27);
     const create = px.calls.find(
       (c) => c.op === "create" && c.vars?.name === "narnia-extract-facts",
     );

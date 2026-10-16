@@ -53,6 +53,32 @@
     },
     "updatedAt": "2026-10-15T01:21:11.105Z"
   },
+  "narnia-cover-letter-generate": {
+    "scores": {
+      "cobertura_da_referencia": 1,
+      "idioma": 1,
+      "json_schema": 1,
+      "origens_do_resumo": 1,
+      "padrao_de_entrega": 1,
+      "sem_termo_sem_evidencia": 1
+    },
+    "versionId": "7c7e97bdfcb1c8e8df2c50ef55006d93db729932687a0e83d9525f303b2b0445",
+    "commit": "91b92f0",
+    "updatedAt": "2026-10-16T15:34:26.549Z"
+  },
+  "narnia-cv-generate": {
+    "scores": {
+      "cobertura_da_referencia": 1,
+      "idioma": 1,
+      "json_schema": 1,
+      "origens_do_resumo": 1,
+      "padrao_de_entrega": 1,
+      "sem_termo_sem_evidencia": 1
+    },
+    "versionId": "e96ec2b44b5447b93ca8ed53aca9129ac435234c8a40ac0523383e86cf8975cf",
+    "commit": "91b92f0",
+    "updatedAt": "2026-10-16T15:34:26.549Z"
+  },
   "narnia-posting-duplicate": {
     "scores": {
       "cobertura_da_referencia": 1,

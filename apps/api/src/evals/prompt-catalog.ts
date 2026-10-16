@@ -6,9 +6,9 @@ import { pluginDir, readPluginFile, splitFrontmatter } from "../plugin";
 
 /**
  * Catálogo dos prompts do narnia-jobs para o Phoenix (M2, decisão AV-4): o repositório é a fonte; cada entrada vira um
- * prompt versionado no Phoenix. São 19: as 9 chamadas estruturadas (system + template da mensagem), a persona do
- * recrutador, as 4 notas de contexto do chat e as 5 skills do terminal. O hash cobre tudo o que muda a resposta do
- * modelo (mensagens, modelo, schema, tools): hash igual = mesma versão.
+ * prompt versionado no Phoenix. São 27: as 14 chamadas estruturadas (system + template da mensagem), os 2 agentes
+ * (recrutador e especializado), as 5 notas de contexto do chat e as 6 skills do terminal. O hash cobre tudo o que muda a
+ * resposta do modelo (mensagens, modelo, schema, tools): hash igual = mesma versão.
  */
 export type PromptKind = "structured" | "agent" | "note" | "skill";
 

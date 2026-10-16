@@ -15,6 +15,11 @@ import {
   ChatTitleOutputSchema,
   type CheckProposalsOutput,
   CheckProposalsOutputSchema,
+  type CoverLetterDraft,
+  CoverLetterDraftSchema,
+  CV_OUTPUT_JSON_SCHEMAS,
+  type CvDraft,
+  CvDraftSchema,
   clip,
   contentTracingEnabled,
   EXTRACTION_JSON_SCHEMAS,
@@ -62,6 +67,7 @@ import {
   type CheckProposalsInput,
   type CompleteInput,
   type CompleteResult,
+  type CvGenerateInput,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
@@ -844,6 +850,28 @@ export class ClaudeCodeProvider implements Provider {
       POSTING_OUTPUT_JSON_SCHEMAS.postingDuplicate,
       PostingDuplicateOutputSchema,
       "postingDuplicate",
+    );
+  }
+
+  cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>> {
+    return this.single(
+      renderStructuredPrompt("cvGenerate", input),
+      input.model,
+      PROMPTS.cvGenerate(),
+      CV_OUTPUT_JSON_SCHEMAS.cvGenerate,
+      CvDraftSchema,
+      "cvGenerate",
+    );
+  }
+
+  coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>> {
+    return this.single(
+      renderStructuredPrompt("coverLetterGenerate", input),
+      input.model,
+      PROMPTS.coverLetterGenerate(),
+      CV_OUTPUT_JSON_SCHEMAS.coverLetterGenerate,
+      CoverLetterDraftSchema,
+      "coverLetterGenerate",
     );
   }
 

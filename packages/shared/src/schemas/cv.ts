@@ -207,3 +207,102 @@ export const CvReviewSchema = z.object({
   issues: z.array(CvReviewIssueSchema),
 });
 export type CvReview = z.infer<typeof CvReviewSchema>;
+
+/* ---------- gerador (F05-11): o que o modelo recebe e devolve ---------- */
+
+/** Resumo montado pelo código para o gerador: fatos já filtrados (sem ocultos) e ordenados pelo score de match. */
+export interface CvBrief {
+  kind: DocumentKind;
+  locale: CvLocale;
+  maxPages: 2;
+  profile: {
+    name: string;
+    targetTitle: string;
+    seniority: string;
+    area: string;
+    pitch: string | null;
+  };
+  posting: null | {
+    company: string | null;
+    client: string | null;
+    title: string | null;
+    seniority: string | null;
+    required: string[];
+    nice: string[];
+    responsibilities: string[];
+    analysis: null | {
+      summary: string;
+      matches: Array<{ requirement: string; evidence: Array<{ kind: string; id: string }> }>;
+      gaps: string[];
+      atsKeywordsMissing: string[];
+      cvImprovements: string[];
+    };
+  };
+  experiences: Array<{
+    id: string;
+    company: string;
+    title: string;
+    start: string | null;
+    end: string | null;
+    current: boolean;
+    summary: string | null;
+    tech: string[];
+    matchScore: number;
+    achievements: Array<{ id: string; text: string; metric: string | null; highlight: boolean }>;
+  }>;
+  /** Experiências fora do PDF (roteiro de entrevista): o gerador não escreve sobre elas. */
+  omitted: Array<{ id: string; company: string; title: string; reason: string }>;
+  skills: Array<{ id: string; name: string; category: string | null; matchScore: number }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    tech: string[];
+    matchScore: number;
+  }>;
+  education: Array<{
+    id: string;
+    institution: string;
+    course: string | null;
+    degree: string | null;
+  }>;
+  languages: Array<{ id: string; name: string; level: string }>;
+  /** Termos da vaga sem evidência nos dados: nunca escritos no CV; adjacência só com o nome verdadeiro (F05-20). */
+  gaps: string[];
+  instructions: string | null;
+  /** Apontamentos da revisão anterior (regeração automática, F05-13). */
+  previousIssues: Array<{ area: string; message: string; where: string | null }>;
+}
+
+export const CvDraftSchema = z.object({
+  summary: Text,
+  experiences: z.array(
+    z.object({
+      factId: IdSchema,
+      bullets: z.array(CvBulletSchema).min(1).max(6),
+      tech: z.array(Text).max(12),
+    }),
+  ),
+  skills: z.array(
+    z.object({ label: Text, items: z.array(z.object({ name: Text, factIds: Sourced })).min(1) }),
+  ),
+  projects: z.array(z.object({ factId: IdSchema, description: Text })),
+  adjacent: z.array(z.object({ asked: Text, shown: Text, factIds: Sourced })),
+  sectionsOrder: z.array(CvSectionSchema).min(1),
+});
+export type CvDraft = z.infer<typeof CvDraftSchema>;
+
+export const CoverLetterDraftSchema = z.object({
+  greeting: Text,
+  paragraphs: z
+    .array(
+      z.object({
+        role: z.enum(["why", "covers", "gaps", "closing"]),
+        text: Text,
+        factIds: z.array(EvidenceIdSchema),
+      }),
+    )
+    .min(3)
+    .max(5),
+});
+export type CoverLetterDraft = z.infer<typeof CoverLetterDraftSchema>;

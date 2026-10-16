@@ -57,6 +57,36 @@ describe("setup do Phoenix no boot", () => {
     expect(r).toEqual({ registered: true, synced: 3 });
   });
 
+  it("ponte já registrada: atualiza a chave a cada boot (reset do banco gera chave nova; o Phoenix guardava a antiga e a ponte respondia 401)", async () => {
+    t = makeTestApp();
+    const a = admin({ reachable: true, providerRegistered: true, providerId: "CP1" });
+    const keys: string[] = [];
+    const inner = a.admin.registerBridge;
+    a.admin.registerBridge = async (input?: { key: string }) => {
+      keys.push(input?.key ?? "");
+      await inner();
+    };
+    await setupPhoenix({
+      repos: t.repos,
+      admin: a.admin as never,
+      bridgeUrl: "http://api:3100/bridge/anthropic",
+      sync: async () => ({
+        prompts: [],
+        evaluators: {
+          datasets: 0,
+          evaluatorsCreated: 0,
+          evaluatorsUpdated: 0,
+          attached: 0,
+          judgesCreated: 0,
+          judgesUpdated: 0,
+        },
+      }),
+      retries: 0,
+    });
+    expect(a.calls).toEqual(["register"]);
+    expect(keys[0]).toMatch(/^narnia-ponte-/);
+  });
+
   it("ponte desligada: não registra, mas sincroniza os prompts (sem provedor)", async () => {
     t = makeTestApp();
     t.repos.settings.set(BRIDGE_SETTING_KEYS.enabled, false);

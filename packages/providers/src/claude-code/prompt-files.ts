@@ -19,4 +19,6 @@ export const PROMPTS = {
   postingExtract: () => loadPrompt("posting-extract"),
   postingMerge: () => loadPrompt("posting-merge"),
   postingDuplicate: () => loadPrompt("posting-duplicate"),
+  cvGenerate: () => loadPrompt("cv-generate"),
+  coverLetterGenerate: () => loadPrompt("cover-letter-generate"),
 };

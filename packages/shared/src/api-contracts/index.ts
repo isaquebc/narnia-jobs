@@ -795,6 +795,15 @@ export const PostingUpdatedEventSchema = z.object({
   postingId: IdSchema,
 });
 
+/** CV ou carta mudou de etapa ou ficou pronto (F05 §2.7): a web recarrega o documento, a aba do perfil e a vaga. */
+export const DocumentUpdatedEventSchema = z.object({
+  type: z.literal("document.updated"),
+  documentId: IdSchema,
+  profileId: IdSchema,
+  postingId: IdSchema.nullable(),
+  status: z.string(),
+});
+
 // WS /ws — jobs/provider (F01) + perfil (F02). Quem lê `jobId` discrimina por `type` antes.
 export const WsEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("provider.status"), status: ProviderStatusResponseSchema }),
@@ -820,6 +829,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   ChatSessionUpdatedEventSchema,
   ChatIngestionCreatedEventSchema,
   PostingUpdatedEventSchema,
+  DocumentUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

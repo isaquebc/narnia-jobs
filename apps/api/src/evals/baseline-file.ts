@@ -41,6 +41,8 @@ export class BaselineGate {
     scores: Record<string, number>;
     versionId?: string | undefined;
     commit?: string | undefined;
+    /** Erros do modelo na rodada (ou nenhuma nota): a rodada não vale como linha de base. */
+    incomplete: number;
   }> = [];
   readonly regressions: Regression[] = [];
 
@@ -55,16 +57,22 @@ export class BaselineGate {
   record(
     key: string,
     scores: Record<string, number>,
-    meta: { versionId?: string; commit?: string; gate?: boolean } = {},
+    meta: { versionId?: string; commit?: string; gate?: boolean; errors?: number } = {},
   ): Regression[] {
     const found = meta.gate === false ? [] : findRegressions(this.baselines, key, scores);
     this.regressions.push(...found);
-    this.runs.push({ key, scores, versionId: meta.versionId, commit: meta.commit });
+    const incomplete = (meta.errors ?? 0) + (Object.keys(scores).length === 0 ? 1 : 0);
+    this.runs.push({ key, scores, versionId: meta.versionId, commit: meta.commit, incomplete });
     return found;
   }
 
   /** Imprime o resumo; grava a linha de base nova se pedida e sem regressão. Devolve true se o gate falhou. */
   finish(log: (line: string) => void = console.log): boolean {
+    // rodada com erro do modelo ou sem notas não mede nada: reprova o gate e nunca vira linha de base (2026-10-16:
+    // a ponte respondeu 401 e a linha de base saiu vazia)
+    const incomplete = this.runs.filter((r) => r.incomplete > 0);
+    for (const r of incomplete)
+      log(`\n  ✘ ${r.key}: rodada incompleta (${r.incomplete} erro(s) do modelo ou sem notas).`);
     if (this.regressions.length > 0) {
       log(`\nRegressões em relação a ${this.path}:`);
       for (const r of this.regressions)
@@ -75,8 +83,8 @@ export class BaselineGate {
       log("\nSem regressão em relação à linha de base.");
     }
     if (this.flags.update) {
-      if (this.regressions.length > 0) {
-        log("Linha de base não atualizada: corrija as regressões antes.");
+      if (this.regressions.length > 0 || incomplete.length > 0) {
+        log("Linha de base não atualizada: corrija as regressões e as rodadas incompletas antes.");
       } else {
         const next: Baselines = { ...this.baselines };
         for (const r of this.runs)
@@ -90,6 +98,6 @@ export class BaselineGate {
         log(`Linha de base atualizada em ${this.path} (${this.runs.length} entradas).`);
       }
     }
-    return this.flags.gate && this.regressions.length > 0;
+    return this.flags.gate && (this.regressions.length > 0 || incomplete.length > 0);
   }
 }

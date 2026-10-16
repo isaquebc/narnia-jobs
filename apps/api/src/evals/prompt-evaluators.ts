@@ -1,5 +1,7 @@
 import {
   checkVerdicts,
+  cvFactIds,
+  cvNoGapTerms,
   type EvalParams,
   type EvalResult,
   jsonSchema,
@@ -79,6 +81,24 @@ const coverage = (min: number): Rule => ({
   impl: referenceCoverage as Rule["impl"],
 });
 
+const cvIds: Rule = {
+  name: "origens_do_resumo",
+  description: "F05: toda origem citada (factId, factIds) existe no resumo enviado ao gerador.",
+  module: "cv-honesty",
+  fn: "cvFactIds",
+  config: null,
+  impl: cvFactIds as Rule["impl"],
+};
+const cvGaps: Rule = {
+  name: "sem_termo_sem_evidencia",
+  description:
+    "F05-20: nenhum termo da vaga sem evidência no texto (na carta, só no parágrafo das lacunas).",
+  module: "cv-honesty",
+  fn: "cvNoGapTerms",
+  config: null,
+  impl: cvNoGapTerms as Rule["impl"],
+};
+
 const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = {
   readDocument: (op) => [schemaRule(op), coverage(0.8)],
   extractFacts: (op) => [schemaRule(op), quotes(["text"]), years(["text"]), coverage(0.8)],
@@ -138,6 +158,20 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
   postingExtract: (op) => [schemaRule(op), years(["text"]), coverage(0.8)],
   postingMerge: (op) => [schemaRule(op), years(["text"]), coverage(0.75)],
   postingDuplicate: (op) => [schemaRule(op), lang(["rationale"]), coverage(1)],
+  cvGenerate: (op) => [
+    schemaRule(op),
+    cvIds,
+    cvGaps,
+    lang(["summary", "text", "label"]),
+    coverage(0.75),
+  ],
+  coverLetterGenerate: (op) => [
+    schemaRule(op),
+    cvIds,
+    cvGaps,
+    lang(["greeting", "text"]),
+    coverage(0.5),
+  ],
 };
 
 export const PROMPTS_WITH_EVALUATORS = Object.keys(RULES) as StructuredOperation[];

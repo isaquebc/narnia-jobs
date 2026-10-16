@@ -66,7 +66,7 @@ export async function runPromptEvals(args: string[]): Promise<number> {
       gate.record(
         def.name,
         Object.fromEntries(Object.entries(r.scores).map(([k, v]) => [k, v.mean])),
-        { versionId: def.hash, ...(commit ? { commit } : {}) },
+        { versionId: def.hash, errors: r.errors.length, ...(commit ? { commit } : {}) },
       );
     } catch (e) {
       failed++;

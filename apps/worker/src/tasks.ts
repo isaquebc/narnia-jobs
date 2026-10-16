@@ -1,4 +1,5 @@
 import {
+  DOCUMENT_TASKS,
   INGEST_TASKS,
   POSTING_TASKS,
   type StageJobData,
@@ -14,6 +15,7 @@ import {
 import { setRunStatus } from "./ingest/status";
 import type { WorkerDeps } from "./pipeline";
 import { analyzeProfiles } from "./processors/analyze-profiles";
+import { cvGenerate } from "./processors/cv-generate";
 import { postingExtract } from "./processors/posting-extract";
 
 /**
@@ -50,6 +52,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [INGEST_TASKS.reconcile]: ingestReconcile,
   [INGEST_TASKS.reviewCheck]: ingestReviewCheck,
   [POSTING_TASKS.extract]: postingExtract,
+  [DOCUMENT_TASKS.generate]: cvGenerate,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

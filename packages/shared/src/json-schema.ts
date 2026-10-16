@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ChatTitleOutputSchema } from "./schemas/chat";
+import { CoverLetterDraftSchema, CvDraftSchema } from "./schemas/cv";
 import {
   BuildDigestOutputSchema,
   ExtractFactsOutputSchema,
@@ -55,4 +56,10 @@ export const POSTING_OUTPUT_JSON_SCHEMAS = {
   postingExtract: toJsonSchema(PostingExtractOutputSchema),
   postingMerge: toJsonSchema(PostingMergeOutputSchema),
   postingDuplicate: toJsonSchema(PostingDuplicateOutputSchema),
+} as const;
+
+/** Saídas do gerador da F05 (conteúdo do CV e da carta; o código monta o resto). */
+export const CV_OUTPUT_JSON_SCHEMAS = {
+  cvGenerate: toJsonSchema(CvDraftSchema),
+  coverLetterGenerate: toJsonSchema(CoverLetterDraftSchema),
 } as const;

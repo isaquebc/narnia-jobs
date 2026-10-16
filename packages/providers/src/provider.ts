@@ -5,6 +5,9 @@ import type {
   BuildDigestOutput,
   ChatTitleOutput,
   CheckProposalsOutput,
+  CoverLetterDraft,
+  CvBrief,
+  CvDraft,
   ExtractFactsOutput,
   FactProposal,
   PickFilesOutput,
@@ -152,6 +155,12 @@ export interface PostingDuplicateInput {
   model: string;
 }
 
+/** F05-11: conteúdo do CV e da carta a partir do resumo montado pelo código (Sonnet por padrão). */
+export interface CvGenerateInput {
+  brief: CvBrief;
+  model: string;
+}
+
 /** Avaliações no Phoenix (M1): chamada simples, sem tools, usada pela ponte da assinatura. */
 export interface CompleteInput {
   system: string;
@@ -196,6 +205,9 @@ export interface Provider {
   postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>>;
   postingMerge(input: PostingMergeInput): Promise<ProviderResult<PostingMergeOutput>>;
   postingDuplicate(input: PostingDuplicateInput): Promise<ProviderResult<PostingDuplicateOutput>>;
+  /** F05: conteúdo do CV e da carta de apresentação (Sonnet). */
+  cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>>;
+  coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;
   /**
    * F03 §2.4: diagnóstico do plano (assinatura e uso das janelas). Nunca gasta tokens; `null` quando o plano não se
    * aplica (API key, terceiros) ou não há dado.

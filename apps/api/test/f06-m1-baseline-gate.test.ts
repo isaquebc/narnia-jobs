@@ -36,6 +36,20 @@ describe("F06/M1 · gate da linha de base", () => {
     });
   });
 
+  it("rodada incompleta (erro do modelo ou sem notas) reprova o gate e nunca vira linha de base (2026-10-16)", () => {
+    const p = file(JSON.stringify({ "narnia-x": { scores: { schema: 1 }, updatedAt: "t" } }));
+    const g = new BaselineGate({ gate: true, update: true }, p);
+    g.record("narnia-cv-generate", {}, { versionId: "v1", errors: 3 });
+    g.record("narnia-x", { schema: 1 }, { versionId: "v2" });
+    const out: string[] = [];
+    expect(g.finish((l) => out.push(l))).toBe(true);
+    expect(out.join("\n")).toMatch(/narnia-cv-generate.*incompleta/);
+    expect(out.join("\n")).toMatch(/não atualizada/);
+    const saved = JSON.parse(readFileSync(p, "utf8"));
+    expect(saved["narnia-cv-generate"]).toBeUndefined();
+    expect(saved["narnia-x"].updatedAt).toBe("t");
+  });
+
   it("queda reprova com --gate e não atualiza a linha de base", () => {
     const p = file(JSON.stringify({ "chat:salario": { scores: { graders: 1 }, updatedAt: "t" } }));
     const g = new BaselineGate({ gate: true, update: true }, p);

@@ -1,6 +1,7 @@
 import {
   AnalyzeProfilesOutputSchema,
   CHAT_OUTPUT_JSON_SCHEMAS,
+  CV_OUTPUT_JSON_SCHEMAS,
   EXTRACTION_JSON_SCHEMAS,
   INGEST_OUTPUT_JSON_SCHEMAS,
   POSTING_OUTPUT_JSON_SCHEMAS,
@@ -12,6 +13,7 @@ import type {
   BuildDigestInput,
   ChatTitleInput,
   CheckProposalsInput,
+  CvGenerateInput,
   ExtractFactsInput,
   PickFilesInput,
   PostingDuplicateInput,
@@ -180,6 +182,26 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: POSTING_OUTPUT_JSON_SCHEMAS.postingDuplicate,
     tools: [],
   }),
+  cvGenerate: spec("cvGenerate", {
+    name: "narnia-cv-generate",
+    description:
+      "F05: conteúdo do CV (bullets com origem, skills, resumo) a partir do resumo montado pelo código.",
+    file: FILE("cv-generate"),
+    userTemplate: "<resumo>\n{{brief_json}}\n</resumo>",
+    defaultModel: "sonnet",
+    jsonSchema: CV_OUTPUT_JSON_SCHEMAS.cvGenerate,
+    tools: [],
+  }),
+  coverLetterGenerate: spec("coverLetterGenerate", {
+    name: "narnia-cover-letter-generate",
+    description:
+      "F05-21: carta de apresentação com o que a pessoa cobre, as lacunas e a abertura para aprender.",
+    file: FILE("cover-letter-generate"),
+    userTemplate: "<resumo>\n{{brief_json}}\n</resumo>",
+    defaultModel: "sonnet",
+    jsonSchema: CV_OUTPUT_JSON_SCHEMAS.coverLetterGenerate,
+    tools: [],
+  }),
 };
 
 const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
@@ -226,6 +248,8 @@ export const structuredPromptVars = {
     saved_json: JSON.stringify(i.saved, null, 1),
     incoming_json: JSON.stringify(i.incoming, null, 1),
   }),
+  cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
+  coverLetterGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
 } satisfies Record<StructuredOperation, (input: never) => Record<string, string>>;
 
 /** Troca `{{nome}}` pelas variáveis numa passada só (conteúdo com chaves não é reinterpretado). */

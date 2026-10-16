@@ -18,6 +18,7 @@ import type { Provider } from "@narnia-jobs/providers";
 import type { WsEvent } from "@narnia-jobs/shared";
 import { notifyRun, setRunStatus } from "./ingest/status";
 import { consolidate } from "./processors/consolidate";
+import type { DocumentDeps } from "./processors/cv-generate";
 import { digest } from "./processors/digest";
 import { facts } from "./processors/facts";
 import { ocrPagesStage } from "./processors/ocr";
@@ -46,6 +47,8 @@ export interface WorkerDeps {
   gh: () => GhClient;
   /** Clone de fallback para árvore truncada (correções F03 item 13); ausente ou `null` = sem fallback. */
   ghCloneTree?: () => ((fullName: string) => Promise<TreeEntry[]>) | null;
+  /** F05: navegador do PDF e checagens (padrão: `NARNIA_BROWSER_WS`); injetável nos testes. */
+  documents?: DocumentDeps;
 }
 
 export interface StageContext {

@@ -7,6 +7,9 @@ import type {
   BuildDigestOutput,
   ChatTitleOutput,
   CheckProposalsOutput,
+  CoverLetterDraft,
+  CvBrief,
+  CvDraft,
   Evidence,
   ExtractFactsOutput,
   PickFilesOutput,
@@ -29,6 +32,7 @@ import {
   type CheckProposalsInput,
   type CompleteInput,
   type CompleteResult,
+  type CvGenerateInput,
   type ExtractFactsInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
@@ -67,6 +71,8 @@ export type MockOperation =
   | "postingExtract"
   | "postingMerge"
   | "postingDuplicate"
+  | "cvGenerate"
+  | "coverLetterGenerate"
   | "complete"
   | "openChat";
 
@@ -839,6 +845,109 @@ export class MockProvider implements Provider {
       JSON.stringify(input),
       input.model,
     );
+  }
+
+  /**
+   * CV previsível (F05): bullets das conquistas do resumo (texto + métrica, com a origem), tecnologias de cada
+   * experiência sem os termos de `gaps`, skills num grupo só. Nunca escreve um termo sem evidência.
+   */
+  async cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>> {
+    await this.gate("cvGenerate");
+    const b = input.brief;
+    const en = b.locale === "en-US";
+    const gaps = new Set(b.gaps.map((g) => g.toLowerCase()));
+    const clean = (list: string[]) => list.filter((t) => !gaps.has(t.toLowerCase()));
+    const experiences = b.experiences.slice(0, 4).map((e, i) => {
+      const ach = e.achievements.slice(0, i === 0 ? 3 : 2);
+      const bullets = ach.length
+        ? ach.map((a) => ({
+            text: a.metric ? `${a.text} (${a.metric}).` : `${a.text}.`,
+            factIds: [{ kind: "achievement" as const, id: a.id }],
+          }))
+        : [
+            {
+              text:
+                e.summary ?? (en ? `${e.title} at ${e.company}.` : `${e.title} na ${e.company}.`),
+              factIds: [{ kind: "experience" as const, id: e.id }],
+            },
+          ];
+      return { factId: e.id, bullets, tech: clean(e.tech).slice(0, 6) };
+    });
+    const skills = clean(b.skills.map((s) => s.name)).slice(0, 12);
+    const draft: CvDraft = {
+      summary: en
+        ? `${b.profile.targetTitle} focused on ${skills.slice(0, 3).join(", ")}.`
+        : `${b.profile.targetTitle} com foco em ${skills.slice(0, 3).join(", ")}.`,
+      experiences,
+      skills: skills.length
+        ? [
+            {
+              label: en ? "Skills" : "Habilidades",
+              items: b.skills
+                .filter((s) => skills.includes(s.name))
+                .map((s) => ({ name: s.name, factIds: [{ kind: "skill" as const, id: s.id }] })),
+            },
+          ]
+        : [],
+      projects: [],
+      adjacent: [],
+      sectionsOrder: ["summary", "experience", "skills", "education", "languages"],
+    };
+    return this.result(draft, JSON.stringify(b), input.model);
+  }
+
+  /** Carta previsível (F05-21): quatro parágrafos de ~75 palavras; lacunas só no parágrafo delas. */
+  async coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>> {
+    await this.gate("coverLetterGenerate");
+    const b: CvBrief = input.brief;
+    const en = b.locale === "en-US";
+    const company = b.posting?.company ?? (en ? "the team" : "o time");
+    const fill = (base: string) => {
+      const words: string[] = [];
+      while (words.length < 75) words.push(...base.split(" "));
+      return `${words.slice(0, 75).join(" ")}.`;
+    };
+    const ach = b.experiences.flatMap((e) => e.achievements).slice(0, 2);
+    const draft: CoverLetterDraft = {
+      greeting: en ? `Dear ${company} team,` : `Olá, time da ${company},`,
+      paragraphs: [
+        {
+          role: "why",
+          text: fill(
+            en
+              ? `I am applying for the ${b.posting?.title ?? "open"} role`
+              : `Me candidato à vaga de ${b.posting?.title ?? "aberta"}`,
+          ),
+          factIds: [],
+        },
+        {
+          role: "covers",
+          text: fill(ach.map((a) => a.text).join(" ") || b.profile.targetTitle),
+          factIds: ach.length
+            ? ach.map((a) => ({ kind: "achievement" as const, id: a.id }))
+            : [{ kind: "experience" as const, id: b.experiences[0]?.id ?? "x" }],
+        },
+        {
+          role: "gaps",
+          text: fill(
+            en
+              ? `I am eager to learn ${b.gaps.slice(0, 2).join(" and ") || "new tools"}`
+              : `Quero aprender ${b.gaps.slice(0, 2).join(" e ") || "novas ferramentas"}`,
+          ),
+          factIds: [],
+        },
+        {
+          role: "closing",
+          text: fill(
+            en
+              ? "Thank you for your time and I look forward to talking"
+              : "Obrigada pelo tempo e fico à disposição para conversar",
+          ),
+          factIds: [],
+        },
+      ],
+    };
+    return this.result(draft, JSON.stringify(b), input.model);
   }
 
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {

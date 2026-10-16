@@ -85,9 +85,11 @@ export async function setupPhoenix(o: {
   if (!status.reachable) return { registered: false, synced: 0 };
   const bridgeOn = resolveBridgeSettings(o.repos.settings).enabled;
   let registered = false;
-  if (bridgeOn && !status.providerRegistered) {
+  // sempre registra (upsert): o Phoenix guarda a chave do provedor no volume dele, e um reset do banco gera chave nova;
+  // sem isso a ponte responde 401 (2026-10-16)
+  if (bridgeOn) {
     await o.admin.registerBridge({ key: bridgeKey(o.repos.settings), bridgeUrl: o.bridgeUrl });
-    registered = true;
+    registered = !status.providerRegistered;
     status = await o.admin.status();
   }
   try {

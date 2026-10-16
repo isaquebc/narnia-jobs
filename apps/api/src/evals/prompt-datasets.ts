@@ -4,6 +4,7 @@ import type {
   BuildDigestInput,
   ChatTitleInput,
   CheckProposalsInput,
+  CvGenerateInput,
   ExtractFactsInput,
   PickFilesInput,
   PostingDuplicateInput,
@@ -35,6 +36,8 @@ type Input<Op extends StructuredOperation> = Omit<
     postingExtract: PostingExtractInput;
     postingMerge: PostingMergeInput;
     postingDuplicate: PostingDuplicateInput;
+    cvGenerate: CvGenerateInput;
+    coverLetterGenerate: CvGenerateInput;
   }[Op],
   "model"
 >;
@@ -252,6 +255,198 @@ const HEURISTIC_CONSULTORIA = {
     { term: "Terraform", section: "required" },
   ],
 };
+
+/* ---------- F05: resumos fictícios do gerador de CV e da carta ---------- */
+
+const CV_EXPERIENCES: CvGenerateInput["brief"]["experiences"] = [
+  {
+    id: "e1",
+    company: "Acme Pagamentos",
+    title: "Engenheira de Software Sênior",
+    start: "2021-03",
+    end: null,
+    current: true,
+    summary: "Plataforma de pagamentos com alta disponibilidade.",
+    tech: ["TypeScript", "Node.js", "PostgreSQL", "Docker"],
+    matchScore: 91,
+    achievements: [
+      {
+        id: "a1",
+        text: "Reduziu a latência p95 do checkout",
+        metric: "de 800 ms para 300 ms",
+        highlight: true,
+      },
+      {
+        id: "a2",
+        text: "Liderou a migração de 40 serviços para containers Docker",
+        metric: "zero downtime",
+        highlight: false,
+      },
+      { id: "a3", text: "Mentorou 4 pessoas desenvolvedoras", metric: null, highlight: false },
+    ],
+  },
+  {
+    id: "e2",
+    company: "Globex Logística",
+    title: "Desenvolvedora Backend",
+    start: "2017-01",
+    end: "2021-02",
+    current: false,
+    summary: "Roteirização e rastreio de entregas.",
+    tech: ["Java", "Redis", "AWS"],
+    matchScore: 64,
+    achievements: [
+      {
+        id: "a4",
+        text: "Criou o serviço de rastreio em tempo real",
+        metric: "120 mil eventos/min",
+        highlight: false,
+      },
+    ],
+  },
+];
+
+const cvBrief = (o: Partial<CvGenerateInput["brief"]>): CvGenerateInput["brief"] => ({
+  kind: "cv",
+  locale: "pt-BR",
+  maxPages: 2,
+  profile: {
+    name: "Ana Maria Exemplo",
+    targetTitle: "Engenheira de Software Sênior",
+    seniority: "senior",
+    area: "backend",
+    pitch: "Backend de pagamentos com foco em performance.",
+  },
+  posting: null,
+  experiences: CV_EXPERIENCES,
+  omitted: [
+    {
+      id: "e0",
+      company: "Initech",
+      title: "Estagiária",
+      reason: "Pouca aderência ao perfil (score 12).",
+    },
+  ],
+  skills: [
+    { id: "s1", name: "Node.js", category: "framework", matchScore: 95 },
+    { id: "s2", name: "PostgreSQL", category: "data", matchScore: 90 },
+    { id: "s3", name: "Docker", category: "infra", matchScore: 80 },
+    { id: "s4", name: "Redis", category: "infra", matchScore: 60 },
+    { id: "s5", name: "Mentoria", category: "soft", matchScore: 55 },
+  ],
+  projects: [],
+  education: [
+    { id: "ed1", institution: "Unicamp", course: "Ciência da Computação", degree: "Bacharelado" },
+  ],
+  languages: [
+    { id: "l1", name: "Português", level: "native" },
+    { id: "l2", name: "Inglês", level: "C1" },
+  ],
+  gaps: [],
+  instructions: null,
+  previousIssues: [],
+  ...o,
+});
+
+const VAGA_INITECH: NonNullable<CvGenerateInput["brief"]["posting"]> = {
+  company: "Initech",
+  client: null,
+  title: "Senior Backend Engineer",
+  seniority: "senior",
+  required: ["Node.js", "PostgreSQL", "Kubernetes", "Kafka"],
+  nice: ["Redis"],
+  responsibilities: ["Build payment APIs", "Mentor engineers"],
+  analysis: {
+    summary: "Strong backend fit; no Kubernetes or Kafka evidence.",
+    matches: [
+      { requirement: "Node.js", evidence: [{ kind: "experience", id: "e1" }] },
+      { requirement: "PostgreSQL", evidence: [{ kind: "skill", id: "s2" }] },
+    ],
+    gaps: ["Kubernetes", "Kafka"],
+    atsKeywordsMissing: ["Node.js"],
+    cvImprovements: ["Show the latency result in the first bullet"],
+  },
+};
+
+const CV_DATASETS = {
+  cvGenerate: [
+    {
+      id: "cv-do-perfil",
+      description:
+        "CV do perfil em pt-BR, sem vaga: bullets das conquistas com origem e o número de cada uma.",
+      input: { brief: cvBrief({}) },
+      reference: {
+        expected: ['"factId":"e1"', "300 ms", '"id":"a1"', "Node.js"],
+        forbidden: ["Initech", "Estagiária"],
+      },
+    },
+    {
+      id: "cv-vaga-en-lacunas",
+      description:
+        "CV para vaga em inglês que pede Kubernetes e Kafka (sem evidência): os termos não aparecem; Docker entra como adjacente.",
+      input: {
+        brief: cvBrief({ locale: "en-US", posting: VAGA_INITECH, gaps: ["Kubernetes", "Kafka"] }),
+      },
+      // os termos que faltam ficam registrados em adjacent.asked; a ausência no texto é do avaliador
+      // sem_termo_sem_evidencia
+      reference: {
+        expected: ['"factId":"e1"', "Docker", "300 ms", '"asked":"Kubernetes"'],
+        forbidden: ["k8s", "noções de Kubernetes", "familiarity with Kubernetes"],
+      },
+    },
+    {
+      id: "cv-instrucao-e-revisao",
+      description:
+        "Pedido da pessoa (destacar mentoria) e apontamento da revisão anterior (número inventado): segue o pedido sem inventar.",
+      input: {
+        brief: cvBrief({
+          instructions: "Dê mais destaque à mentoria.",
+          previousIssues: [
+            {
+              area: "hallucination",
+              message: 'O bullet "mentorou 10 pessoas" não está nos dados (são 4).',
+              where: "Acme Pagamentos",
+            },
+          ],
+        }),
+      },
+      reference: { expected: ['"id":"a3"', "4 pessoas"], forbidden: ["10 pessoas"] },
+    },
+  ],
+  coverLetterGenerate: [
+    {
+      id: "carta-en-lacunas",
+      description:
+        "Carta em inglês para vaga com lacunas: cobre com números e cita as lacunas só no parágrafo delas.",
+      input: {
+        brief: cvBrief({
+          kind: "cover_letter",
+          locale: "en-US",
+          posting: VAGA_INITECH,
+          gaps: ["Kubernetes", "Kafka"],
+        }),
+      },
+      reference: { expected: ["Initech", '"role":"gaps"', '"id":"a1"', "300 ms"] },
+    },
+    {
+      id: "carta-pt",
+      description:
+        "Carta em pt-BR para vaga sem lacunas: específica para a vaga, com origem nos destaques.",
+      input: {
+        brief: cvBrief({
+          kind: "cover_letter",
+          posting: {
+            ...VAGA_INITECH,
+            title: "Engenheira Backend Sênior",
+            required: ["Node.js", "PostgreSQL"],
+            analysis: null,
+          },
+        }),
+      },
+      reference: { expected: ["Initech", '"role":"covers"', '"id":"a1"'] },
+    },
+  ],
+} satisfies { [K in "cvGenerate" | "coverLetterGenerate"]: DatasetExample<K>[] };
 
 export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[] } = {
   readDocument: [
@@ -703,6 +898,7 @@ Requisitos:
       reference: { expected: ['"sameJob":false'] },
     },
   ],
+  ...CV_DATASETS,
 };
 
 /** Exemplo pronto para o Phoenix: `input` = variáveis do template, `output` = referência, `metadata`. */
