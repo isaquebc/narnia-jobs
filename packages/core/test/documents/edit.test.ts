@@ -158,13 +158,46 @@ describe("F05/M6 core · edição e versões", () => {
     expect(v3.version).toBe(3);
   });
 
-  it("conteúdo diferente (editado depois) ou versão com erro: monta de novo", async () => {
+  it("a montagem no modelo novo ajustou o texto (dados atualizados): voltar ainda reaproveita a última daquele modelo", async () => {
     const s = setup();
     const v2 = await changeDocumentLayout(s.r, s.enqueue, {
       documentId: s.doc.id,
       templateId: "moderno",
     });
+    // a remontagem pega os dados de agora (ex.: cargo como nos dados), então o conteúdo da v2 difere um pouco da v1
     s.r.documents.updateVersion(v2.id, {
+      status: "ready",
+      content: { ...CV_SHORT, summary: "Resumo remontado com os dados de agora." },
+    });
+    const back = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "classico",
+    });
+    expect(back.version).toBe(1);
+    const again = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    expect(again.version).toBe(2);
+    expect(s.enqueued).toHaveLength(1);
+  });
+
+  it("texto editado ou gerado de novo depois: o modelo antigo não volta com o texto velho, monta de novo", async () => {
+    const s = setup();
+    const v2 = await changeDocumentLayout(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    s.r.documents.updateVersion(v2.id, { status: "ready", content: CV_SHORT });
+    const draft = contentToCvDraft(CV_SHORT);
+    draft.summary = "Resumo editado no Moderno.";
+    const v3 = await editDocument(s.r, s.enqueue, {
+      documentId: s.doc.id,
+      baseVersion: 2,
+      cv: draft,
+      source: "edit",
+    });
+    s.r.documents.updateVersion(v3.id, {
       status: "ready",
       content: { ...CV_SHORT, summary: "Resumo editado no Moderno." },
     });
@@ -172,8 +205,8 @@ describe("F05/M6 core · edição e versões", () => {
       documentId: s.doc.id,
       templateId: "classico",
     });
-    expect(back.version).toBe(3);
-    expect(s.enqueued).toHaveLength(2);
+    expect(back.version).toBe(4);
+    expect(s.enqueued).toHaveLength(3);
   });
 
   it("versão do modelo que deu erro não é reaproveitada", async () => {

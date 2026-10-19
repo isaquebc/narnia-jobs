@@ -163,8 +163,8 @@ export async function changeDocumentLayout(
     ...(input.format && doc.kind === "cover_letter" ? { format: input.format } : {}),
   });
   const draft = contentToDraft(content);
-  // já montado nesse modelo, papel e formato com o mesmo conteúdo: volta a ser a atual, sem montar nem revisar de novo
-  const same = sameLayoutVersion(repos, next, draft);
+  // já montado nesse modelo, papel e formato a partir do mesmo texto: volta a ser a atual, sem montar nem revisar
+  const same = current ? sameLayoutVersion(repos, next, current) : null;
   if (same) {
     repos.documents.setCurrent(doc.id, same.version);
     return same;
@@ -174,24 +174,37 @@ export async function changeDocumentLayout(
 
 const FINISHED = new Set(["ready", "ready_with_issues"]);
 
+/**
+ * Origem do texto de uma versão: a última versão até ela que não veio de troca de modelo (gerada, atualizada,
+ * editada). A troca de modelo remonta com os dados de agora e o conteúdo pode mudar um pouco (ex.: cargo como nos
+ * dados), então comparar o conteúdo falhava (dono, 2026-10-19); a origem não muda. A atual nunca volta para trás de
+ * uma origem mais nova (o reaproveitamento só anda dentro da mesma origem), então a regra vale sem coluna nova.
+ */
+function textOrigin(versions: DocumentVersionRecord[], version: number): number {
+  return (
+    versions
+      .filter((v) => v.version <= version && v.source !== "template")
+      .reduce((max, v) => Math.max(max, v.version), 0) || version
+  );
+}
+
 function sameLayoutVersion(
   repos: Repos,
   doc: { id: string; templateId: string; paper: Paper; format: "pdf" | "text" },
-  draft: ReturnType<typeof contentToDraft>,
+  current: DocumentVersionRecord,
 ): DocumentVersionRecord | null {
-  const key = JSON.stringify(draft);
+  const versions = repos.documents.listVersions(doc.id);
+  const origin = textOrigin(versions, current.version);
   return (
-    repos.documents
-      .listVersions(doc.id)
-      .find(
-        (v) =>
-          FINISHED.has(v.status) &&
-          v.content !== null &&
-          v.templateId === doc.templateId &&
-          v.paper === doc.paper &&
-          v.format === doc.format &&
-          JSON.stringify(contentToDraft(v.content as CvContent | CoverLetterContent)) === key,
-      ) ?? null
+    versions.find(
+      (v) =>
+        FINISHED.has(v.status) &&
+        v.content !== null &&
+        v.templateId === doc.templateId &&
+        v.paper === doc.paper &&
+        v.format === doc.format &&
+        textOrigin(versions, v.version) === origin,
+    ) ?? null
   );
 }
 
