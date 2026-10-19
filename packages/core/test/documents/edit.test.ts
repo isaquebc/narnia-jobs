@@ -8,7 +8,9 @@ import {
   documentText,
   editDocument,
 } from "../../src/documents/edit";
+import type { EnqueueDocumentTask } from "../../src/documents/request";
 import { contentToCvDraft } from "../../src/documents/tools";
+import { enqueueTask } from "../../src/jobs/tasks";
 import { seedFixture } from "../../src/testing/profile-fixtures";
 import { CV_SHORT, LETTER } from "./fixtures/cv";
 
@@ -192,6 +194,32 @@ describe("F05/M6 core · edição e versões", () => {
     });
     expect(again.version).toBe(3);
     expect(s.enqueued).toHaveLength(2);
+  });
+
+  it("trocar o modelo logo depois da montagem anterior enfileira de novo (job anterior ainda fechando na fila)", async () => {
+    const s = setup();
+    const added: string[] = [];
+    const q = {
+      add: async (_n: string, _d: unknown, o: { jobId: string }) => {
+        added.push(o.jobId);
+      },
+      getJob: async () => ({ getState: async () => "active", remove: async () => {} }),
+    };
+    const queues = { ingest: q, ocr: q, extract: q };
+    const enqueue: EnqueueDocumentTask = (req) => enqueueTask({ queues, repos: s.r, ...req });
+    const v2 = await changeDocumentLayout(s.r, enqueue, {
+      documentId: s.doc.id,
+      templateId: "moderno",
+    });
+    // a montagem terminou (versão pronta), mas o evento "completed" da fila ainda não chegou ao espelho
+    s.r.documents.updateVersion(v2.id, { status: "ready", content: CV_SHORT });
+    const v3 = await changeDocumentLayout(s.r, enqueue, {
+      documentId: s.doc.id,
+      templateId: "compacto",
+    });
+    expect(added).toHaveLength(2);
+    expect(new Set(added).size).toBe(2);
+    expect(added[1]).toContain(v3.id);
   });
 
   it("texto do documento e diff por linha entre versões", () => {

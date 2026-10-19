@@ -54,7 +54,7 @@ describe("F05/M4 core · pedido de documento", () => {
     expect(s.enqueued).toEqual([
       {
         type: "cv.generate",
-        key: res.document.id,
+        key: res.version.id,
         payload: { documentId: res.document.id, versionId: res.version.id },
       },
     ]);

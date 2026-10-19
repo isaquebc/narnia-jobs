@@ -129,6 +129,8 @@ export interface DocumentsRepo {
   currentVersion(documentId: string): DocumentVersionRecord | null;
   /** Mais recente primeiro. */
   listVersions(documentId: string): DocumentVersionRecord[];
+  /** Versões ainda em andamento (de todos os documentos), para o verificador de presas. */
+  listActiveVersions(): DocumentVersionRecord[];
   updateVersion(id: string, patch: VersionPatch): DocumentVersionRecord;
 }
 
@@ -341,6 +343,14 @@ export function documentsRepo(db: Db): DocumentsRepo {
         q("select * from document_version where document_id = ? order by version desc").all(
           documentId,
         ) as Row[]
+      ).map(mapVersion);
+    },
+    listActiveVersions() {
+      const done = ["ready", "ready_with_issues", "error"];
+      return (
+        q(
+          `select * from document_version where status not in (${done.map(() => "?").join(", ")}) order by created_at`,
+        ).all(...done) as Row[]
       ).map(mapVersion);
     },
     updateVersion(id, patch) {

@@ -141,7 +141,7 @@ function newDoc(h: H, over: Partial<DocumentRecord> = {}) {
 
 const run = (h: H, documentId: string, versionId: string) =>
   processTask(
-    { kind: "task", type: "cv.generate", key: documentId, payload: { documentId, versionId } },
+    { kind: "task", type: "cv.generate", key: versionId, payload: { documentId, versionId } },
     { jobId: `task__cv.generate__${documentId}`, progress: async () => {} },
     h.deps,
   );
@@ -225,7 +225,7 @@ describe("F05/M2 worker · cv.generate", () => {
       {
         kind: "task",
         type: "cv.generate",
-        key: doc.id,
+        key: v.id,
         payload: { documentId: doc.id, versionId: v.id, previousIssues },
       },
       { jobId: `task__cv.generate__${doc.id}`, progress: async () => {} },
@@ -359,7 +359,7 @@ describe("F05/M2 worker · cv.generate", () => {
       {
         kind: "task",
         type: "cv.render",
-        key: doc.id,
+        key: v.id,
         payload: { documentId: doc.id, versionId: v2.id, cv: draft },
       },
       { jobId: "j2", progress: async () => {} },

@@ -1,4 +1,5 @@
 import {
+  healStuckDocuments,
   healStuckRun,
   isJobStale,
   type QueueStateFn,
@@ -160,6 +161,18 @@ export async function runSweep(
       "ingestion.stuck",
     ]))
       await deps.publish({ type: "notification.updated", notification: r });
+  }
+  // versões de documento cuja tarefa morreu (worker reiniciou no meio): erro, e a tela mostra "Tentar de novo"
+  for (const v of await healStuckDocuments(repos, opts.state, now)) {
+    const doc = repos.documents.get(v.documentId);
+    if (!doc) continue;
+    await deps.publish({
+      type: "document.updated",
+      documentId: doc.id,
+      profileId: doc.profileId,
+      postingId: doc.postingId,
+      status: v.status,
+    });
   }
   return { ran: true };
 }

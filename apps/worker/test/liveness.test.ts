@@ -8,6 +8,7 @@ import {
   openDatabase,
   type QueueStateFn,
   type Repos,
+  seedFixture,
   synthesisTask,
 } from "@narnia-jobs/core";
 import { MockProvider } from "@narnia-jobs/providers";
@@ -176,6 +177,44 @@ describe("runSweep · verificador periódico", () => {
     expect(r.ran).toBe(true);
     expect(h.repos.ingestionRuns.get(h.runId)?.status).toBe("error");
     expect(h.published.some((e) => e.type === "ingestion.updated")).toBe(true);
+  });
+
+  it("versão de documento cuja tarefa sumiu da fila (worker reiniciou) → erro, e a tela é avisada", async () => {
+    h = harness();
+    const { profileId } = seedFixture(h.repos, "engineer");
+    const doc = h.repos.documents.create({
+      kind: "cv",
+      profileId,
+      postingId: null,
+      templateId: "moderno",
+      paper: "A4",
+      locale: "pt-BR",
+      format: "pdf",
+    });
+    const v = h.repos.documents.addVersion(doc.id, {
+      source: "template",
+      instructions: null,
+      factsVersion: 1,
+      postingUpdatedAt: null,
+      profileHash: "h",
+    });
+    h.repos.documents.updateVersion(v.id, { status: "reviewing" });
+    await h.deps.enqueueTask({
+      queue: "extract",
+      type: "cv.render",
+      key: v.id,
+      payload: { documentId: doc.id, versionId: v.id },
+    });
+    const later = () => new Date(Date.now() + 10 * 60_000);
+    await runSweep(h.deps, {
+      acquire: async () => true,
+      state: async () => ({ state: "missing" }),
+      now: later,
+    });
+    expect(h.repos.documents.versionById(v.id)?.status).toBe("error");
+    expect(h.published).toContainEqual(
+      expect.objectContaining({ type: "document.updated", documentId: doc.id, status: "error" }),
+    );
   });
 
   it("ativo sem sinal há mais de 2 min → notificação 'Ingestão parada'; com sinal novo, ela se resolve", async () => {

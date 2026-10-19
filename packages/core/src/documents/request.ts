@@ -137,7 +137,7 @@ export async function requestDocument(
   await enqueue({
     queue: "extract",
     type: DOCUMENT_TASKS.generate,
-    key: doc.id,
+    key: version.id,
     payload: {
       documentId: doc.id,
       versionId: version.id,

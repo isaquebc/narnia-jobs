@@ -66,7 +66,8 @@ async function newRenderVersion(
   await enqueue({
     queue: "extract",
     type: DOCUMENT_TASKS.render,
-    key: doc.id,
+    // uma tarefa por versão: com a chave do documento, a troca logo depois da montagem anterior era ignorada
+    key: version.id,
     payload: { documentId: doc.id, versionId: version.id, ...draft },
     profileId: doc.profileId,
   });
