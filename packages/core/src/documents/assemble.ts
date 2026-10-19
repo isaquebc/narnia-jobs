@@ -17,6 +17,7 @@ import {
 import type { Repos } from "../db";
 import { canonicalTerm, normalizeTerm } from "../postings/dictionary";
 import { termInText } from "./ats";
+import { languageName } from "./labels";
 
 /**
  * Montagem do documento a partir do rascunho do gerador (F05-11): o código preenche cabeçalho, empresa, cargo, datas,
@@ -235,7 +236,11 @@ export function assembleCv(
       end: f?.endDate ?? null,
     };
   });
-  const languages = brief.languages.map((l) => ({ factId: l.id, name: l.name, level: l.level }));
+  const languages = brief.languages.map((l) => ({
+    factId: l.id,
+    name: languageName(brief.locale, l.name),
+    level: l.level,
+  }));
   const factIdsUsed = dedupe(used);
 
   const content: CvContent = {

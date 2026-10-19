@@ -27,7 +27,7 @@ const BASE_CSS = `*{box-sizing:border-box;margin:0;padding:0}
 body{color:#1f2328;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 a{color:inherit;text-decoration:none}
 .hd{margin-bottom:10pt}
-.contact a,.contact span{white-space:nowrap}
+.contact a,.contact span{display:inline-block;max-width:100%;overflow-wrap:anywhere}
 .contact .sep{margin:0 4pt;color:#8b949e}
 .sec{margin-top:9pt}
 .sec h2{break-after:avoid}

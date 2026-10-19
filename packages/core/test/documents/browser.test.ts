@@ -94,4 +94,74 @@ describe.skipIf(!ws)("F05/M1 core · PDF com Chromium real", () => {
     expect(insp.pages).toHaveLength(1);
     expect(layoutIssues(insp, { headings: [] })).toEqual([]);
   });
+
+  // dono, 2026-10-19: "Fonte de 7.7 pt" no contato e 7.3 pt nas tecnologias, em toda tentativa. Um trecho mais largo
+  // que a folha fazia o Chromium encolher a página inteira (~0,86); o modelo não pode deixar nada estourar a largura
+  const wide =
+    "github.com/exemplo/plataforma-de-reservas-online-com-integracoes-de-cobranca-e-notificacoes-em-tempo-real";
+  const overflowing: Array<[string, (c: typeof CV_SHORT) => typeof CV_SHORT]> = [
+    [
+      "palavra longa num bullet",
+      (c) => ({
+        ...c,
+        experiences: c.experiences.map((e, i) =>
+          i === 0
+            ? { ...e, bullets: [{ text: `Publicou ${wide}`, factIds: [] }, ...e.bullets] }
+            : e,
+        ),
+      }),
+    ],
+    [
+      "link longo no contato",
+      (c) => ({
+        ...c,
+        header: {
+          ...c.header,
+          links: [...c.header.links, { kind: "portfolio", label: wide, url: `https://${wide}` }],
+        },
+      }),
+    ],
+    [
+      "muitos links curtos no contato (a linha inteira não pode virar um bloco só)",
+      (c) => ({
+        ...c,
+        header: {
+          ...c.header,
+          location: "São Paulo, SP",
+          phone: "+55 11 98888-7777",
+          links: [
+            ...c.header.links,
+            ...["github", "portfolio", "blog", "medium", "stackoverflow", "dribbble"].map((k) => ({
+              kind: "portfolio" as const,
+              label: `${k}.com/exemplo`,
+              url: `https://${k}.com/exemplo`,
+            })),
+          ],
+        },
+      }),
+    ],
+    [
+      "tecnologia longa",
+      (c) => ({
+        ...c,
+        experiences: c.experiences.map((e, i) =>
+          i === 0 ? { ...e, tech: [...e.tech, wide.replace(/[/.]/g, "-")] } : e,
+        ),
+      }),
+    ],
+  ];
+  for (const t of ["classico", "moderno", "compacto"] as const)
+    for (const [what, make] of overflowing)
+      it(`${t}: ${what} quebra a linha em vez de encolher a página (fonte ≥ 8 pt)`, async () => {
+        const r = await renderPdf(ws as string, renderDocumentHtml(make(CV_SHORT), t), {
+          paper: "A4",
+        });
+        if (!r.ok) throw new Error(r.message);
+        const insp = await inspectPdf(r.pdf);
+        const sizes = insp.pages.flatMap((p) => p.items.map((i) => i.size));
+        expect(Math.min(...sizes)).toBeGreaterThanOrEqual(8);
+        expect(layoutIssues(insp, { headings }).filter((i) => i.message.includes("Fonte"))).toEqual(
+          [],
+        );
+      });
 });

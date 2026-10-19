@@ -27,6 +27,49 @@ const LABELS: Record<CvLocale, Record<CvSection, string> & { present: string; mo
 
 export const sectionLabel = (locale: CvLocale, s: CvSection) => LABELS[locale][s];
 
+/** [pt-BR, en-US] dos idiomas mais comuns; a chave de busca ignora acento e caixa. */
+const LANGUAGES: Array<[string, string]> = [
+  ["Português", "Portuguese"],
+  ["Inglês", "English"],
+  ["Espanhol", "Spanish"],
+  ["Francês", "French"],
+  ["Alemão", "German"],
+  ["Italiano", "Italian"],
+  ["Holandês", "Dutch"],
+  ["Russo", "Russian"],
+  ["Polonês", "Polish"],
+  ["Ucraniano", "Ukrainian"],
+  ["Sueco", "Swedish"],
+  ["Norueguês", "Norwegian"],
+  ["Dinamarquês", "Danish"],
+  ["Finlandês", "Finnish"],
+  ["Grego", "Greek"],
+  ["Turco", "Turkish"],
+  ["Árabe", "Arabic"],
+  ["Hebraico", "Hebrew"],
+  ["Hindi", "Hindi"],
+  ["Chinês", "Chinese"],
+  ["Mandarim", "Mandarin"],
+  ["Cantonês", "Cantonese"],
+  ["Japonês", "Japanese"],
+  ["Coreano", "Korean"],
+  ["Libras", "Brazilian Sign Language"],
+];
+const languageKey = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
+const LANGUAGE_INDEX = new Map(
+  LANGUAGES.flatMap((pair) => pair.map((n) => [languageKey(n), pair] as const)),
+);
+
+/**
+ * Nome do idioma no idioma do documento (dono, 2026-10-19: "Português (Native)" num CV em inglês reprovava em toda
+ * tentativa, e o gerador não escreve essa seção). Desconhecido fica como nos dados.
+ */
+export function languageName(locale: CvLocale, name: string): string {
+  const pair = LANGUAGE_INDEX.get(languageKey(name));
+  if (!pair) return name;
+  return locale === "pt-BR" ? pair[0] : pair[1];
+}
+
 /** Nível do idioma no CV: CEFR como está; "native" no idioma do documento. */
 export function languageLevelLabel(locale: CvLocale, level: string): string {
   if (level !== "native") return level;

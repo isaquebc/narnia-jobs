@@ -181,6 +181,21 @@ describe("F05/M2 core · montagem do CV", () => {
     });
   });
 
+  it("idiomas no idioma do documento pelo código (dono, 2026-10-19: 'Português (Native)' num CV em inglês)", () => {
+    const en = setup("en-US");
+    const a = assembleCv(en.r, en.brief, draftFor(en.brief), {
+      meta: { ...meta(en.ids.profileId), locale: "en-US" },
+      header: { name: "Ana", title: "", location: null, email: null, phone: null, links: [] },
+    });
+    expect(a.content.languages.map((l) => l.name)).toEqual(["Portuguese", "English"]);
+    const pt = setup("pt-BR");
+    const b = assembleCv(pt.r, pt.brief, draftFor(pt.brief), {
+      meta: meta(pt.ids.profileId),
+      header: { name: "Ana", title: "", location: null, email: null, phone: null, links: [] },
+    });
+    expect(b.content.languages.map((l) => l.name)).toEqual(["Português", "Inglês"]);
+  });
+
   it("competência traduzida com a origem certa passa; tecnologia trocada não", () => {
     const s = setup();
     const mentoria = s.brief.skills.find((k) => k.name === "Mentoria") as { id: string };
