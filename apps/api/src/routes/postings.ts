@@ -21,7 +21,7 @@ import {
   PostingNoteInputSchema,
   PostingPatchSchema,
 } from "@narnia-jobs/shared";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
@@ -212,7 +212,10 @@ export function postingsRoutes(deps: {
   app.post("/api/postings/:id/contacts", validate("json", PostingContactInputSchema), (c) => {
     const id = c.req.param("id");
     if (!repos.postings.get(id)) return notFound(c);
-    const contact = repos.postingContacts.add(id, c.req.valid("json"));
+    const input = c.req.valid("json");
+    const dup = repos.postingContacts.findDuplicate(id, input);
+    if (dup) return duplicateContact(c, dup.name);
+    const contact = repos.postingContacts.add(id, input);
     touched(id);
     return c.json({ contact }, 201);
   });
@@ -223,7 +226,31 @@ export function postingsRoutes(deps: {
       const cur = repos.postingContacts.get(c.req.param("contactId"));
       if (!cur || cur.postingId !== c.req.param("id"))
         return apiError(c, 404, "contact_not_found", "Contato não encontrado");
-      const contact = repos.postingContacts.update(cur.id, c.req.valid("json"));
+      const patch = c.req.valid("json");
+      const dup = repos.postingContacts.findDuplicate(
+        cur.postingId,
+        {
+          name: patch.name ?? cur.name,
+          email: patch.email === undefined ? cur.email : patch.email,
+          linkedinUrl: patch.linkedinUrl === undefined ? cur.linkedinUrl : patch.linkedinUrl,
+        },
+        cur.id,
+      );
+      if (dup) return duplicateContact(c, dup.name);
+      const contact = repos.postingContacts.update(cur.id, patch);
+      touched(cur.postingId);
+      return c.json({ contact });
+    },
+  );
+  // fixado no topo da página (um por vaga: fixar outro solta o anterior)
+  app.post(
+    "/api/postings/:id/contacts/:contactId/pin",
+    validate("json", z.object({ pinned: z.boolean() })),
+    (c) => {
+      const cur = repos.postingContacts.get(c.req.param("contactId"));
+      if (!cur || cur.postingId !== c.req.param("id"))
+        return apiError(c, 404, "contact_not_found", "Contato não encontrado");
+      const contact = repos.postingContacts.setPinned(cur.id, c.req.valid("json").pinned);
       touched(cur.postingId);
       return c.json({ contact });
     },
@@ -288,4 +315,14 @@ export function postingsRoutes(deps: {
   );
 
   return app;
+}
+
+/** Mesmo LinkedIn ou e-mail de um contato já registrado na vaga. */
+function duplicateContact(c: Context, name: string) {
+  return apiError(
+    c,
+    409,
+    "duplicate_contact",
+    `Esse contato já está na vaga (${name}), com o mesmo LinkedIn ou e-mail.`,
+  );
 }

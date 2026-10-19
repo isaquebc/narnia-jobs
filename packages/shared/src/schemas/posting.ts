@@ -149,9 +149,40 @@ export type PostingPatch = z.infer<typeof PostingPatchSchema>;
 export const ContactOriginSchema = z.enum(["linkedin", "whatsapp", "email", "other"]);
 export type ContactOrigin = z.infer<typeof ContactOriginSchema>;
 
+/**
+ * Link de perfil do LinkedIn (2026-10-19): só `linkedin.com` (e subdomínios), com caminho; sai sem query, sem barra
+ * final e com https. Inválido devolve null.
+ */
+export function normalizeLinkedinUrl(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  let u: URL;
+  try {
+    u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase();
+  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+  if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) return null;
+  const path = u.pathname.replace(/\/+$/, "");
+  if (!path || path === "/") return null;
+  return `https://${host}${path}`;
+}
+
+const LinkedinUrl = z.string().transform((v, ctx) => {
+  const url = normalizeLinkedinUrl(v);
+  if (!url) {
+    ctx.addIssue({ code: "custom", message: "Link do LinkedIn inválido" });
+    return z.NEVER;
+  }
+  return url;
+});
+
 export const PostingContactInputSchema = z.object({
   name: Text,
   origin: ContactOriginSchema,
+  linkedinUrl: LinkedinUrl.nullable().optional(),
   email: z.email().nullable().optional(),
   phone: z
     .string()
@@ -169,6 +200,9 @@ export const PostingContactSchema = z.object({
   origin: ContactOriginSchema,
   email: z.string().nullable(),
   phone: z.string().nullable(),
+  linkedinUrl: z.string().nullable(),
+  /** Fixado no topo da página da vaga (um por vaga; fora do limite dos dois últimos). */
+  pinned: z.boolean(),
   createdAt: IsoDateTimeSchema,
 });
 export type PostingContact = z.infer<typeof PostingContactSchema>;

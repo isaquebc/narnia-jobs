@@ -1,4 +1,4 @@
-import { editPostingNote, seedFixture } from "@narnia-jobs/core";
+import { createPostingTools, editPostingNote, seedFixture } from "@narnia-jobs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeTestApp, type TestApp } from "./helpers";
 
@@ -71,6 +71,77 @@ describe("F06/M2 · /api/postings", () => {
     expect(await detail(a.id)).toEqual([]);
     const c = t.repos.postings.create({ company: "Itaú", role: "backend" });
     expect((await detail(a.id)).map((p) => p.id)).toEqual([c.id]);
+  });
+
+  it("contatos: LinkedIn, duplicata recusada (409) e fixar um por vaga (2026-10-19)", async () => {
+    t = makeTestApp();
+    const p = t.repos.postings.create({ company: "Nubank" });
+    const add = (body: object) => t.api(`/api/postings/${p.id}/contacts`, json(body));
+    const r = await add({
+      name: "Joana",
+      origin: "linkedin",
+      linkedinUrl: "linkedin.com/in/joana-silva/",
+    });
+    expect(r.status).toBe(201);
+    const joana = ((await r.json()) as { contact: { id: string; linkedinUrl: string } }).contact;
+    expect(joana.linkedinUrl).toBe("https://linkedin.com/in/joana-silva");
+    expect(
+      (await add({ name: "J", origin: "linkedin", linkedinUrl: "evil.com/in/x" })).status,
+    ).toBe(400);
+    const dup = await add({
+      name: "Joana Silva",
+      origin: "linkedin",
+      linkedinUrl: "https://www.linkedin.com/in/joana-silva",
+    });
+    expect(dup.status).toBe(409);
+    expect(await dup.json()).toMatchObject({ error: { code: "duplicate_contact" } });
+    const rui = (
+      (await (await add({ name: "Rui", origin: "email", email: "rui@nu.com" })).json()) as {
+        contact: { id: string };
+      }
+    ).contact;
+    // editar para o e-mail de outro contato também é duplicata
+    expect(
+      (
+        await t.api(
+          `/api/postings/${p.id}/contacts/${joana.id}`,
+          json({ email: "rui@nu.com" }, "PATCH"),
+        )
+      ).status,
+    ).toBe(409);
+    const pin = (id: string, pinned: boolean) =>
+      t.api(`/api/postings/${p.id}/contacts/${id}/pin`, json({ pinned }));
+    expect((await pin(joana.id, true)).status).toBe(200);
+    await pin(rui.id, true);
+    const d = (await (await t.api(`/api/postings/${p.id}`)).json()) as {
+      contacts: Array<{ id: string; pinned: boolean }>;
+    };
+    expect(d.contacts.filter((c) => c.pinned).map((c) => c.id)).toEqual([rui.id]);
+    expect(t.events).toContainEqual({ type: "posting.updated", postingId: p.id });
+  });
+
+  it("tool posting.contact_add: LinkedIn e, se já existe, devolve o contato existente sem duplicar", async () => {
+    t = makeTestApp();
+    const p = t.repos.postings.create({ company: "Nubank" });
+    const tools = createPostingTools(t.repos, {
+      ports: { intake: async () => ({ ok: false, code: "x", message: "x" }) },
+    });
+    const a = await tools["posting.contact_add"]({
+      postingId: p.id,
+      name: "Joana",
+      origin: "linkedin",
+      linkedinUrl: "linkedin.com/in/joana",
+    });
+    const b = await tools["posting.contact_add"]({
+      postingId: p.id,
+      name: "Joana Silva",
+      origin: "linkedin",
+      linkedinUrl: "https://www.linkedin.com/in/joana/",
+    });
+    expect(b).toEqual({ id: a.id, duplicate: true });
+    expect(t.repos.postingContacts.list(p.id)).toHaveLength(1);
+    const got = await tools["posting.get"]({ id: p.id });
+    expect(got.contacts[0]?.line).toContain("https://linkedin.com/in/joana");
   });
 
   it("contatos: adicionar, editar, recusar telefone inválido e remover", async () => {

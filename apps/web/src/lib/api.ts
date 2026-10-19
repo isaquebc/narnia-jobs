@@ -544,6 +544,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         `/api/postings/${encodeURIComponent(id)}/contacts/${encodeURIComponent(contactId)}`,
         { method: "PATCH", body: JSON.stringify(body) },
       ),
+    /** Fixa o contato no topo da página da vaga (um por vaga) ou solta. */
+    pinPostingContact: (id: string, contactId: string, pinned: boolean) =>
+      request<{ contact: PostingContact }>(
+        `/api/postings/${encodeURIComponent(id)}/contacts/${encodeURIComponent(contactId)}/pin`,
+        json({ pinned }),
+      ),
     deletePostingContact: (id: string, contactId: string) =>
       request<null>(
         `/api/postings/${encodeURIComponent(id)}/contacts/${encodeURIComponent(contactId)}`,
@@ -581,6 +587,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     getDocument: (id: string) => request<DocumentView>(`/api/documents/${encodeURIComponent(id)}`),
     generateDocument: (body: GenerateDocumentBody) =>
       request<{ documents: DocumentView[] }>("/api/documents", json(body)),
+    /** "Regerar com mensagem": abre a conversa da vaga com o documento e o pedido do usuário. */
+    documentFeedback: (id: string, message: string) =>
+      request<{ session: ChatSession }>(
+        `/api/documents/${encodeURIComponent(id)}/feedback`,
+        json({ message }),
+      ),
     regenerateDocument: (
       id: string,
       body: { instructions?: string | null; acceptLanguage?: boolean; fixIssues?: boolean },

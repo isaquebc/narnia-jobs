@@ -15,6 +15,8 @@ import { type TKey, t } from "../../i18n";
 import { GenerateDialog } from "../documents/GenerateDialog";
 import { PostingDocuments } from "../documents/PostingDocuments";
 import { AnalysisCard, PreAnalysisCard } from "./PostingAnalysis";
+import { PostingAssets } from "./PostingAssets";
+import { PostingContactsSummary } from "./PostingContactsSummary";
 import { PostingForm } from "./PostingForm";
 import { ContactsCard, DuplicateDialog, NotesCard } from "./PostingSections";
 import { postingWho, statusTone } from "./PostingsPage";
@@ -23,6 +25,7 @@ import { postingWho, statusTone } from "./PostingsPage";
  * Página da vaga (F06 §1.3, M6): duplicata pendente (F06-9), análise do recrutador com validade (F06-10), pré-análise
  * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. Link para a vaga oficial (`postingUrl`)
  * junto das ações (2026-10-15). "Gerar" (F05) abre CV ou cover letter, e os documentos da vaga ficam na página;
+ * na coluna da pré-análise, antes dela, os assets (CV e carta pequenos) e os contatos recentes (2026-10-19);
  * o alerta de vagas parecidas (mesma empresa e role) só aparece quando existe outra vaga assim (correção 2026-10-15;
  * o de candidatura repetida chega com as candidaturas, F06-11/F07).
  */
@@ -163,9 +166,14 @@ export function PostingPage({
           </Alert>
         </section>
       ) : null}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <AnalysisCard postingId={postingId} analyses={analyses.data?.analyses ?? []} />
-        <PreAnalysisCard pre={posting.preAnalysis as PreAnalysis | null} />
+        {/* coluna da pré-análise: antes dela, os assets e os contatos (2026-10-19) */}
+        <div className="flex flex-col gap-4">
+          <PostingAssets postingId={postingId} onGenerate={setGenerating} />
+          <PostingContactsSummary postingId={postingId} contacts={contacts} />
+          <PreAnalysisCard pre={posting.preAnalysis as PreAnalysis | null} />
+        </div>
       </div>
       <PostingDocuments postingId={postingId} focusId={documentId} />
       <PostingForm posting={posting} />

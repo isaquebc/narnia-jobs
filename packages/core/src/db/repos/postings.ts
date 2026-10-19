@@ -1,6 +1,7 @@
 import {
   type FieldSource,
   type NoteAuthor,
+  normalizeLinkedinUrl,
   nowUtc,
   POSTING_FIELD_NAMES,
   POSTING_IDENTITY_FIELDS,
@@ -252,6 +253,18 @@ export interface PostingContactsRepo {
     patch: { [K in keyof PostingContactInput]?: PostingContactInput[K] | undefined },
   ): PostingContact;
   remove(id: string): void;
+  /** Fixa (soltando o fixado anterior da mesma vaga) ou solta o contato. */
+  setPinned(id: string, pinned: boolean): PostingContact;
+  /** Outro contato da vaga com o mesmo LinkedIn ou e-mail (`exceptId` = o próprio, na edição). */
+  findDuplicate(
+    postingId: string,
+    input: {
+      name: string;
+      email?: string | null | undefined;
+      linkedinUrl?: string | null | undefined;
+    },
+    exceptId?: string,
+  ): PostingContact | null;
 }
 
 function mapContact(r: Row): PostingContact {
@@ -262,6 +275,8 @@ function mapContact(r: Row): PostingContact {
     origin: r.origin,
     email: r.email ?? null,
     phone: r.phone ?? null,
+    linkedinUrl: r.linkedin_url ?? null,
+    pinned: Number(r.pinned ?? 0) === 1,
     createdAt: r.created_at,
   });
 }
@@ -282,25 +297,72 @@ export function postingContactsRepo(db: Db): PostingContactsRepo {
     add(postingId, i) {
       const id = newId();
       q(
-        `insert into posting_contact (id, posting_id, name, origin, email, phone, created_at)
-         values (?, ?, ?, ?, ?, ?, ?)`,
-      ).run(id, postingId, i.name, i.origin, i.email ?? null, i.phone ?? null, nowUtc());
+        `insert into posting_contact (id, posting_id, name, origin, email, phone, linkedin_url, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        postingId,
+        i.name,
+        i.origin,
+        i.email ?? null,
+        i.phone ?? null,
+        i.linkedinUrl ? (normalizeLinkedinUrl(i.linkedinUrl) ?? null) : null,
+        nowUtc(),
+      );
       return repo.get(id) as PostingContact;
     },
     update(id, p) {
       const cur = repo.get(id);
       if (!cur) throw new Error(`Contato não encontrado: ${id}`);
-      q("update posting_contact set name = ?, origin = ?, email = ?, phone = ? where id = ?").run(
+      q(
+        "update posting_contact set name = ?, origin = ?, email = ?, phone = ?, linkedin_url = ? where id = ?",
+      ).run(
         p.name ?? cur.name,
         p.origin ?? cur.origin,
         p.email === undefined ? cur.email : p.email,
         p.phone === undefined ? cur.phone : p.phone,
+        p.linkedinUrl === undefined
+          ? cur.linkedinUrl
+          : p.linkedinUrl
+            ? (normalizeLinkedinUrl(p.linkedinUrl) ?? null)
+            : null,
         id,
       );
       return repo.get(id) as PostingContact;
     },
     remove(id) {
       q("delete from posting_contact where id = ?").run(id);
+    },
+    setPinned(id, pinned) {
+      const cur = repo.get(id);
+      if (!cur) throw new Error(`Contato não encontrado: ${id}`);
+      if (pinned)
+        q("update posting_contact set pinned = 0 where posting_id = ? and id <> ?").run(
+          cur.postingId,
+          id,
+        );
+      q("update posting_contact set pinned = ? where id = ?").run(pinned ? 1 : 0, id);
+      return repo.get(id) as PostingContact;
+    },
+    findDuplicate(postingId, input, exceptId) {
+      const email = input.email?.trim().toLowerCase() || null;
+      // o mesmo perfil abre por www., br. ou sem subdomínio: compara o caminho
+      const profilePath = (url: string | null | undefined) => {
+        const n = url ? normalizeLinkedinUrl(url) : null;
+        return n ? new URL(n).pathname.toLowerCase() : null;
+      };
+      const linkedin = profilePath(input.linkedinUrl);
+      if (!email && !linkedin) return null;
+      return (
+        repo
+          .list(postingId)
+          .find(
+            (c) =>
+              c.id !== exceptId &&
+              ((email !== null && c.email?.toLowerCase() === email) ||
+                (linkedin !== null && profilePath(c.linkedinUrl) === linkedin)),
+          ) ?? null
+      );
     },
   };
   return repo;

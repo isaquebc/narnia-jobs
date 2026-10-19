@@ -98,6 +98,44 @@ describe("F06/M2 core · repositórios da vaga", () => {
     expect(r.postingContacts.list(p.id)).toHaveLength(0);
   });
 
+  it("contatos: LinkedIn normalizado, um fixado por vaga e duplicata pelo mesmo LinkedIn ou e-mail (2026-10-19)", () => {
+    const r = repos();
+    const p = r.postings.create({ company: "Nubank" });
+    const joana = r.postingContacts.add(p.id, {
+      name: "Joana",
+      origin: "linkedin",
+      linkedinUrl: "https://www.LinkedIn.com/in/joana-silva/?utm_source=share",
+    });
+    expect(joana).toMatchObject({
+      linkedinUrl: "https://www.linkedin.com/in/joana-silva",
+      pinned: false,
+    });
+    const rui = r.postingContacts.add(p.id, { name: "Rui", origin: "email", email: "rui@nu.com" });
+    expect(r.postingContacts.setPinned(joana.id, true).pinned).toBe(true);
+    // fixar outro solta o anterior: só um fixado por vaga
+    r.postingContacts.setPinned(rui.id, true);
+    expect(r.postingContacts.get(joana.id)?.pinned).toBe(false);
+    expect(r.postingContacts.get(rui.id)?.pinned).toBe(true);
+    expect(
+      r.postingContacts.findDuplicate(p.id, {
+        name: "Joana S.",
+        linkedinUrl: "linkedin.com/in/joana-silva",
+      })?.id,
+    ).toBe(joana.id);
+    expect(r.postingContacts.findDuplicate(p.id, { name: "Outro", email: "RUI@nu.com" })?.id).toBe(
+      rui.id,
+    );
+    expect(r.postingContacts.findDuplicate(p.id, { name: "Joana" })).toBeNull();
+    // na edição, o próprio contato não conta como duplicata
+    expect(
+      r.postingContacts.findDuplicate(p.id, { name: "Rui", email: "rui@nu.com" }, rui.id),
+    ).toBeNull();
+    const other = r.postings.create({ company: "Itaú" });
+    expect(
+      r.postingContacts.findDuplicate(other.id, { name: "x", email: "rui@nu.com" }),
+    ).toBeNull();
+  });
+
   it("notas: recrutador editando nota do usuário fica pendente até confirmar ou recusar (F06-17)", () => {
     const r = repos();
     const p = r.postings.create({ company: "Nubank" });

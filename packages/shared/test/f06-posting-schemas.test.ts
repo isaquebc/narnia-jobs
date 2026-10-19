@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeLinkedinUrl,
   POSTING_OUTPUT_JSON_SCHEMAS,
+  PostingContactInputSchema,
   PostingCreateSchema,
   PostingDuplicateOutputSchema,
   PostingFieldsSchema,
@@ -66,5 +68,24 @@ describe("F06 shared · schemas da vaga", () => {
       expect(s).not.toHaveProperty("$schema");
       expect(s.type).toBe("object");
     }
+  });
+
+  it("contato: LinkedIn só de perfil do linkedin.com, normalizado (sem query, barra final e com https)", () => {
+    const ok = PostingContactInputSchema.parse({
+      name: "Joana",
+      origin: "linkedin",
+      linkedinUrl: "br.linkedin.com/in/joana-silva/?trk=x",
+    });
+    expect(ok.linkedinUrl).toBe("https://br.linkedin.com/in/joana-silva");
+    for (const bad of ["https://evil.com/in/joana", "javascript:alert(1)", "linkedin.com"])
+      expect(
+        PostingContactInputSchema.safeParse({ name: "J", origin: "linkedin", linkedinUrl: bad })
+          .success,
+      ).toBe(false);
+    expect(
+      PostingContactInputSchema.parse({ name: "J", origin: "other", linkedinUrl: null })
+        .linkedinUrl,
+    ).toBeNull();
+    expect(normalizeLinkedinUrl("http://LINKEDIN.com/in/Ana/")).toBe("https://linkedin.com/in/Ana");
   });
 });

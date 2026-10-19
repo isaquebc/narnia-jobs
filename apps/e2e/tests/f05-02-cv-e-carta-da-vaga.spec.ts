@@ -10,12 +10,12 @@ test("F05/E2E-02 vaga › Gerar › CV com a carta junto (texto): os dois na pá
   const { ids } = await freshStart("engineer");
   const p = await intake({ text: JD });
   await login(page, `/vagas/${p.id}`);
-  await page.getByRole("button", { name: "Gerar" }).click();
+  await page.getByRole("button", { name: "Gerar", exact: true }).click();
   await page.getByRole("menuitem", { name: "CV" }).click();
   const dialog = page.getByRole("dialog", { name: "Gerar currículo" });
   await dialog.getByLabel("Gerar a carta de apresentação junto").check();
   await dialog.getByLabel("Formato da carta").selectOption("text");
-  await dialog.getByRole("button", { name: "Gerar" }).click();
+  await dialog.getByRole("button", { name: "Gerar", exact: true }).click();
   const docs = await waitDocuments({ postingId: p.id }, 2);
   expect(docs.map((d) => d.document.kind).sort()).toEqual(["cover_letter", "cv"]);
   const section = page.getByRole("region", { name: "Currículos e cartas" });

@@ -18,6 +18,8 @@ const STATUS: Record<SessionStateError["code"], 404 | 409> = {
   no_profile: 409,
   budget_exhausted: 409,
   posting_not_found: 404,
+  document_not_found: 404,
+  busy: 409,
 };
 
 function sessionError(c: Context, e: unknown) {
@@ -165,6 +167,20 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
       return sessionError(c, e);
     }
   });
+
+  // página da vaga › assets: "Regerar com mensagem" abre a conversa da vaga com o documento no contexto
+  app.post(
+    "/api/documents/:id/feedback",
+    validate("json", z.object({ message: z.string().trim().min(1).max(4000) })),
+    (c) => {
+      try {
+        const { message } = c.req.valid("json");
+        return c.json({ session: sessions.openDocumentFeedback(c.req.param("id"), message) }, 201);
+      } catch (e) {
+        return sessionError(c, e);
+      }
+    },
+  );
 
   // F04 §2.8: sessão de clarificação ligada à execução; as correções viram propostas no próprio run
   app.post("/api/ingestions/:id/clarify", (c) => {

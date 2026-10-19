@@ -37,6 +37,26 @@ describe("sandbox de avaliação", () => {
     expect(owner.repos.chatSessions.list({}).length).toBe(before);
   }, 20_000);
 
+  it("caso com open: document_feedback abre pela rota do feedback, sobre o CV pronto da vaga do sandbox", async () => {
+    sb = await openEvalSandbox({ provider: new MockProvider() });
+    const docs = sb.repos.documents.list({ kind: "cv" });
+    expect(docs).toHaveLength(1);
+    expect(docs[0]?.postingId).not.toBeNull();
+    expect(sb.repos.documents.currentVersion(docs[0]?.id ?? "")).toMatchObject({ status: "ready" });
+    const cases = parseEvalCases(
+      '{"id":"feedback","category":"job","open":"document_feedback","messages":["encurte o resumo"],"graders":[{"type":"within_budget","value":"80000"}]}',
+    );
+    const [r] = await runEvalCases(cases, {
+      baseUrl: sb.baseUrl,
+      token: sb.token,
+      turnTimeoutMs: 10000,
+    });
+    expect(r?.error ?? null).toBeNull();
+    const [session] = sb.repos.chatSessions.list({});
+    expect(session?.postingId).toBe(docs[0]?.postingId);
+    expect(session?.title).toContain("· CV");
+  }, 20_000);
+
   it("o /mcp do sandbox exige o token dele; fechar apaga a pasta e derruba o servidor", async () => {
     sb = await openEvalSandbox({ provider: new MockProvider() });
     const noToken = await fetch(`${sb.baseUrl}/api/profiles`);

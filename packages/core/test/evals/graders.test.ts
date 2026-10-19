@@ -21,6 +21,17 @@ describe("F04/M5 · avaliadores do chat", () => {
     expect(r.every((g) => g.passed)).toBe(true);
   });
 
+  it("uses_tool aceita alternativas separadas por | (qualquer uma passa)", () => {
+    const ok = gradeTranscript({ ...transcript, tools: ["cv_get", "cv_edit"] }, [
+      { type: "uses_tool", value: "cv_edit|cv_generate" },
+    ]);
+    expect(ok[0]?.passed).toBe(true);
+    const no = gradeTranscript({ ...transcript, tools: ["cv_get"] }, [
+      { type: "uses_tool", value: "cv_edit|cv_generate" },
+    ]);
+    expect(no[0]?.passed).toBe(false);
+  });
+
   it("acusa tool ausente, ano inventado, falta de fonte e de pedido de confirmação", () => {
     const bad = {
       replies: ["Você trabalhou na Acme em 2015 e foi ótimo."],

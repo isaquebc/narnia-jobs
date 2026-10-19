@@ -79,15 +79,16 @@ export const POSTING_TOOLS = {
     z.object({ id: IdSchema, updated: z.array(z.string()) }),
   ),
   "posting.contact_add": tool(
-    "Registra uma pessoa com quem o usuário falou sobre a vaga (nome, origem e, se houver, e-mail e telefone).",
+    "Registra uma pessoa com quem o usuário falou sobre a vaga (nome, origem e, se houver, e-mail, telefone e o link do perfil no LinkedIn). Se o mesmo LinkedIn ou e-mail já estiver na vaga, devolve esse contato com duplicate: true, sem criar outro.",
     z.object({
       postingId: IdSchema,
       name: z.string().min(1),
       origin: ContactOriginSchema,
       email: z.email().optional(),
       phone: z.string().min(7).optional(),
+      linkedinUrl: z.string().min(1).optional(),
     }),
-    z.object({ id: IdSchema }),
+    z.object({ id: IdSchema, duplicate: z.boolean().optional() }),
   ),
   "posting.note_add": tool(
     "Adiciona uma nota do recrutador à vaga (o que combinaram, próximos passos, impressões).",

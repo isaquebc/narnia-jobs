@@ -95,13 +95,31 @@ export async function runEvalCases(
     });
     let sessionId = "";
     try {
-      sessionId = (
-        await call<{ session: { id: string } }>("/api/sessions", {
-          method: "POST",
-          body: JSON.stringify({ category: c.category, title: `eval: ${c.id}` }),
-        })
-      ).session.id;
+      let first = 0;
+      if (c.open === "document_feedback") {
+        // "Regerar com mensagem": o CV da vaga do sandbox, com a primeira mensagem como feedback
+        const { documents } = await call<{
+          documents: Array<{ document: { id: string; kind: string } }>;
+        }>("/api/documents");
+        const cv = documents.find((d) => d.document.kind === "cv");
+        if (!cv) throw new Error("sandbox sem CV para o feedback");
+        sessionId = (
+          await call<{ session: { id: string } }>(`/api/documents/${cv.document.id}/feedback`, {
+            method: "POST",
+            body: JSON.stringify({ message: c.messages[0] }),
+          })
+        ).session.id;
+        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000);
+        first = 1;
+      } else
+        sessionId = (
+          await call<{ session: { id: string } }>("/api/sessions", {
+            method: "POST",
+            body: JSON.stringify({ category: c.category, title: `eval: ${c.id}` }),
+          })
+        ).session.id;
       for (const [i, text] of c.messages.entries()) {
+        if (i < first) continue;
         await call(`/api/sessions/${sessionId}/messages`, {
           method: "POST",
           body: JSON.stringify({ text }),

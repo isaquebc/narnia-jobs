@@ -49,6 +49,7 @@ rodar `./start.sh promote` e, se mudaram dependências, composes ou a imagem, `m
 ## Recrutador global e vagas (F06)
 
 - O chat é global (F06-8): `chat_session.profile_id` é só contexto; o recrutador geral recebe os cartões de todos os perfis e chama o subagente `recrutador-especializado` (`plugin/agents/recrutador-especializado.md`, mesmo arquivo nos modos A e B). No modo A o subagente roda dentro do turno (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`).
+- Página da vaga: na coluna da pré-análise, os assets (CV e carta pequenos, baixar, "Regerar com mensagem" → `POST /api/documents/:id/feedback` abre a conversa da vaga com a nota `documento-feedback-contexto.md`) e os contatos (fixado + dois últimos, modal com LinkedIn; duplicata por LinkedIn ou e-mail = 409).
 - Vagas: domínio `posting` (`job` é a fila). Link de vaga: fetch simples, JSON-LD e, se falhar, o serviço `browser` (Chromium headless, rede só com o api e o worker, `NARNIA_BROWSER_WS`; no e2e o api não usa, o worker usa para os PDFs). Heurística sem tokens em `packages/core/src/postings/`; extração, junção e duplicata pelo modelo na tarefa `posting.extract`; análise numa conversa `job` com a skill `analisar-vaga`. Plano e decisões F06-1 a F06-17 em `plans/plan-v0/tasks/F06-analisar-vaga.md`.
 
 ## Currículo e carta (F05)

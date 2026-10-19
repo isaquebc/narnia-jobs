@@ -3,6 +3,7 @@ import {
   type JobAnalysis,
   JobAnalysisSchema,
   type Notification,
+  normalizeLinkedinUrl,
   POSTING_TOOLS,
   type Posting,
   type PostingFields,
@@ -286,7 +287,9 @@ export function createPostingTools(
         preAnalysis: brief(preAnalysis as PreAnalysis | null, focus()),
         contacts: repos.postingContacts.list(p.id).map((c) => ({
           id: c.id,
-          line: [c.name, c.origin, c.email, c.phone].filter(Boolean).join(" · "),
+          line: [c.name, c.origin, c.email, c.phone, c.linkedinUrl, c.pinned ? "fixado" : null]
+            .filter(Boolean)
+            .join(" · "),
         })),
         notes: repos.postingNotes.list(p.id).map((n) => ({
           id: n.id,
@@ -322,12 +325,19 @@ export function createPostingTools(
     }),
     "posting.contact_add": wrap("posting.contact_add", (i) => {
       must(i.postingId);
-      const c = repos.postingContacts.add(i.postingId, {
+      const linkedinUrl = i.linkedinUrl ? normalizeLinkedinUrl(i.linkedinUrl) : null;
+      if (i.linkedinUrl && !linkedinUrl)
+        throw new Error("Link do LinkedIn inválido: use o endereço do perfil (linkedin.com/in/…).");
+      const input = {
         name: i.name,
         origin: i.origin,
         email: i.email ?? null,
         phone: i.phone ?? null,
-      });
+        linkedinUrl,
+      };
+      const dup = repos.postingContacts.findDuplicate(i.postingId, input);
+      if (dup) return { id: dup.id, duplicate: true };
+      const c = repos.postingContacts.add(i.postingId, input);
       ctx.ports.changed?.(i.postingId);
       return { id: c.id };
     }),

@@ -27,6 +27,11 @@ const EvalCaseSchema = z.object({
   id: z.string().min(1),
   description: z.string().optional(),
   category: z.enum(["career", "ingest", "clarify", "discovery", "job"]).default("career"),
+  /**
+   * Como a conversa abre: padrão, uma sessão nova; `document_feedback`, pelo "Regerar com mensagem" do CV da vaga do
+   * sandbox (a primeira mensagem é o feedback; a nota com o contexto vai junto).
+   */
+  open: z.enum(["document_feedback"]).optional(),
   messages: z.array(z.string().min(1)).min(1),
   graders: z.array(GraderSchema).min(1),
 });
@@ -114,7 +119,8 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
   return graders.map((g): GradeResult => {
     switch (g.type) {
       case "uses_tool": {
-        const passed = t.tools.includes(g.value ?? "");
+        // "a|b": qualquer uma das tools vale (ex.: cv_edit|cv_generate)
+        const passed = (g.value ?? "").split("|").some((name) => t.tools.includes(name));
         return {
           type: g.type,
           passed,

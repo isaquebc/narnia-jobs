@@ -13,7 +13,7 @@ test("F05/E2E-01 CV do perfil: aba Currículo → Gerar → bandeja → prévia 
   await page.getByRole("button", { name: "Gerar currículo" }).click();
   const dialog = page.getByRole("dialog", { name: "Gerar currículo" });
   await dialog.getByLabel("Instruções (opcional)").fill("dê mais peso à liderança");
-  await dialog.getByRole("button", { name: "Gerar" }).click();
+  await dialog.getByRole("button", { name: "Gerar", exact: true }).click();
   const [doc] = await waitDocuments({ profileId: ids.profileId });
   expect(doc?.current).toMatchObject({ status: "ready" });
   expect(doc?.current?.pagesRendered).toBeLessThanOrEqual(2);

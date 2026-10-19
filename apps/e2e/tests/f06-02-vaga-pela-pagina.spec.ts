@@ -19,7 +19,7 @@ test("F06/E2E-02 vaga pela página: colar, extrair, ver a origem de cada campo, 
   await expect(form.getByText("heurística + modelo").first()).toBeVisible();
   await expect(page.getByText(/Cobertura dos obrigatórios/)).toBeVisible();
   // F05: o "Criar CV" virou o menu "Gerar" (CV · Cover letter)
-  await expect(page.getByRole("button", { name: "Gerar" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "Gerar", exact: true })).toHaveAttribute(
     "aria-haspopup",
     "menu",
   );

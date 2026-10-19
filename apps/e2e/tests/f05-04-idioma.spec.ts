@@ -25,19 +25,19 @@ test("F05/E2E-04 idioma: vaga em inglês sem inglês fluente → pergunta; Parar
   await patchFact("language", ids.languageIds[1] as string, { level: "A2" });
   const p = await intake({ text: JD_EN });
   await login(page, `/vagas/${p.id}`);
-  await page.getByRole("button", { name: "Gerar" }).click();
+  await page.getByRole("button", { name: "Gerar", exact: true }).click();
   await page.getByRole("menuitem", { name: "CV" }).click();
   const dialog = page.getByRole("dialog", { name: "Gerar currículo" });
-  await dialog.getByRole("button", { name: "Gerar" }).click();
+  await dialog.getByRole("button", { name: "Gerar", exact: true }).click();
   await expect(dialog.getByText(/não mostra inglês fluente/)).toBeVisible();
   await dialog.getByRole("button", { name: "Parar" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(await documents({ postingId: p.id })).toEqual([]);
-  await page.getByRole("button", { name: "Gerar" }).click();
+  await page.getByRole("button", { name: "Gerar", exact: true }).click();
   await page.getByRole("menuitem", { name: "CV" }).click();
   await page
     .getByRole("dialog", { name: "Gerar currículo" })
-    .getByRole("button", { name: "Gerar" })
+    .getByRole("button", { name: "Gerar", exact: true })
     .click();
   await page.getByRole("button", { name: "Continuar mesmo assim" }).click();
   const [doc] = await waitDocuments({ postingId: p.id });

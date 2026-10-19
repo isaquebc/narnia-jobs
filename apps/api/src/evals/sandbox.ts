@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import {
+  assembleCv,
+  buildCvBrief,
+  buildCvHeader,
   createRepos,
   enqueueTask,
   type FixtureName,
@@ -15,7 +18,7 @@ import {
   seedFixture,
   stageJobId,
 } from "@narnia-jobs/core";
-import type { Provider } from "@narnia-jobs/providers";
+import { MockProvider, type Provider } from "@narnia-jobs/providers";
 import { createApp } from "../app";
 import { SessionManager } from "../chat/session-manager";
 import { EventBus } from "../events";
@@ -79,7 +82,8 @@ export async function openEvalSandbox(o: {
   const db = openDatabase(join(dir, "narnia.sqlite"));
   migrate(db);
   const repos = createRepos(db);
-  seedFixture(repos, o.fixture ?? "engineer");
+  const seeded = seedFixture(repos, o.fixture ?? "engineer");
+  await seedPostingCv(repos, seeded.profileId);
   const token = randomBytes(24).toString("hex");
   const bus = new EventBus();
   let handler: ((req: Request) => Response | Promise<Response>) | null = null;
@@ -131,4 +135,54 @@ export async function openEvalSandbox(o: {
       rmSync(dir, { recursive: true, force: true });
     },
   };
+}
+
+/**
+ * Vaga com um CV pronto (casos `open: document_feedback`): o rascunho é o do mock, determinístico, mesmo quando a
+ * rodada usa o modelo real (o preparo não gasta tokens; o que se avalia é a conversa de feedback).
+ */
+async function seedPostingCv(repos: Repos, profileId: string) {
+  const posting = repos.postings.create({
+    company: "Globex Consultoria",
+    role: "backend",
+    title: "Desenvolvedora Backend Sênior",
+    jdText:
+      "Desenvolvedora Backend Sênior. Requisitos: Node.js, TypeScript, PostgreSQL e Kubernetes. Diferenciais: AWS e Kafka.",
+  });
+  const doc = repos.documents.create({
+    kind: "cv",
+    profileId,
+    postingId: posting.id,
+    templateId: "classico",
+    paper: "A4",
+    locale: "pt-BR",
+    format: "pdf",
+  });
+  const version = repos.documents.addVersion(doc.id, {
+    source: "agent",
+    instructions: null,
+    factsVersion: repos.settings.getFactsVersion(),
+    postingUpdatedAt: posting.contentUpdatedAt,
+    profileHash: "avaliacao",
+  });
+  const { brief } = buildCvBrief(repos, {
+    kind: "cv",
+    profileId,
+    postingId: posting.id,
+    locale: "pt-BR",
+    instructions: null,
+    previousIssues: [],
+  });
+  const draft = (await new MockProvider().cvGenerate({ brief, model: "mock" })).output;
+  const { content } = assembleCv(repos, brief, draft, {
+    meta: {
+      locale: "pt-BR",
+      paper: "A4",
+      profileId,
+      postingId: posting.id,
+      generatedAt: new Date().toISOString(),
+    },
+    header: buildCvHeader(repos, profileId, "pt-BR"),
+  });
+  repos.documents.updateVersion(version.id, { status: "ready", content });
 }

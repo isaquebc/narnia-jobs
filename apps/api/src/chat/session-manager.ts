@@ -2,6 +2,7 @@ import {
   cardUpdatedNote,
   friendlyError,
   gradeTranscript,
+  isVersionActive,
   newId,
   notifyAnalysisIncomplete,
   POSTING_MODEL_DEFAULTS,
@@ -59,7 +60,9 @@ export class SessionStateError extends Error {
       | "session_archived"
       | "no_profile"
       | "budget_exhausted"
-      | "posting_not_found",
+      | "posting_not_found"
+      | "document_not_found"
+      | "busy",
     message: string,
   ) {
     super(message);
@@ -311,6 +314,43 @@ export class SessionManager {
     return this.get(session.id);
   }
 
+  /**
+   * "Regerar com mensagem" (página da vaga › assets, 2026-10-19): feedback humano sobre o CV ou a carta. Conversa
+   * `job` ligada à vaga (título "<vaga> · CV"), a mensagem do usuário aparece como dele e o modelo recebe a nota com o
+   * documento, a versão e a vaga; o recrutador refaz com `cv_edit` ou `cv_generate`.
+   */
+  openDocumentFeedback(documentId: string, message: string): ChatSession {
+    const doc = this.repos.documents.get(documentId);
+    if (!doc) throw new SessionStateError("document_not_found", "Documento não encontrado.");
+    const current = this.repos.documents.currentVersion(doc.id);
+    if (current && isVersionActive(current))
+      throw new SessionStateError(
+        "busy",
+        "Este documento está sendo gerado agora; espere terminar.",
+      );
+    const posting = doc.postingId ? this.repos.postings.get(doc.postingId) : null;
+    const label = doc.kind === "cv" ? "CV" : "Carta";
+    const title = posting
+      ? `${postingSessionTitle(posting)} · ${label}`
+      : `${label} · ${this.repos.profiles.get(doc.profileId)?.name ?? "perfil"}`;
+    const session = this.create({ category: "job", title, profileId: doc.profileId });
+    if (posting) this.repos.chatSessions.setPosting(session.id, posting.id);
+    const note = renderNote(readPluginFile("prompts/documento-feedback-contexto.md"), {
+      documento: doc.kind === "cv" ? "o CV" : "a carta de apresentação",
+      document_id: doc.id,
+      version: String(current?.version ?? doc.currentVersion),
+      profile_id: doc.profileId,
+      kind: doc.kind,
+      vaga: posting ? ` para a vaga ${posting.id} ("${postingSessionTitle(posting)}")` : "",
+      ler_vaga: posting ? ` e a vaga com \`posting_get\` (id ${posting.id})` : "",
+      posting_arg: posting ? `, postingId ${posting.id}` : "",
+      mensagem: message.trim(),
+    });
+    this.send(session.id, note, { display: message.trim(), asUser: true });
+    this.emitState(session.id, session.state, session.category);
+    return this.get(session.id);
+  }
+
   private open(session: ChatSession): Live {
     // recrutador geral (F06-8): todos os perfis no prompt, persona do perfil ativo
     const ctx = recruiterContext(this.repos);
@@ -377,7 +417,11 @@ export class SessionManager {
    * `system`: turno aberto pelo sistema (aviso de ingestão pronta): a conversa mostra só `display` como nota e o texto
    * vai ao agente sem virar mensagem do usuário.
    */
-  send(id: string, text: string, system?: { display: string }): { turnIndex: number } {
+  send(
+    id: string,
+    text: string,
+    system?: { display: string; asUser?: boolean },
+  ): { turnIndex: number } {
     const session = this.get(id);
     if (session.state === "archived")
       throw new SessionStateError(
@@ -434,7 +478,8 @@ export class SessionManager {
     this.repos.chatMessages.add({
       sessionId: id,
       turnIndex,
-      role: system ? "system_note" : "user",
+      // nota com contexto e o pedido do usuário: na conversa aparece só o que ele escreveu, como mensagem dele
+      role: system && !system.asUser ? "system_note" : "user",
       contentMd: system ? system.display : text,
       toolCalls: [],
       usage: null,
