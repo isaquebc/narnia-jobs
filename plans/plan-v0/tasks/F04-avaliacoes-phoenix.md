@@ -12,6 +12,7 @@ Status: **M1–M5 implementados** (2026-10-13, provados com o mock na instância
 | AV-2 | O Phoenix chama o modelo por uma **ponte pela assinatura** (endpoint compatível com a API de mensagens da Anthropic, servido pela api com o Agent SDK). Configurável no Phoenix (AI Providers: editar a ponte ou usar uma chave de API) e no menu Configurações › Avaliações. | 2026-10-13 |
 | AV-3 | Os prompts que dependem das tools do `/mcp` (recrutador, notas, skills) rodam pelo nosso comando num **perfil temporário** criado das fixtures e apagado no fim (conversas, fontes e ingestões junto); assim a rodada vale também na instância do dono sem tocar no perfil real. | 2026-10-13 |
 | AV-4 | O repositório continua a fonte dos prompts; a sincronização cria uma versão no Phoenix por mudança (metadata com o commit) e a tag `production` marca a versão em uso. O app nunca lê prompt do Phoenix. | proposta aceita em 2026-10-13 |
+| AV-5 | **Gate pairwise: prompt só é trocado se for upgrade.** Para cada caso, o prompt novo contra a saída da versão aprovada (guardada no experimento dela no Phoenix); um juiz cego escolhe A, B ou empate com o motivo, julgando cada par duas vezes com a ordem trocada (discordância = empate). Passa só com as duas condições: nenhum avaliador cai mais de 5 pontos no gate atual (F06-14) **e** vitórias > derrotas, sem contar empates (só empatar não passa). Correção de um caso específico: o caso corrigido é ganho e nenhum outro é perdido. Resultado como experimento comparativo no Phoenix. | 2026-10-21 |
 | AV-3 (revisão) | **Premissa errada:** os fatos (experiências, formação, skills) são do usuário, não do perfil; um perfil temporário não isola nada. **Decisão do dono: banco temporário isolado** (SQLite descartável com fixture fictícia, app e `/mcp` próprios em 127.0.0.1, token próprio, apagado no fim). | 2026-10-13 |
 
 ## 2 · Viabilidade (verificada no código do Phoenix 20.21)
@@ -30,6 +31,7 @@ Status: **M1–M5 implementados** (2026-10-13, provados com o mock na instância
 4. **M4 · Juízes** (avaliadores com modelo) com o padrão de entrega de cada prompt.
 5. **M5 · Comando dos prompts com tools** em perfil temporário, experimentos com os mesmos avaliadores.
 6. **M6 · Documentação e e2e.**
+7. **M7 · Gate pairwise (AV-5):** saída da versão aprovada guardada e recuperável, juiz comparativo por prompt (ordem trocada), placar e regra de passagem no `--gate`, experimento comparativo no Phoenix, documentação no CLAUDE.md. Antes da F12.
 
 ## 4 · Registro
 

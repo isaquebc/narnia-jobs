@@ -14,6 +14,7 @@ Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo
 | [F07-candidaturas](F07-candidaturas.md) | F5.3 | kanban, agenda com link/`.ics`, integração opcional com o MCP oficial do Google Calendar | F04, F06 |
 | [F09-carta-e-linkedin](F09-carta-e-linkedin.md) | F5.5/5.6 | mensagem curta a recrutador e otimização de LinkedIn (a carta foi para a F05, F05-21) | F05, F07 |
 | [F08-entrevista-voz](F08-entrevista-voz.md) | F5.4 | entrevista mãos livres com Whisper local + TTS local (padrão de N provedores), só modo A | F04, F07 |
+| [F12-extensao-navegador](F12-extensao-navegador.md) | F5 | extensão do Chrome: captura de vagas e janela de ajuda nos formulários de candidatura (Haiku localiza, skill sugere, copiar/refazer/chat); análise do perfil do LinkedIn (F12-7) | F04, F05, F06; gate pairwise (F04-avaliacoes M7) |
 | [F11-provider-codex](F11-provider-codex.md) | — | segundo provider (Codex) nos modos A e B; exige verificação documental antes de implementar | F04, F10 |
 
 ## Ordem sugerida (ondas)
@@ -23,6 +24,7 @@ Onda 1  F01
 Onda 2  F02 ──► F03 ──► F04   (decisão do dono, 2026-10-09: F03 antes da F04; o botão "Clarificar" fica desabilitado até a F04)
 Onda 3  F10
 Onda 4  F06 ──► F05 ──► F07  (features; o dono pôs a F06 antes da F05 em 2026-10-14)
+Onda 4b gate pairwise (F04-avaliacoes M7) ──► F12 ──► F07   (decisão do dono, 2026-10-21: extensão antes das candidaturas)
 Onda 5  F09   F08
 Onda 6  F11
 ```
