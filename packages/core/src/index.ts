@@ -30,6 +30,7 @@ export * from "./estimate";
 export * from "./evals/baseline";
 export * from "./evals/bridge-settings";
 export * from "./evals/graders";
+export * from "./evals/pairwise";
 export * from "./evals/prompt-evaluators";
 export * from "./extract";
 export * from "./ids";

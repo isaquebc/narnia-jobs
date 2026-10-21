@@ -18,6 +18,7 @@ import { createApp } from "./app";
 import { generateBootToken } from "./auth";
 import { bootData } from "./boot";
 import { SessionManager } from "./chat/session-manager";
+import { syncApproved } from "./evals/approved-sync";
 import { syncEvaluators } from "./evals/eval-sync";
 import { bridgeUrlForPhoenix, createPhoenixAdmin, phoenixBaseUrl } from "./evals/phoenix-admin";
 import { gitCommit, setupPhoenix } from "./evals/phoenix-setup";
@@ -106,6 +107,8 @@ if (await initTelemetry(process.env, "narnia-api"))
           commit: gitCommit(),
         }),
         evaluators: await syncEvaluators({ baseUrl: phoenixUrl, customProviderId }),
+        // versões aprovadas do git (AV-6) depois dos datasets, que elas usam
+        approved: await syncApproved({ baseUrl: phoenixUrl }),
       }),
     })
       .then((r) => {

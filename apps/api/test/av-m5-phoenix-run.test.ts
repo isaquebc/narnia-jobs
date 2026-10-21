@@ -12,7 +12,7 @@ const MULTIPART =
   part({
     __typename: "ChatCompletionSubscriptionResult",
     datasetExampleId: "e1",
-    experimentRun: { id: "R1" },
+    experimentRun: { id: "R1", output: { messages: [{ role: "assistant", content: "{}" }] } },
   }) +
   part({
     __typename: "EvaluationChunk",
@@ -129,6 +129,31 @@ describe("experimento de prompt no Phoenix", () => {
         padrao_de_entrega: { mean: 0.5, n: 1, failed: ["cv-completo: faltou a formação"] },
       },
       evaluatorErrors: ["json_schema (cv-ingles): sem saída"],
+      // M7: saída e notas por exemplo, para o pairwise e a versão aprovada
+      examples: [
+        {
+          exampleId: "cv-completo",
+          runId: "R1",
+          output: { messages: [{ role: "assistant", content: "{}" }] },
+          evaluations: [
+            { name: "json_schema", kind: "CODE", label: "passou", score: 1, explanation: "ok" },
+            {
+              name: "padrao_de_entrega",
+              kind: "LLM",
+              label: "parcial",
+              score: 0.5,
+              explanation: "faltou a formação",
+            },
+          ],
+        },
+        {
+          exampleId: "cv-ingles",
+          runId: null,
+          output: null,
+          evaluations: [],
+          error: "Limite da assinatura",
+        },
+      ],
     });
   });
 });

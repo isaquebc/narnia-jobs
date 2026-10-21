@@ -9,6 +9,8 @@ import type { SyncResult } from "./prompt-sync";
 export interface FullSync {
   prompts: SyncResult[];
   evaluators: EvalSyncResult;
+  /** Versões aprovadas ingeridas como experimento (AV-6). */
+  approved?: { ingested: number; skipped: number };
 }
 
 /**

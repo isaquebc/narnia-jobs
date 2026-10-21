@@ -7,6 +7,7 @@ import { authMiddleware, enterHandler } from "./auth";
 import { bridgeRoutes } from "./bridge/anthropic";
 import { SessionManager } from "./chat/session-manager";
 import { apiError } from "./errors";
+import { syncApproved } from "./evals/approved-sync";
 import { syncEvaluators } from "./evals/eval-sync";
 import { bridgeUrlForPhoenix, createPhoenixAdmin, phoenixBaseUrl } from "./evals/phoenix-admin";
 import { gitCommit } from "./evals/phoenix-setup";
@@ -170,6 +171,8 @@ export function createApp(deps: AppDeps) {
                     commit: gitCommit(),
                   }),
                   evaluators: await syncEvaluators({ baseUrl: phoenixUrl, customProviderId }),
+                  // versões aprovadas do git (AV-6) depois dos datasets, que elas usam
+                  approved: await syncApproved({ baseUrl: phoenixUrl }),
                 };
               }
             : null,

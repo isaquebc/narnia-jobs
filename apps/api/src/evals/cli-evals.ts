@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   mkdirSync,
@@ -22,12 +23,15 @@ import {
 } from "@narnia-jobs/core";
 import { createProviderFromEnv, type Provider, STRUCTURED_PROMPTS } from "@narnia-jobs/providers";
 import { type CvContent, contentTracingEnabled } from "@narnia-jobs/shared";
-import { BaselineGate, gateFlags } from "./baseline-file";
+import { BaselineGate, gateFlags, type PairRun } from "./baseline-file";
 import { syncChatJudge, syncEvaluators } from "./eval-sync";
 import { chatJudge, judgeFor } from "./judges";
 import { judgeLocally, type LocalEvaluation, recordLocalExperiment } from "./local-eval";
+import { PAIRWISE_NAME } from "./pairwise";
 import { recordPhoenixExperiment } from "./phoenix";
 import { createPhoenixAdmin, phoenixBaseUrl } from "./phoenix-admin";
+import { gitCommit } from "./phoenix-setup";
+import { promptCatalog } from "./prompt-catalog";
 import { datasetRows, PROMPT_DATASETS } from "./prompt-datasets";
 import { promptEvaluators } from "./prompt-evaluators";
 import { runEvalCases } from "./run";
@@ -64,6 +68,18 @@ async function context(): Promise<Ctx> {
     customProviderId: status?.providerId ?? null,
   };
 }
+
+/** Chave da versão aprovada das conversas (AV-6) e versão: hash de tudo o que o recrutador usa. */
+const CHAT_KEY = "narnia-chat";
+const chatVersion = () =>
+  createHash("sha256")
+    .update(
+      promptCatalog()
+        .filter((p) => p.kind !== "structured")
+        .map((p) => `${p.name}:${p.hash}`)
+        .join("\n"),
+    )
+    .digest("hex");
 
 const mark = (score: number) => (score >= 1 ? "✔" : score >= 0.5 ? "~" : "✘");
 
@@ -129,6 +145,47 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
       gate.record("chat:juiz", {
         media: judged.reduce((sum, j) => sum + j.score, 0) / judged.length,
       });
+    // M7: a conversa depende do recrutador, do especializado, das notas e das skills; qualquer um mudou = versão nova
+    if (gate && only.length === 0) {
+      const cmp = await gate.pairwise(CHAT_KEY, {
+        versionId: chatVersion(),
+        commit: gitCommit(),
+        judge,
+        provider: ctx.provider,
+        runs: report.flatMap((r): PairRun[] => {
+          const c = cases.find((x) => x.id === r.id);
+          if (!c) return [];
+          return [
+            {
+              exampleId: r.id,
+              ctx: { input: { messages: c.messages, context: r.context ?? "" } },
+              output: { replies: r.replies, tools: r.tools },
+              evaluations: [
+                ...r.results.map((g) => ({
+                  name: g.type,
+                  kind: "CODE" as const,
+                  label: g.passed ? "passou" : "falhou",
+                  score: g.passed ? 1 : 0,
+                  explanation: g.detail,
+                })),
+                ...(r.judges ?? []).map((j) => ({ ...j, kind: "LLM" as const })),
+              ],
+              error: r.error,
+            },
+          ];
+        }),
+      });
+      // no experimento do Phoenix, o resultado do pairwise de cada conversa vai junto dos juízes
+      for (const x of cmp.cases) {
+        const r = report.find((y) => y.id === x.exampleId);
+        r?.judges?.push({
+          name: PAIRWISE_NAME,
+          label: x.outcome,
+          score: x.outcome === "ganhou" ? 1 : x.outcome === "empate" ? 0.5 : 0,
+          explanation: x.explanation,
+        });
+      }
+    }
     if (ctx.phoenix && report.length > 0) {
       const exp = await recordPhoenixExperiment(cases, report, {
         baseUrl: ctx.phoenix,
@@ -241,6 +298,7 @@ async function cvReview(ctx: Ctx, gate?: BaselineGate): Promise<number> {
   let failed = 0;
   let errors = 0;
   const runs: Parameters<typeof recordLocalExperiment>[0]["runs"] = [];
+  const pairRuns: PairRun[] = [];
   for (const [i, example] of examples.entries()) {
     const dir = mkdtempSync(join(tmpdir(), "narnia-cv-review-"));
     const startedAt = new Date().toISOString();
@@ -306,12 +364,43 @@ async function cvReview(ctx: Ctx, gate?: BaselineGate): Promise<number> {
       ...(error ? { error } : {}),
       evaluations,
     });
+    pairRuns.push({
+      exampleId: example.id,
+      ctx: {
+        input: { ...row?.input, pdf_text: pdfText },
+        reference: example.reference,
+        metadata: row?.metadata,
+      },
+      output: { messages: [{ role: "assistant", content: JSON.stringify(output) }] },
+      evaluations,
+      error,
+    });
   }
   gate?.record(
     STRUCTURED_PROMPTS.cvReview.name,
     Object.fromEntries([...scores].map(([k, v]) => [k, v.reduce((a, b) => a + b, 0) / v.length])),
     { errors },
   );
+  const version = promptCatalog().find((p) => p.name === STRUCTURED_PROMPTS.cvReview.name)?.hash;
+  if (gate && version) {
+    const cmp = await gate.pairwise(STRUCTURED_PROMPTS.cvReview.name, {
+      versionId: version,
+      commit: gitCommit(),
+      judge: judgeFor("cvReview"),
+      provider: ctx.provider,
+      runs: pairRuns,
+    });
+    for (const x of cmp.cases)
+      runs
+        .find((r) => r.exampleId === x.exampleId)
+        ?.evaluations.push({
+          name: PAIRWISE_NAME,
+          kind: "LLM",
+          label: x.outcome,
+          score: x.outcome === "ganhou" ? 1 : x.outcome === "empate" ? 0.5 : 0,
+          explanation: x.explanation,
+        });
+  }
   if (ctx.phoenix) {
     await syncEvaluators({ baseUrl: ctx.phoenix, customProviderId: ctx.customProviderId });
     const exp = await recordLocalExperiment(

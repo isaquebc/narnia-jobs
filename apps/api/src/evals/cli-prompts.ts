@@ -1,9 +1,13 @@
+import { createProviderFromEnv, STRUCTURED_PROMPTS } from "@narnia-jobs/providers";
 import { BaselineGate, gateFlags } from "./baseline-file";
 import { syncEvaluators } from "./eval-sync";
+import { judgeFor } from "./judges";
+import { recordPairwiseEvaluations } from "./pairwise";
 import { createPhoenixAdmin, phoenixBaseUrl } from "./phoenix-admin";
 import { runPromptExperiment } from "./phoenix-run";
 import { gitCommit } from "./phoenix-setup";
 import { promptCatalog } from "./prompt-catalog";
+import { datasetRows } from "./prompt-datasets";
 import { syncPrompts } from "./prompt-sync";
 
 /**
@@ -12,7 +16,9 @@ import { syncPrompts } from "./prompt-sync";
  * modelo pela ponte da assinatura, avaliadores rodando no Phoenix). Não grava nada no banco do narnia-jobs além do uso
  * no medidor. Prompts que usam tools (leitura do PDF) ficam de fora: o Playground não executa tools. `--gate` falha
  * quando um avaliador cai abaixo da linha de base de `evals/baselines.json` (F06-14); `--update-baseline` grava as
- * notas desta rodada como a nova linha de base, se não houver regressão.
+ * notas desta rodada como a nova linha de base, se não houver regressão. Com `--gate` ou `--update-baseline`, o prompt que
+ * mudou é comparado com a versão aprovada (`evals/approved/`, M7): só passa se for upgrade (AV-5); `--fixes=id,…`
+ * marca os casos que a mudança corrige.
  */
 export async function runPromptEvals(args: string[]): Promise<number> {
   const strict = args.includes("--strict");
@@ -46,6 +52,7 @@ export async function runPromptEvals(args: string[]): Promise<number> {
       (only.length === 0 || only.includes(p.name)),
   );
   let failed = 0;
+  const provider = createProviderFromEnv();
   for (const def of targets) {
     try {
       const r = await runPromptExperiment(def, {
@@ -68,6 +75,34 @@ export async function runPromptEvals(args: string[]): Promise<number> {
         Object.fromEntries(Object.entries(r.scores).map(([k, v]) => [k, v.mean])),
         { versionId: def.hash, errors: r.errors.length, ...(commit ? { commit } : {}) },
       );
+      const op = Object.values(STRUCTURED_PROMPTS).find((s) => s.name === def.name)?.operation;
+      if (op) {
+        const rows = new Map(datasetRows(op).map((row) => [row.metadata.id, row]));
+        const cmp = await gate.pairwise(def.name, {
+          versionId: def.hash,
+          commit,
+          judge: judgeFor(op),
+          provider,
+          runs: r.examples.map((e) => {
+            const row = rows.get(e.exampleId);
+            return {
+              exampleId: e.exampleId,
+              ctx: { input: row?.input, reference: row?.output, metadata: row?.metadata },
+              output: e.output,
+              evaluations: e.evaluations,
+              error: e.error ?? (e.runId ? undefined : "sem execução"),
+            };
+          }),
+        });
+        const runIds = new Map(r.examples.map((e) => [e.exampleId, e.runId]));
+        await recordPairwiseEvaluations(
+          cmp.cases.flatMap((c) => {
+            const runId = runIds.get(c.exampleId);
+            return runId ? [{ runId, outcome: c.outcome, explanation: c.explanation }] : [];
+          }),
+          { baseUrl },
+        );
+      }
     } catch (e) {
       failed++;
       console.log(`\n${def.name} · erro: ${(e as Error).message}`);

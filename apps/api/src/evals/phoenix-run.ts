@@ -1,3 +1,5 @@
+import type { ApprovedEvaluation } from "@narnia-jobs/core";
+import { JUDGE_NAME } from "./judges";
 import type { PromptDef } from "./prompt-catalog";
 import { promptVersionInput } from "./prompt-sync";
 
@@ -18,6 +20,14 @@ export interface PromptExperimentResult {
   /** Média por avaliador e os exemplos abaixo de 1 (com a explicação). */
   scores: Record<string, { mean: number; n: number; failed: string[] }>;
   evaluatorErrors: string[];
+  /** Por exemplo (id do narnia-jobs): execução, saída e notas, para o pairwise (M7) e a versão aprovada (AV-6). */
+  examples: Array<{
+    exampleId: string;
+    runId: string | null;
+    output: unknown;
+    evaluations: ApprovedEvaluation[];
+    error?: string;
+  }>;
 }
 
 const SUBSCRIPTION = `subscription($i: ChatCompletionOverDatasetInput!) {
@@ -25,7 +35,7 @@ const SUBSCRIPTION = `subscription($i: ChatCompletionOverDatasetInput!) {
     __typename
     datasetExampleId
     ... on ChatCompletionSubscriptionExperiment { experiment { id } }
-    ... on ChatCompletionSubscriptionResult { experimentRun { id } }
+    ... on ChatCompletionSubscriptionResult { experimentRun { id output } }
     ... on ChatCompletionSubscriptionError { message }
     ... on EvaluationChunk { evaluatorName error experimentRunEvaluation { name label score explanation } }
   }
@@ -61,11 +71,13 @@ type Chunk = {
   __typename: string;
   datasetExampleId?: string;
   experiment?: { id: string };
+  experimentRun?: { id: string; output: unknown } | null;
   message?: string;
   evaluatorName?: string;
   error?: string | null;
   experimentRunEvaluation?: {
     name: string;
+    label?: string | null;
     score: number | null;
     explanation: string | null;
   } | null;
@@ -171,15 +183,31 @@ export async function runPromptExperiment(
     errors: [],
     scores: {},
     evaluatorErrors: [],
+    examples: [],
+  };
+  const byExample = new Map<string, PromptExperimentResult["examples"][number]>();
+  const exampleOf = (id: string | undefined) => {
+    const key = ex(id);
+    let e = byExample.get(key);
+    if (!e) {
+      e = { exampleId: key, runId: null, output: null, evaluations: [] };
+      byExample.set(key, e);
+    }
+    return e;
   };
   const acc: Record<string, { sum: number; n: number; failed: string[] }> = {};
   for (const c of chunks) {
     if (c.__typename === "ChatCompletionSubscriptionExperiment")
       out.experimentId = c.experiment?.id ?? null;
-    else if (c.__typename === "ChatCompletionSubscriptionResult") out.runs++;
-    else if (c.__typename === "ChatCompletionSubscriptionError")
+    else if (c.__typename === "ChatCompletionSubscriptionResult") {
+      out.runs++;
+      const e = exampleOf(c.datasetExampleId);
+      e.runId = c.experimentRun?.id ?? null;
+      e.output = c.experimentRun?.output ?? null;
+    } else if (c.__typename === "ChatCompletionSubscriptionError") {
       out.errors.push(`${ex(c.datasetExampleId)}: ${c.message}`);
-    else if (c.__typename === "EvaluationChunk") {
+      exampleOf(c.datasetExampleId).error = c.message ?? "erro do modelo";
+    } else if (c.__typename === "EvaluationChunk") {
       const ev = c.experimentRunEvaluation;
       if (c.error || !ev || ev.score === null) {
         out.evaluatorErrors.push(
@@ -189,6 +217,13 @@ export async function runPromptExperiment(
       }
       const a = acc[ev.name] ?? { sum: 0, n: 0, failed: [] };
       acc[ev.name] = a;
+      exampleOf(c.datasetExampleId).evaluations.push({
+        name: ev.name,
+        kind: ev.name === JUDGE_NAME ? "LLM" : "CODE",
+        label: ev.label ?? "",
+        score: ev.score,
+        explanation: ev.explanation ?? "",
+      });
       a.sum += ev.score;
       a.n++;
       if (ev.score < 1) a.failed.push(`${ex(c.datasetExampleId)}: ${ev.explanation ?? ""}`);
@@ -196,5 +231,6 @@ export async function runPromptExperiment(
   }
   for (const [name, a] of Object.entries(acc))
     out.scores[name] = { mean: a.sum / a.n, n: a.n, failed: a.failed };
+  out.examples = [...byExample.values()];
   return out;
 }

@@ -53,6 +53,17 @@
     },
     "updatedAt": "2026-10-15T01:21:11.105Z"
   },
+  "narnia-chat-title": {
+    "scores": {
+      "cobertura_da_referencia": 0.667,
+      "idioma": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 0.667
+    },
+    "versionId": "99edb633f55afa93b9c37ec66cb480aa0536d231701a9b479f766f0d24ddc193",
+    "commit": "af9f29d",
+    "updatedAt": "2026-10-21T19:36:39.990Z"
+  },
   "narnia-cover-letter-generate": {
     "scores": {
       "cobertura_da_referencia": 1,
@@ -60,8 +71,8 @@
       "json_schema": 1,
       "origens_do_resumo": 1,
       "padrao_de_entrega": 1,
-      "tamanho_da_carta": 1,
-      "sem_termo_sem_evidencia": 1
+      "sem_termo_sem_evidencia": 1,
+      "tamanho_da_carta": 1
     },
     "versionId": "2bd1f15622671bd0e231ef2525a4e9225efc25c3823b96b34a474b0a0749499b",
     "commit": "15aae49",

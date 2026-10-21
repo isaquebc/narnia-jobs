@@ -27,7 +27,7 @@ export function resolvePath(ctx: unknown, path: string): unknown {
   return cur;
 }
 
-const asText = (v: unknown) =>
+export const asText = (v: unknown) =>
   v === undefined
     ? ""
     : typeof v === "string"
@@ -80,7 +80,13 @@ export interface LocalRun {
 
 /** Grava um experimento no dataset do Phoenix: uma execução por exemplo conhecido e as avaliações de cada uma. */
 export async function recordLocalExperiment(
-  e: { dataset: string; name: string; description?: string; runs: LocalRun[] },
+  e: {
+    dataset: string;
+    name: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+    runs: LocalRun[];
+  },
   o: { baseUrl: string; fetch?: FetchLike },
 ): Promise<{ experimentId: string; runs: number }> {
   const f: FetchLike = o.fetch ?? ((url, init) => fetch(url, init));
@@ -113,7 +119,7 @@ export async function recordLocalExperiment(
     {
       name: e.name,
       description: e.description ?? "narnia-jobs: rodada do comando de avaliações",
-      metadata: { source: "narnia-jobs evals" },
+      metadata: { source: "narnia-jobs evals", ...e.metadata },
     },
   );
   let runs = 0;
