@@ -229,23 +229,33 @@ export function buildCvBrief(
     .sort((a, b) => b.matchScore - a.matchScore)
     .slice(0, MAX_PROJECTS);
 
-  const evidenced = (term: string) =>
-    keywords.some((k) => k.term === term && k.evidence.length > 0) ||
-    facts.skills.some((s) => visible("skill", s.id) && termInText(aliases(term), s.name)) ||
-    included.some((x) =>
-      termInText(
-        aliases(term),
-        [...x.e.tech, x.e.summary ?? "", ...x.achievements.map((a) => a.text)].join(" "),
-      ),
-    );
+  // evidência só conta no que o gerador recebe: termo achado em fato oculto, experiência omitida ou skill/projeto
+  // fora do corte não tem como entrar no texto e reprovaria o ATS em toda tentativa
+  const cvText = [
+    ...skills.map((s) => s.name),
+    ...projects.flatMap((p) => [p.name, p.description ?? "", ...p.tech]),
+    ...included.flatMap((x) => [
+      ...x.e.tech,
+      x.e.summary ?? "",
+      ...x.achievements.map((a) => a.text),
+    ]),
+    ...facts.education
+      .filter((e) => visible("education", e.id))
+      .flatMap((e) => [e.course ?? "", e.degree ?? ""]),
+    ...facts.languages.filter((l) => visible("language", l.id)).map((l) => l.name),
+  ].join(" \n ");
   const atsTerms: AtsTerm[] = keywords
     .filter((k) => k.section !== "other")
-    .map((k) => ({
-      term: k.term,
-      aliases: canonicalTerm(k.term)?.aliases ?? [],
-      weight: WEIGHT[k.section],
-      hasEvidence: evidenced(k.term),
-    }));
+    .map((k) => {
+      const hasEvidence = termInText(aliases(k.term), cvText);
+      return {
+        term: k.term,
+        aliases: canonicalTerm(k.term)?.aliases ?? [],
+        weight: WEIGHT[k.section],
+        hasEvidence,
+        outsideCv: !hasEvidence && k.evidence.length > 0,
+      };
+    });
 
   const sourceText = [
     ...included.flatMap((x) => [
@@ -325,7 +335,7 @@ export function buildCvBrief(
     languages: facts.languages
       .filter((l) => visible("language", l.id))
       .map((l) => ({ id: l.id, name: l.name, level: l.level })),
-    gaps: atsTerms.filter((t) => !t.hasEvidence).map((t) => t.term),
+    gaps: atsTerms.filter((t) => !t.hasEvidence && !t.outsideCv).map((t) => t.term),
     instructions: input.instructions,
     previousIssues: input.previousIssues,
   };

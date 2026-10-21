@@ -417,6 +417,14 @@ async function renderAndCheck(
         message: `A vaga pede ${brief.gaps.join(", ")}, sem registro nos seus dados.`,
         where: null,
       });
+    const outside = atsTerms.filter((t) => t.outsideCv).map((t) => t.term);
+    if (outside.length)
+      issues.push({
+        area: "ats",
+        severity: "warning",
+        message: `A vaga pede ${outside.join(", ")}: está nos seus dados, mas fora deste CV (oculto ou menos aderente). Mostre o item no perfil e use Atualizar para incluir.`,
+        where: null,
+      });
   }
   return {
     issues,

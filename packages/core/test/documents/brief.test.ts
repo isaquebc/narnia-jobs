@@ -178,6 +178,30 @@ describe("F05/M2 core · resumo do gerador", () => {
     expect(k8s?.matchScore).toBeGreaterThan(go?.matchScore ?? 100);
   });
 
+  it("termo com evidência só fora do CV (skill oculta): não conta na nota ATS nem vira lacuna", () => {
+    const { r, ids } = setup();
+    const posting = postingFor(r);
+    const terraform = r.facts.skills.list().find((s) => s.name === "Terraform");
+    r.emphasis.replace(ids.profileId, [
+      { kind: "skill", id: terraform?.id as string, mode: "hidden" },
+    ]);
+    const { brief, atsTerms } = buildCvBrief(r, {
+      kind: "cv",
+      profileId: ids.profileId,
+      postingId: posting.id,
+      locale: "en-US",
+      instructions: null,
+      previousIssues: [],
+    });
+    expect(brief.skills.map((s) => s.name)).not.toContain("Terraform");
+    expect(atsTerms.find((t) => t.term === "Terraform")).toMatchObject({
+      hasEvidence: false,
+      outsideCv: true,
+    });
+    expect(brief.gaps).not.toContain("Terraform");
+    expect(atsTerms.find((t) => t.term === "Kafka")).toMatchObject({ outsideCv: false });
+  });
+
   it("carreira longa: as de score baixo e antigas viram roteiro de entrevista; no máximo 6 no CV", () => {
     const { r, ids } = setup("long");
     const posting = postingFor(r);

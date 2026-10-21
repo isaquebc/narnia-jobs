@@ -11,6 +11,8 @@ export interface AtsTerm {
   /** Exigido 2, desejável 1. */
   weight: number;
   hasEvidence: boolean;
+  /** Evidência só em fatos fora do CV (ocultos, omitidos, fora do corte): não conta na nota nem é lacuna. */
+  outsideCv?: boolean;
 }
 
 export interface AtsInput {

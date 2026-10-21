@@ -339,6 +339,37 @@ describe("F05/M2 worker · cv.generate", () => {
     expect(done?.textBody).toContain("Initech");
   });
 
+  it("termo da vaga com evidência só em fato oculto: não reprova o ATS e vira aviso", async () => {
+    h = harness();
+    const text = "Backend Engineer\nCompany: Initech\nRequirements:\n- Node.js\n- Terraform";
+    const p = h.repos.postings.create(
+      { company: "Initech", title: "Backend Engineer", jdText: text },
+      { source: "user" },
+    );
+    h.repos.postings.setPreAnalysis(p.id, {
+      version: 1,
+      keywords: matchKeywords(h.repos, analyzePostingText(text).keywords),
+      ngrams: [],
+      sectionsDetected: true,
+      yearsMin: null,
+      coverage: null,
+      risksByProfile: {},
+      createdAt: "2026-10-16T00:00:00Z",
+    });
+    const terraform = h.repos.facts.skills.list().find((s) => s.name === "Terraform");
+    h.repos.emphasis.replace(h.ids.profileId, [
+      { kind: "skill", id: terraform?.id as string, mode: "hidden" },
+    ]);
+    const { doc, v } = newDoc(h, { postingId: p.id, locale: "en-US" });
+    await run(h, doc.id, v.id);
+    const done = h.repos.documents.versionById(v.id);
+    expect(done).toMatchObject({ status: "ready", attempts: 1 });
+    expect(done?.atsScore).toBeGreaterThanOrEqual(90);
+    const ats = done?.review?.issues.filter((i) => i.area === "ats") ?? [];
+    expect(ats.map((i) => i.severity)).toEqual(["warning"]);
+    expect(ats[0]?.message).toMatch(/Terraform.*fora deste CV/);
+  });
+
   it("cv.render (alteração do recrutador): sem o gerador, uma tentativa, conteúdo novo na versão 2", async () => {
     h = harness();
     const { doc, v } = newDoc(h);
