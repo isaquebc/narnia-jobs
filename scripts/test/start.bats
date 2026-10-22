@@ -336,6 +336,35 @@ git_repo() { # git_repo DIR -> repositório git com um commit
   [[ "$output" == *"dono"* ]]
 }
 
+# --- F12 · extensão do Chrome (F12-10): ./start.sh extension e o promote gera junto -------------------------------
+
+@test "extension gera a extensão no código de NARNIA_SRC_DIR e diz a pasta" {
+  mkdir -p "$TMP/src/apps/extension" && echo '{}' > "$TMP/src/apps/extension/package.json"
+  run bash -c "source '$BATS_TEST_DIRNAME/../../start.sh'; require_docker() { :; }; dev_run() { echo \"RUN SRC=\$NARNIA_SRC_DIR \$*\"; }; NARNIA_SRC_DIR='$TMP/src' cmd_extension"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"RUN SRC=$TMP/src"*"@narnia-jobs/extension build"* ]]
+  [[ "$output" == *"$TMP/src/apps/extension/dist"* ]]
+}
+
+@test "extension recusa código sem apps/extension" {
+  run bash -c "source '$BATS_TEST_DIRNAME/../../start.sh'; require_docker() { :; }; NARNIA_SRC_DIR='$TMP/vazio' cmd_extension"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"apps/extension"* ]]
+}
+
+@test "promote gera a extensão no .owner-src; se falhar, só avisa" {
+  git_repo "$TMP/repo"
+  mkdir -p "$TMP/repo/apps/extension" && echo '{}' > "$TMP/repo/apps/extension/package.json"
+  git -C "$TMP/repo" add apps && git -C "$TMP/repo" commit -qm ext
+  run bash -c "cd '$TMP/repo' && source '$BATS_TEST_DIRNAME/../../start.sh' && extension_build() { echo \"\$1\" > '$TMP/built'; } && cmd_promote"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TMP/built")" == "./.owner-src" ]]
+  [[ "$output" == *"Recarregar"* ]]
+  run bash -c "cd '$TMP/repo' && source '$BATS_TEST_DIRNAME/../../start.sh' && extension_build() { return 1; } && cmd_promote"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"./start.sh extension"* ]]
+}
+
 # --- F04/M5 · modo B: install-plugin e diagnóstico no host (claude falso, HOME temporário) ---------------------------
 
 fake_claude() { # registra cada chamada em $TMP/claude.calls; respostas configuráveis por $TMP/claude.mcpget e .pluginlist

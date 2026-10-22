@@ -545,6 +545,33 @@ cmd_promote() {
   fi
   info "instância do dono agora no commit ${sha:0:7} (${dir})."
   info "o hot reload aplica o código; se mudaram dependências, composes ou a imagem: make dev-down && make dev"
+  # F12-10: a extensão do Chrome é carregada de .owner-src/apps/extension/dist; o promote a gera junto
+  if [[ -f "$dir/apps/extension/package.json" ]]; then
+    if extension_build "$dir" >/dev/null 2>&1; then
+      info "extensão do Chrome atualizada em ${dir}/apps/extension/dist: em chrome://extensions, clique em Recarregar no narnia."
+    else
+      info "não consegui gerar a extensão do Chrome agora; rode ./start.sh extension."
+    fi
+  fi
+}
+
+# extension_build DIR -> gera a extensão do Chrome (F12-10) a partir do código em DIR (DIR/apps/extension/dist)
+extension_build() {
+  (
+    export NARNIA_SRC_DIR=$1
+    dev_run sh -c '(test -f node_modules/.modules.yaml && pnpm install --frozen-lockfile --prefer-offline >/dev/null 2>&1 || pnpm install --frozen-lockfile >/dev/null) && pnpm --filter @narnia-jobs/extension build'
+  )
+}
+
+# cmd_extension -> gera a extensão no código desta instância (.owner-src no dono, a raiz no claude)
+cmd_extension() {
+  require_docker
+  local dir=${NARNIA_SRC_DIR:-.}
+  [[ -f "$dir/apps/extension/package.json" ]] || die "este código ainda não tem a extensão (apps/extension); atualize o narnia."
+  extension_build "$dir" || die "não consegui gerar a extensão."
+  info "extensão gerada em ${dir%/}/apps/extension/dist"
+  info "no Chrome: chrome://extensions → Modo do desenvolvedor → Carregar sem compactação (ou Recarregar, se já instalada)."
+  info "passo a passo no narnia: Configurações › Extensão do navegador › Como instalar no Chrome."
 }
 
 # avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
@@ -569,6 +596,7 @@ Uso (produção, só Docker no host):
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
   promote [c]   leva a instância do dono (.owner-src) para um commit verde (padrão HEAD)
+  extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
@@ -612,6 +640,7 @@ main() {
     install-plugin) cmd_install_plugin "$@" ;;
     evals) cmd_evals "$@" ;;
     promote) cmd_promote "$@" ;;
+    extension) cmd_extension ;;
     dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;

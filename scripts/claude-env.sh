@@ -110,7 +110,7 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   api M PATH [B]   chama a API da instância (token já incluso)
   sql "consulta"   consulta somente leitura no SQLite da instância
   logs [svc]       logs da instância
-  test|lint|typecheck|build|e2e|test:sh [args]   comandos do start.sh dentro da instância
+  test|lint|typecheck|build|e2e|test:sh|extension [args]   comandos do start.sh dentro da instância
   doctor | restore ARQ | dev-down                diagnóstico, restauração de backup e derrubar a stack (só desta instância)
   exec CMD [ARGS…] roda um comando no container de dev da instância (ex.: exec pnpm --filter @narnia-jobs/core exec vitest run x)
   evals [chat] [id…] [--strict]  conversas de referência (evals/chat) num banco temporário isolado; Phoenix :${NARNIA_PHOENIX_PORT:-6106}
@@ -132,7 +132,7 @@ main() {
     api) api "$@" ;;
     sql) cmd_env_sql "$@" ;;
     logs) "${DEV_COMPOSE[@]}" --profile app logs -f --tail=100 "$@" ;;
-    test | lint | typecheck | build | e2e | shell | cli | install | test:sh | doctor | restore | dev-down) "$ROOT/start.sh" "$cmd" "$@" ;;
+    test | lint | typecheck | build | e2e | shell | cli | install | test:sh | doctor | restore | dev-down | extension) "$ROOT/start.sh" "$cmd" "$@" ;;
     exec) require_docker; ensure_installed; dev_run "$@" ;;
     evals)
       # prompts (Playground pela ponte) | chat | pdf (banco temporário isolado) | all; sem subcomando = chat

@@ -127,6 +127,32 @@ function Invoke-Promote([string] $Commit = "HEAD") {
   else { git worktree add -q --detach $dir $sha *> $null; if ($LASTEXITCODE -ne 0) { Fail "não consegui criar $dir." } }
   Info "instância do dono agora no commit $($sha.Substring(0,7)) ($dir)."
   Info "o hot reload aplica o código; se mudaram dependências, composes ou a imagem: make dev-down; make dev"
+  # F12-10: a extensão do Chrome é carregada de .owner-src/apps/extension/dist; o promote a gera junto
+  if (Test-Path (Join-Path $dir "apps/extension/package.json")) {
+    if (Build-Extension $dir) { Info "extensão do Chrome atualizada em $dir/apps/extension/dist: em chrome://extensions, clique em Recarregar no narnia." }
+    else { Info "não consegui gerar a extensão do Chrome agora; rode .\start.ps1 extension." }
+  }
+}
+
+# Gera a extensão do Chrome (F12-10) a partir do código em $Dir ($Dir/apps/extension/dist); devolve true se deu certo
+function Build-Extension([string] $Dir) {
+  $saved = $env:NARNIA_SRC_DIR; $env:NARNIA_SRC_DIR = $Dir
+  try {
+    & docker @script:DevCompose run --rm dev sh -c '(test -f node_modules/.modules.yaml && pnpm install --frozen-lockfile --prefer-offline >/dev/null 2>&1 || pnpm install --frozen-lockfile >/dev/null) && pnpm --filter @narnia-jobs/extension build' *> $null
+    return $LASTEXITCODE -eq 0
+  } catch { return $false }
+  finally { if ($saved) { $env:NARNIA_SRC_DIR = $saved } else { Remove-Item env:NARNIA_SRC_DIR -ErrorAction SilentlyContinue } }
+}
+
+# Gera a extensão no código desta instância (.owner-src no dono, a raiz no claude)
+function Invoke-Extension {
+  $dir = if ($env:NARNIA_SRC_DIR) { $env:NARNIA_SRC_DIR } else { "." }
+  if (-not (Test-Path (Join-Path $dir "apps/extension/package.json"))) { Fail "este código ainda não tem a extensão (apps/extension); atualize o narnia." }
+  Assert-Docker
+  if (-not (Build-Extension $dir)) { Fail "não consegui gerar a extensão." }
+  Info "extensão gerada em $($dir.TrimEnd('/'))/apps/extension/dist"
+  Info "no Chrome: chrome://extensions → Modo do desenvolvedor → Carregar sem compactação (ou Recarregar, se já instalada)."
+  Info "passo a passo no narnia: Configurações › Extensão do navegador › Como instalar no Chrome."
 }
 
 function Invoke-Restore {
@@ -384,6 +410,7 @@ Uso (produção, só Docker no host):
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
+  extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker
   evals prompts|chat|pdf|all [nome…] [--strict]  avaliações no Phoenix (chat e pdf num banco temporário isolado)
@@ -433,6 +460,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "install-plugin" { Invoke-InstallPlugin }
     "restore"   { Invoke-Restore }
     "promote"   { Invoke-Promote @Rest }
+    "extension" { Invoke-Extension }
     "dev-down"  { Assert-Docker; $a = Get-DevDownArgs; & docker @a }
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }

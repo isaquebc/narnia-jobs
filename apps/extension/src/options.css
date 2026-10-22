@@ -1,0 +1,90 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f7f6f2;
+  --fg: #1c1b19;
+  --muted: #5d5a54;
+  --card: #ffffff;
+  --border: #dedad2;
+  --primary: #0f5e57;
+  --primary-fg: #ffffff;
+  --ok: #1d7a3a;
+  --danger: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161614;
+    --fg: #ecebe7;
+    --muted: #a3a09a;
+    --card: #1f1e1b;
+    --border: #36342f;
+    --primary: #4fb3a7;
+    --primary-fg: #0c1f1d;
+    --ok: #5cc27d;
+    --danger: #f2877d;
+  }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 system-ui, sans-serif;
+}
+main {
+  max-width: 520px;
+  margin: 32px auto;
+  padding: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+h1 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0 12px;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 12px;
+}
+input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+button {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-fg);
+  font: inherit;
+  cursor: pointer;
+}
+button.secondary {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+#status.ok {
+  color: var(--ok);
+}
+#status.error {
+  color: var(--danger);
+}

@@ -1176,10 +1176,22 @@ export const ptBR = {
     settingsHint:
       "Leve vagas de qualquer site para o narnia e receba ajuda nos formulários de candidatura, numa janela ao lado. Só no Chrome, por enquanto.",
     installLink: "Como instalar no Chrome",
+    pairButton: "Gerar código de pareamento",
+    pairNew: "Gerar outro código",
+    pairCode: "Código de pareamento",
+    pairHint:
+      "Nas opções da extensão, informe o endereço abaixo e este código. Ele vale até {time} e uma vez só; gerar outro invalida este.",
+    pairFail: "Não consegui gerar o código. Tente de novo.",
+    devices: "Navegadores conectados",
+    noDevices: "Nenhum navegador conectado ainda.",
+    lastSeen: "Último uso: {date}",
+    neverUsed: "Ainda não usado",
+    revoke: "Desconectar",
+    revokeLabel: "Desconectar {name}",
     title: "Instalar a extensão no Chrome",
     intro:
       "A extensão lê a página só quando você clica no ícone do narnia e manda o conteúdo para esta instância, no seu computador. Ela nunca preenche nem envia formulários.",
-    wip: "A extensão ainda está em construção (F12): este guia já mostra como vai ser a instalação, mas a pasta e o pareamento só existem quando ela for entregue.",
+    wip: "Nesta versão, por enquanto, a extensão só se conecta ao narnia (instalar, parear e testar a conexão). Ler vagas e formulários de candidatura chega nas próximas atualizações.",
     stepsLabel: "Passos da instalação",
     step: {
       build: {

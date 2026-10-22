@@ -23,6 +23,8 @@ import type {
   EstimateResponse,
   EvalsSettingsResponse,
   EvidenceFile,
+  ExtensionDevicesResponse,
+  ExtensionPairingResponse,
   FileDigest,
   FileResponse,
   GithubAuthSourceSchema,
@@ -264,6 +266,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       ),
     getChatSettings: () => request<{ settings: ChatSettingsDto }>("/api/settings/chat"),
     getPluginStatus: () => request<PluginStatusResponse>("/api/plugin/status"),
+    // Configurações › Extensão do navegador (F12/M1)
+    createExtensionPairing: () =>
+      request<ExtensionPairingResponse>("/api/extension/pairing", { method: "POST" }),
+    listExtensionDevices: () => request<ExtensionDevicesResponse>("/api/extension/devices"),
+    revokeExtensionDevice: (id: string) =>
+      request<void>(`/api/extension/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
     // Configurações › Avaliações (ponte da assinatura e Phoenix, AV-2)
     getEvalsSettings: () => request<EvalsSettingsResponse>("/api/settings/evals"),
     putBridgeSettings: (patch: Partial<BridgeSettingsDto>) =>

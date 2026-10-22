@@ -783,6 +783,30 @@ export const PluginStatusResponseSchema = z.object({
   lastSeenAt: z.string().nullable(),
 });
 export type PluginStatusResponse = z.infer<typeof PluginStatusResponseSchema>;
+// Extensão do navegador (F12/M1, F12-9): código de pareamento, troca pelo token de dispositivo e dispositivos
+export const ExtensionPairingResponseSchema = z.object({ code: z.string(), expiresAt: z.string() });
+export type ExtensionPairingResponse = z.infer<typeof ExtensionPairingResponseSchema>;
+export const ExtensionPairRequestSchema = z.object({
+  code: z.string().trim().min(1).max(20),
+  name: z.string().trim().max(80).default("Chrome"),
+});
+export const ExtensionDeviceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.string(),
+  lastSeenAt: z.string().nullable(),
+});
+export type ExtensionDevice = z.infer<typeof ExtensionDeviceSchema>;
+export const ExtensionPairResponseSchema = z.object({
+  token: z.string(),
+  device: ExtensionDeviceSchema,
+});
+export const ExtensionDevicesResponseSchema = z.object({ devices: z.array(ExtensionDeviceSchema) });
+export type ExtensionDevicesResponse = z.infer<typeof ExtensionDevicesResponseSchema>;
+export const ExtensionMeResponseSchema = z.object({
+  device: ExtensionDeviceSchema.nullable(),
+  version: z.string(),
+});
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
   pattern: true,
   trustTag: true,

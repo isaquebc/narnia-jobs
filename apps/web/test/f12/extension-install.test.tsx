@@ -1,6 +1,6 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { githubAuth, ingestSettings } from "../f03/fixtures";
 import { shellApi } from "../f03/shell-api";
 import { renderApp } from "../router-helpers";
@@ -53,8 +53,62 @@ describe("F12 · tutorial de instalação da extensão", () => {
     expect(screen.getByRole("heading", { name: "Se algo der errado" })).toBeInTheDocument();
   });
 
-  it("avisa que a extensão ainda está em construção", async () => {
+  it("avisa que, por enquanto, a extensão só conecta (ler vagas e formulários vem depois)", async () => {
     renderApp({ api, initialUrl: "/extensao" });
-    expect(await screen.findByText(/ainda está em construção/)).toBeInTheDocument();
+    expect(await screen.findByText(/por enquanto, a extensão só se conecta/)).toBeInTheDocument();
+  });
+});
+
+describe("F12/M1 · Configurações › Extensão do navegador", () => {
+  const device = (id: string, name: string, lastSeenAt: string | null = null) => ({
+    id,
+    name,
+    createdAt: "2026-10-22T10:00:00.000Z",
+    lastSeenAt,
+  });
+
+  it("gera o código de pareamento e mostra com a validade e o endereço da instância", async () => {
+    const createExtensionPairing = vi.fn(async () => ({
+      code: "K7QM-3XPA",
+      expiresAt: "2026-10-22T13:10:00.000Z",
+    }));
+    renderApp({
+      api: { ...api, listExtensionDevices: async () => ({ devices: [] }), createExtensionPairing },
+      initialUrl: "/configuracoes",
+    });
+    const card = await screen.findByRole("region", { name: "Extensão do navegador" });
+    expect(await within(card).findByText(/Nenhum navegador conectado/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Gerar código de pareamento" }));
+    expect(await within(card).findByText("K7QM-3XPA")).toBeInTheDocument();
+    expect(within(card).getByText(/vale até 10:10/)).toBeInTheDocument();
+    expect(within(card).getByText(window.location.origin)).toBeInTheDocument();
+    expect(createExtensionPairing).toHaveBeenCalledTimes(1);
+  });
+
+  it("lista os navegadores conectados e desconecta um", async () => {
+    let devices = [
+      device("d1", "Chrome do notebook", "2026-10-22T12:00:00.000Z"),
+      device("d2", "Chrome do trabalho"),
+    ];
+    const revokeExtensionDevice = vi.fn(async (id: string) => {
+      devices = devices.filter((d) => d.id !== id);
+    });
+    renderApp({
+      api: { ...api, listExtensionDevices: async () => ({ devices }), revokeExtensionDevice },
+      initialUrl: "/configuracoes",
+    });
+    const card = await screen.findByRole("region", { name: "Extensão do navegador" });
+    const row = (await within(card).findByText("Chrome do notebook")).closest("li") as HTMLElement;
+    expect(within(row).getByText(/Último uso: 22\/10\/2026 09:00/)).toBeInTheDocument();
+    expect(
+      within(within(card).getByText("Chrome do trabalho").closest("li") as HTMLElement).getByText(
+        "Ainda não usado",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(row).getByRole("button", { name: "Desconectar Chrome do notebook" }),
+    );
+    expect(revokeExtensionDevice).toHaveBeenCalledWith("d1");
+    await waitFor(() => expect(within(card).queryByText("Chrome do notebook")).toBeNull());
   });
 });

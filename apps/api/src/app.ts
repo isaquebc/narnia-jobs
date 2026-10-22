@@ -32,6 +32,7 @@ import { chatSettingsRoutes } from "./routes/chat-settings";
 import { dashboardRoutes } from "./routes/dashboard";
 import { documentsRoutes } from "./routes/documents";
 import { evalsSettingsRoutes } from "./routes/evals-settings";
+import { extensionRoutes } from "./routes/extension";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
 import { ingestionsRoutes } from "./routes/ingestions";
@@ -90,7 +91,13 @@ export function createApp(deps: AppDeps) {
     }
   });
   app.use("*", hostGuard(deps.allowedHosts ?? allowedHostsFromEnv(process.env)));
-  app.use("*", authMiddleware(deps.token));
+  app.use(
+    "*",
+    authMiddleware(deps.token, {
+      find: (t) => deps.repos.extension.findByToken(t),
+      touch: (id) => deps.repos.extension.touch(id),
+    }),
+  );
   app.onError((err, c) => {
     console.error("[api] erro não tratado:", err);
     return apiError(c, 500, "internal", err.message);
@@ -180,6 +187,7 @@ export function createApp(deps: AppDeps) {
     );
   }
   app.route("/", chatSettingsRoutes({ repos: deps.repos }));
+  app.route("/", extensionRoutes({ repos: deps.repos, version: deps.version }));
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",

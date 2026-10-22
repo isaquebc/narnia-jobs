@@ -193,6 +193,13 @@ Describe "C7 / CM-4: cópia separada da instância do dono (.owner-src)" {
     finally { Remove-Item env:NARNIA_INSTANCE, env:NARNIA_SRC_DIR, env:NARNIA_DATA_MOUNT, env:NARNIA_BACKUP_MOUNT, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue }
     $out | Should -Match "dono"
   }
+  It "extension recusa código sem apps/extension (F12-10)" {
+    $dir = Join-Path $script:Tmp "sem-ext"; New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $env:NARNIA_SRC_DIR = $dir
+    try { $out = pwsh -NoProfile -Command ". '$($script:Ps1)'; Invoke-Extension" 2>&1 | Out-String }
+    finally { Remove-Item env:NARNIA_SRC_DIR -ErrorAction SilentlyContinue }
+    $out | Should -Match "apps/extension"
+  }
 }
 
 Describe "F04/M5 · modo B (install-plugin e diagnóstico no host)" {

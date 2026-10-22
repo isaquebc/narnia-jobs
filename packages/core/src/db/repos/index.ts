@@ -19,6 +19,7 @@ import {
   documentsRepo,
 } from "./documents";
 import { type EmphasisRepo, emphasisRepo } from "./emphasis";
+import { type ExtensionRepo, extensionRepo } from "./extension";
 import { type FactSourcesRepo, factSourcesRepo } from "./fact-sources";
 import { type FactsRepo, factsRepo } from "./facts";
 import {
@@ -95,6 +96,8 @@ export interface Repos {
   // F05
   documents: DocumentsRepo;
   cvTemplates: CvTemplatesRepo;
+  // F12
+  extension: ExtensionRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -156,6 +159,7 @@ export function createRepos(db: Db): Repos {
     jobAnalyses: jobAnalysesRepo(db),
     documents: documentsRepo(db),
     cvTemplates: cvTemplatesRepo(db),
+    extension: extensionRepo(db),
   };
 }
 
@@ -163,6 +167,7 @@ export * from "./chat";
 export * from "./digests";
 export * from "./documents";
 export * from "./emphasis";
+export * from "./extension";
 export * from "./fact-sources";
 export * from "./facts";
 export * from "./github";
