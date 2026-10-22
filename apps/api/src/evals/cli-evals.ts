@@ -137,10 +137,13 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
     // o bloqueio é pela média da rodada inteira (todos os avaliadores de todos os casos, e o juiz), só na rodada completa
     const graded = report.flatMap((r) => r.results);
     const judged = report.flatMap((r) => r.judges ?? []);
+    // caso com erro (do modelo ou do preparo) deixa a rodada incompleta: não vira linha de base nem aprovada
     if (gate && graded.length > 0 && only.length === 0)
-      gate.record("chat:avaliadores", {
-        media: graded.filter((g) => g.passed).length / graded.length,
-      });
+      gate.record(
+        "chat:avaliadores",
+        { media: graded.filter((g) => g.passed).length / graded.length },
+        { errors: report.filter((r) => r.error).length },
+      );
     if (gate && judged.length > 0 && only.length === 0)
       gate.record("chat:juiz", {
         media: judged.reduce((sum, j) => sum + j.score, 0) / judged.length,

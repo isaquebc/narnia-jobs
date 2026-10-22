@@ -57,6 +57,37 @@ describe("sandbox de avaliação", () => {
     expect(session?.title).toContain("· CV");
   }, 20_000);
 
+  it("document_feedback usa o CV pronto da vaga mesmo com outro CV em geração (deixado por um caso anterior)", async () => {
+    sb = await openEvalSandbox({ provider: new MockProvider() });
+    const [seeded] = sb.repos.documents.list({ kind: "cv" });
+    const busy = sb.repos.documents.create({
+      kind: "cv",
+      profileId: seeded?.profileId ?? "",
+      postingId: null,
+      templateId: "classico",
+      paper: "A4",
+      locale: "pt-BR",
+      format: "pdf",
+    });
+    sb.repos.documents.addVersion(busy.id, {
+      source: "agent",
+      instructions: null,
+      factsVersion: sb.repos.settings.getFactsVersion(),
+      postingUpdatedAt: null,
+      profileHash: "x",
+    });
+    const cases = parseEvalCases(
+      '{"id":"feedback","category":"job","open":"document_feedback","messages":["encurte o resumo"],"graders":[{"type":"within_budget","value":"80000"}]}',
+    );
+    const [r] = await runEvalCases(cases, {
+      baseUrl: sb.baseUrl,
+      token: sb.token,
+      turnTimeoutMs: 10000,
+    });
+    expect(r?.error ?? null).toBeNull();
+    expect(sb.repos.chatSessions.list({})[0]?.postingId).toBe(seeded?.postingId);
+  }, 20_000);
+
   it("o /mcp do sandbox exige o token dele; fechar apaga a pasta e derruba o servidor", async () => {
     sb = await openEvalSandbox({ provider: new MockProvider() });
     const noToken = await fetch(`${sb.baseUrl}/api/profiles`);

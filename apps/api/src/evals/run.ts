@@ -97,11 +97,15 @@ export async function runEvalCases(
     try {
       let first = 0;
       if (c.open === "document_feedback") {
-        // "Regerar com mensagem": o CV da vaga do sandbox, com a primeira mensagem como feedback
+        // "Regerar com mensagem": o CV pronto da vaga do sandbox (um caso anterior pode ter deixado outro CV em
+        // geração), com a primeira mensagem como feedback
         const { documents } = await call<{
-          documents: Array<{ document: { id: string; kind: string } }>;
-        }>("/api/documents");
-        const cv = documents.find((d) => d.document.kind === "cv");
+          documents: Array<{
+            document: { id: string; postingId: string | null };
+            current: { status: string } | null;
+          }>;
+        }>("/api/documents?kind=cv");
+        const cv = documents.find((d) => d.document.postingId && d.current?.status === "ready");
         if (!cv) throw new Error("sandbox sem CV para o feedback");
         sessionId = (
           await call<{ session: { id: string } }>(`/api/documents/${cv.document.id}/feedback`, {
