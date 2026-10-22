@@ -6,6 +6,8 @@ Status: **em escopo** (2026-10-07). Nada implementado.
 
 > **2026-10-16 (dono):** a carta de apresentação / cover letter foi para a F05 (F05-21), junto do CV da vaga. Esta task fica com a otimização de LinkedIn e a mensagem curta a recrutador (e-mail curto, InMail); onde o texto abaixo fala da carta formal, vale a F05.
 
+> **2026-10-22 (dono, F12-7):** a F09 vem depois da extensão do navegador (F12) e passa a ler a página do perfil do LinkedIn por ela. Aqui também se decide o destino da importação pelo ZIP (F03-7): sair do plano ou ficar como alternativa.
+
 ---
 
 ## 1 · Objetivo e resultado esperado
