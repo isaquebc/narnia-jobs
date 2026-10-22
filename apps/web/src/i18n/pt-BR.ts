@@ -1171,6 +1171,65 @@ export const ptBR = {
       doctor: "Para conferir o registro no Claude Code do computador (porta, token, plugin):",
     },
   },
+  extension: {
+    settingsTitle: "Extensão do navegador",
+    settingsHint:
+      "Leve vagas de qualquer site para o narnia e receba ajuda nos formulários de candidatura, numa janela ao lado. Só no Chrome, por enquanto.",
+    installLink: "Como instalar no Chrome",
+    title: "Instalar a extensão no Chrome",
+    intro:
+      "A extensão lê a página só quando você clica no ícone do narnia e manda o conteúdo para esta instância, no seu computador. Ela nunca preenche nem envia formulários.",
+    wip: "A extensão ainda está em construção (F12): este guia já mostra como vai ser a instalação, mas a pasta e o pareamento só existem quando ela for entregue.",
+    stepsLabel: "Passos da instalação",
+    step: {
+      build: {
+        title: "Gere a extensão",
+        body: "No terminal, na pasta do narnia, rode o comando do seu sistema. Se você atualiza o narnia com promote, a extensão já é gerada junto.",
+        linux: "Linux e macOS",
+        windows: "Windows (PowerShell)",
+      },
+      open: {
+        title: "Abra a página de extensões do Chrome",
+        body: "Copie o endereço abaixo e cole na barra de endereços do Chrome. Por segurança, o Chrome não deixa uma página abrir esse endereço sozinha.",
+      },
+      devMode: {
+        title: "Ligue o modo do desenvolvedor",
+        body: 'No canto superior direito da página de extensões, ligue a chave "Modo do desenvolvedor". Aparecem os botões de carregar extensões.',
+      },
+      load: {
+        title: "Carregue a pasta da extensão",
+        body: 'Clique em "Carregar sem compactação" e escolha esta pasta, dentro da pasta do narnia:',
+        ownerSrc: "Se a sua instância roda pelo promote, use a mesma pasta dentro de .owner-src.",
+      },
+      pin: {
+        title: "Fixe o ícone na barra",
+        body: "Clique no ícone de quebra-cabeça ao lado da barra de endereços e no alfinete ao lado do narnia. Assim o ícone fica sempre à mão.",
+      },
+      pair: {
+        title: "Conecte ao narnia",
+        body: 'Clique com o botão direito no ícone do narnia, abra "Opções" e informe o endereço desta instância:',
+        code: "Depois, gere um código de pareamento em Configurações › Extensão do navegador e cole nas opções. O código vale por 10 minutos e uma vez só; você pode desconectar o dispositivo quando quiser.",
+      },
+    },
+    use: {
+      title: "Como usar",
+      body: "Numa página de vaga ou de candidatura, clique no ícone do narnia. Abre uma janela ao lado com a vaga lida, ou com as perguntas do formulário e as respostas sugeridas para copiar.",
+    },
+    update: {
+      title: "Depois de atualizar o narnia",
+      body: "O Chrome não recarrega extensões sem compactação sozinho. Depois de cada atualização, abra chrome://extensions e clique no ícone de recarregar no cartão do narnia.",
+    },
+    trouble: {
+      title: "Se algo der errado",
+      manifest:
+        '"Arquivo de manifesto ausente": a pasta escolhida está errada ou a extensão não foi gerada. Rode o passo 1 de novo e escolha a pasta dist.',
+      offline:
+        '"Não foi possível conectar": confira se o narnia está no ar e se o endereço nas opções é o desta página.',
+      code: '"Código inválido ou vencido": gere um código novo em Configurações; cada código vale uma vez, por 10 minutos.',
+      warning:
+        "O Chrome pode mostrar um aviso sobre extensões no modo do desenvolvedor ao abrir. É esperado para extensões instaladas fora da Chrome Web Store.",
+    },
+  },
   postings: {
     title: "Vagas",
     hint: "Toda vaga analisada fica salva aqui. Salvar não é se candidatar.",

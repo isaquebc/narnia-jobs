@@ -194,7 +194,7 @@ Refazer troca a lista pelo chat na mesma janela, com "← voltar às perguntas".
 
 | Marco | Entrega | Prova |
 |-------|---------|-------|
-| M1 | `apps/extension` (MV3, build no Docker, `./start.sh extension`, `promote` gera), pareamento, token de dispositivo, revogar, opções, seção em Configurações | unit da API e da extensão; e2e: parear e testar conexão com a extensão carregada |
+| M1 | `apps/extension` (MV3, build no Docker, `./start.sh extension`, `promote` gera), pareamento, token de dispositivo, revogar, opções, seção em Configurações (botão Parear e dispositivos); tirar o aviso "em construção" do tutorial `/extensao` | unit da API e da extensão; e2e: parear e testar conexão com a extensão carregada |
 | M2 | Leitor de vaga, captura, janela `/candidatura` modo vaga, Salvar vaga → F06 | e2e com página de vaga de fixture (com e sem JSON-LD), duplicata |
 | M3 | Leitor de formulário (labels, grupos, Shadow DOM, iframes com permissão), `application.locate` + heurística + autodeclaração e consentimento; dataset, juiz e gate | unit em jsdom com fixtures no estilo Gupy, Greenhouse, Lever e Workday; gate real do prompt |
 | M4 | `application.answer` + `assembleAnswers` + copiar + baixar CV; dataset, juiz e gate | unit da conferência; e2e com mock; gate real |
@@ -247,3 +247,4 @@ Lint, typecheck, unit, e2e e gate verdes; README com instalação e limites; i18
 | 2026-10-22 | — | F12-8: alvo só o Chrome por enquanto. |
 | 2026-10-22 | — | Rascunho do plano (§3 a §9) a partir da revisão do código. |
 | 2026-10-22 | — | Dono fechou P-1 a P-5 → F12-9 a F12-13 (P-3 e P-4 mudaram: pedir a descrição da vaga; autodeclaração perguntada no chat e ingerida como evidência). |
+| 2026-10-22 | — | Tutorial de instalação no front, a pedido do dono: página `/extensao` (gerar, `chrome://extensions`, modo do desenvolvedor, carregar `apps/extension/dist`, fixar, parear com o endereço da instância; atualizar; problemas comuns) e cartão em Configurações › Extensão do navegador. Aviso "em construção" até o M1. Teste antes: sim (`apps/web/test/f12/extension-install.test.tsx`). |

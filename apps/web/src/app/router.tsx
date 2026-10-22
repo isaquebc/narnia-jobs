@@ -301,6 +301,15 @@ const processesRoute = createRoute({
   path: "/processos",
   component: ProcessesPage,
 });
+const ExtensionInstallPage = lazyRouteComponent(
+  () => import("../features/extension/ExtensionInstallPage"),
+  "ExtensionInstallPage",
+);
+const extensionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/extensao",
+  component: ExtensionInstallPage,
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/configuracoes",
@@ -327,6 +336,7 @@ const routeTree = rootRoute.addChildren([
   repoDetailRoute,
   notificationsRoute,
   settingsRoute,
+  extensionRoute,
   processesRoute,
   postingsRoute,
   postingRoute,

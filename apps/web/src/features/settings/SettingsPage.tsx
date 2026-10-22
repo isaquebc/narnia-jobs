@@ -17,6 +17,7 @@ import { bytesLabel } from "../ingestion/units";
 import { ChatSettingsSection } from "./ChatSettingsSection";
 import { CvTemplatesSection } from "./CvTemplatesSection";
 import { EvalsSettingsSection } from "./EvalsSettingsSection";
+import { ExtensionSettingsSection } from "./ExtensionSettingsSection";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { PluginSettingsSection } from "./PluginSettingsSection";
 import { WorkerSettingsSection } from "./WorkerSettingsSection";
@@ -210,6 +211,7 @@ export function SettingsPage() {
       <CvTemplatesSection />
       <WorkerSettingsSection />
       <PluginSettingsSection />
+      <ExtensionSettingsSection />
       <EvalsSettingsSection />
       {form ? (
         <Card className="flex flex-col gap-4">
