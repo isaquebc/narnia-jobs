@@ -2,7 +2,7 @@
 
 Entregável 12 do plan-v0. Uma extensão do Chrome (Chromium) que liga as páginas abertas pela pessoa ao narnia local: **captura de dados** (vagas de qualquer plataforma, enviadas à F06) e **ajuda no preenchimento de formulários de candidatura** (perguntas localizadas e respostas sugeridas numa janela própria, com copiar, refazer e chat). A análise da página do perfil do LinkedIn ficou para a F09, depois desta task, lendo a página por esta extensão (F12-7). Depende de F04 (chat, skills, provider pela assinatura), F05 (CV da vaga) e F06 (vagas). O gate pairwise de prompts (F04-avaliacoes AV-5, M7) vem antes, para os prompts novos desta task já nascerem passando por ele.
 
-Status: **plano em rascunho** (2026-10-22, §3 a §9 a revisar com o dono). Nada implementado. Decisões fechadas: F12-1 a F12-8. As propostas do rascunho que dependem do dono estão em §2 (P-1 a P-5).
+Status: **plano em rascunho** (2026-10-22). Nada implementado. Decisões fechadas: F12-1 a F12-13 (as propostas P-1 a P-5 do rascunho viraram F12-9 a F12-13).
 
 ---
 
@@ -18,16 +18,15 @@ Status: **plano em rascunho** (2026-10-22, §3 a §9 a revisar com o dono). Nada
 | F12-6 | Prompts | Todo prompt novo desta task (localizador de campos, skill de candidatura) é versionado no Phoenix com dataset, avaliadores e juiz, e passa pelo gate com pairwise (AV-5) antes do commit. | 2026-10-21 |
 | F12-7 | LinkedIn | A **análise do perfil do LinkedIn fica na F09**, depois da F12: a F09 lê a página do perfil pela extensão desta task. A F12 não traz nada específico do LinkedIn além da captura de vagas. O destino da importação pelo ZIP (F03-7) se decide na F09. | 2026-10-22 |
 | F12-8 | Navegadores | **Alvo por enquanto: só o Chrome.** Testes e instruções de instalação só para ele; derivados do Chromium (Edge, Brave) e Firefox ficam para o futuro. | 2026-10-22 |
+| F12-9 | Credencial da extensão | O pareamento gera um **token de dispositivo** próprio (persistente, revogável em Configurações), em vez do token do boot. Vale para toda a API, como o do dono: a instância é local e de uma pessoa só, e a janela popup carrega a web inteira. | 2026-10-22 |
+| F12-10 | Build e carregamento | Pacote `apps/extension/` (Manifest V3, TypeScript, build no Docker). `./start.sh extension` gera `apps/extension/dist/`; o `promote` também gera. O dono carrega uma vez `.owner-src/apps/extension/dist` em `chrome://extensions` ("Carregar sem compactação") e depois só clica "Recarregar" após cada `promote`. Chrome Web Store fora desta versão. | 2026-10-22 |
+| F12-11 | Formulário sem a descrição da vaga | A janela **não** responde só com o perfil: pede para a pessoa **abrir a página da descrição da vaga** (e clicar no narnia lá, o que salva a vaga e a liga ao formulário) **ou colar a descrição no chat** da janela. Só depois as respostas são geradas. | 2026-10-22 |
+| F12-12 | Perguntas sensíveis | Autodeclaração (raça, gênero, deficiência, orientação, religião, idade e afins): quando aparece uma pergunta assim sem dado guardado, o **chat da janela pergunta à pessoa** e **ingere a resposta como evidência** (fato da pessoa, pela ingestão da conversa); com o dado já guardado, a resposta sai dele, sem perguntar de novo. Consentimentos (LGPD, termos) ficam sempre com a pessoa, sem sugestão. Pretensão salarial usa o piso e a pesquisa da F06, sem número inventado. | 2026-10-22 |
+| F12-13 | Ligação com a F07 | Até a F07, a janela guarda o formulário e as respostas (`application_form`) ligados à vaga; a F07 transforma isso em candidatura ("marquei como enviada") sem migração destrutiva. | 2026-10-22 |
 
-## 2 · Decisões abertas (propostas do rascunho, a confirmar com o dono)
+## 2 · Decisões abertas
 
-| Id | Tema | Proposta do rascunho |
-|----|------|----------------------|
-| P-1 | Credencial da extensão | O pareamento gera um **token de dispositivo** próprio (persistente, revogável em Configurações), em vez do token do boot (que muda a cada reinício sem `NARNIA_TOKEN`). O token de dispositivo vale para toda a API, como o do dono: a instância é local e de uma pessoa só; restringir escopo complica a janela popup, que carrega a web inteira. |
-| P-2 | Build e carregamento | Pacote novo `apps/extension/` (Manifest V3, TypeScript, build no Docker). `./start.sh extension` gera `apps/extension/dist/`; o `promote` também gera, então o dono carrega uma vez `chrome://extensions` → "Carregar sem compactação" → `.owner-src/apps/extension/dist` e depois só clica "Recarregar" após cada `promote`. Chrome Web Store fora desta versão. |
-| P-3 | Formulário sem vaga | Se a página do formulário não traz a descrição da vaga, a janela oferece **escolher uma vaga salva** (busca pelo título e empresa da página) ou seguir **só com o perfil**. Sem vaga, as respostas ficam genéricas e a janela avisa. |
-| P-4 | Perguntas sensíveis | Perguntas de autodeclaração (raça, gênero, deficiência, orientação, religião, idade) e consentimentos (LGPD, termos) **não recebem sugestão**: a janela marca "resposta pessoal" e não chama o modelo. Pretensão salarial usa o piso e a pesquisa já feitos (F06), sem número novo inventado. |
-| P-5 | Ligação com a F07 | Até a F07, a janela guarda o formulário e as respostas (`application_form`) ligados à vaga; a F07 transforma isso em candidatura ("marquei como enviada") sem migração destrutiva. |
+Nenhuma.
 
 ## 3 · Objetivo e resultado esperado
 
@@ -40,7 +39,7 @@ A extensão não preenche nem envia nada (F12-3) e só lê a página quando a pe
 
 ### Dentro do escopo
 - Extensão MV3 para o Chrome (F12-8): ícone, página de opções (endereço da instância, código de pareamento, estado da conexão), leitura da página sob demanda.
-- Pareamento e token de dispositivo (P-1); lista de dispositivos com revogar em Configurações.
+- Pareamento e token de dispositivo (F12-9); lista de dispositivos com revogar em Configurações.
 - Página `/candidatura` do narnia na janela popup, com chat embutido.
 - Captura de vaga → `POST /api/postings/intake` (texto já capturado + URL + campos do JSON-LD).
 - Captura de formulário → localizador (Haiku) → respostas (Sonnet) → copiar, refazer, chat.
@@ -49,7 +48,7 @@ A extensão não preenche nem envia nada (F12-3) e só lê a página quando a pe
 
 ### Fora do escopo (e para onde vai)
 - Preencher campos ou enviar o formulário (F12-3; fora do plano).
-- Registrar candidatura no kanban (F07, P-5).
+- Registrar candidatura no kanban (F07, F12-13).
 - Perfil do LinkedIn (F09, F12-7); perfil em outras plataformas (futuro, F12-1).
 - Edge, Brave, Firefox; publicação na Chrome Web Store (futuro, F12-8).
 - Upload de arquivo pelo formulário (o CV): a janela só oferece **baixar o CV da vaga** (F05) para a pessoa anexar.
@@ -94,7 +93,7 @@ Chrome do usuário                               narnia (instância local)
 - **Opções**: endereço da instância (padrão `http://127.0.0.1:3100`), código de pareamento, botão "Testar conexão", nome do dispositivo. Guarda o token em `chrome.storage.local`.
 - **Login na janela**: a janela abre `<instância>/api/extension/enter?device=<token>` (como o `/api/auth/enter`: grava o cookie e redireciona para `/candidatura?...`), para a web da janela ficar autenticada sem expor o token do dono.
 
-### 4.4 Pareamento (P-1)
+### 4.4 Pareamento (F12-9)
 - Configurações → "Extensão do navegador" → **Parear**: a API gera um código de 8 caracteres (sem 0/O/1/I), válido por 10 minutos e de uso único, mostrado com o endereço da instância.
 - Na extensão, a pessoa cola o código; `POST /api/extension/pair {code, name}` (rota pública, com limite de tentativas) devolve um token de dispositivo aleatório. A API guarda só o hash (`extension_device`).
 - `authMiddleware` passa a aceitar também tokens de dispositivo não revogados (atualiza `last_seen_at`). Revogar em Configurações derruba na hora.
@@ -105,9 +104,13 @@ Chrome do usuário                               narnia (instância local)
 - `IntakeSchema` ganha `source: "extension"` para a origem aparecer na vaga.
 
 ### 4.6 Formulário: localizar e responder
-1. **Localizar** (tarefa `application.locate`, fila `extract`, prompt `narnia-application-locate`, Haiku): entrada = campos brutos da captura; saída = perguntas normalizadas `{id, question, kind (texto curto, texto longo, escolha, múltipla, sim/não, número, data, arquivo, consentimento, autodeclaração), options[], required, maxChars?, fieldRefs[], section}`. Junta rótulos quebrados, separa "outro (especifique)", descarta campos de navegação e marca as sensíveis (P-4). Uma heurística por código vem antes (campos óbvios como nome, e-mail e telefone saem direto dos dados, sem modelo).
-2. **Responder** (tarefa `application.answer`, prompt `narnia-application-answer`, Sonnet): entrada = perguntas não sensíveis + resumo do perfil (o mesmo `buildCvBrief` da F05, com os ids curtos) + vaga (se houver) + idioma do formulário; saída por pergunta `{id, answer, origins[], confidence, gap?}`. Regras do CV valem: cada afirmação aponta origem; sem dado, `gap` explica o que falta ("conte no chat") em vez de inventar; escolha só entre as opções da página; respeita `maxChars`. A conferência por código (`assembleAnswers`) recusa origem inexistente, número ou empresa fora dos dados e opção fora da lista.
-3. **Refazer** abre, na mesma janela, uma conversa `job` com a vaga e a nota `candidatura-contexto.md` (pergunta, opções, limite, resposta atual) e a skill `responder-candidatura` (`plugin/skills/responder-candidatura/SKILL.md`, modos A e B). A tool `application_answer_save` grava a resposta combinada, que volta para a lista como versão nova (a anterior fica no histórico).
+1. **Localizar** (tarefa `application.locate`, fila `extract`, prompt `narnia-application-locate`, Haiku): entrada = campos brutos da captura; saída = perguntas normalizadas `{id, question, kind (texto curto, texto longo, escolha, múltipla, sim/não, número, data, arquivo, consentimento, autodeclaração), options[], required, maxChars?, fieldRefs[], section}`. Junta rótulos quebrados, separa "outro (especifique)", descarta campos de navegação e marca as de autodeclaração e de consentimento (F12-12). Uma heurística por código vem antes (campos óbvios como nome, e-mail e telefone saem direto dos dados, sem modelo).
+2. **Pré-condições** (F12-11, F12-12):
+   - **Sem a descrição da vaga** (a página do formulário não traz e nenhuma vaga ficou ligada): a janela não gera respostas. Mostra "Abra a página da descrição desta vaga e clique no narnia lá, ou cole a descrição aqui", com o chat aberto. Capturar a página da vaga salva a vaga (F06) e a liga ao formulário aberto na janela; texto colado no chat entra por `posting_create` e também liga. Vaga já salva com a mesma empresa e título é sugerida para confirmar.
+   - **Autodeclaração sem dado guardado**: o chat da janela pergunta à pessoa, uma pergunta por vez, dizendo que a resposta fica guardada localmente e é reaproveitada em outros formulários; a resposta entra como evidência pela ingestão da conversa (F04), com origem "declarado pela pessoa". Com o dado guardado, a resposta é escolhida por código entre as opções da página (sem modelo); "Prefiro não informar" é sempre uma opção respeitada.
+   - **Consentimentos**: só exibidos ("você decide"), sem sugestão.
+3. **Responder** (tarefa `application.answer`, prompt `narnia-application-answer`, Sonnet): entrada = perguntas que não são de autodeclaração nem de consentimento + resumo do perfil (o mesmo `buildCvBrief` da F05, com os ids curtos) + vaga (se houver) + idioma do formulário; saída por pergunta `{id, answer, origins[], confidence, gap?}`. Regras do CV valem: cada afirmação aponta origem; sem dado, `gap` explica o que falta ("conte no chat") em vez de inventar; escolha só entre as opções da página; respeita `maxChars`. A conferência por código (`assembleAnswers`) recusa origem inexistente, número ou empresa fora dos dados e opção fora da lista.
+4. **Refazer** abre, na mesma janela, uma conversa `job` com a vaga e a nota `candidatura-contexto.md` (pergunta, opções, limite, resposta atual) e a skill `responder-candidatura` (`plugin/skills/responder-candidatura/SKILL.md`, modos A e B). A tool `application_answer_save` grava a resposta combinada, que volta para a lista como versão nova (a anterior fica no histórico).
 
 ### 4.7 Janela `/candidatura`
 - Rota nova em `router.tsx` (`/candidatura`, `validateSearch: {captura, formulario}`), com layout compacto (sem o shell lateral), pensado para ~420×720.
@@ -167,6 +170,8 @@ Estado      ● conectado como "Chrome do notebook"   [Testar]
 ```
 ┌ narnia · candidatura ───────────────┐
 │ Vaga: Backend Sr · Nubank  [trocar] │
+│ (sem vaga: "abra a descrição da     │
+│  vaga ou cole aqui" + chat)         │
 │ Perfil: Engenharia backend [trocar] │
 │ ─────────────────────────────────── │
 │ 1. Por que você quer trabalhar aqui?│
@@ -177,7 +182,7 @@ Estado      ● conectado como "Chrome do notebook"   [Testar]
 │    ⚠ sem dados: conte no chat       │
 │                          [Refazer]  │
 │ 3. Gênero (autodeclaração)          │
-│    resposta pessoal                 │
+│    ? o chat vai te perguntar        │
 │ 📎 Baixar CV da vaga                │
 └─────────────────────────────────────┘
 ```
@@ -191,29 +196,29 @@ Refazer troca a lista pelo chat na mesma janela, com "← voltar às perguntas".
 |-------|---------|-------|
 | M1 | `apps/extension` (MV3, build no Docker, `./start.sh extension`, `promote` gera), pareamento, token de dispositivo, revogar, opções, seção em Configurações | unit da API e da extensão; e2e: parear e testar conexão com a extensão carregada |
 | M2 | Leitor de vaga, captura, janela `/candidatura` modo vaga, Salvar vaga → F06 | e2e com página de vaga de fixture (com e sem JSON-LD), duplicata |
-| M3 | Leitor de formulário (labels, grupos, Shadow DOM, iframes com permissão), `application.locate` + heurística + perguntas sensíveis; dataset, juiz e gate | unit em jsdom com fixtures no estilo Gupy, Greenhouse, Lever e Workday; gate real do prompt |
+| M3 | Leitor de formulário (labels, grupos, Shadow DOM, iframes com permissão), `application.locate` + heurística + autodeclaração e consentimento; dataset, juiz e gate | unit em jsdom com fixtures no estilo Gupy, Greenhouse, Lever e Workday; gate real do prompt |
 | M4 | `application.answer` + `assembleAnswers` + copiar + baixar CV; dataset, juiz e gate | unit da conferência; e2e com mock; gate real |
-| M5 | `ChatPanel` extraído, refazer no chat, skill `responder-candidatura`, nota de contexto, tool `application_answer_save`, tools MCP do modo B | testes do chat seguem verdes; e2e refazer → resposta nova na lista; gate do chat com caso novo |
+| M5 | `ChatPanel` extraído, refazer no chat, skill `responder-candidatura`, nota de contexto, tool `application_answer_save`, pedido da descrição da vaga (F12-11), autodeclaração perguntada e ingerida (F12-12), tools MCP do modo B | testes do chat seguem verdes; e2e refazer → resposta nova na lista; gate do chat com caso novo |
 | M6 | Formulário em várias etapas, poda de capturas, backup/exportação, README (instalar no Chrome, parear, limites), registro | e2e de duas etapas; teste de upgrade do banco; teste manual do dono no Chrome dele |
 
 ## 8 · Testes
 
 ### 8.1 Unitários (Vitest)
 - **Extensão**: `readPosting` e `readForm` em jsdom com fixtures HTML fictícias (rótulo por `for`, `aria-*`, texto vizinho, `fieldset`, radio, select, checkbox de consentimento, Shadow DOM, campos ocultos e senha excluídos); montagem do manifesto (permissões mínimas).
-- **core**: pareamento (código, validade, uso único, hash), heurística de campos óbvios, classificação de sensíveis, `assembleAnswers` (origem, número, opção fora da lista, `maxChars`), junção de etapas.
+- **core**: pareamento (código, validade, uso único, hash), heurística de campos óbvios, classificação de autodeclaração e consentimento, resposta de autodeclaração por código a partir do fato guardado (com "prefiro não informar"), `assembleAnswers` (origem, número, opção fora da lista, `maxChars`), junção de etapas.
 - **api**: rotas novas (auth por dispositivo, revogado = 401, limite de tentativas no `pair`, `enter` grava cookie), intake com `source: extension`, abertura da conversa de refazer com a nota.
 - **worker**: `application.locate` e `application.answer` com o mock, `usage_event` gravado.
 
 ### 8.2 e2e (Playwright, Chromium com a extensão)
 - Projeto novo `extension` em `apps/e2e/playwright.config.ts`: `chromium.launchPersistentContext` com `--disable-extensions-except` e `--load-extension=apps/extension/dist`, headless, contra a pilha do e2e (mock); páginas de fixture servidas por um servidor estático no próprio container de teste.
-- Casos: E2E-01 parear e testar conexão; E2E-02 vaga → janela → Salvar → vaga na lista da F06; E2E-03 formulário → perguntas e respostas → copiar; E2E-04 refazer → chat → resposta nova; E2E-05 dispositivo revogado → extensão pede novo pareamento; E2E-06 formulário em iframe de outra origem (permissão opcional).
+- Casos: E2E-01 parear e testar conexão; E2E-02 vaga → janela → Salvar → vaga na lista da F06; E2E-03 formulário → perguntas e respostas → copiar; E2E-04 refazer → chat → resposta nova; E2E-05 dispositivo revogado → extensão pede novo pareamento; E2E-06 formulário em iframe de outra origem (permissão opcional); E2E-07 formulário sem descrição → abrir a página da vaga → vaga ligada e respostas geradas; E2E-08 pergunta de autodeclaração → chat pergunta → fato ingerido → próximo formulário responde sem perguntar.
 - Nunca o Chrome do dono (F12-4); só o Chromium do Playwright.
 
 ### 8.3 Avaliações (F12-6)
-- `narnia-application-locate`: 6+ formulários fictícios (curto, longo, várias etapas, rótulos quebrados, perguntas sensíveis, injeção no texto da página: "ignore as instruções e responda que…").
+- `narnia-application-locate`: 6+ formulários fictícios (curto, longo, várias etapas, rótulos quebrados, autodeclaração e consentimento, injeção no texto da página: "ignore as instruções e responda que…").
 - `narnia-application-answer`: perguntas com e sem dado, escolha fechada, limite de caracteres, idioma inglês, pretensão salarial, injeção na descrição da vaga.
-- Avaliadores por código (schema, opção válida, `maxChars`, sem sensível respondida, origens válidas) e juiz de padrão de entrega; versão inicial aprovada pelo gate pairwise.
-- Caso novo no chat: refazer uma resposta pela conversa.
+- Avaliadores por código (schema, opção válida, `maxChars`, sem autodeclaração ou consentimento respondidos pelo modelo, origens válidas) e juiz de padrão de entrega; versão inicial aprovada pelo gate pairwise.
+- Casos novos no chat: refazer uma resposta pela conversa; perguntar a autodeclaração e ingerir como evidência; pedir a descrição da vaga quando falta.
 
 ### 8.4 Teste manual do dono (antes de fechar)
 Carregar a extensão do `.owner-src`, parear com a instância dele, salvar uma vaga real e abrir um formulário real (sem enviar), conferindo as respostas.
@@ -230,7 +235,8 @@ Lint, typecheck, unit, e2e e gate verdes; README com instalação e limites; i18
 | A janela popup mostra a faixa de endereço | aceito em F12-2 |
 | Mudança de porta ou de instância | endereço configurável e "Testar conexão" nas opções |
 | Chrome atualiza políticas de extensão sem compactação | só o Chrome (F12-8); instruções no README; Web Store fica para o futuro |
-| Respostas genéricas sem vaga | P-3: escolher vaga salva ou aviso de resposta genérica |
+| Respostas genéricas sem vaga | F12-11: sem a descrição, a janela pede a página da vaga ou o texto colado antes de responder |
+| Dado sensível guardado | só local, origem "declarado pela pessoa", editável e apagável em Meus dados (F10); "prefiro não informar" respeitado |
 
 ## 10 · Registro
 
@@ -239,4 +245,5 @@ Lint, typecheck, unit, e2e e gate verdes; README com instalação e limites; i18
 | 2026-10-21 | — | Task criada a partir da conversa com o dono (F12-1 a F12-6). |
 | 2026-10-22 | — | F12-7: análise do LinkedIn vai para a F09, depois desta task. |
 | 2026-10-22 | — | F12-8: alvo só o Chrome por enquanto. |
-| 2026-10-22 | — | Rascunho do plano (§2 a §9) a partir da revisão do código. |
+| 2026-10-22 | — | Rascunho do plano (§3 a §9) a partir da revisão do código. |
+| 2026-10-22 | — | Dono fechou P-1 a P-5 → F12-9 a F12-13 (P-3 e P-4 mudaram: pedir a descrição da vaga; autodeclaração perguntada no chat e ingerida como evidência). |
