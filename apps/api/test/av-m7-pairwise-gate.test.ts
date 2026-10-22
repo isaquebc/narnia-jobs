@@ -185,6 +185,67 @@ describe("M7 · gate pairwise", () => {
     expect(g.finish(() => undefined)).toBe(false);
   });
 
+  it("--seed-approved: grava a primeira aprovada mesmo com a nota oscilando, sem mexer na linha de base", async () => {
+    expect(gateFlags(["--seed-approved"])).toEqual({
+      gate: false,
+      update: false,
+      fixes: [],
+      seed: true,
+    });
+    const { baselines, file } = setup();
+    writeFileSync(
+      baselines,
+      JSON.stringify({ "narnia-chat-title": { scores: { padrao_de_entrega: 1 }, updatedAt: "x" } }),
+    );
+    const before = readFileSync(baselines, "utf8");
+    const g = new BaselineGate(gateFlags(["--seed-approved"]), baselines);
+    g.record("narnia-chat-title", { padrao_de_entrega: 0.8 }, { versionId: "v2" });
+    const r = await g.pairwise("narnia-chat-title", {
+      versionId: "v2",
+      commit: "iii",
+      judge,
+      provider: judgeProvider([]).provider,
+      runs: candidate(["a"]),
+    });
+    expect(r.status).toBe("primeira");
+    const log: string[] = [];
+    expect(g.finish((l) => log.push(l))).toBe(false);
+    expect(log.join("\n")).toMatch(/Versão aprovada de narnia-chat-title gravada/);
+    expect(parseApproved(readFileSync(file, "utf8")).map((c) => c.versionId)).toEqual(["v2"]);
+    expect(readFileSync(baselines, "utf8")).toBe(before);
+  });
+
+  it("--seed-approved não regrava prompt que já tem aprovada nem grava rodada incompleta", async () => {
+    const { baselines, file } = setup([approvedCase("a", "v1")]);
+    const before = readFileSync(file, "utf8");
+    const j = judgeProvider(["a"]);
+    const g = new BaselineGate(gateFlags(["--seed-approved"]), baselines);
+    const r = await g.pairwise("narnia-chat-title", {
+      versionId: "v2",
+      commit: "jjj",
+      judge,
+      provider: j.provider,
+      runs: candidate(["a"]),
+    });
+    expect(r.status).toBe("pulado");
+    expect(j.calls()).toBe(0);
+    g.finish(() => undefined);
+    expect(readFileSync(file, "utf8")).toBe(before);
+
+    const fresh = setup();
+    const g2 = new BaselineGate(gateFlags(["--seed-approved"]), fresh.baselines);
+    g2.record("narnia-chat-title", { padrao_de_entrega: 1 }, { errors: 1 });
+    await g2.pairwise("narnia-chat-title", {
+      versionId: "v2",
+      commit: "kkk",
+      judge,
+      provider: judgeProvider([]).provider,
+      runs: candidate(["a"]),
+    });
+    g2.finish(() => undefined);
+    expect(existsSync(fresh.file)).toBe(false);
+  });
+
   it("sem --gate nem --update-baseline o pairwise não roda (não gasta a assinatura)", async () => {
     const { baselines } = setup([approvedCase("a")]);
     const j = judgeProvider(["a"]);

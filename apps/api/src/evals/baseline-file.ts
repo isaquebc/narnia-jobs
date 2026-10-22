@@ -39,6 +39,12 @@ export interface GateFlags {
   update: boolean;
   /** `--fixes=id,…`: casos que a mudança corrige (AV-5: ganhos e nenhuma derrota). */
   fixes: string[];
+  /**
+   * `--seed-approved`: grava a primeira versão aprovada dos prompts que ainda não têm uma, sem pairwise e sem olhar a
+   * linha de base (a nota do juiz oscila de uma rodada para outra; o dono pediu as versões atuais como iniciais,
+   * 2026-10-22). Não grava a linha de base nem regrava aprovada existente; rodada incompleta não grava nada.
+   */
+  seed?: boolean;
 }
 
 export function gateFlags(args: string[]): GateFlags {
@@ -47,6 +53,7 @@ export function gateFlags(args: string[]): GateFlags {
     gate: args.includes("--gate"),
     update: args.includes("--update-baseline"),
     fixes: fixes.split(",").filter(Boolean),
+    ...(args.includes("--seed-approved") ? { seed: true } : {}),
   };
 }
 
@@ -128,8 +135,10 @@ export class BaselineGate {
     },
   ): Promise<PairwiseReport> {
     const report: PairwiseReport = { key, status: "pulado", decision: null, cases: [] };
-    if (!this.flags.gate && !this.flags.update) return report;
     const approved = readApproved(key, this.path);
+    if (this.flags.seed && !this.flags.gate && !this.flags.update && approved.length > 0)
+      return report;
+    if (!this.flags.gate && !this.flags.update && !this.flags.seed) return report;
     const ok = o.runs.filter((r) => !r.error);
     const stage = () =>
       this.staged.set(
@@ -199,6 +208,11 @@ export class BaselineGate {
       }
     }
     const notUpgrade = this.comparisons.filter((c) => c.decision && !c.decision.passed);
+    if (this.flags.seed && !this.flags.update) {
+      if (incomplete.length > 0)
+        log("Versões aprovadas não gravadas: corrija as rodadas incompletas antes.");
+      else this.writeStaged(log);
+    }
     if (this.flags.update) {
       if (this.regressions.length > 0 || incomplete.length > 0 || notUpgrade.length > 0) {
         log(
@@ -217,17 +231,21 @@ export class BaselineGate {
           writeFileSync(this.path, serializeBaselines(next));
           log(`Linha de base atualizada em ${this.path} (${this.runs.length} entradas).`);
         }
-        for (const [key, cases] of this.staged) {
-          const p = approvedPath(key, this.path);
-          mkdirSync(dirname(p), { recursive: true });
-          writeFileSync(p, serializeApproved(cases));
-          log(`Versão aprovada de ${key} gravada em ${p} (${cases.length} casos).`);
-        }
+        this.writeStaged(log);
       }
     }
     return (
       this.flags.gate &&
       (this.regressions.length > 0 || incomplete.length > 0 || notUpgrade.length > 0)
     );
+  }
+
+  private writeStaged(log: (line: string) => void) {
+    for (const [key, cases] of this.staged) {
+      const p = approvedPath(key, this.path);
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, serializeApproved(cases));
+      log(`Versão aprovada de ${key} gravada em ${p} (${cases.length} casos).`);
+    }
   }
 }
