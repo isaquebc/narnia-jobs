@@ -826,7 +826,8 @@ export const ExtensionCaptureReadingSchema = z.object({
   company: z.string().nullable(),
   siteName: z.string().nullable(),
   location: z.string().nullable(),
-  excerpt: z.string().nullable(),
+  /** A descrição inteira lida da página (sem o cabeçalho que o JSON-LD monta). */
+  description: z.string().nullable(),
   chars: z.number().int(),
   /** Por que não deu para ler a vaga (página bloqueada, texto curto demais). */
   message: z.string().nullable(),

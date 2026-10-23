@@ -103,6 +103,14 @@ test("F12/E2E-02 extensão: página de vaga → janela com a vaga lida → Salva
   await expect(popup.getByText(/time de pagamentos/)).toBeVisible();
   await expect(popup.getByText("Início · Entrar")).toHaveCount(0);
   await expect(popup.getByRole("navigation")).toHaveCount(0);
+  // cabe na janela, sem rolagem lateral, e a descrição vai até o fim (testes do dono, 2026-10-23); no headless o
+  // tamanho da janela popup não vira o viewport, então o teste usa o mesmo da extensão (480 × 860)
+  await popup.setViewportSize({ width: 480, height: 860 });
+  expect(
+    await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+  await popup.getByText(/vale refeição/).scrollIntoViewIfNeeded();
+  await expect(popup.getByText(/vale refeição/)).toBeInViewport();
   await popup.getByRole("button", { name: "Salvar vaga" }).click();
   await expect(popup.getByRole("status")).toContainText("Vaga salva");
   await expect(popup.getByRole("link", { name: "Abrir a vaga no narnia" })).toHaveAttribute(

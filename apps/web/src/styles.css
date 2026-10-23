@@ -56,3 +56,8 @@ body {
   @apply bg-bg text-fg antialiased;
   min-width: 1024px;
 }
+
+/* janela popup da extensão (F12-2): ~480 px de largura, sem o layout do narnia */
+body:has([data-layout="bare"]) {
+  min-width: 0;
+}

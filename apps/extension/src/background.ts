@@ -6,7 +6,7 @@ import { loadPairing } from "./storage";
  * Service worker (F12/M2): o clique no ícone lê a aba (só ela e só agora, pelo `activeTab`) e abre a janela do narnia
  * ao lado (F12-2), reaproveitando a que já estiver aberta.
  */
-const WINDOW = { width: 440, height: 760 };
+const WINDOW = { width: 480, height: 860 };
 
 async function readTab(tabId: number): Promise<PageSnapshot> {
   await chrome.scripting.executeScript({ target: { tabId }, files: ["capture.js"] });

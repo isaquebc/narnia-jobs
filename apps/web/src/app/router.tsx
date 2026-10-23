@@ -39,7 +39,7 @@ function RootLayout() {
   if (BARE.includes(pathname))
     return (
       <TooltipProvider>
-        <div className="min-h-screen bg-bg">
+        <div data-layout="bare" className="min-h-screen bg-bg">
           <Outlet />
         </div>
       </TooltipProvider>

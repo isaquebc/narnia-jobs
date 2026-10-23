@@ -193,8 +193,6 @@ type CapturePayload =
 
 const capturePath = (dataDir: string, id: string) => join(dataDir, "captures", `${id}.html`);
 
-const EXCERPT_CHARS = 600;
-
 function readingOf(p: CapturePayload): ExtensionCaptureReading {
   if (!p.ok)
     return {
@@ -203,7 +201,7 @@ function readingOf(p: CapturePayload): ExtensionCaptureReading {
       company: null,
       siteName: null,
       location: null,
-      excerpt: null,
+      description: null,
       chars: 0,
       message: p.message,
     };
@@ -213,19 +211,19 @@ function readingOf(p: CapturePayload): ExtensionCaptureReading {
     [[f.city, f.state].filter(Boolean).join(" - "), f.workMode ? workMode[f.workMode] : null]
       .filter(Boolean)
       .join(" · ") || null;
-  // o trecho pula o cabeçalho que o JSON-LD monta (cargo, empresa, local): começa na descrição
+  // a descrição pula o cabeçalho que o JSON-LD monta (cargo, empresa, local), já mostrado acima dela
   const lines = p.text.split("\n");
   const body = lines.filter(
     (l, i) => !(i === 0 && l === p.title) && !/^(Empresa|Local|Contrato|Publicada em): /.test(l),
   );
-  const excerpt = body.join("\n").trim().slice(0, EXCERPT_CHARS);
+  const description = body.join("\n").trim();
   return {
     ok: true,
     title: p.title,
     company: p.company,
     siteName: p.siteName,
     location,
-    excerpt: excerpt || null,
+    description: description || null,
     chars: p.text.length,
     message: null,
   };

@@ -18,7 +18,7 @@ export function CaptureWindow({
   error?: string | undefined;
 }) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 p-4">
+    <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-4 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-fg">
         {t("capture.title")}
       </p>
@@ -81,9 +81,9 @@ function PostingCapture({ capture }: { capture: ExtensionCapture }) {
         {r.location ? <span className="text-sm text-muted-fg">{r.location}</span> : null}
         <span className="text-xs text-muted-fg">{meta}</span>
       </header>
-      {r.excerpt ? (
-        <p className="line-clamp-[10] whitespace-pre-line rounded-md border border-border bg-muted/40 p-3 text-sm">
-          {r.excerpt}
+      {r.description ? (
+        <p className="whitespace-pre-line break-words rounded-md border border-border bg-muted/40 p-3 text-sm">
+          {r.description}
         </p>
       ) : null}
       {dup && !savedId ? (
@@ -117,7 +117,8 @@ function PostingCapture({ capture }: { capture: ExtensionCapture }) {
           </a>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        // a descrição pode ser longa: o botão fica sempre à vista no pé da janela
+        <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-border bg-bg px-4 py-3">
           <Button disabled={save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? t("capture.saving") : t("capture.save")}
           </Button>

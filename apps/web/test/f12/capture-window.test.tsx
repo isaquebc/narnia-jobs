@@ -22,7 +22,7 @@ const capture = (over: Record<string, unknown> = {}) => ({
     company: "Acme Pagamentos",
     siteName: "Vagas Exemplo",
     location: "São Paulo - SP · híbrido",
-    excerpt: "Buscamos uma pessoa engenheira backend para o time de pagamentos.",
+    description: `Buscamos uma pessoa engenheira backend para o time de pagamentos.\n\n${"Requisito. ".repeat(80)}\nFim da descrição.`,
     chars: 900,
     message: null,
   },
@@ -50,7 +50,12 @@ describe("F12/M2 · janela da extensão: vaga", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Acme Pagamentos")).toBeInTheDocument();
     expect(screen.getByText("São Paulo - SP · híbrido")).toBeInTheDocument();
-    expect(screen.getByText(/time de pagamentos/)).toBeInTheDocument();
+    // a descrição inteira, sem corte de linhas (testes do dono, 2026-10-23)
+    const description = screen.getByText(/time de pagamentos/);
+    expect(description).toHaveTextContent(/Fim da descrição\.$/);
+    expect(description.className).not.toMatch(/line-clamp/);
+    // a janela tem ~480 px: a largura mínima do layout do narnia (1024 px) não vale aqui
+    expect(document.querySelector('[data-layout="bare"]')).not.toBeNull();
     expect(screen.getByText(/vagas\.example/)).toBeInTheDocument();
     expect(screen.queryByRole("navigation")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Salvar vaga" }));
@@ -108,7 +113,7 @@ describe("F12/M2 · janela da extensão: vaga", () => {
               company: null,
               siteName: null,
               location: null,
-              excerpt: null,
+              description: null,
               chars: 0,
               message: "O site bloqueou a leitura automática desta página. Cole o texto da vaga.",
             },

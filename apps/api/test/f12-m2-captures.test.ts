@@ -83,7 +83,10 @@ describe("F12/M2 · captura de vaga pela extensão", () => {
         message: null,
       },
     });
-    expect(String(c.reading.excerpt)).toContain("engenheira backend");
+    // a descrição inteira, até o fim (testes do dono, 2026-10-23: antes ia só um trecho)
+    expect(String(c.reading.description)).toContain("engenheira backend");
+    expect(String(c.reading.description)).toContain("vale refeição");
+    expect(String(c.reading.description)).not.toMatch(/^Empresa: /m);
     expect(Number(c.reading.chars)).toBeGreaterThan(200);
     expect(existsSync(join(t.dataDir, "captures", `${r.body.id}.html`))).toBe(true);
     // a captura fica com o dispositivo que leu
@@ -101,7 +104,7 @@ describe("F12/M2 · captura de vaga pela extensão", () => {
       title: "Desenvolvedor Frontend Pleno",
       siteName: "Portal Exemplo",
     });
-    expect(String(c.reading.excerpt)).not.toContain("Entrar");
+    expect(String(c.reading.description)).not.toContain("Entrar");
   });
 
   it("página bloqueada: a leitura falha com a mensagem e Salvar vaga dá 422", async () => {
