@@ -30,6 +30,7 @@ import {
   CheckStatusSchema,
   ConflictSchema,
   EvidenceSchema,
+  FactChangeSchema,
   IngestionDepthSchema,
   IngestionModeSchema,
   IngestionSourceSchema,
@@ -245,6 +246,8 @@ export const IngestionResponseSchema = z.object({
   origin: RunOriginSchema.optional(),
   /** Experiências do perfil, para escolher a dona de uma conquista na revisão. */
   profileExperiences: z.array(z.object({ id: IdSchema, label: z.string() })).optional(),
+  /** Alteração pedida na conversa (`fact.propose_change`): o cartão de confirmar ou manter. */
+  factChange: FactChangeSchema.nullable().optional(),
 });
 export type IngestionResponse = z.infer<typeof IngestionResponseSchema>;
 

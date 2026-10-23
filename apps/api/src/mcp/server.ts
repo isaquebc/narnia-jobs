@@ -142,7 +142,7 @@ const isZodError = (e: unknown): e is { issues: Array<{ path: PropertyKey[]; mes
   typeof e === "object" && e !== null && Array.isArray((e as { issues?: unknown }).issues);
 
 /** Tools da conversa que criam uma execução de ingestão (o link "Abrir a ingestão criada" vem delas). */
-const CREATES_RUN = new Set(["ingest.text", "ingest.file", "ingest.github"]);
+const CREATES_RUN = new Set(["ingest.text", "ingest.file", "ingest.github", "fact.propose_change"]);
 
 /**
  * Erro como `isError`: `[código] mensagem` em pt-BR (tools tipadas) ou `invalid_input`; os demais passam pelo mapa de

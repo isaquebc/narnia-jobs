@@ -12,6 +12,12 @@ import {
 import type { z } from "zod";
 import type { Repos } from "../db";
 import { newId } from "../ids";
+import {
+  FactChangeError,
+  type FactChangePlan,
+  factChangeOf,
+  planFactChange,
+} from "../ingest/fact-change";
 import { isBelowReference } from "../salary";
 import { resolveChatSettings } from "./settings";
 
@@ -35,7 +41,10 @@ export type ChatToolErrorCode =
   | "invalid_url"
   | "source_not_found"
   | "source_not_in_profile"
-  | "field_not_pending";
+  | "field_not_pending"
+  | "invalid_change"
+  | "no_change"
+  | "quote_not_found";
 
 /** Erro tipado das tools; o servidor MCP (M2) devolve como `isError` com o texto em pt-BR. */
 export class ChatToolError extends Error {
@@ -66,6 +75,8 @@ export interface ChatIngestPort {
   startGithub(req: In<"ingest.github">): Promise<IngestStart>;
   /** Confirma a estimativa de uma execução de texto/arquivo criada por esta conversa (auditoria E1). */
   confirm(runId: string): Promise<{ runId: string; status: RunStatus }>;
+  /** Grava o registro da alteração como fonte e cria a execução em revisão (`createFactChangeRun`). */
+  proposeChange(plan: FactChangePlan): Promise<{ runId: string; status: RunStatus }>;
 }
 
 export interface ChatToolsContext {
@@ -540,6 +551,33 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
         })),
         nextCursor: p.nextCursor,
       };
+    }),
+    "fact.propose_change": wrap("fact.propose_change", async (input) => {
+      const sessionId = ctx.sessionId ?? null;
+      let plan: FactChangePlan;
+      try {
+        plan = planFactChange(repos, input, { sessionId });
+      } catch (e) {
+        if (e instanceof FactChangeError) throw new ChatToolError(e.code, e.message);
+        throw e;
+      }
+      // a mesma alteração do mesmo fato ainda esperando o usuário: devolve a pendente em vez de repetir
+      const pending = repos.ingestionRuns.list({ status: ["review"] }).find((r) => {
+        const c = factChangeOf(r);
+        return (
+          c?.factId === plan.change.factId &&
+          JSON.stringify(c.changes) === JSON.stringify(plan.change.changes)
+        );
+      });
+      if (pending)
+        return {
+          runId: pending.id,
+          status: pending.status,
+          url: runUrl(pending.id),
+          alreadyPending: true,
+        };
+      const r = await ctx.ingest.proposeChange(plan);
+      return { ...r, url: runUrl(r.runId), alreadyPending: false };
     }),
     "fact.verify": wrap("fact.verify", (input) => {
       const repo = factRepo(input.kind) as {

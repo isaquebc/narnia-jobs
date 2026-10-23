@@ -10,6 +10,9 @@ import { type SeededIds, seedFixture } from "../../src/testing/profile-fixtures"
 let repos: Repos;
 let ids: SeededIds;
 const port: ChatIngestPort = {
+  proposeChange: async () => {
+    throw new Error("não usado");
+  },
   startText: async () => {
     throw new Error("não usado");
   },

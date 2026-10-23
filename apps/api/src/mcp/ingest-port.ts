@@ -1,8 +1,11 @@
 import {
   type ChatIngestPort,
+  createFactChangeRun,
+  factChangeText,
   IngestError,
   ingestModelsForDepth,
   previousRunsForFile,
+  resolveExtractionModels,
 } from "@narnia-jobs/core";
 import {
   confirmIngestion,
@@ -11,13 +14,15 @@ import {
   startGithubRun,
 } from "../routes/ingestions";
 import { storeText } from "../services/files";
+import { emitRun } from "../services/runs";
 
 /**
  * Ingestão pela conversa (F04-16): as mesmas funções que as rotas usam (`startFileRun`, `startGithubRun`, `storeText`),
  * para a conversa e a tela seguirem o mesmo caminho (estimativa, confirmação do GitHub, conferência). Texto e
  * arquivo seguem a regra da tela (auditoria E1, §1.4/§7): abaixo de `ingest.auto_confirm_below` começam na hora; acima
  * a execução espera confirmação e o recrutador chama `ingest.confirm` depois que o usuário concordar com o custo.
- * `params.chat.sessionId` marca a conversa que criou a execução (null = terminal): só ela confirma.
+ * `params.chat.sessionId` marca a conversa que criou a execução (null = terminal): só ela confirma. A alteração pedida
+ * na conversa (`fact.propose_change`) grava o registro dela como texto e cria a execução já em revisão.
  */
 export function createChatIngestPort(
   deps: IngestionStartDeps,
@@ -63,6 +68,18 @@ export function createChatIngestPort(
         estimatedTokens: budget.amount,
         needsConfirmation: true,
       };
+    },
+    async proposeChange(plan) {
+      // o registro da alteração é o texto da fonte, como um texto livre; a execução já nasce em revisão
+      const stored = await storeText(deps.repos, deps.dataDir, factChangeText(plan));
+      const run = createFactChangeRun(deps.repos, plan, {
+        fileId: stored.file.id,
+        provider: deps.provider.id,
+        models: resolveExtractionModels(deps.repos.settings),
+        sessionId,
+      });
+      emitRun(deps.bus, deps.repos, run.id);
+      return { runId: run.id, status: run.status };
     },
     async confirm(runId) {
       const run = deps.repos.ingestionRuns.get(runId);

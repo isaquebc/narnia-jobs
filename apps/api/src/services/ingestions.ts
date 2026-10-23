@@ -1,4 +1,5 @@
 import {
+  factChangeOf,
   friendlyError,
   type IngestionRunRecord,
   type ProposalRecord,
@@ -248,6 +249,7 @@ export function toIngestionResponse(repos: Repos, run: IngestionRunRecord) {
     errorFriendly: run.error ? friendlyError(run.error) : null,
     timeline: runTimeline(repos, run),
     origin: runOrigin(repos, run),
+    factChange: factChangeOf(run),
     profileExperiences: profileExperiences(repos),
     failedTaskType: (run.params.failedTask as { type?: string } | undefined)?.type ?? null,
     createdAt: run.createdAt,

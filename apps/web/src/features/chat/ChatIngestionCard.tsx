@@ -8,6 +8,7 @@ import { Card, CardTitle } from "../../components/ui/card";
 import { ingestionKey, useIngestion } from "../../hooks/useIngestion";
 import { t } from "../../i18n";
 import { formatDate, formatTokens } from "../../lib/format";
+import { FactChangeCard } from "../ingestion/FactChangeCard";
 import { originText } from "../ingestion/proposalReference";
 import { ReviewPanel } from "../ingestion/ReviewPanel";
 import { runHeadline } from "../ingestion/runHeadline";
@@ -94,8 +95,11 @@ export function ChatIngestionCard({ runId }: { runId: string }) {
             {run.status === "error" ? (
               <Alert tone="danger">{run.error ?? t("chat.ingestion.failed")}</Alert>
             ) : null}
-            {run.status === "review" ? <ReviewPanel run={run} variant="panel" /> : null}
-            {run.status === "done" ? (
+            {run.factChange ? <FactChangeCard run={run} change={run.factChange} /> : null}
+            {run.status === "review" && !run.factChange ? (
+              <ReviewPanel run={run} variant="panel" />
+            ) : null}
+            {run.status === "done" && !run.factChange ? (
               <p className="text-xs text-muted-fg">{t("chat.ingestion.saved")}</p>
             ) : null}
           </>

@@ -6,6 +6,7 @@ import { seedFixture } from "../../src/testing/profile-fixtures";
 
 /** F04/M1 · cobertura (teste depois: cobertura) dos ramos das tools e dos repositórios do chat. */
 const noIngest: ChatIngestPort = {
+  proposeChange: async () => ({ runId: "r", status: "review" }),
   startText: async () => ({
     runId: "r",
     status: "queued",

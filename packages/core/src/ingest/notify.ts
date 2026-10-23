@@ -2,6 +2,7 @@ import type { Notification, NotificationKind } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import type { IngestionRunRecord } from "../db/repos/ingestion-runs";
 import { IngestError } from "./errors";
+import { factChangeOf } from "./fact-change";
 
 /**
  * Notificações da ingestão (F03-10): o estado do run define quais pendências ficam abertas. Idempotente: chamar
@@ -20,6 +21,8 @@ function label(repos: Repos, run: IngestionRunRecord): string {
     const n = run.params.repos?.length ?? 0;
     return `GitHub (${n} ${n === 1 ? "repositório" : "repositórios"})`;
   }
+  const change = factChangeOf(run);
+  if (change) return `Alteração: ${change.label}`;
   if (run.source === "text") return "Texto livre";
   const file = run.fileId ? repos.sourceFiles.get(run.fileId) : null;
   return file?.originalName ?? "Currículo";
@@ -58,6 +61,18 @@ export function syncRunNotifications(repos: Repos, runId: string): NotificationE
   switch (run.status) {
     case "review": {
       const pending = repos.proposals.listByRun(run.id).filter((p) => p.decision === "pending");
+      // alteração pedida na conversa: uma pendência só, com o que muda; o conflito já vem resolvido para o valor novo
+      const change = factChangeOf(run);
+      if (change) {
+        resolve(["review.conflicts"]);
+        upsert(
+          "review.pending",
+          `O recrutador quer alterar um dado seu: ${change.label}`,
+          `${change.changes.map((c) => c.field).join(", ")}: confirme ou mantenha como estava`,
+          "info",
+        );
+        break;
+      }
       const conflicts = pending.filter((p) => p.match === "conflict" && !p.resolution).length;
       resolve([
         "ingestion.awaiting_decision",

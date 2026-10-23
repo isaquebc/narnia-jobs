@@ -13,6 +13,7 @@ import { ingestionKey, useIngestion } from "../../hooks/useIngestion";
 import { type TKey, t } from "../../i18n";
 import type { IngestionDetail } from "../../lib/api";
 import { BudgetDecisionDialog } from "./BudgetDecisionDialog";
+import { FactChangeCard } from "./FactChangeCard";
 import { FriendlyError } from "./FriendlyError";
 import { shortTokens } from "./format";
 import { STATUS_TONE } from "./PendingRuns";
@@ -276,8 +277,14 @@ export function RunPage({ runId }: { runId: string }) {
         </Card>
       ) : null}
 
-      {run.status === "review" ? <ReviewPanel run={run} /> : null}
-      {run.status === "done" ? <RunResult run={run} /> : null}
+      {run.factChange ? (
+        <FactChangeCard run={run} change={run.factChange} />
+      ) : (
+        <>
+          {run.status === "review" ? <ReviewPanel run={run} /> : null}
+          {run.status === "done" ? <RunResult run={run} /> : null}
+        </>
+      )}
 
       {run.report && (run.status === "done" || run.status === "review") ? (
         <RunReportView report={run.report} />

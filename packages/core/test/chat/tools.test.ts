@@ -35,6 +35,10 @@ function port(o: { githubConfirm?: boolean } = {}): ChatIngestPort {
         alreadyRead: true,
       };
     },
+    async proposeChange(plan) {
+      calls.push({ op: "change", arg: plan.change.factId });
+      return { runId: "run-c", status: "review" };
+    },
     async confirm(runId) {
       calls.push({ op: "confirm", arg: runId });
       return { runId, status: "queued" };

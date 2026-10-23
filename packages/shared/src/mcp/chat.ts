@@ -7,7 +7,12 @@ import {
   TrustTagSchema,
 } from "../schemas/chat";
 import { IdSchema, PartialDateSchema } from "../schemas/common";
-import { IngestionDepthSchema, IngestionModeSchema, RunStatusSchema } from "../schemas/ingest";
+import {
+  FactChangeKindSchema,
+  IngestionDepthSchema,
+  IngestionModeSchema,
+  RunStatusSchema,
+} from "../schemas/ingest";
 import {
   AvailableFromSchema,
   ContractTypeSchema,
@@ -178,6 +183,22 @@ export const CHAT_TOOLS = {
         }),
       ),
       nextCursor: z.string().nullable(),
+    }),
+  ),
+  "fact.propose_change": tool(
+    "Propõe uma alteração pequena num fato do usuário (cargo, datas, tecnologias, nível de idioma…) que ele pediu na conversa. Nunca grava direto: vira uma ingestão cuja fonte é o registro da alteração (antes, depois, motivo e o pedido), e o usuário confirma no cartão da conversa ou em Pendências. `quote` é a frase do usuário copiada literalmente. `changes` traz só os campos que mudam (null apaga um campo opcional).",
+    z.object({
+      kind: FactChangeKindSchema,
+      id: IdSchema,
+      changes: z.record(z.string().min(1), z.unknown()),
+      reason: z.string().min(1).max(500),
+      quote: z.string().min(1).max(600),
+    }),
+    z.object({
+      runId: IdSchema,
+      status: RunStatusSchema,
+      url: z.string(),
+      alreadyPending: z.boolean(),
     }),
   ),
   "fact.verify": tool(

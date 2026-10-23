@@ -126,6 +126,16 @@ const CASES: Record<string, Case> = {
     where: "career",
     args: (c) => ({ kind: "experience", id: first(c.ids.experienceIds, "experiência") }),
   },
+  fact_propose_change: {
+    where: "terminal",
+    args: (c) => ({
+      kind: "experience",
+      id: first(c.ids.experienceIds, "experiência"),
+      changes: { title: "Tech Lead" },
+      reason: "O usuário corrigiu o cargo.",
+      quote: "eu era Tech Lead",
+    }),
+  },
   research_save: {
     where: "career",
     args: () => ({

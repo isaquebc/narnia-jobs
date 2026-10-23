@@ -23,6 +23,7 @@ describe("F04/M1 shared · tools MCP do chat", () => {
         "evidence.skill.list",
         "fact.gaps",
         "fact.get",
+        "fact.propose_change",
         "fact.search",
         "fact.timeline",
         "fact.unverified",

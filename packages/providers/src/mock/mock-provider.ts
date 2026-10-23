@@ -678,6 +678,16 @@ export class MockProvider implements Provider {
           })();
           args.sourceId = first ?? "sem-fonte";
         }
+        if (args.id === FIRST_EXPERIENCE) {
+          const listed = await callTool("evidence_experience_list", { limit: 1 });
+          try {
+            args.id =
+              (JSON.parse(listed.text) as { items?: Array<{ id: string }> }).items?.[0]?.id ??
+              "sem-experiencia";
+          } catch {
+            args.id = "sem-experiencia";
+          }
+        }
         const id = `mock-tool-${++rpcId}`;
         const input = JSON.stringify(args);
         // uma "chamada ao modelo" antes da tool e outra para a resposta, como o CLI (rastro por passo)
@@ -1080,6 +1090,19 @@ export function mockChatScript(
       },
     ];
   }
+  // alteração pequena pedida na conversa: vira uma proposta para o usuário confirmar, nunca grava direto
+  const role = /meu cargo .*? era ([^,.!?]+)/i.exec(text);
+  if (role)
+    return [
+      "fact_propose_change",
+      {
+        kind: "experience",
+        id: FIRST_EXPERIENCE,
+        changes: { title: (role[1] as string).trim() },
+        reason: "O usuário corrigiu o cargo na conversa.",
+        quote: text.trim().slice(0, 600),
+      },
+    ];
   const file = /^arquivo:\s*(\S+)/i.exec(text);
   if (file) return ["ingest_file", { fileId: file[1] as string }];
   const github = /^github:\s*(\S+)/i.exec(text);
@@ -1160,6 +1183,8 @@ const MOCK_POSTING_TERMS = [
 
 /** Marcador do roteiro: troca pelo id da fonte mais recente antes de chamar `research_apply`. */
 const LATEST_RESEARCH = "__fonte_mais_recente__";
+/** Marcador do roteiro: troca pelo id da primeira experiência da lista antes de chamar `fact_propose_change`. */
+const FIRST_EXPERIENCE = "__primeira_experiencia__";
 
 function emptyUsage(model: string) {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, model };
@@ -1183,6 +1208,8 @@ function mockChatReply(tool: string, isError: boolean): string {
       "Gravei a faixa no seu perfil com a fonte pesquisada (fonte: research_save); o campo saiu da lista de pendências.",
     fact_gaps:
       "Vi o que ainda falta no seu perfil (fonte: fact_gaps). Primeira pergunta: na sua experiência mais recente, que resultado você consegue medir com um número?",
+    fact_propose_change:
+      "Preparei a alteração para você confirmar: o antes e o depois estão no cartão ao lado. Nada muda até você confirmar.",
     ingest_confirm: "Confirmei a estimativa; a ingestão começou e as propostas vão para a revisão.",
     ingest_propose:
       "Anotei a correção como proposta na revisão desta ingestão. Próxima pergunta: em que período isso aconteceu?",

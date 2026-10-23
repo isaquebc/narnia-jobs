@@ -589,6 +589,92 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
       "type": "object",
     },
   },
+  "fact.propose_change": {
+    "description": "Propõe uma alteração pequena num fato do usuário (cargo, datas, tecnologias, nível de idioma…) que ele pediu na conversa. Nunca grava direto: vira uma ingestão cuja fonte é o registro da alteração (antes, depois, motivo e o pedido), e o usuário confirma no cartão da conversa ou em Pendências. \`quote\` é a frase do usuário copiada literalmente. \`changes\` traz só os campos que mudam (null apaga um campo opcional).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "additionalProperties": {},
+          "propertyNames": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "experience",
+            "achievement",
+            "education",
+            "skill",
+            "language",
+            "project",
+          ],
+          "type": "string",
+        },
+        "quote": {
+          "maxLength": 600,
+          "minLength": 1,
+          "type": "string",
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "id",
+        "changes",
+        "reason",
+        "quote",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "alreadyPending": {
+          "type": "boolean",
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "estimating",
+            "queued",
+            "running",
+            "awaiting_confirmation",
+            "awaiting_decision",
+            "paused",
+            "review",
+            "done",
+            "error",
+            "cancelled",
+          ],
+          "type": "string",
+        },
+        "url": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "runId",
+        "status",
+        "url",
+        "alreadyPending",
+      ],
+      "type": "object",
+    },
+  },
   "fact.search": {
     "description": "Busca nos fatos e resumos do usuário sem ler tudo (acentos ignorados, prefixo). Use antes de listar.",
     "input": {

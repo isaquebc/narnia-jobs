@@ -146,3 +146,31 @@ export const FieldResolutionSchema = z.object({
 });
 export const ResolutionSchema = z.record(z.string().min(1), FieldResolutionSchema);
 export type Resolution = z.infer<typeof ResolutionSchema>;
+
+/**
+ * Alteração pequena pedida na conversa (pedido do dono, 2026-10-23): o registro que vira a fonte da ingestão e o cartão
+ * de aprovação (antes e depois por campo, motivo e o pedido literal do usuário). `quoteFound`: o pedido foi achado nas
+ * mensagens do usuário da conversa (no terminal não há como conferir).
+ */
+export const FACT_CHANGE_KINDS = [
+  "experience",
+  "achievement",
+  "education",
+  "skill",
+  "language",
+  "project",
+] as const;
+export const FactChangeKindSchema = z.enum(FACT_CHANGE_KINDS);
+export type FactChangeKind = z.infer<typeof FactChangeKindSchema>;
+export const FactChangeSchema = z.object({
+  kind: FactChangeKindSchema,
+  factId: IdSchema,
+  label: z.string(),
+  changes: z
+    .array(z.object({ field: z.string().min(1), before: z.unknown(), after: z.unknown() }))
+    .min(1),
+  reason: z.string(),
+  quote: z.string(),
+  quoteFound: z.boolean(),
+});
+export type FactChange = z.infer<typeof FactChangeSchema>;

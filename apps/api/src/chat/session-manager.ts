@@ -85,7 +85,12 @@ export interface SessionManagerDeps {
 }
 
 /** Tools (nome publicado) que criam uma execução de ingestão: o runId vai para a tool call gravada. */
-const CREATES_RUN_TOOLS = new Set(["ingest_text", "ingest_file", "ingest_github"]);
+const CREATES_RUN_TOOLS = new Set([
+  "ingest_text",
+  "ingest_file",
+  "ingest_github",
+  "fact_propose_change",
+]);
 
 /** Avaliadores que valem para qualquer turno real (sem tokens); os demais dependem do caso de referência. */
 const ONLINE_GRADERS = [

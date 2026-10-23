@@ -250,8 +250,14 @@ export function proposalsRepo(db: Db, deps: Deps): ProposalsRepo {
         };
         const ensureSource = () => {
           if (!result.sourceId) {
-            const kind: FactSourceKind =
-              run?.source === "github" ? "github" : file?.kind === "text" ? "text" : "cv";
+            // alteração pedida na conversa: a fonte do fato é a conversa (o registro fica no arquivo da execução)
+            const kind: FactSourceKind = run?.params.factChange
+              ? "chat"
+              : run?.source === "github"
+                ? "github"
+                : file?.kind === "text"
+                  ? "text"
+                  : "cv";
             result.sourceId = deps.factSources.create({ kind, fileId: file?.id ?? null, runId }).id;
           }
           return result.sourceId;

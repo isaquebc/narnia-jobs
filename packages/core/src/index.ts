@@ -40,6 +40,7 @@ export * from "./ingest/chain";
 export * from "./ingest/coverage";
 export * from "./ingest/errors";
 export * from "./ingest/estimate-github";
+export * from "./ingest/fact-change";
 export * from "./ingest/github-run";
 export * from "./ingest/heal";
 export * from "./ingest/notify";

@@ -240,6 +240,59 @@ describe("F04/M4 · chat com o recrutador", () => {
   });
 });
 
+describe("alteração pedida na conversa (2026-10-23)", () => {
+  it("a alteração proposta pelo recrutador aparece no painel com confirmar e manter", async () => {
+    const reviewIngestion = vi.fn(async () => ({ pending: 0, runStatus: "done" }));
+    const { ws } = renderApp({
+      api: chatApi({
+        getIngestion: async () =>
+          ({
+            id: "r1",
+            fileId: "f1",
+            source: "text",
+            status: "review",
+            jobs: [],
+            digest: null,
+            error: null,
+            proposals: [
+              {
+                id: "pp1",
+                proposal: { kind: "experience", confidence: 1, data: {} },
+                decision: "pending",
+                match: "conflict",
+                matchTargetId: "e1",
+                conflict: null,
+                evidence: null,
+                checkStatus: "supported",
+                suggestedProfiles: [],
+              },
+            ],
+            factChange: {
+              kind: "experience",
+              factId: "e1",
+              label: "Engenheira · Acme",
+              changes: [{ field: "title", before: "Engenheira", after: "Tech Lead" }],
+              reason: "Corrigiu o cargo.",
+              quote: "eu era Tech Lead",
+              quoteFound: true,
+            },
+          }) as never,
+        reviewIngestion,
+      }),
+      initialUrl: "/chat/s1",
+    });
+    await screen.findByRole("textbox", { name: "Mensagem para o recrutador" });
+    act(() => ws.emit({ type: "chat.ingestion_created", sessionId: "s1", runId: "r1" }));
+    const card = await screen.findByRole("region", {
+      name: "O recrutador quer alterar um dado seu",
+    });
+    await userEvent.click(within(card).getByRole("button", { name: "Confirmar alteração" }));
+    expect(reviewIngestion).toHaveBeenCalledWith("r1", {
+      decisions: [{ proposalId: "pp1", decision: "accepted" }],
+    });
+  });
+});
+
 describe("Regressão 2026-10-11 (e2e F04/E2E-05) · painel Contexto mostra só o cartão do perfil", () => {
   it("usa o cartão do perfil ativo (F02), nunca o prompt completo do recrutador com persona e regras", async () => {
     const getActiveProfileCard = vi.fn(async () => ({
