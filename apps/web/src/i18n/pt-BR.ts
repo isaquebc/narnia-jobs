@@ -1225,6 +1225,10 @@ export const ptBR = {
     title: "Formulário de candidatura",
     posting: "Vaga:",
     noPosting: "Nenhuma vaga ligada a este formulário ainda.",
+    linkPosting: "Ligar a uma vaga salva",
+    changePosting: "Trocar",
+    savedPosting: "Vaga salva",
+    noneOption: "Nenhuma",
     locating: "Organizando as perguntas do formulário…",
     error: "Não deu para organizar as perguntas deste formulário.",
     fallback:

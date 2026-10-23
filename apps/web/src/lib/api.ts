@@ -285,6 +285,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     /** "Analisar de novo" na janela da extensão: abre a conversa da análise da vaga salva. */
     getApplication: (id: string) =>
       request<{ application: ApplicationFormView }>(`/api/applications/${encodeURIComponent(id)}`),
+    linkApplicationPosting: (id: string, postingId: string | null) =>
+      request<{ application: ApplicationFormView }>(`/api/applications/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postingId }),
+      }),
     relocateApplication: (id: string) =>
       request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/locate`, {
         method: "POST",

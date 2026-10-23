@@ -40,6 +40,8 @@ export interface ApplicationsRepo {
     now?: Date,
   ): void;
   setError(id: string, error: string, now?: Date): void;
+  /** Liga (ou desliga) o formulário a uma vaga salva, escolhida na janela. */
+  setPosting(id: string, postingId: string | null, now?: Date): void;
   /** Pede a organização de novo (Ler de novo). */
   setLocating(id: string, now?: Date): void;
 }
@@ -104,6 +106,13 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
       db.prepare(
         "update application_form set status = 'error', error = ?, updated_at = ? where id = ?",
       ).run(error, now.toISOString(), id);
+    },
+    setPosting(id, postingId, now = new Date()) {
+      db.prepare("update application_form set posting_id = ?, updated_at = ? where id = ?").run(
+        postingId,
+        now.toISOString(),
+        id,
+      );
     },
     setLocating(id, now = new Date()) {
       db.prepare(

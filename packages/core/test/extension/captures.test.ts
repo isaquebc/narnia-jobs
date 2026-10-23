@@ -130,3 +130,66 @@ describe("F12/M2 · migração", () => {
     expect(createRepos(db).extension.getCapture("x")).toBeNull();
   });
 });
+
+describe("F12 · formulário acha a vaga salva (testes do dono, 2026-10-23)", () => {
+  it("a página do formulário é a mesma vaga: /application, /apply, /applications/new", () => {
+    expect(
+      samePostingUrl(
+        "https://jobs.ashbyhq.com/vitalis/0f1e2d3c-4b5a-4968-8778-a1b2c3d4e5f6/application?utm_source=exemplo",
+        "https://jobs.ashbyhq.com/vitalis/0f1e2d3c-4b5a-4968-8778-a1b2c3d4e5f6",
+      ),
+    ).toBe(true);
+    expect(
+      samePostingUrl(
+        "https://jobs.lever.co/acme/1a2b3c4d-1111/apply",
+        "https://jobs.lever.co/acme/1a2b3c4d-1111",
+      ),
+    ).toBe(true);
+    expect(
+      samePostingUrl("https://acme.gupy.io/jobs/123456/apply", "https://acme.gupy.io/jobs/123456"),
+    ).toBe(true);
+  });
+
+  it("mesmo id da vaga em outro link, ou cargo e empresa no título da página", () => {
+    const r = repos();
+    const ashby = r.postings.create({
+      title: "Senior Software Engineer",
+      company: "Vitalis",
+      postingUrl:
+        "https://www.linkedin.com/jobs/view/999?url=https://jobs.ashbyhq.com/vitalis/0f1e2d3c-4b5a-4968-8778-a1b2c3d4e5f6",
+    });
+    const form =
+      "https://jobs.ashbyhq.com/vitalis/0f1e2d3c-4b5a-4968-8778-a1b2c3d4e5f6/application";
+    expect(findLikelyPosting(r.postings.list(), { url: form })?.id).toBe(ashby.id);
+    const r2 = repos();
+    const byTitle = r2.postings.create({
+      title: "Senior Software Engineer - Vitalis Labs",
+      company: "Vitalis",
+      postingUrl: "https://www.linkedin.com/jobs/view/4012345678",
+    });
+    r2.postings.create({ title: "Senior Software Engineer", company: "Outra" });
+    expect(
+      findLikelyPosting(r2.postings.list(), {
+        url: "https://jobs.example/xyz/application",
+        pageTitle: "Senior Software Engineer - Vitalis Labs @ Vitalis",
+      })?.id,
+    ).toBe(byTitle.id);
+    // cargo curto (o modelo tirou o "- Vitalis Labs") com a empresa: ainda acha pelo título da página
+    const r3 = repos();
+    const short = r3.postings.create({ title: "Senior Software Engineer", company: "Vitalis" });
+    expect(
+      findLikelyPosting(r3.postings.list(), {
+        url: "https://jobs.example/xyz/application",
+        title: "Senior Software Engineer - Vitalis Labs",
+        company: "Vitalis",
+      })?.id,
+    ).toBe(short.id);
+    // só o cargo genérico, sem a empresa: não é a mesma
+    expect(
+      findLikelyPosting(r3.postings.list(), {
+        url: "https://jobs.example/xyz/application",
+        pageTitle: "Senior Software Engineer @ Globex",
+      }),
+    ).toBeNull();
+  });
+});

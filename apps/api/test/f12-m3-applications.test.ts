@@ -175,6 +175,53 @@ describe("F12/M3 · formulário de candidatura", () => {
     expect(application).toMatchObject({ postingId: p.id, posting: { title: "Backend Sr" } });
   });
 
+  it("ligar o formulário a uma vaga salva à mão (ou desligar); vaga inexistente dá 404", async () => {
+    t = makeTestApp();
+    const p = t.repos.postings.create({ title: "Senior Software Engineer", company: "Vitalis" });
+    const { applicationId } = await capture(t, { form: FORM });
+    const link = (postingId: string | null) =>
+      t?.api(`/api/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postingId }),
+      });
+    expect((await link(p.id))?.status).toBe(200);
+    expect((await view(t, applicationId as string)).application).toMatchObject({
+      postingId: p.id,
+      posting: { title: "Senior Software Engineer" },
+    });
+    expect((await link("nao"))?.status).toBe(404);
+    expect((await link(null))?.status).toBe(200);
+    expect((await view(t, applicationId as string)).application.postingId).toBeNull();
+  });
+
+  it("a página do formulário acha a vaga salva pela página da vaga (Ashby /application)", async () => {
+    t = makeTestApp();
+    const p = t.repos.postings.create({
+      title: "Senior Software Engineer - Vitalis Labs",
+      company: "Vitalis",
+      postingUrl: "https://jobs.ashbyhq.com/vitalis/0f1e2d3c-4b5a-4968-8778-a1b2c3d4e5f6",
+    });
+    const token = await device(t);
+    const r = await t.app.request("/api/extension/captures", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "page",
+        url: "https://jobs.ashbyhq.com/vitalis/0f1e2d3c-4b5a-4968-8778-a1b2c3d4e5f6/application?utm_source=exemplo",
+        title: "Senior Software Engineer - Vitalis Labs @ Vitalis",
+        html: HTML,
+        form: FORM,
+        mode: "form",
+      }),
+    });
+    const { id } = (await r.json()) as { id: string };
+    const got = (await (await t.api(`/api/extension/captures/${id}`)).json()) as {
+      capture: { applicationId: string };
+    };
+    expect((await view(t, got.capture.applicationId)).application.postingId).toBe(p.id);
+  });
+
   it("ler de novo pede as perguntas outra vez; formulário inexistente dá 404", async () => {
     t = makeTestApp();
     const { applicationId } = await capture(t, { form: FORM });

@@ -893,6 +893,8 @@ export const ApplicationFormViewSchema = z.object({
   updatedAt: z.string(),
 });
 export type ApplicationFormView = z.infer<typeof ApplicationFormViewSchema>;
+/** Ligar o formulário a uma vaga salva (ou desligar, `null`) na janela. */
+export const ApplicationPatchSchema = z.object({ postingId: z.string().min(1).nullable() });
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
   pattern: true,
   trustTag: true,

@@ -1,11 +1,12 @@
 import type { ApplicationFormView } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useApi, useWs } from "../../app/context";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
+import { Select } from "../../components/ui/input";
 import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { bridgeRequest, extensionAvailable } from "./bridge";
@@ -92,20 +93,7 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
     <article className="flex flex-col gap-3">
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold leading-tight">{t("application.title")}</h1>
-        {a.posting ? (
-          <span className="text-sm">
-            {t("application.posting")}{" "}
-            <a
-              href={`/vagas/${a.postingId}`}
-              {...external}
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              {[a.posting.title, a.posting.company].filter(Boolean).join(" · ")}
-            </a>
-          </span>
-        ) : (
-          <span className="text-sm text-muted-fg">{t("application.noPosting")}</span>
-        )}
+        <PostingLink application={a} />
       </header>
       {a.status === "locating" ? (
         <div className="flex items-center gap-2 rounded-md border border-border p-3 text-sm font-medium">
@@ -250,4 +238,77 @@ function PostingDocuments({
   const { analyses } = usePosting(postingId);
   const recommended = analyses.data?.analyses[0]?.recommendedProfileId ?? profileId;
   return <CaptureDocuments postingId={postingId} recommendedProfileId={recommended} />;
+}
+
+/**
+ * A vaga do formulário: a que a busca achou (mesmo link, id da vaga, cargo e empresa) ou a escolhida aqui, quando ela
+ * não achou ou achou outra (testes do dono, 2026-10-23).
+ */
+function PostingLink({ application: a }: { application: ApplicationFormView }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const selectId = useId();
+  const [choosing, setChoosing] = useState(false);
+  const postings = useQuery({
+    queryKey: ["postings", "for-application"],
+    queryFn: () => api.listPostings(),
+    enabled: choosing,
+  });
+  const link = useMutation({
+    mutationFn: (postingId: string | null) => api.linkApplicationPosting(a.id, postingId),
+    onSuccess: async () => {
+      setChoosing(false);
+      await qc.invalidateQueries({ queryKey: applicationKey(a.id) });
+    },
+  });
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <span className="flex flex-wrap items-center gap-x-2">
+        {a.posting ? (
+          <span>
+            {t("application.posting")}{" "}
+            <a
+              href={`/vagas/${a.postingId}`}
+              {...external}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {[a.posting.title, a.posting.company].filter(Boolean).join(" · ")}
+            </a>
+          </span>
+        ) : (
+          <span className="text-muted-fg">{t("application.noPosting")}</span>
+        )}
+        {!choosing ? (
+          <button
+            type="button"
+            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+            onClick={() => setChoosing(true)}
+          >
+            {a.posting ? t("application.changePosting") : t("application.linkPosting")}
+          </button>
+        ) : null}
+      </span>
+      {choosing ? (
+        <span className="flex flex-col gap-1">
+          <label htmlFor={selectId} className="text-xs text-muted-fg">
+            {t("application.savedPosting")}
+          </label>
+          <Select
+            id={selectId}
+            value={a.postingId ?? ""}
+            disabled={postings.isPending || link.isPending}
+            onChange={(e) => link.mutate(e.target.value || null)}
+          >
+            <option value="">{t("application.noneOption")}</option>
+            {(postings.data?.postings ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {[p.title, p.company].filter(Boolean).join(" · ")}
+              </option>
+            ))}
+          </Select>
+        </span>
+      ) : null}
+      {link.isError ? <Alert tone="danger">{(link.error as Error).message}</Alert> : null}
+    </div>
+  );
 }

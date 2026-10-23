@@ -170,6 +170,35 @@ describe("F12/M3 · janela: formulário de candidatura", () => {
     expect(within(docs).getByRole("button", { name: "Gerar carta" })).toBeInTheDocument();
   });
 
+  it("sem vaga ligada (ou a errada): escolher a vaga salva na janela", async () => {
+    const linkApplicationPosting = vi.fn(
+      async (_id: string, _p: string | null) => ({ application: application() }) as never,
+    );
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () =>
+          ({ application: application({ postingId: null, posting: null }) }) as never,
+        listPostings: async () =>
+          ({
+            postings: [
+              { id: "v1", title: "Backend Sr", company: "Acme" },
+              { id: "v2", title: "Senior Software Engineer - Vitalis Labs", company: "Vitalis" },
+            ],
+          }) as never,
+        linkApplicationPosting,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Ligar a uma vaga salva" }));
+    await userEvent.selectOptions(
+      await screen.findByRole("combobox", { name: "Vaga salva" }),
+      "Senior Software Engineer - Vitalis Labs · Vitalis",
+    );
+    expect(linkApplicationPosting).toHaveBeenCalledWith("a1", "v2");
+  });
+
   it("organizando: mostra o andamento e recarrega quando o worker avisa", async () => {
     let current = application({ status: "locating", questions: [] });
     const { ws } = renderApp({

@@ -118,6 +118,7 @@ export function extensionRoutes(deps: {
           url: b.url,
           title: read.ok ? read.title : null,
           company: read.ok ? read.company : null,
+          pageTitle: b.title ?? null,
         });
         const form = deps.repos.applications.create({
           captureId: capture.id,
@@ -144,6 +145,7 @@ export function extensionRoutes(deps: {
           url: capture.url,
           title: reading.title,
           company: reading.company,
+          pageTitle: capture.title,
         });
     const body: ExtensionCapture = {
       id: capture.id,
