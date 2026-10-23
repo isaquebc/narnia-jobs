@@ -34,7 +34,12 @@ function PostingCard({ p }: { p: Posting }) {
         <Card className="flex h-full flex-col gap-1 hover:bg-muted">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-base font-medium">{p.company ?? t("postings.noCompany")}</h3>
-            <Badge tone={statusTone[p.status]}>{t(`postings.status.${p.status}` as TKey)}</Badge>
+            <span className="flex shrink-0 gap-1">
+              {p.duplicate && p.duplicate.decision === null ? (
+                <Badge tone="warn">{t("postings.duplicate.badge")}</Badge>
+              ) : null}
+              <Badge tone={statusTone[p.status]}>{t(`postings.status.${p.status}` as TKey)}</Badge>
+            </span>
           </div>
           {p.client ? <p className="text-sm text-muted-fg">{p.client}</p> : null}
           <p className="text-sm">

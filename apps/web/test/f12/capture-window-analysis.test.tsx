@@ -238,4 +238,50 @@ describe("F12/M2 · janela: CV e carta", () => {
       }),
     );
   });
+
+  it("vaga repetida: a janela mostra a comparação e a análise espera a decisão", async () => {
+    let current = capture();
+    let saved = posting("v1", {
+      status: "ready",
+      duplicate: {
+        candidateId: "v0",
+        sameJob: true,
+        confidence: 92,
+        differences: [],
+        rationale: "Mesmo link.",
+        checkedAt: "2026-10-23T12:00:00.000Z",
+        decision: null,
+      },
+    });
+    const decideDuplicate = vi.fn(async () => {
+      current = { ...capture({ sessionId: "s1" }), postingId: "v0" };
+      saved = posting("v0", { status: "ready" });
+      return { keptId: "v0", removedId: "v1" };
+    });
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture: current }) as never,
+        getPosting: async () => ({ posting: saved, contacts: [], notes: [], duplicates: ["v0"] }),
+        listPostingAnalyses: async () => ({ analyses: [] }),
+        getChatSession: async () => session(true),
+        listDocuments: async () => ({ documents: [] }),
+        decideDuplicate,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    const dialog = await screen.findByRole("dialog", { name: "Vaga repetida?" });
+    expect(screen.getByText(/A análise começa depois que você decidir/)).toBeInTheDocument();
+    expect(screen.queryByText(/Lendo os detalhes da vaga/)).toBeNull();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Atualizar a vaga salva" }));
+    expect(decideDuplicate).toHaveBeenCalledWith("v1", "update");
+    // a janela passa a acompanhar a vaga salva
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Abrir a vaga no narnia" })).toHaveAttribute(
+        "href",
+        "/vagas/v0",
+      ),
+    );
+    expect(await screen.findByText(/Analisando a vaga/)).toBeInTheDocument();
+  });
 });

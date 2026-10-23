@@ -5,6 +5,7 @@ import {
   buildPreAnalysis,
   confirmPostingNote,
   decideDuplicate,
+  duplicatePostings,
   editPostingNote,
   evidenceLabels,
   type NoteEditResult,
@@ -124,6 +125,8 @@ export function postingsRoutes(deps: {
       const r = decideDuplicate(repos, id, c.req.valid("json").action);
       if (r.keptId) touched(r.keptId);
       if (r.removedId) touched(r.removedId);
+      // descartada a nova, a salva também avisa: a janela da extensão passou a acompanhar ela
+      if (!r.keptId) touched(p.duplicate.candidateId);
       return c.json(r);
     },
   );
@@ -150,9 +153,7 @@ export function postingsRoutes(deps: {
       posting,
       contacts: repos.postingContacts.list(posting.id),
       notes: repos.postingNotes.list(posting.id),
-      duplicates: posting.identityHash
-        ? repos.postings.findByIdentity(posting.identityHash, posting.id).map((p) => p.id)
-        : [],
+      duplicates: duplicatePostings(repos, posting).map((p) => p.id),
       // outras vagas da mesma empresa com o mesmo role (alerta da página, F06-11)
       related: relatedPostings(repos, posting),
     });

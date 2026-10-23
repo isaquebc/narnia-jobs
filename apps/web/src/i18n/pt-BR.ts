@@ -1192,6 +1192,8 @@ export const ptBR = {
     paste: "Colar a descrição em Vagas",
     step: {
       reading: "Lendo os detalhes da vaga…",
+      duplicate:
+        "A análise começa depois que você decidir: atualizar a salva, salvar como nova ou descartar esta.",
       starting: "Começando a análise…",
       analyzing: "Analisando a vaga com os seus perfis…",
       analyzingHint:
@@ -1509,6 +1511,7 @@ export const ptBR = {
       new: "Salvar como vaga nova",
       cancel: "Descartar esta vaga",
       decidedNew: "Mantida como vaga separada.",
+      badge: "Repetida?",
     },
   },
   documents: {

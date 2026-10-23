@@ -320,6 +320,94 @@ describe("F12/M2 · Salvar vaga também analisa (pedido do dono, 2026-10-23)", (
     expect(await analysisOf(t, id)).toMatchObject({ sessionId: expect.any(String), error: null });
   });
 
+  /** A extração achou uma vaga salva parecida: a comparação fica pendente na vaga nova. */
+  function pendingDuplicate(app: TestApp, postingId: string) {
+    const savedPosting = app.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    app.repos.postings.setDuplicate(postingId, {
+      candidateId: savedPosting.id,
+      sameJob: true,
+      confidence: 92,
+      differences: [],
+      rationale: "Mesma vaga.",
+      checkedAt: "2026-10-23T12:00:00.000Z",
+      decision: null,
+    });
+    return savedPosting.id;
+  }
+
+  const postingOf = async (app: TestApp, id: string) =>
+    (
+      (await (await app.api(`/api/extension/captures/${id}`)).json()) as {
+        capture: { postingId: string | null };
+      }
+    ).capture.postingId;
+
+  const decide = (app: TestApp, postingId: string, action: string) =>
+    app.api(`/api/postings/${postingId}/duplicate-decision`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+
+  it("vaga repetida: a análise espera a decisão; Salvar como nova analisa a nova", async () => {
+    t = makeTestApp();
+    const { id, postingId } = await saved(t);
+    pendingDuplicate(t, postingId);
+    extractionDone(t, postingId);
+    expect(await analysisOf(t, id)).toEqual({ requested: true, sessionId: null, error: null });
+    expect((await decide(t, postingId, "new")).status).toBe(200);
+    expect((await analysisOf(t, id)).sessionId).toEqual(expect.any(String));
+    const session = t.repos.chatSessions.get((await analysisOf(t, id)).sessionId as string);
+    expect(session?.postingId).toBe(postingId);
+  });
+
+  it("vaga repetida: Atualizar a salva liga a captura à salva e analisa a salva", async () => {
+    t = makeTestApp();
+    const { id, postingId } = await saved(t);
+    const savedId = pendingDuplicate(t, postingId);
+    extractionDone(t, postingId);
+    expect((await decide(t, postingId, "update")).status).toBe(200);
+    expect(await postingOf(t, id)).toBe(savedId);
+    const session = t.repos.chatSessions.get((await analysisOf(t, id)).sessionId as string);
+    expect(session?.postingId).toBe(savedId);
+  });
+
+  it("vaga repetida: Descartar liga a captura à salva; a salva já analisada não abre outra análise", async () => {
+    t = makeTestApp();
+    const { id, postingId } = await saved(t);
+    const savedId = pendingDuplicate(t, postingId);
+    t.repos.jobAnalyses.add({
+      postingId: savedId,
+      analysis: {},
+      recommendedProfileId: null,
+      factsVersion: 1,
+      postingUpdatedAt: "2026-10-23T12:00:00.000Z",
+      models: [],
+      usage: null,
+      chatSessionId: null,
+    });
+    extractionDone(t, postingId);
+    expect((await decide(t, postingId, "cancel")).status).toBe(200);
+    expect(await postingOf(t, id)).toBe(savedId);
+    expect(t.repos.chatSessions.list({}).filter((s) => s.category === "job")).toHaveLength(0);
+  });
+
+  it("a página da vaga lista como repetida a de mesmo link, mesmo com outro cargo", async () => {
+    t = makeTestApp();
+    const a = t.repos.postings.create({
+      title: "Engenheira Backend Sênior",
+      company: "Acme",
+      postingUrl: "https://vagas.example/1?utm_source=x",
+    });
+    const b = t.repos.postings.create({
+      title: "Senior Backend Engineer",
+      company: "Acme",
+      postingUrl: "https://vagas.example/1",
+    });
+    const r = (await (await t.api(`/api/postings/${b.id}`)).json()) as { duplicates: string[] };
+    expect(r.duplicates).toEqual([a.id]);
+  });
+
   it("Analisar de novo: abre na hora; captura sem vaga dá 422 e inexistente 404", async () => {
     t = makeTestApp();
     const { id } = await saved(t);

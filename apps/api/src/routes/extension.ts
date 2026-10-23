@@ -287,7 +287,7 @@ function captureAnalysisStarter(deps: {
 
 /**
  * "Salvar vaga" também analisa (F12/M2, pedido do dono 2026-10-23): quando a extração da vaga termina (pronta ou com
- * erro, o texto já está salvo), abre a análise das capturas que pediram. Roda no api, então a análise segue mesmo
+ * erro, o texto já está salvo), abre a análise das capturas que pediram; vaga com duplicata pendente espera a decisão. Roda no api, então a análise segue mesmo
  * com a janela fechada.
  */
 export function watchCaptureAnalyses(deps: {
@@ -300,6 +300,10 @@ export function watchCaptureAnalyses(deps: {
     if (e.type !== "posting.updated") return;
     const posting = deps.repos.postings.get(e.postingId);
     if (!posting || posting.status === "extracting") return;
+    // parece repetida: espera a decisão (Salvar como nova, Atualizar ou Descartar) para não analisar à toa; a salva
+    // que já tem análise não abre outra
+    if (posting.duplicate && posting.duplicate.decision === null) return;
+    if (deps.repos.jobAnalyses.list(e.postingId).length) return;
     for (const capture of deps.repos.extension.capturesAwaitingAnalysis(e.postingId))
       start(capture.id, e.postingId);
   });

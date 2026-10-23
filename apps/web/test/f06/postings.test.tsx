@@ -52,6 +52,37 @@ describe("F06/M6 · Vagas", () => {
     );
   });
 
+  it("vaga com comparação de repetida pendente aparece marcada na lista", async () => {
+    renderApp({
+      api: api({
+        listPostings: async () => ({
+          postings: [
+            posting("v1", {
+              duplicate: {
+                candidateId: "v0",
+                sameJob: true,
+                confidence: 90,
+                differences: [],
+                rationale: "Mesma.",
+                checkedAt: "2026-10-23T12:00:00.000Z",
+                decision: null,
+              },
+            }),
+            posting("v2", { company: "Nubank", client: null }),
+          ],
+        }),
+      }) as never,
+      initialUrl: "/vagas",
+    });
+    const list = await screen.findByRole("list", { name: "Vagas" });
+    expect(
+      await within(list).findByRole("listitem", { name: "Globex Consultoria / Initech Bank" }),
+    ).toHaveTextContent("Repetida?");
+    expect(within(list).getByRole("listitem", { name: "Nubank" })).not.toHaveTextContent(
+      "Repetida?",
+    );
+  });
+
   it("nova vaga pelo texto chama a entrada e abre a página da vaga", async () => {
     const intakePosting = vi.fn(async () => ({ posting: posting("v9"), job: null }));
     const { router } = renderApp({ api: api({ intakePosting }) as never, initialUrl: "/vagas" });

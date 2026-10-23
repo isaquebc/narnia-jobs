@@ -139,6 +139,46 @@ describe("F06/M4 core · pipeline da vaga", () => {
     expect(repos.postings.get(incoming.id)).toBeNull();
   });
 
+  it("duplicata: mesmo link (sem o rastreio) é candidata mesmo com o cargo escrito de outro jeito", () => {
+    const repos = setup();
+    const saved = createPostingFromIntake(repos, {
+      url: "https://vagas.example/123?utm_source=linkedin",
+      fields: { company: "Acme", title: "Engenheira Backend Sênior" },
+    });
+    createPostingFromIntake(repos, { fields: { company: "Outra", title: "Dev" } });
+    const incoming = createPostingFromIntake(repos, {
+      url: "https://vagas.example/123/",
+      fields: { company: "Acme", title: "Senior Backend Engineer" },
+    });
+    expect(duplicateCandidate(repos, incoming.id)?.id).toBe(saved.id);
+    // sem link igual nem identidade igual, não há candidata
+    const other = createPostingFromIntake(repos, {
+      url: "https://vagas.example/999",
+      fields: { company: "Acme", title: "Designer" },
+    });
+    expect(duplicateCandidate(repos, other.id)).toBeNull();
+  });
+
+  it("duplicata decidida: capturas da extensão ligadas à nova passam para a salva (update e cancel)", () => {
+    const repos = setup();
+    const saved = createPostingFromIntake(repos, { fields: { company: "Itaú", title: "Dev" } });
+    const out = { sameJob: true, confidence: 90, differences: [], rationale: "Mesma." };
+    for (const action of ["update", "cancel"] as const) {
+      const p = createPostingFromIntake(repos, { fields: { company: "Itaú", title: "Dev" } });
+      const c = repos.extension.createCapture({
+        kind: "page",
+        url: "https://vagas.example/1",
+        title: null,
+        payload: {},
+        deviceId: null,
+      });
+      repos.extension.linkCapturePosting(c.id, p.id);
+      recordDuplicateCheck(repos, p.id, saved.id, out);
+      decideDuplicate(repos, p.id, action);
+      expect(repos.extension.getCapture(c.id)?.postingId).toBe(saved.id);
+    }
+  });
+
   it("duplicata: new mantém as duas com a decisão; cancel apaga a nova", () => {
     const repos = setup();
     const saved = createPostingFromIntake(repos, { fields: { company: "Itaú", title: "Dev" } });

@@ -10,7 +10,7 @@ import { login } from "../helpers/profiles";
 /**
  * F12/E2E-02 (M2, F12-2): numa página de vaga, o clique no ícone lê a aba, abre a janela do narnia com a vaga lida e
  * "Salvar vaga" entra pelo fluxo da F06; clicar de novo na mesma vaga reaproveita a janela e avisa que ela já está
- * salva. A página de vaga é uma fixture servida pelo próprio Playwright em `http://vagas.example` (host extra do build
+ * salva; salvar assim mesmo mostra a comparação de vaga repetida na janela. A página de vaga é uma fixture servida pelo próprio Playwright em `http://vagas.example` (host extra do build
  * do e2e). O Playwright não clica na barra do Chrome: o teste chama o mesmo fluxo pelo service worker.
  */
 const FIXTURE_HOST = "vagas.example";
@@ -146,4 +146,15 @@ test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → anál
     popup.getByText(/Parece a vaga "Engenheira Backend Sênior · Acme Pagamentos"/),
   ).toBeVisible();
   expect(context.pages().length).toBe(pagesBefore);
+
+  // salvar assim mesmo: a extração acha a salva pelo link e a janela pede a decisão antes de analisar; descartar
+  // volta para a salva, com a análise que ela já tem
+  await popup.getByRole("button", { name: "Salvar vaga" }).click();
+  const dialog = popup.getByRole("dialog", { name: "Vaga repetida?" });
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
+  await expect(popup.getByText(/A análise começa depois que você decidir/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Descartar esta vaga" }).click();
+  await expect(popup.getByRole("region", { name: "Análise da vaga" })).toBeVisible();
+  await page.goto("/vagas");
+  await expect(page.getByText("Engenheira Backend Sênior")).toHaveCount(1);
 });

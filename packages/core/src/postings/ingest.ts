@@ -13,6 +13,7 @@ import {
   type PreAnalysisKeyword,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
+import { samePostingUrl } from "../extension/captures";
 import { canonicalTerm } from "./dictionary";
 import { normalizeIdentityPart } from "./identity";
 import { buildPreAnalysis, matchKeywords, postingRisks } from "./match";
@@ -135,11 +136,29 @@ export function refreshPreAnalysis(
   };
 }
 
-/** Outra vaga salva com o mesmo hash de identidade (a mais recente), candidata a duplicata (F06-9). */
+/**
+ * Outras vagas salvas que podem ser a mesma (F06-9), a mais recente primeiro: o mesmo link (sem os parâmetros de
+ * rastreio), que pega a vaga com o cargo escrito de outro jeito, e depois o mesmo hash de identidade.
+ */
+export function duplicatePostings(repos: Repos, p: Posting): Posting[] {
+  const byUrl = p.postingUrl
+    ? repos.postings
+        .list()
+        .filter(
+          (o) =>
+            o.id !== p.id && o.postingUrl && samePostingUrl(o.postingUrl, p.postingUrl as string),
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    : [];
+  const byIdentity = p.identityHash ? repos.postings.findByIdentity(p.identityHash, p.id) : [];
+  const seen = new Set<string>();
+  return [...byUrl, ...byIdentity].filter((o) => !seen.has(o.id) && seen.add(o.id));
+}
+
+/** A candidata a duplicata da vaga (F06-9): a primeira de `duplicatePostings`. */
 export function duplicateCandidate(repos: Repos, postingId: string): Posting | null {
   const p = repos.postings.get(postingId);
-  if (!p?.identityHash) return null;
-  return repos.postings.findByIdentity(p.identityHash, p.id)[0] ?? null;
+  return p ? (duplicatePostings(repos, p)[0] ?? null) : null;
 }
 
 /** Resumo de uma vaga para a comparação (campos preenchidos e a JD). */
@@ -176,7 +195,8 @@ export type DuplicateAction = "update" | "new" | "cancel";
 
 /**
  * Decisão do modal (F06-9): `update` leva para a vaga salva o que a nova trouxe de diferente (campos, contatos e notas)
- * e apaga a nova; `new` mantém as duas; `cancel` apaga a nova. Devolve a vaga que fica.
+ * e apaga a nova; `new` mantém as duas; `cancel` apaga a nova. Devolve a vaga que fica. Em `update` e `cancel`, as
+ * capturas da extensão ligadas à nova passam para a salva.
  */
 export function decideDuplicate(
   repos: Repos,
@@ -220,6 +240,8 @@ export function decideDuplicate(
     for (const n of repos.postingNotes.list(postingId))
       repos.postingNotes.add(savedId, n.author, n.body);
   }
+  // a janela da extensão que salvou a nova passa a acompanhar a salva (F12/M2)
+  repos.extension.moveCaptures(postingId, savedId);
   repos.postings.remove(postingId);
   return { keptId: action === "update" ? savedId : null, removedId: postingId };
 }

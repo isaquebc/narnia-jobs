@@ -48,6 +48,8 @@ export interface ExtensionRepo {
   ): ExtensionCaptureRecord;
   getCapture(id: string): ExtensionCaptureRecord | null;
   linkCapturePosting(id: string, postingId: string): void;
+  /** Liga à vaga `to` as capturas da vaga `from` (duplicata decidida: a nova some, fica a salva). */
+  moveCaptures(from: string, to: string): void;
   requestCaptureAnalysis(id: string, now?: Date): void;
   /** Conversa da análise aberta (limpa o erro) ou o erro ao abrir. */
   setCaptureAnalysis(id: string, result: { sessionId: string } | { error: string }): void;
@@ -189,6 +191,9 @@ export function extensionRepo(db: Db): ExtensionRepo {
     },
     linkCapturePosting(id, postingId) {
       q("update extension_capture set posting_id = ? where id = ?").run(postingId, id);
+    },
+    moveCaptures(from, to) {
+      q("update extension_capture set posting_id = ? where posting_id = ?").run(to, from);
     },
     requestCaptureAnalysis(id, now = new Date()) {
       q("update extension_capture set analysis_requested_at = ? where id = ?").run(

@@ -11,11 +11,13 @@ import { usePosting } from "../../hooks/usePostings";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import { ApiError, type DocumentView, type PostingAnalysisView } from "../../lib/api";
+import { DuplicateDialog } from "../postings/PostingSections";
 
 /**
  * Janela da extensão depois de "Salvar vaga" (F12/M2, pedido do dono 2026-10-23): na mesma janela, as etapas (lendo os
  * detalhes da vaga, analisando), o resultado resumido da análise e o CV e/ou a carta com andamento e download. A
- * análise abre sozinha no api quando a extração termina, então ela segue mesmo com a janela fechada.
+ * análise abre sozinha no api quando a extração termina, então ela segue mesmo com a janela fechada. Vaga que parece
+ * repetida mostra a comparação aqui mesmo, e a análise espera a decisão.
  */
 const external = { target: "_blank", rel: "noreferrer" } as const;
 const captureKey = (id: string) => ["extension", "capture", id] as const;
@@ -50,8 +52,19 @@ export function CaptureFollowUp({ capture }: { capture: ExtensionCapture }) {
   const latest = analyses.data?.analyses[0] ?? null;
   const status = detail.data?.posting.status;
   const busy = session.data?.session.busy ?? false;
-  let step: "reading" | "starting" | "analyzing" | "incomplete" | "error" | "idle" | "done";
+  const posting = detail.data?.posting;
+  let step:
+    | "reading"
+    | "duplicate"
+    | "starting"
+    | "analyzing"
+    | "incomplete"
+    | "error"
+    | "idle"
+    | "done";
   if (latest) step = "done";
+  // parece repetida: o api só abre a análise depois da decisão (Salvar como nova, Atualizar ou Descartar)
+  else if (posting?.duplicate && posting.duplicate.decision === null) step = "duplicate";
   else if (capture.analysis.error) step = "error";
   else if (!detail.data || status === "extracting") step = "reading";
   else if (sessionId && (busy || session.isPending)) step = "analyzing";
@@ -80,6 +93,15 @@ export function CaptureFollowUp({ capture }: { capture: ExtensionCapture }) {
           {t("capture.open")}
         </a>
       </div>
+      {step === "duplicate" && posting ? (
+        <div className="flex flex-col gap-2">
+          <DuplicateDialog
+            posting={posting}
+            onDecided={() => qc.invalidateQueries({ queryKey: captureKey(capture.id) })}
+          />
+          <span className="text-xs text-muted-fg">{t("capture.step.duplicate")}</span>
+        </div>
+      ) : null}
       {step === "reading" || step === "starting" || step === "analyzing" ? (
         <div className="flex flex-col gap-1 rounded-md border border-border p-3 text-sm">
           <span className="flex items-center gap-2 font-medium">
