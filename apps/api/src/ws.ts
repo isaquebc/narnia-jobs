@@ -1,6 +1,7 @@
 import type { Server } from "node:http";
+import { isDeviceToken } from "@narnia-jobs/core";
 import { WebSocketServer } from "ws";
-import { COOKIE_NAME, tokenMatches } from "./auth";
+import { COOKIE_NAME, type DeviceAuth, tokenMatches } from "./auth";
 import type { EventBus } from "./events";
 import { allowedHostsFromEnv, hostAllowed } from "./hosts";
 
@@ -13,11 +14,15 @@ function cookieValue(header: string | undefined, name: string): string | null {
   return null;
 }
 
-/** WebSocket `/ws`: autenticado por `?token=` ou cookie; retransmite os eventos do bus a todos os clientes. */
+/**
+ * WebSocket `/ws`: autenticado por `?token=` ou cookie (o do dono ou o token de dispositivo da janela da extensão,
+ * F12/M2); retransmite os eventos do bus a todos os clientes.
+ */
 export function attachWebSocket(opts: {
   server: Server;
   bus: EventBus;
   token: string;
+  devices?: DeviceAuth;
   /** Hosts aceitos (DNS rebinding); ausente = os do ambiente. */
   allowedHosts?: Set<string>;
 }) {
@@ -31,7 +36,9 @@ export function attachWebSocket(opts: {
     }
     const given = url.searchParams.get("token") ?? cookieValue(req.headers.cookie, COOKIE_NAME);
     wss.handleUpgrade(req, socket, head, (ws) => {
-      if (!tokenMatches(opts.token, given)) {
+      const device = given && isDeviceToken(given) ? opts.devices?.find(given) : null;
+      if (device) opts.devices?.touch(device.id);
+      if (!tokenMatches(opts.token, given) && !device) {
         ws.close(4401, "unauthorized");
         return;
       }

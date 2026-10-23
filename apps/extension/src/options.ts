@@ -42,6 +42,8 @@ async function render(check: boolean) {
     testButton.disabled = false;
   }
   const v = optionsView(p, c, new Date());
+  // conexão de volta: tira o "!" que o clique no ícone deixou quando o narnia estava fora do ar
+  if (c?.ok) void chrome.action.setBadgeText({ text: "" });
   form.hidden = v.mode !== "pair";
   connected.hidden = v.mode !== "connected";
   show(v.text, v.tone);

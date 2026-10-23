@@ -187,7 +187,17 @@ export function createApp(deps: AppDeps) {
     );
   }
   app.route("/", chatSettingsRoutes({ repos: deps.repos }));
-  app.route("/", extensionRoutes({ repos: deps.repos, version: deps.version }));
+  app.route(
+    "/",
+    extensionRoutes({
+      repos: deps.repos,
+      version: deps.version,
+      token: deps.token,
+      dataDir: deps.dataDir,
+      queue: deps.queue,
+      bus: deps.bus,
+    }),
+  );
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",

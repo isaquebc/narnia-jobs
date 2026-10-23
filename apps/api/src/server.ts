@@ -85,7 +85,15 @@ const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => 
   );
   console.log(`[api] abra: ${publicBase}/api/auth/enter?token=${token}`);
 });
-attachWebSocket({ server: server as unknown as import("node:http").Server, bus, token });
+attachWebSocket({
+  server: server as unknown as import("node:http").Server,
+  bus,
+  token,
+  devices: {
+    find: (t) => repos.extension.findByToken(t),
+    touch: (id) => repos.extension.touch(id),
+  },
+});
 
 // F04/M5: rastros para o Phoenix local só com NARNIA_OTEL_ENDPOINT (ligado por padrão no compose de dev)
 if (await initTelemetry(process.env, "narnia-api"))

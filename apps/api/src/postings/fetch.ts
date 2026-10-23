@@ -33,8 +33,8 @@ export type FetchPostingResult =
       /** Empresa contratante do JSON-LD (`hiringOrganization`), quando a página traz. */
       company: string | null;
       html: string;
-      /** Como a página foi lida: fetch simples ou navegador headless. */
-      via: "fetch" | "browser";
+      /** Como a página foi lida: fetch simples, navegador headless ou a aba da pessoa (extensão, F12/M2). */
+      via: "fetch" | "browser" | "extension";
     }
   | { ok: false; code: FetchFailure; message: string };
 
@@ -249,7 +249,7 @@ async function fetchPlainPage(
 export function extractPosting(
   html: string,
   url: string,
-  via: "fetch" | "browser" = "fetch",
+  via: "fetch" | "browser" | "extension" = "fetch",
 ): FetchPostingResult {
   const { document } = parseHTML(html);
   const meta = (name: string) =>

@@ -89,7 +89,7 @@ describe("F12/M1 · repositório da extensão", () => {
   it("migração 0017 entra sobre um banco da versão anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0016_posting_contact_linkedin" });
-    expect(migrate(db).applied).toEqual(["0017_extension"]);
+    expect(migrate(db).applied).toContain("0017_extension");
     expect(createRepos(db).extension.listDevices()).toEqual([]);
   });
 });

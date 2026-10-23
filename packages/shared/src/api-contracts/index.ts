@@ -807,6 +807,45 @@ export const ExtensionMeResponseSchema = z.object({
   device: ExtensionDeviceSchema.nullable(),
   version: z.string(),
 });
+/** Página lida pela extensão (F12/M2): o HTML renderizado, sem scripts nem estilos (o JSON-LD fica). */
+export const EXTENSION_CAPTURE_MAX_HTML = 5_000_000;
+export const ExtensionCaptureCreateRequestSchema = z.object({
+  kind: z.literal("page"),
+  url: z
+    .string()
+    .url()
+    .regex(/^https?:\/\//i),
+  title: z.string().max(500).nullable().optional(),
+  html: z.string().min(1).max(EXTENSION_CAPTURE_MAX_HTML),
+});
+export type ExtensionCaptureCreateRequest = z.infer<typeof ExtensionCaptureCreateRequestSchema>;
+/** O que a janela mostra da página lida: o extrator da F06 sobre o HTML, sem tokens. */
+export const ExtensionCaptureReadingSchema = z.object({
+  ok: z.boolean(),
+  title: z.string().nullable(),
+  company: z.string().nullable(),
+  siteName: z.string().nullable(),
+  location: z.string().nullable(),
+  excerpt: z.string().nullable(),
+  chars: z.number().int(),
+  /** Por que não deu para ler a vaga (página bloqueada, texto curto demais). */
+  message: z.string().nullable(),
+});
+export type ExtensionCaptureReading = z.infer<typeof ExtensionCaptureReadingSchema>;
+export const ExtensionCaptureSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  title: z.string().nullable(),
+  createdAt: z.string(),
+  reading: ExtensionCaptureReadingSchema,
+  /** Vaga em que a captura virou (Salvar vaga). */
+  postingId: z.string().nullable(),
+  /** Vaga já salva que parece ser esta (mesmo link, ou mesma empresa e cargo). */
+  duplicate: z
+    .object({ id: z.string(), title: z.string().nullable(), company: z.string().nullable() })
+    .nullable(),
+});
+export type ExtensionCapture = z.infer<typeof ExtensionCaptureSchema>;
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
   pattern: true,
   trustTag: true,

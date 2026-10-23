@@ -23,6 +23,7 @@ import type {
   EstimateResponse,
   EvalsSettingsResponse,
   EvidenceFile,
+  ExtensionCapture,
   ExtensionDevicesResponse,
   ExtensionPairingResponse,
   FileDigest,
@@ -272,6 +273,14 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     listExtensionDevices: () => request<ExtensionDevicesResponse>("/api/extension/devices"),
     revokeExtensionDevice: (id: string) =>
       request<void>(`/api/extension/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    // janela da extensão (F12/M2): página lida e "Salvar vaga"
+    getExtensionCapture: (id: string) =>
+      request<{ capture: ExtensionCapture }>(`/api/extension/captures/${encodeURIComponent(id)}`),
+    saveCapturePosting: (id: string) =>
+      request<{ posting: Posting; job: Job | null }>(
+        `/api/extension/captures/${encodeURIComponent(id)}/posting`,
+        { method: "POST" },
+      ),
     // Configurações › Avaliações (ponte da assinatura e Phoenix, AV-2)
     getEvalsSettings: () => request<EvalsSettingsResponse>("/api/settings/evals"),
     putBridgeSettings: (patch: Partial<BridgeSettingsDto>) =>

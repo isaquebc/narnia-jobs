@@ -1,7 +1,7 @@
 /**
- * Manifesto MV3 da extensão (F12-8: só o Chrome). Permissões mínimas: guardar o pareamento e falar com o narnia local
- * (127.0.0.1/localhost, qualquer porta). Ler a página aberta (`activeTab`, `scripting`) entra no M2. `extraHosts` só
- * existe no build do e2e, em que o narnia é `http://web` na rede do compose.
+ * Manifesto MV3 da extensão (F12-8: só o Chrome). Permissões mínimas: guardar o pareamento, falar com o narnia local
+ * (127.0.0.1/localhost, qualquer porta) e ler a aba só quando a pessoa clica no ícone (`activeTab` + `scripting`, M2;
+ * sem `<all_urls>`). `extraHosts` só existe no build do e2e (o narnia em `http://web` e a página de vaga de fixture).
  */
 export function buildManifest(version: string, extraHosts: string[] = []) {
   return {
@@ -22,7 +22,7 @@ export function buildManifest(version: string, extraHosts: string[] = []) {
     },
     background: { service_worker: "background.js", type: "module" },
     options_ui: { page: "options.html", open_in_tab: true },
-    permissions: ["storage"],
+    permissions: ["storage", "activeTab", "scripting"],
     host_permissions: [
       "http://127.0.0.1/*",
       "http://localhost/*",

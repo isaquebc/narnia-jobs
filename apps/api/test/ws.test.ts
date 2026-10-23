@@ -37,6 +37,29 @@ describe("M4/api WebSocket /ws e relay do Redis", () => {
     expect(code).toBe(4401);
   });
 
+  it("F12/M2: token de dispositivo no cookie (janela popup da extensão) conecta; revogado é fechado com 4401", async () => {
+    const bus = new EventBus();
+    const valid = new Set(["nxd_ok"]);
+    server = createServer((_req, res) => res.end("ok"));
+    attachWebSocket({
+      server,
+      bus,
+      token: "tk",
+      devices: { find: (t) => (valid.has(t) ? { id: "d1" } : null), touch: () => {} },
+    });
+    await new Promise<void>((r) => server?.listen(0, "127.0.0.1", () => r()));
+    const port = (server.address() as AddressInfo).port;
+    const ok = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: { cookie: "narnia_token=nxd_ok" },
+    });
+    await new Promise<void>((r) => ok.once("open", () => r()));
+    ok.close();
+    const revoked = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: { cookie: "narnia_token=nxd_revogado" },
+    });
+    expect(await new Promise<number>((r) => revoked.once("close", (c) => r(c)))).toBe(4401);
+  });
+
   it("relay valida e repassa mensagens do canal; ignora JSON inválido e duplicatas consecutivas", () => {
     const bus = new EventBus();
     const got: unknown[] = [];

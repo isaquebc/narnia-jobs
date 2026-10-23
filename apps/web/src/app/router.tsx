@@ -7,11 +7,13 @@ import {
   Outlet,
   type RouterHistory,
   redirect,
+  useRouterState,
 } from "@tanstack/react-router";
 import { ErrorState } from "../components/ErrorState";
 import { Shell } from "../components/shell/Shell";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { Dashboard } from "../features/dashboard/Dashboard";
+import { CaptureWindow } from "../features/extension/CaptureWindow";
 import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { Wizard } from "../features/onboarding/Wizard";
 import { NewProfilePage, type NewProfileSearch } from "../features/profiles/NewProfilePage";
@@ -29,8 +31,20 @@ export interface RouterContext {
   queryClient: QueryClient;
 }
 
-const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: () => (
+/** Páginas sem o layout do narnia: a janela popup da extensão (F12-2, F12/M2). */
+const BARE = ["/candidatura"];
+
+function RootLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (BARE.includes(pathname))
+    return (
+      <TooltipProvider>
+        <div className="min-h-screen bg-bg">
+          <Outlet />
+        </div>
+      </TooltipProvider>
+    );
+  return (
     <TooltipProvider>
       <FormGuardProvider>
         <Shell>
@@ -38,7 +52,11 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
         </Shell>
       </FormGuardProvider>
     </TooltipProvider>
-  ),
+  );
+}
+
+const rootRoute = createRootRouteWithContext<RouterContext>()({
+  component: RootLayout,
   errorComponent: ({ error, reset }) => (
     <TooltipProvider>
       <Shell>
@@ -310,6 +328,19 @@ const extensionRoute = createRoute({
   path: "/extensao",
   component: ExtensionInstallPage,
 });
+// janela popup da extensão (F12-2, F12/M2): sem o menu do narnia (BARE no layout raiz)
+const captureRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/candidatura",
+  validateSearch: (s: Record<string, unknown>) => ({
+    captura: typeof s.captura === "string" ? s.captura : undefined,
+    erro: typeof s.erro === "string" ? s.erro : undefined,
+  }),
+  component: function CaptureRoute() {
+    const { captura, erro } = captureRoute.useSearch();
+    return <CaptureWindow captureId={captura} error={erro} />;
+  },
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/configuracoes",
@@ -337,6 +368,7 @@ const routeTree = rootRoute.addChildren([
   notificationsRoute,
   settingsRoute,
   extensionRoute,
+  captureRoute,
   processesRoute,
   postingsRoute,
   postingRoute,

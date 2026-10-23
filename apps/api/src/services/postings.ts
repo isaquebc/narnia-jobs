@@ -31,11 +31,13 @@ export async function intakePosting(
     text?: string | null | undefined;
     url?: string | null | undefined;
     fields?: { [K in keyof PostingFields]?: PostingFields[K] | undefined } | undefined;
+    /** HTML já lido (página capturada pela extensão, F12/M2): vira o snapshot da vaga. */
+    html?: string | null | undefined;
   },
 ): Promise<IntakeResult> {
   let text = input.text?.trim() || null;
   const url = input.url?.trim() || null;
-  let html: string | null = null;
+  let html: string | null = input.html ?? null;
   let fields = Object.fromEntries(
     Object.entries(input.fields ?? {}).filter(([, v]) => v !== undefined),
   ) as Partial<PostingFields>;

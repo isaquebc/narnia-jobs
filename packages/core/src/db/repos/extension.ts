@@ -16,6 +16,18 @@ export interface ExtensionDevice {
   lastSeenAt: string | null;
 }
 
+/** Página lida pela extensão (F12/M2); `payload` é o que o extrator da F06 tirou dela. */
+export interface ExtensionCaptureRecord {
+  id: string;
+  kind: "page";
+  url: string;
+  title: string | null;
+  payload: unknown;
+  deviceId: string | null;
+  postingId: string | null;
+  createdAt: string;
+}
+
 export interface ExtensionRepo {
   /** Gera um código novo e invalida os anteriores ainda não usados. */
   createPairing(now?: Date): { code: string; expiresAt: string };
@@ -26,6 +38,12 @@ export interface ExtensionRepo {
   revoke(id: string, now?: Date): boolean;
   /** Último uso, gravado no máximo uma vez por minuto. */
   touch(id: string, now?: Date): void;
+  createCapture(
+    input: Pick<ExtensionCaptureRecord, "kind" | "url" | "title" | "payload" | "deviceId">,
+    now?: Date,
+  ): ExtensionCaptureRecord;
+  getCapture(id: string): ExtensionCaptureRecord | null;
+  linkCapturePosting(id: string, postingId: string): void;
 }
 
 const TOUCH_EVERY_MS = 60 * 1000;
@@ -36,6 +54,19 @@ function map(r: Row): ExtensionDevice {
     name: String(r.name),
     createdAt: String(r.created_at),
     lastSeenAt: str(r.last_seen_at),
+  };
+}
+
+function mapCapture(r: Row): ExtensionCaptureRecord {
+  return {
+    id: String(r.id),
+    kind: "page",
+    url: String(r.url),
+    title: str(r.title),
+    payload: JSON.parse(String(r.payload_json)),
+    deviceId: str(r.device_id),
+    postingId: str(r.posting_id),
+    createdAt: String(r.created_at),
   };
 }
 
@@ -123,6 +154,29 @@ export function extensionRepo(db: Db): ExtensionRepo {
         `update extension_device set last_seen_at = ?
          where id = ? and (last_seen_at is null or last_seen_at <= ?)`,
       ).run(now.toISOString(), id, new Date(now.getTime() - TOUCH_EVERY_MS).toISOString());
+    },
+    createCapture(input, now = new Date()) {
+      const id = newId();
+      q(
+        `insert into extension_capture (id, kind, url, title, payload_json, device_id, created_at)
+         values (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        input.kind,
+        input.url,
+        input.title,
+        JSON.stringify(input.payload),
+        input.deviceId,
+        now.toISOString(),
+      );
+      return this.getCapture(id) as ExtensionCaptureRecord;
+    },
+    getCapture(id) {
+      const row = q("select * from extension_capture where id = ?").get(id) as Row | undefined;
+      return row ? mapCapture(row) : null;
+    },
+    linkCapturePosting(id, postingId) {
+      q("update extension_capture set posting_id = ? where id = ?").run(postingId, id);
     },
   };
 }

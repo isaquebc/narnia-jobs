@@ -85,10 +85,10 @@ describe("F12/M1 · pareamento e conexão", () => {
 });
 
 describe("F12/M1 · manifesto", () => {
-  it("MV3 com permissões mínimas: só guardar o pareamento e falar com o narnia local", () => {
+  it("MV3 com permissões mínimas: guardar o pareamento, falar com o narnia local e ler a aba no clique", () => {
     const m = buildManifest("0.1.0");
     expect(m.manifest_version).toBe(3);
-    expect(m.permissions).toEqual(["storage"]);
+    expect(m.permissions).toEqual(["storage", "activeTab", "scripting"]);
     expect(m.host_permissions).toEqual(["http://127.0.0.1/*", "http://localhost/*"]);
     expect(JSON.stringify(m)).not.toContain("<all_urls>");
     expect(buildManifest("0.1.0", ["web"]).host_permissions).toContain("http://web/*");

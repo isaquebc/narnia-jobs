@@ -53,9 +53,9 @@ describe("F12 · tutorial de instalação da extensão", () => {
     expect(screen.getByRole("heading", { name: "Se algo der errado" })).toBeInTheDocument();
   });
 
-  it("avisa que, por enquanto, a extensão só conecta (ler vagas e formulários vem depois)", async () => {
+  it("avisa que a extensão já lê vagas e que os formulários vêm depois (M2)", async () => {
     renderApp({ api, initialUrl: "/extensao" });
-    expect(await screen.findByText(/por enquanto, a extensão só se conecta/)).toBeInTheDocument();
+    expect(await screen.findByText(/a extensão já lê páginas de vaga/)).toBeInTheDocument();
   });
 });
 

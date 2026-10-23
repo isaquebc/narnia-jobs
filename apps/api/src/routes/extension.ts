@@ -1,7 +1,25 @@
-import { isDeviceToken, type Repos } from "@narnia-jobs/core";
-import { ExtensionPairRequestSchema } from "@narnia-jobs/shared";
-import { Hono } from "hono";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  analyzePostingText,
+  findLikelyPosting,
+  isDeviceToken,
+  type Repos,
+} from "@narnia-jobs/core";
+import {
+  type ExtensionCapture,
+  ExtensionCaptureCreateRequestSchema,
+  type ExtensionCaptureReading,
+  ExtensionPairRequestSchema,
+} from "@narnia-jobs/shared";
+import { type Context, Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
+import { COOKIE_NAME, tokenMatches } from "../auth";
 import { apiError } from "../errors";
+import type { EventBus } from "../events";
+import { extractPosting } from "../postings/fetch";
+import type { QueueAdapter } from "../queue";
+import { intakePosting } from "../services/postings";
 import { validate } from "./validate";
 
 /** Tentativas erradas de pareamento aceitas por minuto, somadas (a rota é pública). */
@@ -11,8 +29,21 @@ const MAX_FAILURES_PER_MINUTE = 10;
  * Extensão do navegador (F12/M1, F12-4, F12-9): Configurações gera o código de pareamento; a página de opções da
  * extensão o troca por um token de dispositivo (rota pública, com limite de tentativas) e testa a conexão em `/me`.
  */
-export function extensionRoutes(deps: { repos: Repos; version: string }) {
+export function extensionRoutes(deps: {
+  repos: Repos;
+  version: string;
+  /** Token do dono: `/enter` não troca o cookie de quem já está autenticado. */
+  token: string;
+  dataDir: string;
+  queue?: QueueAdapter | undefined;
+  bus?: EventBus | undefined;
+}) {
   const app = new Hono();
+  const deviceOf = (c: Context) => {
+    const header = c.req.header("authorization");
+    const bearer = header?.startsWith("Bearer ") ? header.slice(7) : "";
+    return isDeviceToken(bearer) ? deps.repos.extension.findByToken(bearer) : null;
+  };
   let failures: number[] = [];
 
   app.post("/api/extension/pairing", (c) => c.json(deps.repos.extension.createPairing()));
@@ -44,12 +75,163 @@ export function extensionRoutes(deps: { repos: Repos; version: string }) {
       : apiError(c, 404, "not_found", "Dispositivo não encontrado"),
   );
 
-  app.get("/api/extension/me", (c) => {
-    const header = c.req.header("authorization");
-    const bearer = header?.startsWith("Bearer ") ? header.slice(7) : "";
-    const device = isDeviceToken(bearer) ? deps.repos.extension.findByToken(bearer) : null;
-    return c.json({ device, version: deps.version });
+  app.get("/api/extension/me", (c) => c.json({ device: deviceOf(c), version: deps.version }));
+
+  // F12/M2: a aba lida pela extensão (HTML renderizado, sem scripts nem estilos) passa pelo extrator da F06
+  app.post(
+    "/api/extension/captures",
+    validate("json", ExtensionCaptureCreateRequestSchema),
+    (c) => {
+      const b = c.req.valid("json");
+      const read = extractPosting(b.html, b.url, "extension");
+      const capture = deps.repos.extension.createCapture({
+        kind: "page",
+        url: b.url,
+        title: b.title ?? null,
+        payload: read.ok
+          ? {
+              ok: true,
+              text: read.text,
+              title: read.title,
+              company: read.company,
+              siteName: read.siteName,
+            }
+          : { ok: false, code: read.code, message: read.message },
+        deviceId: deviceOf(c)?.id ?? null,
+      });
+      mkdirSync(join(deps.dataDir, "captures"), { recursive: true });
+      writeFileSync(capturePath(deps.dataDir, capture.id), b.html);
+      return c.json({ id: capture.id }, 201);
+    },
+  );
+
+  app.get("/api/extension/captures/:id", (c) => {
+    const capture = deps.repos.extension.getCapture(c.req.param("id"));
+    if (!capture) return apiError(c, 404, "not_found", "Captura não encontrada");
+    const p = capture.payload as CapturePayload;
+    const reading = readingOf(p);
+    const likely = capture.postingId
+      ? null
+      : findLikelyPosting(deps.repos.postings.list(), {
+          url: capture.url,
+          title: reading.title,
+          company: reading.company,
+        });
+    const body: ExtensionCapture = {
+      id: capture.id,
+      url: capture.url,
+      title: capture.title,
+      createdAt: capture.createdAt,
+      reading,
+      postingId: capture.postingId,
+      duplicate: likely ? { id: likely.id, title: likely.title, company: likely.company } : null,
+    };
+    return c.json({ capture: body });
+  });
+
+  // "Salvar vaga" (F12/M2): o fluxo da F06 com o texto já lido; a captura fica ligada à vaga (salvar de novo devolve ela)
+  app.post("/api/extension/captures/:id/posting", async (c) => {
+    const capture = deps.repos.extension.getCapture(c.req.param("id"));
+    if (!capture) return apiError(c, 404, "not_found", "Captura não encontrada");
+    const existing = capture.postingId ? deps.repos.postings.get(capture.postingId) : null;
+    if (existing) return c.json({ posting: existing, job: null }, 200);
+    const p = capture.payload as CapturePayload;
+    if (!p.ok) return apiError(c, 422, p.code, p.message);
+    if (!deps.queue) return apiError(c, 503, "queue_unavailable", "Fila indisponível");
+    let html: string | null = null;
+    try {
+      html = readFileSync(capturePath(deps.dataDir, capture.id), "utf8");
+    } catch {
+      html = null;
+    }
+    const r = await intakePosting(
+      { repos: deps.repos, queue: deps.queue, dataDir: deps.dataDir, bus: deps.bus },
+      {
+        text: p.text,
+        url: capture.url,
+        fields: { title: p.title ?? undefined, company: p.company ?? undefined },
+        html,
+      },
+    );
+    if (!r.ok) return apiError(c, 422, r.code, r.message);
+    deps.repos.extension.linkCapturePosting(capture.id, r.posting.id);
+    return c.json({ posting: r.posting, job: r.job }, 201);
+  });
+
+  // janela popup (F12-2, §4.3): o token do dispositivo vira o cookie da web, a menos que o navegador já esteja
+  // autenticado (o dono com o cookie dele no mesmo Chrome); só redireciona para dentro do narnia
+  app.get("/api/extension/enter", (c) => {
+    const given = c.req.query("device") ?? "";
+    if (!isDeviceToken(given) || !deps.repos.extension.findByToken(given))
+      return apiError(c, 401, "unauthorized", "Token inválido");
+    const current = getCookie(c, COOKIE_NAME);
+    const authenticated =
+      tokenMatches(deps.token, current) ||
+      (!!current && isDeviceToken(current) && !!deps.repos.extension.findByToken(current));
+    if (!authenticated)
+      setCookie(c, COOKIE_NAME, given, {
+        httpOnly: true,
+        sameSite: "Strict",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    return c.redirect(safeNext(c.req.query("next")), 302);
   });
 
   return app;
+}
+
+type CapturePayload =
+  | {
+      ok: true;
+      text: string;
+      title: string | null;
+      company: string | null;
+      siteName: string | null;
+    }
+  | { ok: false; code: string; message: string };
+
+const capturePath = (dataDir: string, id: string) => join(dataDir, "captures", `${id}.html`);
+
+const EXCERPT_CHARS = 600;
+
+function readingOf(p: CapturePayload): ExtensionCaptureReading {
+  if (!p.ok)
+    return {
+      ok: false,
+      title: null,
+      company: null,
+      siteName: null,
+      location: null,
+      excerpt: null,
+      chars: 0,
+      message: p.message,
+    };
+  const f = analyzePostingText(p.text).fields;
+  const workMode = { remote: "remoto", hybrid: "híbrido", onsite: "presencial" } as const;
+  const location =
+    [[f.city, f.state].filter(Boolean).join(" - "), f.workMode ? workMode[f.workMode] : null]
+      .filter(Boolean)
+      .join(" · ") || null;
+  // o trecho pula o cabeçalho que o JSON-LD monta (cargo, empresa, local): começa na descrição
+  const lines = p.text.split("\n");
+  const body = lines.filter(
+    (l, i) => !(i === 0 && l === p.title) && !/^(Empresa|Local|Contrato|Publicada em): /.test(l),
+  );
+  const excerpt = body.join("\n").trim().slice(0, EXCERPT_CHARS);
+  return {
+    ok: true,
+    title: p.title,
+    company: p.company,
+    siteName: p.siteName,
+    location,
+    excerpt: excerpt || null,
+    chars: p.text.length,
+    message: null,
+  };
+}
+
+/** Destino do `/enter`: só caminho do próprio narnia (`/…`, nunca `//host` nem esquema). */
+function safeNext(next: string | undefined): string {
+  return next && /^\/(?![/\\])/.test(next) ? next : "/candidatura";
 }

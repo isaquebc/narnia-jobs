@@ -1171,6 +1171,27 @@ export const ptBR = {
       doctor: "Para conferir o registro no Claude Code do computador (porta, token, plugin):",
     },
   },
+  capture: {
+    title: "narnia · vaga",
+    loading: "Lendo a página…",
+    notFound: "Não encontrei esta captura. Clique de novo no ícone do narnia na página da vaga.",
+    readFailed:
+      "Não consegui ler esta aba. Páginas internas do Chrome e a loja de extensões não podem ser lidas; abra a página da vaga e clique de novo no ícone.",
+    sendFailed:
+      "Li a página, mas o narnia não aceitou o envio (ela pode ser grande demais). Copie a descrição da vaga e cole em Vagas.",
+    readFrom: "Lido de {host}",
+    noTitle: "Vaga sem título",
+    save: "Salvar vaga",
+    saving: "Salvando…",
+    saved:
+      "Vaga salva. O narnia está lendo os detalhes e vai preparar a análise; acompanhe na página da vaga.",
+    alreadySaved: "Esta vaga já está salva.",
+    open: "Abrir a vaga no narnia",
+    duplicate: 'Parece a vaga "{name}" já salva.',
+    openDuplicate: "Abrir a salva",
+    saveFail: "Não consegui salvar a vaga: {message}",
+    paste: "Colar a descrição em Vagas",
+  },
   extension: {
     settingsTitle: "Extensão do navegador",
     settingsHint:
@@ -1191,7 +1212,7 @@ export const ptBR = {
     title: "Instalar a extensão no Chrome",
     intro:
       "A extensão lê a página só quando você clica no ícone do narnia e manda o conteúdo para esta instância, no seu computador. Ela nunca preenche nem envia formulários.",
-    wip: "Nesta versão, por enquanto, a extensão só se conecta ao narnia (instalar, parear e testar a conexão). Ler vagas e formulários de candidatura chega nas próximas atualizações.",
+    wip: "Nesta versão, a extensão já lê páginas de vaga e salva no narnia. A ajuda nos formulários de candidatura chega nas próximas atualizações.",
     stepsLabel: "Passos da instalação",
     step: {
       build: {

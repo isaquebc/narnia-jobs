@@ -129,3 +129,40 @@ export async function disconnect(
       "Desconectado neste navegador, mas não foi possível avisar o narnia. Remova em Configurações › Extensão do navegador.",
   };
 }
+
+/** Entrada da janela popup (F12/M2): o token do dispositivo vira o cookie da web e o narnia redireciona para `next`. */
+export function enterUrl(instance: string, token: string, next: string): string {
+  return `${instance}/api/extension/enter?device=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
+}
+
+export type CaptureResult =
+  | { ok: true; id: string }
+  | { ok: false; reason: "offline" | "unauthorized" | "unexpected"; message: string };
+
+/** Manda a aba lida (F12/M2) para o narnia, com o token do dispositivo. */
+export async function sendCapture(
+  fetch: Fetch,
+  instance: string,
+  token: string,
+  page: { url: string; title: string; html: string },
+): Promise<CaptureResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${instance}/api/extension/captures`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ kind: "page", ...page }),
+    });
+  } catch {
+    return { ok: false, reason: "offline", message: offlineMessage(instance) };
+  }
+  if (res.status === 401)
+    return {
+      ok: false,
+      reason: "unauthorized",
+      message: "Este navegador foi desconectado no narnia. Abra as opções e pareie de novo.",
+    };
+  const body = (await res.json().catch(() => ({}))) as { id?: string };
+  if (res.ok && body.id) return { ok: true, id: body.id };
+  return { ok: false, reason: "unexpected", message: `O narnia respondeu ${res.status}.` };
+}

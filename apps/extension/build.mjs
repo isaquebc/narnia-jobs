@@ -15,7 +15,11 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "icons"), { recursive: true });
 
 await build({
-  entryPoints: { background: "src/background.ts", options: "src/options.ts" },
+  entryPoints: {
+    background: "src/background.ts",
+    options: "src/options.ts",
+    capture: "src/capture/inject.ts",
+  },
   absWorkingDir: root,
   outdir: out,
   bundle: true,

@@ -5,8 +5,14 @@ import { getCookie, setCookie } from "hono/cookie";
 import { apiError } from "./errors";
 
 export const COOKIE_NAME = "narnia_token";
-// `/api/extension/pair` troca o código de pareamento pelo token de dispositivo (F12-9): quem chama ainda não tem token
-const PUBLIC_PATHS = new Set(["/api/health", "/api/auth/enter", "/api/extension/pair"]);
+// `/api/extension/pair` troca o código de pareamento pelo token de dispositivo (F12-9): quem chama ainda não tem token;
+// `/api/extension/enter` confere o token de dispositivo da query, como o `/api/auth/enter` (F12/M2)
+const PUBLIC_PATHS = new Set([
+  "/api/health",
+  "/api/auth/enter",
+  "/api/extension/pair",
+  "/api/extension/enter",
+]);
 
 export function generateBootToken(): string {
   return randomBytes(24).toString("hex");
