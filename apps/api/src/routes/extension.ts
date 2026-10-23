@@ -94,21 +94,26 @@ export function extensionRoutes(deps: {
         kind: "page",
         url: b.url,
         title: b.title ?? null,
-        payload: read.ok
-          ? {
-              ok: true,
-              text: read.text,
-              title: read.title,
-              company: read.company,
-              siteName: read.siteName,
-            }
-          : { ok: false, code: read.code, message: read.message },
+        payload: {
+          ...(read.ok
+            ? {
+                ok: true,
+                text: read.text,
+                title: read.title,
+                company: read.company,
+                siteName: read.siteName,
+              }
+            : { ok: false, code: read.code, message: read.message }),
+          mode: b.mode,
+        },
         deviceId: deviceOf(c)?.id ?? null,
       });
       mkdirSync(join(deps.dataDir, "captures"), { recursive: true });
       writeFileSync(capturePath(deps.dataDir, capture.id), b.html);
       // F12/M3: página com formulário de candidatura vira um formulário e o worker organiza as perguntas
-      if (b.form && b.form.fields.length >= MIN_APPLICATION_FIELDS) {
+      // menu (F12-15): "Analisar a vaga" nunca cria formulário; "Ajudar no formulário" cria com qualquer campo
+      const min = b.mode === "form" ? 1 : MIN_APPLICATION_FIELDS;
+      if (b.mode !== "posting" && b.form && b.form.fields.length >= min) {
         const likely = findLikelyPosting(deps.repos.postings.list(), {
           url: b.url,
           title: read.ok ? read.title : null,
@@ -154,6 +159,7 @@ export function extensionRoutes(deps: {
         error: capture.analysisError,
       },
       applicationId: deps.repos.applications.byCapture(capture.id)?.id ?? null,
+      mode: (capture.payload as { mode?: "auto" | "posting" | "form" }).mode ?? "auto",
     };
     return c.json({ capture: body });
   });

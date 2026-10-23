@@ -20,6 +20,7 @@ const capture = (analysisState: Record<string, unknown> = {}) => ({
   postingId: "v1",
   duplicate: null,
   applicationId: null,
+  mode: "auto" as const,
   analysis: { requested: true, sessionId: null, error: null, ...analysisState },
   reading: {
     ok: true,

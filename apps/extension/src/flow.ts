@@ -67,9 +67,16 @@ export function formFrames(origins: string[]): string[] {
 
 export const DEFAULT_TITLE = "narnia-jobs";
 
+/**
+ * O que a pessoa escolheu no menu (F12-15): `posting` lê só a vaga (mesmo com um formulário na página, ex.: só ver o
+ * fit), `form` ajuda no formulário, `auto` decide pelos campos (clique sem menu, e2e).
+ */
+export type CaptureMode = "auto" | "posting" | "form";
+
 export async function onIconClick(
   tab: { id?: number | undefined },
   deps: FlowDeps,
+  mode: CaptureMode = "auto",
 ): Promise<"options" | "window" | "permission"> {
   const p = await deps.loadPairing();
   if (!p.token || !p.instance || tab.id === undefined) {
@@ -87,15 +94,17 @@ export async function onIconClick(
     return open("/candidatura?erro=leitura");
   }
   // o formulário está num quadro de outro site (Greenhouse, Lever, Workday embutidos) e a página não tem outro
+  if (mode === "posting") page = { url: page.url, title: page.title, html: page.html };
   const blocked = formFrames(page.form?.frames ?? []);
   if (page.form && page.form.fields.length < MIN_FORM_FIELDS && blocked.length > 0) {
     await deps.openPermission(tab.id, blocked);
     return "permission";
   }
-  const r = await sendCapture(deps.fetch, p.instance, p.token, page);
+  const r = await sendCapture(deps.fetch, p.instance, p.token, { ...page, mode });
   if (r.ok) {
     await deps.setBadge("", DEFAULT_TITLE);
-    return open(`/candidatura?captura=${encodeURIComponent(r.id)}`);
+    // a aba de origem vai junto: a janela volta para ela e preenche nela (F12-14, F12-17)
+    return open(`/candidatura?captura=${encodeURIComponent(r.id)}&aba=${tab.id}`);
   }
   if (r.reason === "unexpected") return open("/candidatura?erro=envio");
   await deps.setBadge("!", r.message);

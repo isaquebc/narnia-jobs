@@ -1,6 +1,6 @@
 import type { ApplicationFormView } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useApi, useWs } from "../../app/context";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
 import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
+import { bridgeRequest, extensionAvailable } from "./bridge";
 import { CaptureDocuments } from "./CaptureFollowUp";
 
 /**
@@ -20,7 +21,17 @@ const applicationKey = (id: string) => ["extension", "application", id] as const
 
 type Question = ApplicationFormView["questions"][number];
 
-export function ApplicationWindow({ id }: { id: string }) {
+/** A aba do Chrome do formulário: o preenchimento (F12-14) escreve nela, pela extensão. */
+export interface FormPage {
+  url: string;
+  tabId: number | null;
+}
+
+/** Perguntas com valor que dá para preencher: nunca consentimento, autodeclaração nem arquivo (F12-12). */
+const fillable = (q: Question) =>
+  q.prefill !== null && !["consent", "self_declaration", "file"].includes(q.kind);
+
+export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) {
   const api = useApi();
   const ws = useWs();
   const qc = useQueryClient();
@@ -36,6 +47,32 @@ export function ApplicationWindow({ id }: { id: string }) {
     mutationFn: () => api.relocateApplication(id),
     onSettled: () => qc.invalidateQueries({ queryKey: applicationKey(id) }),
   });
+  const [fillMessage, setFillMessage] = useState<{ tone: "ok" | "warn"; text: string } | null>(
+    null,
+  );
+  const fill = async (questions: Question[]) => {
+    setFillMessage(null);
+    if (!extensionAvailable() || page.tabId === null) {
+      setFillMessage({ tone: "warn", text: t("application.fillUnavailable") });
+      return;
+    }
+    const items = questions.map((x) => ({
+      ref: x.fieldRefs[0] as string,
+      value: x.prefill as string,
+    }));
+    const r = await bridgeRequest({ type: "narnia.fill", tabId: page.tabId, url: page.url, items });
+    if (!r.ok) setFillMessage({ tone: "warn", text: r.error });
+    else if (r.failed?.length)
+      setFillMessage({ tone: "warn", text: t("application.fillFailed", { n: r.failed.length }) });
+    else
+      setFillMessage({
+        tone: "ok",
+        text:
+          items.length === 1
+            ? t("application.filledOne")
+            : t("application.filled", { n: r.filled?.length ?? items.length }),
+      });
+  };
   if (q.isPending) return <p className="text-sm text-muted-fg">{t("capture.loading")}</p>;
   if (q.isError) return <Alert tone="warn">{t("capture.notFound")}</Alert>;
   const a = q.data.application;
@@ -100,6 +137,21 @@ export function ApplicationWindow({ id }: { id: string }) {
               </span>
             </Alert>
           ) : null}
+          {a.questions.some(fillable) ? (
+            <div className="flex flex-col gap-1">
+              <Button size="sm" onClick={() => void fill(a.questions.filter(fillable))}>
+                {t("application.fillAll")}
+              </Button>
+            </div>
+          ) : null}
+          {fillMessage ? (
+            <p
+              role="status"
+              className={`text-xs ${fillMessage.tone === "ok" ? "text-ok" : "text-danger"}`}
+            >
+              {fillMessage.text}
+            </p>
+          ) : null}
           <ol aria-label={t("application.list")} className="flex flex-col gap-3">
             {a.questions.map((x, i) => (
               <QuestionItem
@@ -107,6 +159,7 @@ export function ApplicationWindow({ id }: { id: string }) {
                 n={i + 1}
                 q={x}
                 section={x.section && x.section !== a.questions[i - 1]?.section ? x.section : null}
+                onFill={fillable(x) ? () => void fill([x]) : null}
               />
             ))}
           </ol>
@@ -120,7 +173,17 @@ export function ApplicationWindow({ id }: { id: string }) {
   );
 }
 
-function QuestionItem({ n, q, section }: { n: number; q: Question; section: string | null }) {
+function QuestionItem({
+  n,
+  q,
+  section,
+  onFill,
+}: {
+  n: number;
+  q: Question;
+  section: string | null;
+  onFill: (() => void) | null;
+}) {
   const details = [
     q.options.length ? q.options.map((o) => o.label).join(" · ") : null,
     q.maxChars ? t("application.maxChars", { n: q.maxChars }) : null,
@@ -145,18 +208,25 @@ function QuestionItem({ n, q, section }: { n: number; q: Question; section: stri
         {details.length ? (
           <span className="text-xs text-muted-fg">{details.join(" · ")}</span>
         ) : null}
-        <Answer q={q} />
+        <Answer q={q} onFill={onFill} />
       </div>
     </li>
   );
 }
 
-function Answer({ q }: { q: Question }) {
+function Answer({ q, onFill }: { q: Question; onFill: (() => void) | null }) {
   if (q.profileField)
     return q.prefill ? (
       <div className="flex items-center justify-between gap-2 rounded bg-muted/40 px-2 py-1.5">
         <span className="break-all">{q.prefill}</span>
-        <CopyButton text={q.prefill} />
+        <span className="flex shrink-0 gap-1">
+          <CopyButton text={q.prefill} />
+          {onFill ? (
+            <Button size="sm" variant="outline" onClick={onFill}>
+              {t("application.fill")}
+            </Button>
+          ) : null}
+        </span>
       </div>
     ) : (
       <span className="text-xs text-muted-fg">{t("application.noData")}</span>

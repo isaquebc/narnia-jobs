@@ -17,7 +17,11 @@ declare namespace chrome {
     function getManifest(): { version: string };
     function getURL(path: string): string;
     function sendMessage(msg: unknown): Promise<unknown>;
-    const onMessage: { addListener(cb: (msg: never) => void): void };
+    const onMessage: {
+      addListener(
+        cb: (msg: never, sender: never, sendResponse: (r: unknown) => void) => boolean | undefined,
+      ): void;
+    };
   }
   namespace permissions {
     function request(p: { origins: string[] }): Promise<boolean>;
@@ -27,7 +31,13 @@ declare namespace chrome {
       id?: number;
       url?: string;
     }
-    function update(tabId: number, props: { url?: string }): Promise<Tab>;
+    interface Tab {
+      windowId?: number;
+    }
+    function update(tabId: number, props: { url?: string; active?: boolean }): Promise<Tab>;
+    function get(tabId: number): Promise<Tab>;
+    function query(q: { active?: boolean; currentWindow?: boolean; url?: string }): Promise<Tab[]>;
+    function create(props: { url: string }): Promise<Tab>;
   }
   namespace windows {
     interface Window {
@@ -53,11 +63,14 @@ declare namespace chrome {
   namespace scripting {
     interface InjectionResult {
       result?: unknown;
+      frameId?: number;
     }
     function executeScript(opts: {
-      target: { tabId: number; allFrames?: boolean };
+      target: { tabId: number; allFrames?: boolean; frameIds?: number[] };
       files?: string[];
-      func?: () => unknown;
+      // biome-ignore lint/suspicious/noExplicitAny: a função recebe os `args` que a chamada passar
+      func?: (...args: any[]) => unknown;
+      args?: unknown[];
     }): Promise<InjectionResult[]>;
   }
   namespace action {

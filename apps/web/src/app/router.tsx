@@ -335,10 +335,12 @@ const captureRoute = createRoute({
   validateSearch: (s: Record<string, unknown>) => ({
     captura: typeof s.captura === "string" ? s.captura : undefined,
     erro: typeof s.erro === "string" ? s.erro : undefined,
+    // aba do Chrome de onde a página veio (F12-14, F12-17)
+    aba: Number.isInteger(Number(s.aba)) && s.aba !== undefined ? Number(s.aba) : undefined,
   }),
   component: function CaptureRoute() {
-    const { captura, erro } = captureRoute.useSearch();
-    return <CaptureWindow captureId={captura} error={erro} />;
+    const { captura, erro, aba } = captureRoute.useSearch();
+    return <CaptureWindow captureId={captura} error={erro} tabId={aba} />;
   },
 });
 const settingsRoute = createRoute({

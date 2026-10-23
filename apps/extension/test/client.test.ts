@@ -93,6 +93,15 @@ describe("F12/M1 · manifesto", () => {
     expect(JSON.stringify(m)).not.toContain("<all_urls>");
     // F12/M3: quadro de outro site só com a permissão pedida na hora
     expect(m.optional_host_permissions).toEqual(["https://*/*"]);
+    // F12-15: menu no clique; F12-14/F12-17: ponte só nas páginas do narnia
+    expect(m.action.default_popup).toBe("popup.html");
+    expect(m.content_scripts).toEqual([
+      {
+        matches: ["http://127.0.0.1/*", "http://localhost/*"],
+        js: ["page-bridge.js"],
+        run_at: "document_start",
+      },
+    ]);
     expect(buildManifest("0.1.0", ["web"]).host_permissions).toContain("http://web/*");
   });
 });

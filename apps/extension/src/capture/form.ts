@@ -220,6 +220,17 @@ function excluded(el: Element): boolean {
 }
 
 export function readForm(doc: Document): FormSnapshot {
+  const { fields, frames } = scanForm(doc);
+  return { fields, frames };
+}
+
+/** Os elementos de cada campo, na mesma ordem das referências de `readForm` (para preencher, F12-14). */
+export function fieldElements(doc: Document): Element[] {
+  return scanForm(doc).elements;
+}
+
+function scanForm(doc: Document): FormSnapshot & { elements: Element[] } {
+  const elements: Element[] = [];
   const fields: FormField[] = [];
   const frames = new Set<string>();
   const seenGroups = new Set<string>();
@@ -230,6 +241,7 @@ export function readForm(doc: Document): FormSnapshot {
     const legendEl = el.closest("fieldset")?.querySelector("legend");
     const legend = legendEl ? textOf(legendEl) : null;
     fields.push({ ref: `f${fields.length + 1}`, section: legend ?? heading, ...f });
+    elements.push(el);
   };
 
   const read = (root: Document) => {
@@ -414,5 +426,5 @@ export function readForm(doc: Document): FormSnapshot {
   };
 
   read(doc);
-  return { fields, frames: [...frames] };
+  return { fields, frames: [...frames], elements };
 }

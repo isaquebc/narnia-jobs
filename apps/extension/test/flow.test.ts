@@ -40,9 +40,9 @@ describe("F12/M2 · clique no ícone", () => {
     const [url, init] = vi.mocked(d.fetch).mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://127.0.0.1:5173/api/extension/captures");
     expect(new Headers(init.headers).get("authorization")).toBe("Bearer nxd_abc");
-    expect(JSON.parse(String(init.body))).toEqual({ kind: "page", ...snap });
+    expect(JSON.parse(String(init.body))).toEqual({ kind: "page", mode: "auto", ...snap });
     expect(d.openWindow).toHaveBeenCalledWith(
-      enterUrl(paired.instance, paired.token, "/candidatura?captura=c1"),
+      enterUrl(paired.instance, paired.token, "/candidatura?captura=c1&aba=7"),
     );
     expect(d.setBadge).toHaveBeenCalledWith("", "narnia-jobs");
   });
@@ -121,6 +121,42 @@ describe("F12/M3 · clique num formulário", () => {
     const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
     expect(await onIconClick({ id: 7 }, d)).toBe("window");
     expect(d.openPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe("F12-15 · menu: o que fazer nesta página", () => {
+  const field = (ref: string) => ({
+    ref,
+    control: "text" as const,
+    label: ref,
+    name: null,
+    placeholder: null,
+    help: null,
+    section: null,
+    required: false,
+    maxLength: null,
+    options: [],
+    autocomplete: null,
+  });
+  const form = { fields: [field("f1"), field("f2")], frames: [] };
+
+  it("analisar a vaga: manda a página sem o formulário, mesmo havendo um", async () => {
+    const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
+    expect(await onIconClick({ id: 7 }, d, "posting")).toBe("window");
+    const [, init] = vi.mocked(d.fetch).mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.mode).toBe("posting");
+    expect(body.form).toBeUndefined();
+  });
+
+  it("ajudar no formulário: manda os campos com o modo; a janela sabe de qual aba veio", async () => {
+    const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
+    expect(await onIconClick({ id: 7 }, d, "form")).toBe("window");
+    const [, init] = vi.mocked(d.fetch).mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ mode: "form", form });
+    expect(d.openWindow).toHaveBeenCalledWith(
+      enterUrl(paired.instance, paired.token, "/candidatura?captura=c1&aba=7"),
+    );
   });
 });
 

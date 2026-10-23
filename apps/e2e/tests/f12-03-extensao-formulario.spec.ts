@@ -134,6 +134,33 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas na janela �
   );
   // o que a pessoa digitou na página e os campos ocultos não saem do navegador
   await expect(popup.getByText("digitado na página")).toHaveCount(0);
+
+  // preencher (F12-14): a janela pede à extensão, que escreve na aba de origem; consentimento fica com a pessoa
+  await popup.getByRole("button", { name: "Preencher todos" }).click();
+  await expect(popup.getByText(/2 campos preenchidos na página/)).toBeVisible();
+  await expect(job.getByLabel("Nome completo *")).toHaveValue("Ana Maria Exemplo");
+  await expect(job.getByLabel("E-mail")).toHaveValue("ana.exemplo@example.com");
+  await expect(job.getByLabel("Li e aceito a política de privacidade")).not.toBeChecked();
+
+  // abas (F12-16): a página da vaga aberta pela extensão vira outra aba na mesma janela
+  const vaga = await context.newPage();
+  await vaga.goto(`http://${FIXTURE_HOST}/vagas/123`);
+  await vaga.bringToFront();
+  await worker.evaluate(async (host) => {
+    const g = globalThis as unknown as {
+      chrome: {
+        tabs: { query(q: { url: string }): Promise<Array<{ id?: number; url?: string }>> };
+      };
+      narniaIconClick(tab: { id?: number }, mode?: string): Promise<string>;
+    };
+    const tabs = await g.chrome.tabs.query({ url: `http://${host}/*` });
+    const tab = tabs.find((t) => t.url?.endsWith("/vagas/123"));
+    return g.narniaIconClick(tab ?? {}, "posting");
+  }, FIXTURE_HOST);
+  const tabs = popup.getByRole("tablist", { name: "Páginas abertas" });
+  await expect(tabs.getByRole("tab")).toHaveCount(2, { timeout: 30_000 });
+  await tabs.getByRole("tab").first().click();
+  await expect(popup.getByRole("list", { name: "Perguntas do formulário" })).toBeVisible();
   expect(
     await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);

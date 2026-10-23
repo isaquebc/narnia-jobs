@@ -128,6 +128,21 @@ describe("F12/M3 · formulário de candidatura", () => {
     expect(t.queue.tasks).toHaveLength(0);
   });
 
+  it("menu (F12-15): analisar a vaga não cria formulário; ajudar no formulário cria mesmo com um campo só", async () => {
+    t = makeTestApp();
+    expect((await capture(t, { form: FORM, mode: "posting" })).applicationId).toBeNull();
+    const one = { fields: [field("f1", { control: "textarea", label: "Conte" })], frames: [] };
+    expect((await capture(t, { form: one, mode: "form" })).applicationId).toEqual(
+      expect.any(String),
+    );
+    const none = await capture(t, { form: { fields: [], frames: [] }, mode: "form" });
+    expect(none.applicationId).toBeNull();
+    const got = (await (await t.api(`/api/extension/captures/${none.id}`)).json()) as {
+      capture: { mode: string };
+    };
+    expect(got.capture.mode).toBe("form");
+  });
+
   it("perguntas prontas: campos óbvios com o valor dos dados; consentimento e autodeclaração sem valor", async () => {
     t = makeTestApp();
     seedFixture(t.repos, "engineer");

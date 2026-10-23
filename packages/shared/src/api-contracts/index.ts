@@ -827,6 +827,8 @@ export const ExtensionCaptureCreateRequestSchema = z.object({
   html: z.string().min(1).max(EXTENSION_CAPTURE_MAX_HTML),
   /** Campos de formulário lidos na aba (F12/M3); a página de vaga vem sem. */
   form: FormSnapshotSchema.optional(),
+  /** O que a pessoa escolheu no menu da extensão (F12-15); `auto` decide pelos campos. */
+  mode: z.enum(["auto", "posting", "form"]).default("auto"),
 });
 export type ExtensionCaptureCreateRequest = z.infer<typeof ExtensionCaptureCreateRequestSchema>;
 /** O que a janela mostra da página lida: o extrator da F06 sobre o HTML, sem tokens. */
@@ -863,6 +865,8 @@ export const ExtensionCaptureSchema = z.object({
   }),
   /** Formulário de candidatura lido na página (F12/M3): a janela abre no modo formulário. */
   applicationId: z.string().nullable(),
+  /** O que a pessoa escolheu no menu (F12-15): `form` sem formulário achado mostra o aviso. */
+  mode: z.enum(["auto", "posting", "form"]),
 });
 export type ExtensionCapture = z.infer<typeof ExtensionCaptureSchema>;
 

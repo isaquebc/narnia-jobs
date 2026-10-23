@@ -1239,6 +1239,13 @@ export const ptBR = {
     selfDeclaration: "Só você responde (autodeclaração).",
     file: "Anexo: baixe o CV da vaga na página da vaga.",
     soon: "A sugestão de resposta chega na próxima etapa.",
+    fill: "Preencher",
+    fillAll: "Preencher todos",
+    filled: "{n} campos preenchidos na página. Confira antes de enviar.",
+    filledOne: "Preenchido na página.",
+    fillFailed: "Não consegui preencher {n} campo(s); copie e cole esses.",
+    fillUnavailable:
+      "Para preencher, a extensão precisa estar atualizada: recarregue-a em chrome://extensions e abra o formulário pelo ícone de novo.",
     kinds: {
       short_text: "texto curto",
       long_text: "texto longo",
@@ -1255,6 +1262,12 @@ export const ptBR = {
   capture: {
     title: "narnia · vaga",
     loading: "Lendo a página…",
+    tabs: "Páginas abertas",
+    closeTab: "Fechar {name}",
+    formTab: "Formulário · {host}",
+    goToPage: "Ir para a página",
+    noForm:
+      "Não encontrei um formulário nesta página. Se ele está em outra página (ou aparece depois de clicar em Candidatar-se), abra-o e escolha Ajudar no formulário de novo.",
     notFound: "Não encontrei esta captura. Clique de novo no ícone do narnia na página da vaga.",
     readFailed:
       "Não consegui ler esta aba. Páginas internas do Chrome e a loja de extensões não podem ser lidas; abra a página da vaga e clique de novo no ícone.",
@@ -1362,7 +1375,7 @@ export const ptBR = {
     },
     use: {
       title: "Como usar",
-      body: "Numa página de vaga ou de candidatura, clique no ícone do narnia. Abre uma janela ao lado com a vaga lida, ou com as perguntas do formulário e as respostas sugeridas para copiar.",
+      body: "Numa página de vaga ou de candidatura, clique no ícone do narnia e escolha: Analisar a vaga (salvar, ver o fit, gerar CV e carta) ou Ajudar no formulário (as perguntas, copiar ou preencher as respostas). Abre uma janela ao lado; cada página vira uma aba nela.",
     },
     update: {
       title: "Depois de atualizar o narnia",

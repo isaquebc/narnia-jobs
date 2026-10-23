@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>narnia-jobs</title>
+    <link rel="stylesheet" href="options.css" />
+    <style>
+      body { min-width: 260px; margin: 0; }
+      main { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+      h1 { font-size: 14px; margin: 0 0 4px; }
+      button { width: 100%; text-align: left; }
+      .hint { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>narnia-jobs</h1>
+      <div id="paired" hidden>
+        <p class="hint">O que fazer nesta página?</p>
+        <button type="button" id="posting">Analisar a vaga</button>
+        <p class="hint">Salvar, ver o fit com os seus perfis e gerar o CV e a carta.</p>
+        <button type="button" id="form">Ajudar no formulário</button>
+        <p class="hint">Ver as perguntas, copiar ou preencher as respostas.</p>
+        <button type="button" id="open" class="secondary">Abrir o narnia</button>
+      </div>
+      <div id="unpaired" hidden>
+        <p class="hint">Este navegador ainda não está conectado ao seu narnia.</p>
+        <button type="button" id="connect">Conectar</button>
+      </div>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

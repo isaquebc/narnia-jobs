@@ -1,6 +1,8 @@
+import { type BridgeDeps, type BridgeRequest, handleBridge } from "./bridge";
+import type { FillItem } from "./capture/fill";
 import { type FrameForm, mergeFrames } from "./capture/frames";
 import type { PageSnapshot } from "./capture/page";
-import { DEFAULT_TITLE, onIconClick, type TabCapture } from "./flow";
+import { type CaptureMode, DEFAULT_TITLE, onIconClick, type TabCapture } from "./flow";
 import { loadPairing } from "./storage";
 
 /**
@@ -79,22 +81,92 @@ async function setBadge(text: string, title: string) {
   await chrome.action.setTitle({ title: title || DEFAULT_TITLE });
 }
 
-const click = (tab: { id?: number }) =>
-  onIconClick(tab, {
-    loadPairing,
-    readTab,
-    fetch: (url, init) => fetch(url, init),
-    openWindow,
-    openOptions: () => chrome.runtime.openOptionsPage(),
-    setBadge,
-    openPermission,
+const click = (tab: { id?: number }, mode: CaptureMode = "auto") =>
+  onIconClick(
+    tab,
+    {
+      loadPairing,
+      readTab,
+      fetch: (url, init) => fetch(url, init),
+      openWindow,
+      openOptions: () => chrome.runtime.openOptionsPage(),
+      setBadge,
+      openPermission,
+    },
+    mode,
+  );
+
+/** Preenche na aba (F12-14): cada quadro recebe as suas referências, na mesma ordem em que foram lidas e juntadas. */
+async function fillTab(tabId: number, items: FillItem[]) {
+  await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    files: ["capture.js"],
   });
+  const frames = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: () => (globalThis as { __narniaForm?: () => unknown }).__narniaForm?.(),
+  });
+  const filled: string[] = [];
+  const failed = new Set(items.map((i) => i.ref));
+  let offset = 0;
+  for (const f of frames) {
+    const count = (f.result as FrameForm | undefined)?.fields.length ?? 0;
+    const local = items
+      .map((i) => ({ ...i, n: Number(i.ref.slice(1)) - offset }))
+      .filter((i) => i.n >= 1 && i.n <= count)
+      .map((i) => ({ ref: `f${i.n}`, value: i.value, global: i.ref }));
+    if (local.length && f.frameId !== undefined) {
+      const [r] = await chrome.scripting.executeScript({
+        target: { tabId, frameIds: [f.frameId] },
+        func: (list: FillItem[]) =>
+          (globalThis as { __narniaFill?: (l: FillItem[]) => unknown }).__narniaFill?.(list),
+        args: [local.map(({ ref, value }) => ({ ref, value }))],
+      });
+      const done = new Set((r?.result as { filled?: string[] } | undefined)?.filled ?? []);
+      for (const l of local)
+        if (done.has(l.ref)) {
+          filled.push(l.global);
+          failed.delete(l.global);
+        }
+    }
+    offset += count;
+  }
+  return { filled, failed: [...failed] };
+}
+
+const bridgeDeps: BridgeDeps = {
+  loadPairing,
+  tabUrl: async (tabId) => (await chrome.tabs.get(tabId).catch(() => null))?.url ?? null,
+  focusTab: async (tabId) => {
+    const t = await chrome.tabs.update(tabId, { active: true });
+    if (t.windowId !== undefined) await chrome.windows.update(t.windowId, { focused: true });
+  },
+  openUrl: async (url) => {
+    await chrome.windows.create({ url, type: "normal" });
+  },
+  fillTab,
+};
 
 chrome.action.onClicked.addListener((tab) => void click(tab));
-// permissão do quadro concedida na página da extensão: lê a aba de novo, agora com o quadro
-chrome.runtime.onMessage.addListener((msg: { type?: string; tabId?: number }) => {
-  if (msg?.type === "narnia.recapture" && typeof msg.tabId === "number")
-    void click({ id: msg.tabId });
-});
+chrome.runtime.onMessage.addListener(
+  (
+    msg: { type?: string; tabId?: number; mode?: CaptureMode; request?: BridgeRequest },
+    sender: { url?: string; tab?: { url?: string } },
+    sendResponse: (r: unknown) => void,
+  ) => {
+    // permissão do quadro concedida na página da extensão: lê a aba de novo, agora com o quadro
+    if (msg?.type === "narnia.recapture" && typeof msg.tabId === "number")
+      void click({ id: msg.tabId });
+    // menu do ícone (F12-15)
+    if (msg?.type === "narnia.capture" && typeof msg.tabId === "number")
+      void click({ id: msg.tabId }, msg.mode ?? "auto");
+    // pedido da janela do narnia, pela ponte da página (F12-14, F12-17)
+    if (msg?.type === "narnia.bridge" && msg.request) {
+      void handleBridge(msg.request, sender.tab?.url ?? sender.url, bridgeDeps).then(sendResponse);
+      return true;
+    }
+    return false;
+  },
+);
 // e2e (F12/E2E-02): o Playwright não clica na barra do Chrome; chama o mesmo fluxo pelo service worker
 (globalThis as { narniaIconClick?: typeof click }).narniaIconClick = click;

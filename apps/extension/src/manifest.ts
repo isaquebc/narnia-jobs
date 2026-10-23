@@ -4,6 +4,11 @@
  * sem `<all_urls>`). `extraHosts` só existe no build do e2e (o narnia em `http://web` e a página de vaga de fixture).
  */
 export function buildManifest(version: string, extraHosts: string[] = []) {
+  const narnia = [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    ...extraHosts.map((h) => `http://${h}/*`),
+  ];
   return {
     manifest_version: 3,
     name: "narnia-jobs",
@@ -19,16 +24,16 @@ export function buildManifest(version: string, extraHosts: string[] = []) {
     action: {
       default_title: "narnia-jobs",
       default_icon: { "16": "icons/16.png", "32": "icons/32.png" },
+      // F12-15: o clique abre o menu (analisar a vaga, ajudar no formulário)
+      default_popup: "popup.html",
     },
+    // F12-14, F12-17: ponte da janela do narnia com a extensão (voltar à página, preencher); só nas páginas do narnia
+    content_scripts: [{ matches: narnia, js: ["page-bridge.js"], run_at: "document_start" }],
     background: { service_worker: "background.js", type: "module" },
     options_ui: { page: "options.html", open_in_tab: true },
     permissions: ["storage", "activeTab", "scripting"],
     // F12/M3: formulário embutido num quadro de outro site (Greenhouse, Lever, Workday); pedida na hora, origem a origem
     optional_host_permissions: ["https://*/*"],
-    host_permissions: [
-      "http://127.0.0.1/*",
-      "http://localhost/*",
-      ...extraHosts.map((h) => `http://${h}/*`),
-    ],
+    host_permissions: narnia,
   };
 }

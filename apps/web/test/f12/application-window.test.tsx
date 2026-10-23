@@ -16,6 +16,7 @@ const capture = {
   postingId: null,
   duplicate: null,
   applicationId: "a1",
+  mode: "form",
   analysis: { requested: false, sessionId: null, error: null },
   reading: {
     ok: false,
