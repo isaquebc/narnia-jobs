@@ -124,10 +124,9 @@ describe("F12/M2 · migração", () => {
   it("0018 e 0019 entram sobre um banco da versão anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0017_extension" });
-    expect(migrate(db).applied).toEqual([
-      "0018_extension_capture",
-      "0019_extension_capture_analysis",
-    ]);
+    expect(migrate(db).applied).toEqual(
+      expect.arrayContaining(["0018_extension_capture", "0019_extension_capture_analysis"]),
+    );
     expect(createRepos(db).extension.getCapture("x")).toBeNull();
   });
 });

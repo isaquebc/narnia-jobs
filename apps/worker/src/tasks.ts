@@ -1,4 +1,5 @@
 import {
+  APPLICATION_TASKS,
   DOCUMENT_TASKS,
   INGEST_TASKS,
   POSTING_TASKS,
@@ -15,6 +16,7 @@ import {
 import { setRunStatus } from "./ingest/status";
 import type { WorkerDeps } from "./pipeline";
 import { analyzeProfiles } from "./processors/analyze-profiles";
+import { applicationLocate } from "./processors/application-locate";
 import { cvGenerate } from "./processors/cv-generate";
 import { postingExtract } from "./processors/posting-extract";
 import { templateValidate } from "./processors/template-validate";
@@ -53,6 +55,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [INGEST_TASKS.reconcile]: ingestReconcile,
   [INGEST_TASKS.reviewCheck]: ingestReviewCheck,
   [POSTING_TASKS.extract]: postingExtract,
+  [APPLICATION_TASKS.locate]: applicationLocate,
   [DOCUMENT_TASKS.generate]: cvGenerate,
   [DOCUMENT_TASKS.render]: cvGenerate,
   [DOCUMENT_TASKS.validateTemplate]: templateValidate,

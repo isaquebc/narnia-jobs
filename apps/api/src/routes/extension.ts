@@ -4,6 +4,7 @@ import {
   analyzePostingText,
   findLikelyPosting,
   isDeviceToken,
+  MIN_APPLICATION_FIELDS,
   type Repos,
 } from "@narnia-jobs/core";
 import {
@@ -20,6 +21,7 @@ import { apiError } from "../errors";
 import type { EventBus } from "../events";
 import { extractPosting } from "../postings/fetch";
 import type { QueueAdapter } from "../queue";
+import { enqueueLocate } from "../services/applications";
 import { intakePosting } from "../services/postings";
 import { validate } from "./validate";
 
@@ -85,7 +87,7 @@ export function extensionRoutes(deps: {
   app.post(
     "/api/extension/captures",
     validate("json", ExtensionCaptureCreateRequestSchema),
-    (c) => {
+    async (c) => {
       const b = c.req.valid("json");
       const read = extractPosting(b.html, b.url, "extension");
       const capture = deps.repos.extension.createCapture({
@@ -105,6 +107,23 @@ export function extensionRoutes(deps: {
       });
       mkdirSync(join(deps.dataDir, "captures"), { recursive: true });
       writeFileSync(capturePath(deps.dataDir, capture.id), b.html);
+      // F12/M3: página com formulário de candidatura vira um formulário e o worker organiza as perguntas
+      if (b.form && b.form.fields.length >= MIN_APPLICATION_FIELDS) {
+        const likely = findLikelyPosting(deps.repos.postings.list(), {
+          url: b.url,
+          title: read.ok ? read.title : null,
+          company: read.ok ? read.company : null,
+        });
+        const form = deps.repos.applications.create({
+          captureId: capture.id,
+          postingId: likely?.id ?? null,
+          profileId: deps.repos.profiles.active()?.id ?? null,
+          url: b.url,
+          title: b.title ?? null,
+          fields: b.form.fields,
+        });
+        if (deps.queue) await enqueueLocate(deps.queue, form.id);
+      }
       return c.json({ id: capture.id }, 201);
     },
   );
@@ -134,6 +153,7 @@ export function extensionRoutes(deps: {
         sessionId: capture.analysisSessionId,
         error: capture.analysisError,
       },
+      applicationId: deps.repos.applications.byCapture(capture.id)?.id ?? null,
     };
     return c.json({ capture: body });
   });

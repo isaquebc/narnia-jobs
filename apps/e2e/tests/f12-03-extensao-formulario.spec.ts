@@ -1,0 +1,140 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { type BrowserContext, chromium, expect, type Page, test } from "@playwright/test";
+import { BASE_URL } from "../helpers/api";
+import { freshStart } from "../helpers/ingest";
+import { login } from "../helpers/profiles";
+
+/**
+ * F12/E2E-03 (M3): numa página de candidatura, o clique no ícone lê o formulário (rótulos por label, texto vizinho,
+ * fieldset, rádios e select), abre a janela no modo formulário e mostra as perguntas organizadas (heurística + mock do
+ * Haiku), com o valor dos campos óbvios para copiar; consentimento e autodeclaração ficam com a pessoa. Nada é
+ * preenchido na página.
+ */
+const FIXTURE_HOST = "vagas.example";
+const FORM_PAGE = `<!doctype html><html><head><title>Candidatura · Acme</title></head><body>
+<h1>Engenheira Backend Sênior · Acme Pagamentos</h1>
+<form>
+  <h2>Dados pessoais</h2>
+  <label for="nome">Nome completo *</label><input id="nome" name="nome" required>
+  <label for="email">E-mail</label><input id="email" type="email" name="email">
+  <h2>Perguntas</h2>
+  <div><span>Por que você quer trabalhar na Acme?</span><textarea name="motivo" maxlength="800"></textarea></div>
+  <fieldset><legend>Disponível para viagens?</legend>
+    <label><input type="radio" name="viagem" value="s"> Sim</label>
+    <label><input type="radio" name="viagem" value="n"> Não</label></fieldset>
+  <label for="raca">Raça/cor</label><select id="raca" name="raca"><option value="">Selecione</option>
+    <option value="1">Branca</option><option value="9">Prefiro não informar</option></select>
+  <label><input type="checkbox" name="lgpd"> Li e aceito a política de privacidade</label>
+  <input type="hidden" name="csrf" value="segredo">
+  <button type="submit">Enviar</button>
+</form></body></html>`;
+
+let dir: string;
+let context: BrowserContext;
+
+test.beforeAll(() => {
+  dir = mkdtempSync(join(tmpdir(), "narnia-ext-"));
+  execFileSync("node", ["../extension/build.mjs"], {
+    env: {
+      ...process.env,
+      NARNIA_EXTENSION_OUT: join(dir, "dist"),
+      NARNIA_EXTENSION_EXTRA_HOSTS: `${new URL(BASE_URL).hostname},${FIXTURE_HOST}`,
+    },
+    stdio: "inherit",
+  });
+});
+
+test.afterEach(async () => {
+  await context?.close();
+});
+
+test.afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+async function pair(page: Page, extensionId: string) {
+  await login(page, "/configuracoes");
+  const card = page.getByRole("region", { name: "Extensão do navegador" });
+  await card.getByRole("button", { name: "Gerar código de pareamento" }).click();
+  const code = (await card.locator("code").first().textContent())?.trim() ?? "";
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  await options.getByLabel("Endereço do narnia").fill(BASE_URL);
+  await options.getByLabel("Código de pareamento").fill(code);
+  await options.getByRole("button", { name: "Parear" }).click();
+  await expect(options.getByRole("status")).toHaveText(/Conectado como/);
+  await options.close();
+}
+
+test("F12/E2E-03 extensão: formulário de candidatura → perguntas na janela → copiar", async () => {
+  test.setTimeout(120_000);
+  await freshStart("engineer");
+  const ext = join(dir, "dist");
+  context = await chromium.launchPersistentContext(join(dir, "perfil"), {
+    channel: "chromium",
+    headless: true,
+    baseURL: BASE_URL,
+    locale: "pt-BR",
+    timezoneId: "America/Sao_Paulo",
+    args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
+  });
+  // http://web não é contexto seguro (no 127.0.0.1 do dono é): a área de transferência vira um registro na página
+  await context.addInitScript(() => {
+    if (!navigator.clipboard)
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async (t: string) => {
+            (window as unknown as { __copied?: string }).__copied = t;
+          },
+        },
+      });
+  });
+  await context.route(`http://${FIXTURE_HOST}/**`, (route) =>
+    route.fulfill({ contentType: "text/html; charset=utf-8", body: FORM_PAGE }),
+  );
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  const extensionId = new URL(worker.url()).host;
+  const page = await context.newPage();
+  await pair(page, extensionId);
+
+  const job = await context.newPage();
+  await job.goto(`http://${FIXTURE_HOST}/vagas/123/aplicar`);
+  await job.getByLabel("Nome completo *").fill("digitado na página");
+  const opened = context.waitForEvent("page");
+  expect(
+    await worker.evaluate(async (host) => {
+      const g = globalThis as unknown as {
+        chrome: { tabs: { query(q: { url: string }): Promise<Array<{ id?: number }>> } };
+        narniaIconClick(tab: { id?: number }): Promise<string>;
+      };
+      const [tab] = await g.chrome.tabs.query({ url: `http://${host}/*` });
+      return g.narniaIconClick(tab ?? {});
+    }, FIXTURE_HOST),
+  ).toBe("window");
+  const popup = await opened;
+  await popup.waitForURL(/\/candidatura\?captura=/);
+  await popup.setViewportSize({ width: 480, height: 860 });
+  await expect(popup.getByRole("heading", { name: "Formulário de candidatura" })).toBeVisible();
+  const list = popup.getByRole("list", { name: "Perguntas do formulário" });
+  await expect(list).toBeVisible({ timeout: 60_000 });
+  const items = list.getByRole("listitem");
+  await expect(items).toHaveCount(6);
+  await expect(items.nth(0)).toContainText("Nome completo");
+  await expect(items.nth(0)).toContainText("Ana Maria Exemplo");
+  await expect(items.nth(1)).toContainText("ana.exemplo@example.com");
+  await expect(items.nth(2)).toContainText("até 800 caracteres");
+  await expect(items.nth(3)).toContainText("Sim · Não");
+  await expect(items.nth(4)).toContainText("autodeclaração");
+  await expect(items.nth(5)).toContainText("Você decide");
+  await items.nth(0).getByRole("button", { name: "Copiar" }).click();
+  await expect(items.nth(0).getByRole("button", { name: "Copiado" })).toBeVisible();
+  expect(await popup.evaluate(() => (window as unknown as { __copied?: string }).__copied)).toBe(
+    "Ana Maria Exemplo",
+  );
+  // o que a pessoa digitou na página e os campos ocultos não saem do navegador
+  await expect(popup.getByText("digitado na página")).toHaveCount(0);
+  expect(
+    await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+});

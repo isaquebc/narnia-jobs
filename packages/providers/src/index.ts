@@ -71,6 +71,7 @@ export {
 export {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
+  type ApplicationLocateInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ApplicationLocateOutputSchema } from "./schemas/application";
 import { ChatTitleOutputSchema } from "./schemas/chat";
 import { CoverLetterDraftSchema, CvDraftSchema, CvReviewOutputSchema } from "./schemas/cv";
 import {
@@ -56,6 +57,11 @@ export const POSTING_OUTPUT_JSON_SCHEMAS = {
   postingExtract: toJsonSchema(PostingExtractOutputSchema),
   postingMerge: toJsonSchema(PostingMergeOutputSchema),
   postingDuplicate: toJsonSchema(PostingDuplicateOutputSchema),
+} as const;
+
+/** Saídas da F12 (formulário de candidatura: localizar as perguntas). */
+export const APPLICATION_OUTPUT_JSON_SCHEMAS = {
+  applicationLocate: toJsonSchema(ApplicationLocateOutputSchema),
 } as const;
 
 /** Saídas do gerador da F05 (conteúdo do CV e da carta; o código monta o resto). */

@@ -8,6 +8,9 @@ import {
   AnalyzeProfilesOutputSchema,
   type AnalyzeRepoOutput,
   AnalyzeRepoOutputSchema,
+  APPLICATION_OUTPUT_JSON_SCHEMAS,
+  type ApplicationLocateOutput,
+  ApplicationLocateOutputSchema,
   type BuildDigestOutput,
   BuildDigestOutputSchema,
   CHAT_OUTPUT_JSON_SCHEMAS,
@@ -63,6 +66,7 @@ import {
 import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
+  type ApplicationLocateInput,
   type AuthMethod,
   type BuildDigestInput,
   type ChatTitleInput,
@@ -860,6 +864,19 @@ export class ClaudeCodeProvider implements Provider {
       POSTING_OUTPUT_JSON_SCHEMAS.postingMerge,
       PostingMergeOutputSchema,
       "postingMerge",
+    );
+  }
+
+  applicationLocate(
+    input: ApplicationLocateInput,
+  ): Promise<ProviderResult<ApplicationLocateOutput>> {
+    return this.single(
+      renderStructuredPrompt("applicationLocate", input),
+      input.model,
+      PROMPTS.applicationLocate(),
+      APPLICATION_OUTPUT_JSON_SCHEMAS.applicationLocate,
+      ApplicationLocateOutputSchema,
+      "applicationLocate",
     );
   }
 

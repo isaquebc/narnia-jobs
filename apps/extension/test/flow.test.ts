@@ -20,6 +20,7 @@ function deps(over: Partial<FlowDeps> = {}): FlowDeps & Record<string, ReturnTyp
     openWindow: vi.fn(async () => {}),
     openOptions: vi.fn(async () => {}),
     setBadge: vi.fn(async () => {}),
+    openPermission: vi.fn(async () => {}),
     ...over,
   } as FlowDeps & Record<string, ReturnType<typeof vi.fn>>;
 }
@@ -71,6 +72,55 @@ describe("F12/M2 · clique no ícone", () => {
     expect(d.openWindow).toHaveBeenCalledWith(
       enterUrl(paired.instance, paired.token, "/candidatura?erro=envio"),
     );
+  });
+});
+
+describe("F12/M3 · clique num formulário", () => {
+  const field = (ref: string, label: string) => ({
+    ref,
+    control: "text" as const,
+    label,
+    name: null,
+    placeholder: null,
+    help: null,
+    section: null,
+    required: false,
+    maxLength: null,
+    options: [],
+    autocomplete: null,
+  });
+
+  it("manda os campos do formulário junto com a página", async () => {
+    const form = { fields: [field("f1", "Nome"), field("f2", "E-mail")], frames: [] };
+    const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
+    expect(await onIconClick({ id: 7 }, d)).toBe("window");
+    const [, init] = vi.mocked(d.fetch).mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).form).toEqual(form);
+  });
+
+  it("formulário num quadro de outro site sem permissão: pede a permissão antes de mandar", async () => {
+    const form = { fields: [], frames: ["https://boards.greenhouse.io"] };
+    const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
+    expect(await onIconClick({ id: 7 }, d)).toBe("permission");
+    expect(d.openPermission).toHaveBeenCalledWith(7, ["https://boards.greenhouse.io"]);
+    expect(d.fetch).not.toHaveBeenCalled();
+  });
+
+  it("página de vaga com vídeo de outro site: não pede permissão, segue como vaga", async () => {
+    const form = { fields: [], frames: ["https://www.youtube.com"] };
+    const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
+    expect(await onIconClick({ id: 7 }, d)).toBe("window");
+    expect(d.openPermission).not.toHaveBeenCalled();
+  });
+
+  it("com o formulário já lido na página, o quadro de outro site (anúncio, vídeo) não trava", async () => {
+    const form = {
+      fields: [field("f1", "Nome"), field("f2", "E-mail")],
+      frames: ["https://ads.example"],
+    };
+    const d = deps({ readTab: vi.fn(async () => ({ ...snap, form })) });
+    expect(await onIconClick({ id: 7 }, d)).toBe("window");
+    expect(d.openPermission).not.toHaveBeenCalled();
   });
 });
 

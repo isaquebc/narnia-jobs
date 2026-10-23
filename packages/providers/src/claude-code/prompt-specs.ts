@@ -1,5 +1,6 @@
 import {
   AnalyzeProfilesOutputSchema,
+  APPLICATION_OUTPUT_JSON_SCHEMAS,
   CHAT_OUTPUT_JSON_SCHEMAS,
   CV_OUTPUT_JSON_SCHEMAS,
   EXTRACTION_JSON_SCHEMAS,
@@ -10,6 +11,7 @@ import {
 import type {
   AnalyzeProfilesProviderInput,
   AnalyzeRepoInput,
+  ApplicationLocateInput,
   BuildDigestInput,
   ChatTitleInput,
   CheckProposalsInput,
@@ -183,6 +185,16 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: POSTING_OUTPUT_JSON_SCHEMAS.postingDuplicate,
     tools: [],
   }),
+  applicationLocate: spec("applicationLocate", {
+    name: "narnia-application-locate",
+    description:
+      "F12/M3: organiza os campos lidos do formulário de candidatura em perguntas (junta rótulos quebrados, marca consentimento e autodeclaração, descarta navegação).",
+    file: FILE("application-locate"),
+    userTemplate: "<pagina>\n{{page_json}}\n</pagina>\n\n<campos>\n{{fields_json}}\n</campos>",
+    defaultModel: "haiku",
+    jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.applicationLocate,
+    tools: [],
+  }),
   cvGenerate: spec("cvGenerate", {
     name: "narnia-cv-generate",
     description:
@@ -259,6 +271,21 @@ export const structuredPromptVars = {
   postingDuplicate: (i: PostingDuplicateInput) => ({
     saved_json: JSON.stringify(i.saved, null, 1),
     incoming_json: JSON.stringify(i.incoming, null, 1),
+  }),
+  applicationLocate: (i: ApplicationLocateInput) => ({
+    page_json: JSON.stringify(i.page, null, 1),
+    // compacto: sem os nulos e sem o valor das opções (o modelo só precisa do texto)
+    fields_json: JSON.stringify(
+      i.fields.map((f) =>
+        Object.fromEntries(
+          Object.entries({ ...f, options: f.options.map((o) => o.label) }).filter(
+            ([, v]) => v !== null && v !== false && !(Array.isArray(v) && v.length === 0),
+          ),
+        ),
+      ),
+      null,
+      1,
+    ),
   }),
   cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
   coverLetterGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),

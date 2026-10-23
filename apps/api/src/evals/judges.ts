@@ -41,6 +41,7 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
     resposta: OUTPUT,
   },
   postingDuplicate: { salva: "input.saved_json", nova: "input.incoming_json", resposta: OUTPUT },
+  applicationLocate: { pagina: "input.page_json", campos: "input.fields_json", resposta: OUTPUT },
   cvGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   coverLetterGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   cvReview: {

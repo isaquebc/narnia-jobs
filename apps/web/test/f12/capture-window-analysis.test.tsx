@@ -19,6 +19,7 @@ const capture = (analysisState: Record<string, unknown> = {}) => ({
   createdAt: "2026-10-23T12:00:00.000Z",
   postingId: "v1",
   duplicate: null,
+  applicationId: null,
   analysis: { requested: true, sessionId: null, error: null, ...analysisState },
   reading: {
     ok: true,

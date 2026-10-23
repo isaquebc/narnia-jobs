@@ -1,5 +1,10 @@
 import { z } from "zod";
 import {
+  ApplicationQuestionSchema,
+  ApplicationStatusSchema,
+  FormSnapshotSchema,
+} from "../schemas/application";
+import {
   ChatCategorySchema,
   ChatMessageSchema,
   ChatSessionSchema,
@@ -820,6 +825,8 @@ export const ExtensionCaptureCreateRequestSchema = z.object({
     .regex(/^https?:\/\//i),
   title: z.string().max(500).nullable().optional(),
   html: z.string().min(1).max(EXTENSION_CAPTURE_MAX_HTML),
+  /** Campos de formulário lidos na aba (F12/M3); a página de vaga vem sem. */
+  form: FormSnapshotSchema.optional(),
 });
 export type ExtensionCaptureCreateRequest = z.infer<typeof ExtensionCaptureCreateRequestSchema>;
 /** O que a janela mostra da página lida: o extrator da F06 sobre o HTML, sem tokens. */
@@ -854,8 +861,32 @@ export const ExtensionCaptureSchema = z.object({
     sessionId: z.string().nullable(),
     error: z.string().nullable(),
   }),
+  /** Formulário de candidatura lido na página (F12/M3): a janela abre no modo formulário. */
+  applicationId: z.string().nullable(),
 });
 export type ExtensionCapture = z.infer<typeof ExtensionCaptureSchema>;
+
+/** Formulário de candidatura na janela (F12/M3): perguntas na ordem da página e o valor dos campos óbvios. */
+export const ApplicationFormViewSchema = z.object({
+  id: z.string(),
+  captureId: z.string(),
+  url: z.string(),
+  title: z.string().nullable(),
+  status: ApplicationStatusSchema,
+  error: z.string().nullable(),
+  postingId: z.string().nullable(),
+  posting: z.object({ title: z.string().nullable(), company: z.string().nullable() }).nullable(),
+  profileId: z.string().nullable(),
+  questions: z.array(
+    ApplicationQuestionSchema.extend({
+      /** Valor tirado dos dados da pessoa (campos óbvios), pronto para copiar. */
+      prefill: z.string().nullable(),
+    }),
+  ),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type ApplicationFormView = z.infer<typeof ApplicationFormViewSchema>;
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
   pattern: true,
   trustTag: true,
@@ -866,6 +897,12 @@ export const TrustedDomainPatchRequestSchema = z.object({ enabled: z.boolean() }
 export const PostingUpdatedEventSchema = z.object({
   type: z.literal("posting.updated"),
   postingId: IdSchema,
+});
+
+/** Formulário de candidatura com as perguntas organizadas ou com erro (F12/M3): a janela recarrega. */
+export const ApplicationUpdatedEventSchema = z.object({
+  type: z.literal("application.updated"),
+  applicationId: IdSchema,
 });
 
 /** CV ou carta mudou de etapa ou ficou pronto (F05 §2.7): a web recarrega o documento, a aba do perfil e a vaga. */
@@ -903,6 +940,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   ChatIngestionCreatedEventSchema,
   PostingUpdatedEventSchema,
   DocumentUpdatedEventSchema,
+  ApplicationUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

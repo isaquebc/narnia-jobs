@@ -15,6 +15,12 @@ declare namespace chrome {
   namespace runtime {
     function openOptionsPage(): Promise<void>;
     function getManifest(): { version: string };
+    function getURL(path: string): string;
+    function sendMessage(msg: unknown): Promise<unknown>;
+    const onMessage: { addListener(cb: (msg: never) => void): void };
+  }
+  namespace permissions {
+    function request(p: { origins: string[] }): Promise<boolean>;
   }
   namespace tabs {
     interface Tab {
@@ -49,7 +55,7 @@ declare namespace chrome {
       result?: unknown;
     }
     function executeScript(opts: {
-      target: { tabId: number };
+      target: { tabId: number; allFrames?: boolean };
       files?: string[];
       func?: () => unknown;
     }): Promise<InjectionResult[]>;

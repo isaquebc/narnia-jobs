@@ -18,6 +18,7 @@ await build({
   entryPoints: {
     background: "src/background.ts",
     options: "src/options.ts",
+    permission: "src/permission.ts",
     capture: "src/capture/inject.ts",
   },
   absWorkingDir: root,
@@ -42,7 +43,8 @@ writeFileSync(
   `${JSON.stringify(buildManifest(version, extraHosts), null, 2)}\n`,
 );
 rmSync(join(out, ".manifest.mjs"), { force: true });
-for (const f of ["options.html", "options.css"]) copyFileSync(join(root, "src", f), join(out, f));
+for (const f of ["options.html", "options.css", "permission.html"])
+  copyFileSync(join(root, "src", f), join(out, f));
 for (const size of [16, 32, 48, 128]) writeFileSync(join(out, "icons", `${size}.png`), icon(size));
 console.log(`extensão do Chrome gerada (versão ${version})`);
 

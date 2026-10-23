@@ -144,7 +144,7 @@ export async function sendCapture(
   fetch: Fetch,
   instance: string,
   token: string,
-  page: { url: string; title: string; html: string },
+  page: { url: string; title: string; html: string; form?: unknown },
 ): Promise<CaptureResult> {
   let res: Response;
   try {

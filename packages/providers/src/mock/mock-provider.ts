@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type {
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
+  ApplicationLocateOutput,
   BuildDigestOutput,
   ChatTitleOutput,
   CheckProposalsOutput,
@@ -26,6 +27,7 @@ import { type ChatEvent, type ChatHandle, type ChatOpenOptions, createAsyncQueue
 import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
+  type ApplicationLocateInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,
@@ -73,6 +75,7 @@ export type MockOperation =
   | "postingExtract"
   | "postingMerge"
   | "postingDuplicate"
+  | "applicationLocate"
   | "cvGenerate"
   | "coverLetterGenerate"
   | "cvReview"
@@ -829,6 +832,45 @@ export class MockProvider implements Provider {
     return this.result(
       { fields: fields as PostingFields, fieldSources, keywords: [...byTerm.values()] },
       input.text,
+      input.model,
+    );
+  }
+
+  /**
+   * Localizador previsível (F12/M3): uma pergunta por campo, pelo rótulo, com o tipo pelo campo; "buscar" e "CEP" vão
+   * para `ignored` (o real junta rótulos quebrados e entende o sentido).
+   */
+  async applicationLocate(
+    input: ApplicationLocateInput,
+  ): Promise<ProviderResult<ApplicationLocateOutput>> {
+    await this.gate("applicationLocate");
+    const KIND: Record<string, ApplicationLocateOutput["questions"][number]["kind"]> = {
+      textarea: "long_text",
+      richtext: "long_text",
+      select: "choice",
+      radio: "choice",
+      combobox: "choice",
+      multiselect: "multi_choice",
+      checkboxes: "multi_choice",
+      checkbox: "yes_no",
+      number: "number",
+      date: "date",
+      file: "file",
+    };
+    const ignored = input.fields.filter((f) => /buscar|search|\bcep\b/i.test(f.label ?? ""));
+    const questions = input.fields
+      .filter((f) => !ignored.includes(f))
+      .map((f) => ({
+        fieldRefs: [f.ref],
+        question: (f.label ?? f.placeholder ?? f.name ?? "Campo").replace(/\s*\*\s*$/, ""),
+        kind: KIND[f.control] ?? ("short_text" as const),
+        required: f.required,
+        section: f.section,
+        topic: null,
+      }));
+    return this.result(
+      { questions, ignored: ignored.map((f) => f.ref) },
+      JSON.stringify(input.fields),
       input.model,
     );
   }

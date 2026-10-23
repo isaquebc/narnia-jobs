@@ -1,4 +1,5 @@
 import type { Db } from "../open";
+import { type ApplicationsRepo, applicationsRepo } from "./applications";
 import {
   type ChatMessagesRepo,
   type ChatSessionsRepo,
@@ -98,6 +99,7 @@ export interface Repos {
   cvTemplates: CvTemplatesRepo;
   // F12
   extension: ExtensionRepo;
+  applications: ApplicationsRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -160,9 +162,11 @@ export function createRepos(db: Db): Repos {
     documents: documentsRepo(db),
     cvTemplates: cvTemplatesRepo(db),
     extension: extensionRepo(db),
+    applications: applicationsRepo(db),
   };
 }
 
+export * from "./applications";
 export * from "./chat";
 export * from "./digests";
 export * from "./documents";

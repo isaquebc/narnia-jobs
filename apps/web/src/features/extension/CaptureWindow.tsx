@@ -4,12 +4,13 @@ import { useApi } from "../../app/context";
 import { Alert } from "../../components/ui/alert";
 import { Button, buttonClass } from "../../components/ui/button";
 import { t } from "../../i18n";
+import { ApplicationWindow } from "./ApplicationWindow";
 import { CaptureFollowUp } from "./CaptureFollowUp";
 
 /**
  * Janela da extensão (F12-2, F12/M2): aberta numa janela popup do Chrome sobre a página lida, sem o menu do narnia.
  * Modo vaga: o que o extrator da F06 tirou da página, o aviso de vaga já salva e "Salvar vaga", que também analisa
- * (`CaptureFollowUp`). Links abrem fora da janela (`target="_blank"` cai na janela normal do Chrome).
+ * (`CaptureFollowUp`). Modo formulário (F12/M3): as perguntas do formulário (`ApplicationWindow`). Links abrem fora da janela (`target="_blank"` cai na janela normal do Chrome).
  */
 export function CaptureWindow({
   captureId,
@@ -42,6 +43,8 @@ function CaptureView({ id }: { id: string }) {
   });
   if (q.isPending) return <p className="text-sm text-muted-fg">{t("capture.loading")}</p>;
   if (q.isError) return <Alert tone="warn">{t("capture.notFound")}</Alert>;
+  // F12/M3: página com formulário de candidatura abre no modo formulário
+  if (q.data.capture.applicationId) return <ApplicationWindow id={q.data.capture.applicationId} />;
   return <PostingCapture capture={q.data.capture} />;
 }
 

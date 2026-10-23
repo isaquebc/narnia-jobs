@@ -1,5 +1,6 @@
+import { type FrameForm, mergeFrames } from "./capture/frames";
 import type { PageSnapshot } from "./capture/page";
-import { DEFAULT_TITLE, onIconClick } from "./flow";
+import { DEFAULT_TITLE, onIconClick, type TabCapture } from "./flow";
 import { loadPairing } from "./storage";
 
 /**
@@ -8,14 +9,34 @@ import { loadPairing } from "./storage";
  */
 const WINDOW = { width: 480, height: 860 };
 
-async function readTab(tabId: number): Promise<PageSnapshot> {
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["capture.js"] });
+async function readTab(tabId: number): Promise<TabCapture> {
+  // todos os quadros que a extensão pode ler: o de cima pelo `activeTab`, os de outro site só com permissão (F12/M3)
+  await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    files: ["capture.js"],
+  });
   const [r] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => (globalThis as { __narniaSnapshot?: () => unknown }).__narniaSnapshot?.(),
   });
   if (!r?.result) throw new Error("leitura vazia");
-  return r.result as PageSnapshot;
+  const forms = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: () => (globalThis as { __narniaForm?: () => unknown }).__narniaForm?.(),
+  });
+  const frames = forms.map((f) => f.result).filter((x): x is FrameForm => !!x);
+  return { ...(r.result as PageSnapshot), form: mergeFrames(frames) };
+}
+
+/** Página da extensão que pede a permissão do quadro (a permissão só sai com o clique da pessoa). */
+async function openPermission(tabId: number, origins: string[]) {
+  const q = new URLSearchParams({ tab: String(tabId), origins: origins.join(",") });
+  await chrome.windows.create({
+    url: chrome.runtime.getURL(`permission.html?${q}`),
+    type: "popup",
+    width: 420,
+    height: 360,
+  });
 }
 
 async function openWindow(url: string) {
@@ -66,8 +87,14 @@ const click = (tab: { id?: number }) =>
     openWindow,
     openOptions: () => chrome.runtime.openOptionsPage(),
     setBadge,
+    openPermission,
   });
 
 chrome.action.onClicked.addListener((tab) => void click(tab));
+// permissão do quadro concedida na página da extensão: lê a aba de novo, agora com o quadro
+chrome.runtime.onMessage.addListener((msg: { type?: string; tabId?: number }) => {
+  if (msg?.type === "narnia.recapture" && typeof msg.tabId === "number")
+    void click({ id: msg.tabId });
+});
 // e2e (F12/E2E-02): o Playwright não clica na barra do Chrome; chama o mesmo fluxo pelo service worker
 (globalThis as { narniaIconClick?: typeof click }).narniaIconClick = click;

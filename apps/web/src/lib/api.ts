@@ -1,6 +1,7 @@
 import type {
   AnalyzeEstimateResponse,
   AnalyzeRequest,
+  ApplicationFormView,
   BackupSettingsResponse,
   BridgeSettingsDto,
   Budget,
@@ -282,6 +283,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         { method: "POST" },
       ),
     /** "Analisar de novo" na janela da extensão: abre a conversa da análise da vaga salva. */
+    getApplication: (id: string) =>
+      request<{ application: ApplicationFormView }>(`/api/applications/${encodeURIComponent(id)}`),
+    relocateApplication: (id: string) =>
+      request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/locate`, {
+        method: "POST",
+      }),
     analyzeCapture: (id: string) =>
       request<{ session: ChatSession }>(
         `/api/extension/captures/${encodeURIComponent(id)}/analyze`,

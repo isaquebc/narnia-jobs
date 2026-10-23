@@ -26,6 +26,7 @@ import { createJsonlLogger, type JsonlLogger } from "./log";
 import { probeMcp } from "./mcp/probe";
 import { mcpRoutes } from "./mcp/server";
 import type { QueueAdapter } from "./queue";
+import { applicationsRoutes } from "./routes/applications";
 import { backupsRoutes } from "./routes/backups";
 import { chatRoutes } from "./routes/chat";
 import { chatSettingsRoutes } from "./routes/chat-settings";
@@ -200,6 +201,7 @@ export function createApp(deps: AppDeps) {
       openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
     }),
   );
+  app.route("/", applicationsRoutes({ repos: deps.repos, queue: deps.queue, bus: deps.bus }));
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",

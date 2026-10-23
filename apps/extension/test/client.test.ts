@@ -91,6 +91,8 @@ describe("F12/M1 · manifesto", () => {
     expect(m.permissions).toEqual(["storage", "activeTab", "scripting"]);
     expect(m.host_permissions).toEqual(["http://127.0.0.1/*", "http://localhost/*"]);
     expect(JSON.stringify(m)).not.toContain("<all_urls>");
+    // F12/M3: quadro de outro site só com a permissão pedida na hora
+    expect(m.optional_host_permissions).toEqual(["https://*/*"]);
     expect(buildManifest("0.1.0", ["web"]).host_permissions).toContain("http://web/*");
   });
 });

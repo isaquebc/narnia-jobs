@@ -9,6 +9,8 @@ import {
   language,
   letterWordCount,
   literalQuotes,
+  locateKinds,
+  locateRefs,
   noInventedYears,
   pickFilesLimits,
   referenceCoverage,
@@ -121,6 +123,27 @@ const letterWords: Rule = {
   impl: letterWordCount as Rule["impl"],
 };
 
+const locate: Rule[] = [
+  {
+    name: "campos_conferidos",
+    description:
+      "F12/M3: toda referência existe nos campos enviados, nenhum campo fica sem destino nem em duas perguntas.",
+    module: "application-locate",
+    fn: "locateRefs",
+    config: null,
+    impl: locateRefs as Rule["impl"],
+  },
+  {
+    name: "tipos_esperados",
+    description:
+      "F12/M3: consentimento e autodeclaração marcados (F12-12), campos de navegação descartados e rótulos quebrados juntos.",
+    module: "application-locate",
+    fn: "locateKinds",
+    config: null,
+    impl: locateKinds as Rule["impl"],
+  },
+];
+
 const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = {
   readDocument: (op) => [schemaRule(op), coverage(0.8)],
   extractFacts: (op) => [schemaRule(op), quotes(["text"]), years(["text"]), coverage(0.8)],
@@ -180,6 +203,7 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
   postingExtract: (op) => [schemaRule(op), years(["text"]), coverage(0.8)],
   postingMerge: (op) => [schemaRule(op), years(["text"]), coverage(0.75)],
   postingDuplicate: (op) => [schemaRule(op), lang(["rationale"]), coverage(1)],
+  applicationLocate: (op) => [schemaRule(op), ...locate],
   cvGenerate: (op) => [
     schemaRule(op),
     cvIds,

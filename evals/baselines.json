@@ -53,6 +53,17 @@
     },
     "updatedAt": "2026-10-15T01:21:11.105Z"
   },
+  "narnia-application-locate": {
+    "scores": {
+      "campos_conferidos": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 0.833,
+      "tipos_esperados": 0.958
+    },
+    "versionId": "df1ec4ab1401b15ee78205f69e683db55f704fd6bd17397368f06b3283303cc9",
+    "commit": "75ace96",
+    "updatedAt": "2026-10-23T20:15:25.211Z"
+  },
   "narnia-chat-title": {
     "scores": {
       "cobertura_da_referencia": 0.667,

@@ -23,6 +23,8 @@ export function buildManifest(version: string, extraHosts: string[] = []) {
     background: { service_worker: "background.js", type: "module" },
     options_ui: { page: "options.html", open_in_tab: true },
     permissions: ["storage", "activeTab", "scripting"],
+    // F12/M3: formulário embutido num quadro de outro site (Greenhouse, Lever, Workday); pedida na hora, origem a origem
+    optional_host_permissions: ["https://*/*"],
     host_permissions: [
       "http://127.0.0.1/*",
       "http://localhost/*",

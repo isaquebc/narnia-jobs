@@ -351,6 +351,8 @@ export const POSTING_MODEL_KEYS = [
   // F05-13: Sonnet gera o CV e a carta; Haiku revisa
   "cv_generate",
   "cv_review",
+  // F12/M3: Haiku organiza as perguntas do formulário de candidatura
+  "application_locate",
 ] as const;
 export const PostingModelsSchema = z.object(
   Object.fromEntries(POSTING_MODEL_KEYS.map((k) => [k, ClaudeModelSchema])) as Record<

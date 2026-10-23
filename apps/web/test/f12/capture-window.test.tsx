@@ -16,6 +16,7 @@ const capture = (over: Record<string, unknown> = {}) => ({
   createdAt: "2026-10-23T12:00:00.000Z",
   postingId: null,
   duplicate: null,
+  applicationId: null,
   analysis: { requested: false, sessionId: null, error: null },
   reading: {
     ok: true,

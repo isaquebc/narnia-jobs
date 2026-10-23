@@ -2,6 +2,7 @@ import type {
   AnalyzeProfilesInput,
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
+  ApplicationLocateOutput,
   BuildDigestOutput,
   ChatTitleOutput,
   CheckProposalsOutput,
@@ -11,6 +12,7 @@ import type {
   CvReviewOutput,
   ExtractFactsOutput,
   FactProposal,
+  FormField,
   PickFilesOutput,
   PlanUsage,
   PostingDuplicateOutput,
@@ -156,6 +158,13 @@ export interface PostingDuplicateInput {
   model: string;
 }
 
+/** F12/M3: campos do formulário que a heurística não resolveu, para o Haiku organizar em perguntas. */
+export interface ApplicationLocateInput {
+  page: { url: string; title: string | null };
+  fields: FormField[];
+  model: string;
+}
+
 /** F05-11: conteúdo do CV e da carta a partir do resumo montado pelo código (Sonnet por padrão). */
 export interface CvGenerateInput {
   brief: CvBrief;
@@ -217,6 +226,10 @@ export interface Provider {
   postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>>;
   postingMerge(input: PostingMergeInput): Promise<ProviderResult<PostingMergeOutput>>;
   postingDuplicate(input: PostingDuplicateInput): Promise<ProviderResult<PostingDuplicateOutput>>;
+  /** F12/M3: organiza os campos do formulário de candidatura em perguntas (Haiku). */
+  applicationLocate(
+    input: ApplicationLocateInput,
+  ): Promise<ProviderResult<ApplicationLocateOutput>>;
   /** F05: conteúdo do CV e da carta de apresentação (Sonnet). */
   cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>>;
   coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;

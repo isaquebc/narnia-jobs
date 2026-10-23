@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>narnia-jobs · permissão</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Ler o formulário</h1>
+      <p class="hint">
+        O formulário desta candidatura está num quadro de outro site. Para o narnia ler as perguntas, o Chrome precisa da
+        sua permissão para a extensão ler este site:
+      </p>
+      <ul id="origins"></ul>
+      <p class="hint">A extensão só lê a página quando você clica no ícone, e nunca preenche nem envia nada.</p>
+      <div class="actions">
+        <button type="button" id="allow">Permitir e ler</button>
+        <button type="button" id="cancel" class="secondary">Agora não</button>
+      </div>
+      <p id="status" role="status"></p>
+    </main>
+    <script type="module" src="permission.js"></script>
+  </body>
+</html>
