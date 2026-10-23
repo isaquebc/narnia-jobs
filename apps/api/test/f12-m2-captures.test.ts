@@ -233,3 +233,102 @@ describe("F12/M2 · entrada da janela popup", () => {
     }
   });
 });
+
+describe("F12/M2 · Salvar vaga também analisa (pedido do dono, 2026-10-23)", () => {
+  let t: TestApp | undefined;
+  afterEach(() => t?.cleanup());
+
+  async function saved(app: TestApp) {
+    const { code } = (await (
+      await app.api("/api/extension/pairing", { method: "POST" })
+    ).json()) as { code: string };
+    const pair = await app.app.request("/api/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, name: "Chrome" }),
+    });
+    const token = ((await pair.json()) as { token: string }).token;
+    const cap = await app.app.request("/api/extension/captures", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ kind: "page", url: "https://vagas.example/9", html: withJsonLd }),
+    });
+    const { id } = (await cap.json()) as { id: string };
+    const save = await app.api(`/api/extension/captures/${id}/posting`, { method: "POST" });
+    const { posting } = (await save.json()) as { posting: { id: string } };
+    return { id, postingId: posting.id };
+  }
+
+  const analysisOf = async (app: TestApp, id: string) =>
+    (
+      (await (await app.api(`/api/extension/captures/${id}`)).json()) as {
+        capture: {
+          analysis: { requested: boolean; sessionId: string | null; error: string | null };
+        };
+      }
+    ).capture.analysis;
+
+  /** O worker terminou a extração: a vaga fica pronta e o evento chega pelo relay. */
+  function extractionDone(app: TestApp, postingId: string, status: "ready" | "error" = "ready") {
+    app.repos.postings.setStatus(postingId, status);
+    app.bus.emit({ type: "posting.updated", postingId });
+  }
+
+  it("a análise espera a extração e abre sozinha quando ela termina, ligada à vaga", async () => {
+    t = makeTestApp();
+    const { id, postingId } = await saved(t);
+    expect(await analysisOf(t, id)).toEqual({ requested: true, sessionId: null, error: null });
+    expect(t.repos.chatSessions.list({}).filter((s) => s.category === "job")).toHaveLength(0);
+    extractionDone(t, postingId);
+    const a = await analysisOf(t, id);
+    expect(a.sessionId).toEqual(expect.any(String));
+    const session = t.repos.chatSessions.get(a.sessionId as string);
+    expect(session).toMatchObject({ category: "job", postingId });
+    // eventos seguintes da mesma vaga (a própria análise grava e avisa) não abrem outra conversa
+    t.bus.emit({ type: "posting.updated", postingId });
+    expect(t.repos.chatSessions.list({}).filter((s) => s.category === "job")).toHaveLength(1);
+  });
+
+  it("extração com erro também analisa (o texto da vaga já está salvo)", async () => {
+    t = makeTestApp();
+    const { id, postingId } = await saved(t);
+    extractionDone(t, postingId, "error");
+    expect((await analysisOf(t, id)).sessionId).toEqual(expect.any(String));
+  });
+
+  it("teto de conversas cheio: guarda o erro; Analisar de novo abre depois de liberar", async () => {
+    t = makeTestApp();
+    await t.api("/api/settings/chat", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ maxLiveSessions: 1 }),
+    });
+    const other = await t.api("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ category: "career" }),
+    });
+    const { session } = (await other.json()) as { session: { id: string } };
+    const { id, postingId } = await saved(t);
+    extractionDone(t, postingId);
+    expect(await analysisOf(t, id)).toMatchObject({ sessionId: null, error: "session_limit" });
+    const again = await t.api(`/api/extension/captures/${id}/analyze`, { method: "POST" });
+    expect(again.status).toBe(409);
+    await t.api(`/api/sessions/${session.id}/hibernate`, { method: "POST" });
+    const ok = await t.api(`/api/extension/captures/${id}/analyze`, { method: "POST" });
+    expect(ok.status).toBe(201);
+    expect(await analysisOf(t, id)).toMatchObject({ sessionId: expect.any(String), error: null });
+  });
+
+  it("Analisar de novo: abre na hora; captura sem vaga dá 422 e inexistente 404", async () => {
+    t = makeTestApp();
+    const { id } = await saved(t);
+    const r = await t.api(`/api/extension/captures/${id}/analyze`, { method: "POST" });
+    expect(r.status).toBe(201);
+    const { session } = (await r.json()) as { session: { id: string } };
+    expect((await analysisOf(t, id)).sessionId).toBe(session.id);
+    expect((await t.api("/api/extension/captures/nao/analyze", { method: "POST" })).status).toBe(
+      404,
+    );
+  });
+});

@@ -845,6 +845,12 @@ export const ExtensionCaptureSchema = z.object({
   duplicate: z
     .object({ id: z.string(), title: z.string().nullable(), company: z.string().nullable() })
     .nullable(),
+  /** "Salvar vaga" também analisa: o pedido, a conversa da análise e o erro ao abrir (ex.: `session_limit`). */
+  analysis: z.object({
+    requested: z.boolean(),
+    sessionId: z.string().nullable(),
+    error: z.string().nullable(),
+  }),
 });
 export type ExtensionCapture = z.infer<typeof ExtensionCaptureSchema>;
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({

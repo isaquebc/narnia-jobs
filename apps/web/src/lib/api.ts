@@ -281,6 +281,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         `/api/extension/captures/${encodeURIComponent(id)}/posting`,
         { method: "POST" },
       ),
+    /** "Analisar de novo" na janela da extensão: abre a conversa da análise da vaga salva. */
+    analyzeCapture: (id: string) =>
+      request<{ session: ChatSession }>(
+        `/api/extension/captures/${encodeURIComponent(id)}/analyze`,
+        { method: "POST" },
+      ),
     // Configurações › Avaliações (ponte da assinatura e Phoenix, AV-2)
     getEvalsSettings: () => request<EvalsSettingsResponse>("/api/settings/evals"),
     putBridgeSettings: (patch: Partial<BridgeSettingsDto>) =>

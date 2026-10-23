@@ -16,6 +16,7 @@ const capture = (over: Record<string, unknown> = {}) => ({
   createdAt: "2026-10-23T12:00:00.000Z",
   postingId: null,
   duplicate: null,
+  analysis: { requested: false, sessionId: null, error: null },
   reading: {
     ok: true,
     title: "Engenheira Backend Sênior",
@@ -32,16 +33,32 @@ const capture = (over: Record<string, unknown> = {}) => ({
 const posting = postingFixture("p1", {
   title: "Engenheira Backend Sênior",
   company: "Acme Pagamentos",
+  status: "extracting",
 });
+
+/** Depois de salvar, a janela acompanha a vaga (extração e análise) e os documentos. */
+const followUpApi = {
+  getPosting: async () => ({ posting, contacts: [], notes: [], duplicates: [] }),
+  listPostingAnalyses: async () => ({ analyses: [] }),
+  listDocuments: async () => ({ documents: [] }),
+};
 
 describe("F12/M2 · janela da extensão: vaga", () => {
   it("mostra o que foi lido, sem o menu do narnia, e salva a vaga", async () => {
-    const saveCapturePosting = vi.fn(async () => ({ posting, job: null }));
+    let current = capture();
+    const saveCapturePosting = vi.fn(async () => {
+      current = capture({
+        postingId: "p1",
+        analysis: { requested: true, sessionId: null, error: null },
+      });
+      return { posting, job: null };
+    });
     renderApp({
       api: {
         ...shellApi,
-        getExtensionCapture: async () => ({ capture: capture() }),
+        getExtensionCapture: async () => ({ capture: current }),
         saveCapturePosting,
+        ...followUpApi,
       },
       initialUrl: "/candidatura?captura=c1",
     });
@@ -62,6 +79,8 @@ describe("F12/M2 · janela da extensão: vaga", () => {
     expect(saveCapturePosting).toHaveBeenCalledWith("c1");
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/Vaga salva/);
+    // salvar também analisa: a janela acompanha a extração (pedido do dono, 2026-10-23)
+    expect(await screen.findByText(/Lendo os detalhes da vaga/)).toBeInTheDocument();
     const open = within(status).getByRole("link", { name: "Abrir a vaga no narnia" });
     expect(open).toHaveAttribute("href", "/vagas/p1");
     expect(open).toHaveAttribute("target", "_blank");
@@ -85,15 +104,16 @@ describe("F12/M2 · janela da extensão: vaga", () => {
     expect(screen.getByRole("button", { name: "Salvar vaga" })).toBeEnabled();
   });
 
-  it("captura já salva: mostra o link da vaga em vez do botão", async () => {
+  it("captura já salva: mostra o link da vaga e o acompanhamento em vez do botão", async () => {
     renderApp({
       api: {
         ...shellApi,
         getExtensionCapture: async () => ({ capture: capture({ postingId: "p1" }) }),
+        ...followUpApi,
       },
       initialUrl: "/candidatura?captura=c1",
     });
-    expect(await screen.findByText(/Esta vaga já está salva/)).toBeInTheDocument();
+    expect(await screen.findByText(/Vaga salva no narnia/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir a vaga no narnia" })).toHaveAttribute(
       "href",
       "/vagas/p1",

@@ -63,7 +63,8 @@ async function pair(page: Page, extensionId: string) {
   await options.close();
 }
 
-test("F12/E2E-02 extensão: página de vaga → janela com a vaga lida → Salvar vaga → aviso de já salva", async () => {
+test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → análise → CV e carta → aviso de já salva", async () => {
+  test.setTimeout(240_000);
   await freshStart("engineer");
   const ext = join(dir, "dist");
   context = await chromium.launchPersistentContext(join(dir, "perfil"), {
@@ -117,6 +118,19 @@ test("F12/E2E-02 extensão: página de vaga → janela com a vaga lida → Salva
     "href",
     /\/vagas\/.+/,
   );
+
+  // salvar também analisa, e o resultado aparece na mesma janela (pedido do dono, 2026-10-23)
+  const result = popup.getByRole("region", { name: "Análise da vaga" });
+  await expect(result).toBeVisible({ timeout: 90_000 });
+  await expect(result.getByText(/fit \d+/).first()).toBeVisible();
+
+  // depois da análise, CV e carta na mesma janela, com o download
+  await popup.getByRole("button", { name: "Gerar CV e carta" }).click();
+  const docs = popup.getByRole("region", { name: "Currículo e carta" });
+  await expect(docs.getByRole("link", { name: "Baixar o CV" })).toBeVisible({ timeout: 120_000 });
+  await expect(docs.getByRole("link", { name: "Baixar a carta" })).toBeVisible({
+    timeout: 120_000,
+  });
 
   // a vaga entrou pela F06
   await page.goto("/vagas");

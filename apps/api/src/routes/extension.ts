@@ -15,6 +15,7 @@ import {
 import { type Context, Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { COOKIE_NAME, tokenMatches } from "../auth";
+import { SessionLimitError } from "../chat/session-manager";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
 import { extractPosting } from "../postings/fetch";
@@ -37,8 +38,11 @@ export function extensionRoutes(deps: {
   dataDir: string;
   queue?: QueueAdapter | undefined;
   bus?: EventBus | undefined;
+  /** Abre a conversa da análise da vaga (F06 §1.1, `SessionManager.openPostingAnalysis`). */
+  openAnalysis?: ((postingId: string) => { id: string }) | undefined;
 }) {
   const app = new Hono();
+  const startAnalysis = captureAnalysisStarter(deps);
   const deviceOf = (c: Context) => {
     const header = c.req.header("authorization");
     const bearer = header?.startsWith("Bearer ") ? header.slice(7) : "";
@@ -125,6 +129,11 @@ export function extensionRoutes(deps: {
       reading,
       postingId: capture.postingId,
       duplicate: likely ? { id: likely.id, title: likely.title, company: likely.company } : null,
+      analysis: {
+        requested: capture.analysisRequestedAt !== null,
+        sessionId: capture.analysisSessionId,
+        error: capture.analysisError,
+      },
     };
     return c.json({ capture: body });
   });
@@ -155,7 +164,22 @@ export function extensionRoutes(deps: {
     );
     if (!r.ok) return apiError(c, 422, r.code, r.message);
     deps.repos.extension.linkCapturePosting(capture.id, r.posting.id);
+    // pedido do dono (2026-10-23): salvar também analisa; a análise abre quando a extração termina
+    // (`watchCaptureAnalyses`), ou já, se a vaga não ficou extraindo
+    deps.repos.extension.requestCaptureAnalysis(capture.id);
+    if (r.posting.status !== "extracting") startAnalysis(capture.id, r.posting.id);
     return c.json({ posting: r.posting, job: r.job }, 201);
+  });
+
+  // "Analisar de novo" na janela: abre a conversa da análise agora
+  app.post("/api/extension/captures/:id/analyze", (c) => {
+    const capture = deps.repos.extension.getCapture(c.req.param("id"));
+    if (!capture) return apiError(c, 404, "not_found", "Captura não encontrada");
+    if (!capture.postingId) return apiError(c, 422, "not_saved", "Salve a vaga antes de analisar.");
+    deps.repos.extension.requestCaptureAnalysis(capture.id);
+    const r = startAnalysis(capture.id, capture.postingId);
+    if (!r.ok) return apiError(c, r.code === "session_limit" ? 409 : 422, r.code, r.message);
+    return c.json({ session: r.session }, 201);
   });
 
   // janela popup (F12-2, §4.3): o token do dispositivo vira o cookie da web, a menos que o navegador já esteja
@@ -232,4 +256,51 @@ function readingOf(p: CapturePayload): ExtensionCaptureReading {
 /** Destino do `/enter`: só caminho do próprio narnia (`/…`, nunca `//host` nem esquema). */
 function safeNext(next: string | undefined): string {
   return next && /^\/(?![/\\])/.test(next) ? next : "/candidatura";
+}
+
+type AnalysisStart =
+  | { ok: true; session: { id: string } }
+  | { ok: false; code: string; message: string };
+
+/** Abre a análise da vaga para a captura e guarda a conversa, ou o erro (teto de conversas cheio). */
+function captureAnalysisStarter(deps: {
+  repos: Repos;
+  openAnalysis?: ((postingId: string) => { id: string }) | undefined;
+}) {
+  return (captureId: string, postingId: string): AnalysisStart => {
+    if (!deps.openAnalysis)
+      return { ok: false, code: "analysis_unavailable", message: "Análise indisponível." };
+    try {
+      const session = deps.openAnalysis(postingId);
+      deps.repos.extension.setCaptureAnalysis(captureId, { sessionId: session.id });
+      return { ok: true, session };
+    } catch (e) {
+      const code =
+        e instanceof SessionLimitError
+          ? "session_limit"
+          : ((e as { code?: string }).code ?? "analysis_failed");
+      deps.repos.extension.setCaptureAnalysis(captureId, { error: code });
+      return { ok: false, code, message: (e as Error).message };
+    }
+  };
+}
+
+/**
+ * "Salvar vaga" também analisa (F12/M2, pedido do dono 2026-10-23): quando a extração da vaga termina (pronta ou com
+ * erro, o texto já está salvo), abre a análise das capturas que pediram. Roda no api, então a análise segue mesmo
+ * com a janela fechada.
+ */
+export function watchCaptureAnalyses(deps: {
+  repos: Repos;
+  bus: EventBus;
+  openAnalysis: (postingId: string) => { id: string };
+}) {
+  const start = captureAnalysisStarter(deps);
+  return deps.bus.on((e) => {
+    if (e.type !== "posting.updated") return;
+    const posting = deps.repos.postings.get(e.postingId);
+    if (!posting || posting.status === "extracting") return;
+    for (const capture of deps.repos.extension.capturesAwaitingAnalysis(e.postingId))
+      start(capture.id, e.postingId);
+  });
 }

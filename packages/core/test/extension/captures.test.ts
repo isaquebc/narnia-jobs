@@ -79,11 +79,55 @@ describe("F12/M2 · vaga provavelmente já salva", () => {
   });
 });
 
+describe("F12/M2 · análise pedida pela janela", () => {
+  it("pedido → aguardando; conversa aberta ou erro tiram da espera", () => {
+    const r = repos();
+    const p = r.postings.create({ title: "Backend Sr" });
+    const mk = () => {
+      const c = r.extension.createCapture({
+        kind: "page",
+        url: "https://vagas.example/1",
+        title: null,
+        payload: {},
+        deviceId: null,
+      });
+      r.extension.linkCapturePosting(c.id, p.id);
+      return c.id;
+    };
+    const a = mk();
+    const b = mk();
+    mk(); // sem pedido de análise
+    r.extension.requestCaptureAnalysis(a);
+    r.extension.requestCaptureAnalysis(b);
+    expect(r.extension.capturesAwaitingAnalysis(p.id).map((c) => c.id)).toEqual([a, b]);
+    r.extension.setCaptureAnalysis(a, { sessionId: "s1" });
+    r.extension.setCaptureAnalysis(b, { error: "session_limit" });
+    expect(r.extension.capturesAwaitingAnalysis(p.id)).toEqual([]);
+    expect(r.extension.getCapture(a)).toMatchObject({
+      analysisSessionId: "s1",
+      analysisError: null,
+    });
+    expect(r.extension.getCapture(b)).toMatchObject({
+      analysisSessionId: null,
+      analysisError: "session_limit",
+    });
+    // "Analisar de novo" depois do erro: a conversa nova limpa o erro
+    r.extension.setCaptureAnalysis(b, { sessionId: "s2" });
+    expect(r.extension.getCapture(b)).toMatchObject({
+      analysisSessionId: "s2",
+      analysisError: null,
+    });
+  });
+});
+
 describe("F12/M2 · migração", () => {
-  it("0018 entra sobre um banco da versão anterior", () => {
+  it("0018 e 0019 entram sobre um banco da versão anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0017_extension" });
-    expect(migrate(db).applied).toEqual(["0018_extension_capture"]);
+    expect(migrate(db).applied).toEqual([
+      "0018_extension_capture",
+      "0019_extension_capture_analysis",
+    ]);
     expect(createRepos(db).extension.getCapture("x")).toBeNull();
   });
 });

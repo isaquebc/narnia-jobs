@@ -32,7 +32,7 @@ import { chatSettingsRoutes } from "./routes/chat-settings";
 import { dashboardRoutes } from "./routes/dashboard";
 import { documentsRoutes } from "./routes/documents";
 import { evalsSettingsRoutes } from "./routes/evals-settings";
-import { extensionRoutes } from "./routes/extension";
+import { extensionRoutes, watchCaptureAnalyses } from "./routes/extension";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
 import { ingestionsRoutes } from "./routes/ingestions";
@@ -196,6 +196,8 @@ export function createApp(deps: AppDeps) {
       dataDir: deps.dataDir,
       queue: deps.queue,
       bus: deps.bus,
+      // o SessionManager é montado mais abaixo
+      openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
     }),
   );
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
@@ -223,6 +225,12 @@ export function createApp(deps: AppDeps) {
       mcpUrl: `http://127.0.0.1:${process.env.PORT ?? 3100}/mcp`,
     });
   app.route("/", chatRoutes({ repos: deps.repos, sessions }));
+  // F12/M2: "Salvar vaga" na janela da extensão analisa quando a extração termina
+  watchCaptureAnalyses({
+    repos: deps.repos,
+    bus: deps.bus,
+    openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
+  });
   app.route("/", onboardingRoutes({ repos: deps.repos }));
   app.route("/", filesRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
   app.route(

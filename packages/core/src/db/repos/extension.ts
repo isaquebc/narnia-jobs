@@ -26,6 +26,10 @@ export interface ExtensionCaptureRecord {
   deviceId: string | null;
   postingId: string | null;
   createdAt: string;
+  /** "Salvar vaga" pediu a análise (F12/M2): ela abre quando a extração da vaga termina. */
+  analysisRequestedAt: string | null;
+  analysisSessionId: string | null;
+  analysisError: string | null;
 }
 
 export interface ExtensionRepo {
@@ -44,6 +48,11 @@ export interface ExtensionRepo {
   ): ExtensionCaptureRecord;
   getCapture(id: string): ExtensionCaptureRecord | null;
   linkCapturePosting(id: string, postingId: string): void;
+  requestCaptureAnalysis(id: string, now?: Date): void;
+  /** Conversa da análise aberta (limpa o erro) ou o erro ao abrir. */
+  setCaptureAnalysis(id: string, result: { sessionId: string } | { error: string }): void;
+  /** Capturas daquela vaga com análise pedida e ainda sem conversa. */
+  capturesAwaitingAnalysis(postingId: string): ExtensionCaptureRecord[];
 }
 
 const TOUCH_EVERY_MS = 60 * 1000;
@@ -67,6 +76,9 @@ function mapCapture(r: Row): ExtensionCaptureRecord {
     deviceId: str(r.device_id),
     postingId: str(r.posting_id),
     createdAt: String(r.created_at),
+    analysisRequestedAt: str(r.analysis_requested_at),
+    analysisSessionId: str(r.analysis_session_id),
+    analysisError: str(r.analysis_error),
   };
 }
 
@@ -177,6 +189,29 @@ export function extensionRepo(db: Db): ExtensionRepo {
     },
     linkCapturePosting(id, postingId) {
       q("update extension_capture set posting_id = ? where id = ?").run(postingId, id);
+    },
+    requestCaptureAnalysis(id, now = new Date()) {
+      q("update extension_capture set analysis_requested_at = ? where id = ?").run(
+        now.toISOString(),
+        id,
+      );
+    },
+    setCaptureAnalysis(id, result) {
+      q(
+        "update extension_capture set analysis_session_id = ?, analysis_error = ? where id = ?",
+      ).run(
+        "sessionId" in result ? result.sessionId : null,
+        "error" in result ? result.error : null,
+        id,
+      );
+    },
+    capturesAwaitingAnalysis(postingId) {
+      return (
+        q(
+          `select * from extension_capture where posting_id = ? and analysis_requested_at is not null
+           and analysis_session_id is null and analysis_error is null order by created_at, id`,
+        ).all(postingId) as Row[]
+      ).map(mapCapture);
     },
   };
 }
