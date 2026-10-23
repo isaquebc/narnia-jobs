@@ -242,7 +242,7 @@ function AnalysisSummary({ postingId, view }: { postingId: string; view: Posting
 
 const KINDS: DocumentKind[] = ["cv", "cover_letter"];
 
-function CaptureDocuments({
+export function CaptureDocuments({
   postingId,
   recommendedProfileId,
 }: {

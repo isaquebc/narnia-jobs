@@ -137,6 +137,38 @@ describe("F12/M3 · janela: formulário de candidatura", () => {
     expect(items[5]).toHaveTextContent(/Você decide/);
   });
 
+  it("vaga ligada: o CV e a carta da vaga na janela (gerar quando não há; baixar quando há)", async () => {
+    const doc = {
+      document: { id: "d-cv", kind: "cv", profileId: "p1", postingId: "v1", format: "pdf" },
+      current: {
+        version: 1,
+        status: "ready",
+        pdfPath: "documents/d-cv/v1/x.pdf",
+        pagesRendered: 1,
+        textBody: null,
+      },
+      versions: [],
+      stale: null,
+      missingLinks: [],
+    };
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () => ({ application: application() }) as never,
+        getPosting: async () =>
+          ({ posting: { id: "v1" }, contacts: [], notes: [], duplicates: [] }) as never,
+        listPostingAnalyses: async () => ({ analyses: [] }),
+        listDocuments: async () => ({ documents: [doc] }) as never,
+        documentPdfUrl: (id: string, v: number) => `/api/documents/${id}/versions/${v}/pdf`,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    const docs = await screen.findByRole("region", { name: "Currículo e carta" });
+    expect(await within(docs).findByRole("link", { name: "Baixar o CV" })).toBeInTheDocument();
+    expect(within(docs).getByRole("button", { name: "Gerar carta" })).toBeInTheDocument();
+  });
+
   it("organizando: mostra o andamento e recarrega quando o worker avisa", async () => {
     let current = application({ status: "locating", questions: [] });
     const { ws } = renderApp({

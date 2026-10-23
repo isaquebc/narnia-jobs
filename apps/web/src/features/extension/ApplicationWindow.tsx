@@ -6,7 +6,9 @@ import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
+import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
+import { CaptureDocuments } from "./CaptureFollowUp";
 
 /**
  * Janela da extensão no modo formulário (F12/M3, §4.7): as perguntas do formulário de candidatura na ordem da página,
@@ -112,6 +114,8 @@ export function ApplicationWindow({ id }: { id: string }) {
         </>
       ) : null}
       {relocate.isError ? <Alert tone="danger">{(relocate.error as Error).message}</Alert> : null}
+      {/* pedido do dono (2026-10-23): o CV e a carta da vaga ligada, para anexar, ou o botão de gerar */}
+      {a.postingId ? <PostingDocuments postingId={a.postingId} profileId={a.profileId} /> : null}
     </article>
   );
 }
@@ -164,4 +168,16 @@ function Answer({ q }: { q: Question }) {
   if (q.kind === "file")
     return <span className="text-xs text-muted-fg">{t("application.file")}</span>;
   return <span className="text-xs text-muted-fg">{t("application.soon")}</span>;
+}
+
+function PostingDocuments({
+  postingId,
+  profileId,
+}: {
+  postingId: string;
+  profileId: string | null;
+}) {
+  const { analyses } = usePosting(postingId);
+  const recommended = analyses.data?.analyses[0]?.recommendedProfileId ?? profileId;
+  return <CaptureDocuments postingId={postingId} recommendedProfileId={recommended} />;
 }
