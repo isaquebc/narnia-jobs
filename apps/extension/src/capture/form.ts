@@ -124,7 +124,20 @@ function neighborText(el: Element): string | null {
   return null;
 }
 
+/** Rótulo de botão de arquivo ("Attach", "Anexar"): o de verdade fica no grupo em volta. */
+const GENERIC =
+  /^(attach|anexar|upload|enviar( arquivo)?|escolher arquivo|choose file|browse|selecionar arquivo)$/i;
+
 function labelFor(el: Element): string | null {
+  const own = ownLabel(el);
+  if (own && !GENERIC.test(own)) return own;
+  const group = el.closest("[role=group]");
+  return (
+    (group && (byIds(group, "aria-labelledby") ?? clean(group.getAttribute("aria-label")))) || own
+  );
+}
+
+function ownLabel(el: Element): string | null {
   const labelled = byIds(el, "aria-labelledby");
   if (labelled) return labelled;
   const id = el.getAttribute("id");
@@ -172,6 +185,7 @@ function optionLabel(input: Element): string {
 const required = (el: Element, label: string | null) =>
   el.hasAttribute("required") ||
   el.getAttribute("aria-required") === "true" ||
+  el.closest("[role=group]")?.getAttribute("aria-required") === "true" ||
   /\*\s*$/.test(label ?? "");
 
 function maxLength(el: Element): number | null {

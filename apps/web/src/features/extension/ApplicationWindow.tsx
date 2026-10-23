@@ -80,11 +80,24 @@ export function ApplicationWindow({ id }: { id: string }) {
       {a.status === "error" ? (
         <Alert tone="warn" className="flex flex-col gap-2">
           <span>{t("application.error")}</span>
+          {a.error ? (
+            <span className="break-words text-xs">
+              {t("application.detail", { detail: a.error })}
+            </span>
+          ) : null}
           {again}
         </Alert>
       ) : null}
       {a.status === "ready" ? (
         <>
+          {a.warning ? (
+            <Alert tone="warn" className="flex flex-col gap-1">
+              <span>{t("application.fallback")}</span>
+              <span className="break-words text-xs">
+                {t("application.detail", { detail: a.warning })}
+              </span>
+            </Alert>
+          ) : null}
           <ol aria-label={t("application.list")} className="flex flex-col gap-3">
             {a.questions.map((x, i) => (
               <QuestionItem

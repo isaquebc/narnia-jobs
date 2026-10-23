@@ -103,6 +103,17 @@ describe("F12/M3 · readForm", () => {
     });
   });
 
+  it("Greenhouse real: arquivo com rótulo genérico (Attach) usa o rótulo do grupo", () => {
+    const { fields } = readForm(
+      page(`<div role="group" aria-labelledby="upload-label-resume" aria-required="true">
+        <div id="upload-label-resume" class="label">Resume/CV<span>*</span></div>
+        <button type="button">Attach</button><label for="resume">Attach</label>
+        <input id="resume" type="file" accept=".pdf"></div>
+        <label for="nome">Nome</label><input id="nome">`),
+    );
+    expect(fields[0]).toMatchObject({ control: "file", label: "Resume/CV*", required: true });
+  });
+
   it("estilo Lever: label envolvendo o campo e texto de rótulo em div", () => {
     const { fields } = readForm(
       page(`

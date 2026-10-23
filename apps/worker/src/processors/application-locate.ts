@@ -22,27 +22,33 @@ export const applicationLocate: TaskHandler = async (data, ctx, deps) => {
     await ctx.progress(20, "heuristic");
     const h = heuristicQuestions(form.fields);
     let model = null;
+    let warning: string | null = null;
     if (h.rest.length > 0) {
       await ctx.progress(40, "locating");
-      const m = resolveModel(
-        repos.settings,
-        "application_locate",
-        POSTING_MODEL_DEFAULTS.application_locate,
-      );
-      const r = await deps.provider.applicationLocate({
-        page: { url: form.url, title: form.title },
-        fields: h.rest,
-        model: m,
-      });
-      recordUsage(
-        repos,
-        deps.dataDir,
-        usageFromSdkResult(r.sdk, { category: "application.locate", model: m, jobId: ctx.jobId }),
-      );
-      model = r.output;
+      try {
+        const m = resolveModel(
+          repos.settings,
+          "application_locate",
+          POSTING_MODEL_DEFAULTS.application_locate,
+        );
+        const r = await deps.provider.applicationLocate({
+          page: { url: form.url, title: form.title },
+          fields: h.rest,
+          model: m,
+        });
+        recordUsage(
+          repos,
+          deps.dataDir,
+          usageFromSdkResult(r.sdk, { category: "application.locate", model: m, jobId: ctx.jobId }),
+        );
+        model = r.output;
+      } catch (e) {
+        // o modelo não respondeu: as perguntas saem pelos rótulos e o motivo fica como aviso na janela
+        warning = (e as Error).message;
+      }
     }
     const questions = assembleQuestions(form.fields, h, model);
-    repos.applications.setQuestions(id, questions);
+    repos.applications.setQuestions(id, questions, warning);
     await deps.publish({ type: "application.updated", applicationId: id });
     return { applicationId: id, questions: questions.length, model: model !== null };
   } catch (e) {

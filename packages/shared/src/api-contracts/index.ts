@@ -874,6 +874,8 @@ export const ApplicationFormViewSchema = z.object({
   title: z.string().nullable(),
   status: ApplicationStatusSchema,
   error: z.string().nullable(),
+  /** Pronto, mas o modelo falhou: as perguntas saíram pelos rótulos (o motivo). */
+  warning: z.string().nullable(),
   postingId: z.string().nullable(),
   posting: z.object({ title: z.string().nullable(), company: z.string().nullable() }).nullable(),
   profileId: z.string().nullable(),

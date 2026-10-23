@@ -52,6 +52,7 @@ const application = (over: Record<string, unknown> = {}) => ({
   title: "Candidatura",
   status: "ready",
   error: null,
+  warning: null,
   postingId: "v1",
   posting: { title: "Backend Sr", company: "Acme" },
   profileId: "p1",
@@ -154,6 +155,21 @@ describe("F12/M3 · janela: formulário de candidatura", () => {
     ).toBeInTheDocument();
   });
 
+  it("modelo falhou: perguntas pelos rótulos, com o aviso e o detalhe", async () => {
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () =>
+          ({ application: application({ warning: "Claude Code: timeout" }) }) as never,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    expect(await screen.findByText(/montei as perguntas pelos rótulos/)).toBeInTheDocument();
+    expect(screen.getByText(/Claude Code: timeout/)).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Perguntas do formulário" })).toBeInTheDocument();
+  });
+
   it("erro: ler de novo pede as perguntas outra vez; sem vaga ligada, avisa", async () => {
     const relocateApplication = vi.fn(async () => ({ job: null }));
     renderApp({
@@ -175,6 +191,7 @@ describe("F12/M3 · janela: formulário de candidatura", () => {
       initialUrl: "/candidatura?captura=c1",
     });
     expect(await screen.findByText(/Não deu para organizar as perguntas/)).toBeInTheDocument();
+    expect(screen.getByText(/Detalhe: x/)).toBeInTheDocument();
     expect(screen.getByText(/Nenhuma vaga ligada/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Ler de novo" }));
     expect(relocateApplication).toHaveBeenCalledWith("a1");

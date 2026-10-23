@@ -29,8 +29,16 @@ export interface ApplicationsRepo {
   ): ApplicationFormRecord;
   get(id: string): ApplicationFormRecord | null;
   byCapture(captureId: string): ApplicationFormRecord | null;
-  /** Perguntas organizadas: o formulário fica pronto (limpa o erro). */
-  setQuestions(id: string, questions: ApplicationQuestion[], now?: Date): void;
+  /**
+   * Perguntas organizadas: o formulário fica pronto. `warning` (o modelo falhou e as perguntas saíram pelos rótulos)
+   * fica em `error`, com o status `ready`.
+   */
+  setQuestions(
+    id: string,
+    questions: ApplicationQuestion[],
+    warning?: string | null,
+    now?: Date,
+  ): void;
   setError(id: string, error: string, now?: Date): void;
   /** Pede a organização de novo (Ler de novo). */
   setLocating(id: string, now?: Date): void;
@@ -87,10 +95,10 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
         .get(captureId) as Row | undefined;
       return r ? map(r) : null;
     },
-    setQuestions(id, questions, now = new Date()) {
+    setQuestions(id, questions, warning = null, now = new Date()) {
       db.prepare(
-        "update application_form set questions_json = ?, status = 'ready', error = null, updated_at = ? where id = ?",
-      ).run(JSON.stringify(questions), now.toISOString(), id);
+        "update application_form set questions_json = ?, status = 'ready', error = ?, updated_at = ? where id = ?",
+      ).run(JSON.stringify(questions), warning, now.toISOString(), id);
     },
     setError(id, error, now = new Date()) {
       db.prepare(

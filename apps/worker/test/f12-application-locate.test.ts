@@ -119,14 +119,22 @@ describe("F12/M3 worker · application.locate", () => {
     expect(h.repos.usageEvents.list()).toHaveLength(0);
   });
 
-  it("modelo falhou: formulário em erro e a janela avisada", async () => {
+  it("modelo falhou: as perguntas saem pelos rótulos, com o motivo como aviso (a janela não trava)", async () => {
     h = harness(new MockProvider({ errors: { applicationLocate: "modelo fora do ar" } }));
     const f = form(h, [
       field("f1", { control: "textarea", label: "Conte" }),
       field("f2", { label: "Cargo" }),
     ]);
-    await expect(run(h, f.id)).rejects.toThrow(/modelo fora do ar/);
-    expect(h.repos.applications.get(f.id)).toMatchObject({ status: "error" });
+    await run(h, f.id);
+    const done = h.repos.applications.get(f.id);
+    expect(done).toMatchObject({
+      status: "ready",
+      error: expect.stringMatching(/modelo fora do ar/),
+    });
+    expect(done?.questions.map((q) => [q.question, q.kind])).toEqual([
+      ["Conte", "long_text"],
+      ["Cargo", "short_text"],
+    ]);
     expect(h.published).toHaveLength(1);
   });
 });

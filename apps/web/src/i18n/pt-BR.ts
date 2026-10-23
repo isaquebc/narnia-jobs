@@ -1227,6 +1227,9 @@ export const ptBR = {
     noPosting: "Nenhuma vaga ligada a este formulário ainda.",
     locating: "Organizando as perguntas do formulário…",
     error: "Não deu para organizar as perguntas deste formulário.",
+    fallback:
+      "O modelo não respondeu, então montei as perguntas pelos rótulos da página. Podem faltar junções de perguntas; tente Ler de novo.",
+    detail: "Detalhe: {detail}",
     again: "Ler de novo",
     list: "Perguntas do formulário",
     required: "obrigatória",
