@@ -62,14 +62,16 @@ test("F12/E2E-01 extensão: pareia pelo código de Configurações, testa a cone
   await options.getByLabel("Código de pareamento").fill(code.toLowerCase());
   await options.getByLabel("Nome deste navegador").fill("Chromium do e2e");
   await options.getByRole("button", { name: "Parear" }).click();
-  await expect(options.getByRole("status")).toHaveText(/Pareado como "Chromium do e2e"/);
-  await options.getByRole("button", { name: "Testar conexão" }).click();
+  // pareada, a página mostra o estado da conexão em vez do formulário, também ao reabrir (testes do dono, 2026-10-23)
+  const conn = options.getByRole("region", { name: "Conexão" });
   await expect(options.getByRole("status")).toHaveText(/Conectado como "Chromium do e2e"/);
-
-  // o mesmo código não serve duas vezes
-  await options.getByLabel("Código de pareamento").fill(code);
-  await options.getByRole("button", { name: "Parear" }).click();
-  await expect(options.getByRole("status")).toHaveText(/Código inválido ou vencido/);
+  await expect(options.getByLabel("Código de pareamento")).toBeHidden();
+  await expect(conn.getByText("Chromium do e2e")).toBeVisible();
+  await options.reload();
+  await expect(options.getByRole("status")).toHaveText(/Conectado como "Chromium do e2e"/);
+  await expect(options.getByLabel("Código de pareamento")).toBeHidden();
+  await conn.getByRole("button", { name: "Testar conexão" }).click();
+  await expect(options.getByRole("status")).toHaveText(/Conectado como .*Verificado às/);
 
   await page.reload();
   const row = card.getByRole("listitem").filter({ hasText: "Chromium do e2e" });
@@ -77,6 +79,23 @@ test("F12/E2E-01 extensão: pareia pelo código de Configurações, testa a cone
   await row.getByRole("button", { name: "Desconectar Chromium do e2e" }).click();
   await expect(card.getByText("Nenhum navegador conectado ainda.")).toBeVisible();
 
+  // revogado no narnia: a extensão volta ao formulário com o aviso; o mesmo código não serve duas vezes
   await options.reload();
   await expect(options.getByRole("status")).toHaveText(/foi desconectado no narnia/);
+  await options.getByLabel("Código de pareamento").fill(code);
+  await options.getByRole("button", { name: "Parear" }).click();
+  await expect(options.getByRole("status")).toHaveText(/Código inválido ou vencido/);
+
+  // "Desconectar" na extensão remove o dispositivo no narnia também
+  await card.getByRole("button", { name: "Gerar código de pareamento" }).click();
+  await expect(card.locator("code").first()).not.toHaveText(code);
+  const second = (await card.locator("code").first().textContent())?.trim() ?? "";
+  await options.getByLabel("Código de pareamento").fill(second);
+  await options.getByRole("button", { name: "Parear" }).click();
+  await expect(options.getByRole("status")).toHaveText(/Conectado como/);
+  await conn.getByRole("button", { name: "Desconectar" }).click();
+  await expect(options.getByRole("status")).toHaveText(/^Desconectado\./);
+  await expect(options.getByLabel("Código de pareamento")).toBeVisible();
+  await page.reload();
+  await expect(card.getByText("Nenhum navegador conectado ainda.")).toBeVisible();
 });

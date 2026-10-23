@@ -2,7 +2,8 @@
  * Conversa da extensão com o narnia (F12/M1, F12-9): endereço da instância, troca do código de pareamento pelo token
  * de dispositivo e teste da conexão. Sem dependência do Chrome, para os testes.
  */
-export const DEFAULT_INSTANCE = "http://127.0.0.1:3100";
+// o endereço da barra do navegador na instância do dono (web na 5173, que repassa /api)
+export const DEFAULT_INSTANCE = "http://127.0.0.1:5173";
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -96,3 +97,35 @@ export async function testConnection(
 
 const offlineMessage = (instance: string) =>
   `Não foi possível conectar a ${instance}. Confira se o narnia está no ar e se o endereço é o da barra do navegador quando você abre o narnia.`;
+
+export type DisconnectResult = { ok: true } | { ok: false; message: string };
+
+/** Desconecta no narnia também: o token de dispositivo vale para a API (F12-9), então ele remove o próprio dispositivo. */
+export async function disconnect(
+  fetch: Fetch,
+  instance: string,
+  token: string,
+): Promise<DisconnectResult> {
+  const headers = { authorization: `Bearer ${token}` };
+  try {
+    const me = await fetch(`${instance}/api/extension/me`, { headers });
+    if (me.status === 401) return { ok: true };
+    const id = me.ok
+      ? ((await me.json()) as { device: { id: string } | null }).device?.id
+      : undefined;
+    if (id) {
+      const del = await fetch(`${instance}/api/extension/devices/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (del.ok || del.status === 404 || del.status === 401) return { ok: true };
+    }
+  } catch {
+    // narnia fora do ar: cai no aviso abaixo
+  }
+  return {
+    ok: false,
+    message:
+      "Desconectado neste navegador, mas não foi possível avisar o narnia. Remova em Configurações › Extensão do navegador.",
+  };
+}

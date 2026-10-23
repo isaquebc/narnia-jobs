@@ -12,20 +12,33 @@
       <p class="hint">
         Conecte a extensão ao seu narnia. O código de pareamento fica em Configurações › Extensão do navegador.
       </p>
-      <form id="pair-form">
+      <form id="pair-form" hidden>
         <label for="instance">Endereço do narnia</label>
         <input id="instance" name="instance" autocomplete="off" spellcheck="false" />
-        <p class="hint">O endereço da barra do navegador quando você abre o narnia (ex.: http://127.0.0.1:3100).</p>
+        <p class="hint">O endereço da barra do navegador quando você abre o narnia (ex.: http://127.0.0.1:5173).</p>
         <label for="code">Código de pareamento</label>
         <input id="code" name="code" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX" />
         <label for="device-name">Nome deste navegador</label>
         <input id="device-name" name="deviceName" autocomplete="off" />
         <div class="actions">
           <button type="submit" id="pair">Parear</button>
-          <button type="button" id="test" class="secondary">Testar conexão</button>
-          <button type="button" id="forget" class="secondary">Desconectar</button>
         </div>
       </form>
+      <section id="connected" aria-label="Conexão" hidden>
+        <dl>
+          <dt>Endereço do narnia</dt>
+          <dd id="connected-instance"></dd>
+          <dt>Este navegador</dt>
+          <dd id="connected-name"></dd>
+        </dl>
+        <div class="actions">
+          <button type="button" id="test">Testar conexão</button>
+          <button type="button" id="forget" class="secondary">Desconectar</button>
+        </div>
+        <p class="hint">
+          Ler vagas e formulários chega na próxima versão. Por enquanto, clicar no ícone abre esta página.
+        </p>
+      </section>
       <p id="status" role="status" aria-live="polite"></p>
     </main>
     <script type="module" src="options.js"></script>
