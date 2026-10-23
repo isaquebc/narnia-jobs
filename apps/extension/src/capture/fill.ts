@@ -8,6 +8,21 @@ import { fieldElements } from "./form";
 export interface FillItem {
   ref: string;
   value: string;
+  /** Anexo para campo de arquivo (o CV ou a carta da vaga, F12/M4). */
+  file?: { name: string; type: string; base64: string };
+}
+
+/** Anexa no campo de arquivo como se a pessoa tivesse escolhido o arquivo (o Chrome aceita `files` por DataTransfer). */
+function attach(el: HTMLInputElement, file: NonNullable<FillItem["file"]>): boolean {
+  if (typeof DataTransfer === "undefined") return false;
+  const bin = atob(file.base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const dt = new DataTransfer();
+  dt.items.add(new File([bytes], file.name, { type: file.type }));
+  el.files = dt.files;
+  fire(el);
+  return true;
 }
 
 const norm = (s: string) =>
@@ -38,7 +53,8 @@ function labelText(input: Element): string {
   return norm((wrapping ?? byFor)?.textContent ?? (input as HTMLInputElement).value ?? "");
 }
 
-function fillOne(el: Element, value: string): boolean {
+function fillOne(el: Element, item: FillItem): boolean {
+  const value = item.value;
   const v = norm(value);
   if (el instanceof HTMLSelectElement) {
     const opt = Array.from(el.options).find(
@@ -55,7 +71,7 @@ function fillOne(el: Element, value: string): boolean {
   }
   if (el instanceof HTMLInputElement) {
     const type = el.type.toLowerCase();
-    if (type === "file") return false;
+    if (type === "file") return item.file ? attach(el, item.file) : false;
     if (type === "radio" || type === "checkbox") {
       const group = el.name
         ? Array.from(
@@ -107,7 +123,7 @@ export function fillForm(doc: Document, items: FillItem[]): { filled: string[]; 
     const el = elements[Number(it.ref.slice(1)) - 1];
     let ok = false;
     try {
-      ok = !!el && fillOne(el, it.value);
+      ok = !!el && fillOne(el, it);
     } catch {
       ok = false;
     }

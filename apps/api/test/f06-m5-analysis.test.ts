@@ -325,6 +325,7 @@ describe("F06/M6 · Configurações › Modelos", () => {
         cv_generate: "sonnet",
         cv_review: "haiku",
         application_locate: "haiku",
+        application_answer: "sonnet",
       });
       const put = await t.api("/api/settings/models", json({ posting_analyze: "opus" }, "PUT"));
       expect(

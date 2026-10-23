@@ -174,4 +174,133 @@ describe("janela da extensão: abas, voltar à página e preencher", () => {
     ).toBeInTheDocument();
     bridge.stop();
   });
+
+  it("F12/M4: respostas sugeridas com copiar e preencher; lacuna; CV anexado no campo do currículo", async () => {
+    const bridge = fakeBridge(() => ({ ok: true, filled: ["f2"], failed: [] }));
+    const q = (id: string, ref: string, over: Record<string, unknown>) => ({
+      id,
+      question: id,
+      kind: "short_text",
+      options: [],
+      required: false,
+      maxChars: null,
+      fieldRefs: [ref],
+      section: null,
+      profileField: null,
+      topic: null,
+      source: "model",
+      prefill: null,
+      answer: null,
+      ...over,
+    });
+    const ans = (text: string | null, gap: string | null = null) => ({
+      questionId: "x",
+      version: 1,
+      answer: text,
+      origins: [],
+      gap,
+      source: "model",
+      createdAt: "2026-10-23T12:00:00.000Z",
+    });
+    const generateApplicationAnswers = vi.fn(async () => ({ job: null }));
+    const fetchMock = vi.fn(
+      async () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async (id: string) =>
+          ({ capture: capture(id, { applicationId: "a1", mode: "form" }) }) as never,
+        getApplication: async () =>
+          ({
+            application: {
+              id: "a1",
+              captureId: "c1",
+              url: "https://vagas.example/c1",
+              title: null,
+              status: "ready",
+              error: null,
+              warning: null,
+              postingId: "v1",
+              posting: { title: "Backend Sr", company: "Acme" },
+              profileId: "p1",
+              answersStatus: "ready",
+              answersError: null,
+              createdAt: "2026-10-23T12:00:00.000Z",
+              updatedAt: "2026-10-23T12:00:00.000Z",
+              questions: [
+                q("Currículo", "f1", { kind: "file" }),
+                q("Por que a Acme?", "f2", {
+                  kind: "long_text",
+                  answer: ans("Porque pagamentos."),
+                }),
+                q("Anos de Rust", "f3", {
+                  kind: "number",
+                  answer: ans(null, "Os dados não dizem."),
+                }),
+              ],
+            },
+          }) as never,
+        getPosting: async () =>
+          ({ posting: { id: "v1" }, contacts: [], notes: [], duplicates: [] }) as never,
+        listPostingAnalyses: async () => ({ analyses: [] }),
+        listDocuments: async () =>
+          ({
+            documents: [
+              {
+                document: {
+                  id: "d-cv",
+                  kind: "cv",
+                  profileId: "p1",
+                  postingId: "v1",
+                  format: "pdf",
+                },
+                current: {
+                  version: 2,
+                  status: "ready",
+                  pdfPath: "x.pdf",
+                  pagesRendered: 1,
+                  textBody: null,
+                },
+                versions: [],
+                stale: null,
+                missingLinks: [],
+              },
+            ],
+          }) as never,
+        documentPdfUrl: (id: string, v: number) => `/api/documents/${id}/versions/${v}/pdf`,
+        generateApplicationAnswers,
+      },
+      initialUrl: "/candidatura?captura=c1&aba=7",
+    });
+    const list = await screen.findByRole("list", { name: "Perguntas do formulário" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items[1]).toHaveTextContent("Porque pagamentos.");
+    expect(items[2]).toHaveTextContent("Falta: Os dados não dizem.");
+    await userEvent.click(
+      within(items[1] as HTMLElement).getByRole("button", { name: "Preencher" }),
+    );
+    await waitFor(() =>
+      expect(bridge.seen.at(-1)?.items).toEqual([{ ref: "f2", value: "Porque pagamentos." }]),
+    );
+    // o campo do currículo anexa o PDF do CV da vaga
+    await userEvent.click(
+      await within(items[0] as HTMLElement).findByRole("button", { name: "Anexar o CV" }),
+    );
+    await waitFor(() =>
+      expect(bridge.seen.at(-1)?.items).toEqual([
+        {
+          ref: "f1",
+          value: "",
+          file: { name: "curriculo.pdf", type: "application/pdf", base64: btoa("%PDF-1.4") },
+        },
+      ]),
+    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/documents/d-cv/versions/2/pdf", expect.anything());
+    await userEvent.click(screen.getByRole("button", { name: "Gerar respostas de novo" }));
+    expect(generateApplicationAnswers).toHaveBeenCalledWith("a1");
+    vi.unstubAllGlobals();
+    bridge.stop();
+  });
 });

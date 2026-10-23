@@ -130,3 +130,37 @@ export type ApplicationLocateOutput = z.infer<typeof ApplicationLocateOutputSche
 
 export const APPLICATION_STATUSES = ["locating", "ready", "error"] as const;
 export const ApplicationStatusSchema = z.enum(APPLICATION_STATUSES);
+
+/**
+ * Saída do redator das respostas (`narnia-application-answer`, Sonnet, F12/M4): uma resposta por pergunta enviada,
+ * com as origens (ids curtos do resumo) ou a lacuna quando os dados não dizem (nada inventado, mesma regra do CV).
+ * Plana, para gerar JSON Schema simples.
+ */
+export const ApplicationAnswerOutputSchema = z.object({
+  answers: z.array(
+    z.object({
+      questionId: z.string().min(1),
+      /** Texto da resposta; nas escolhas, o texto exato da opção (várias separadas por "; "). Null com lacuna. */
+      answer: z.string().nullable(),
+      origins: z.array(z.string()),
+      /** O que falta para responder (a pessoa conta no chat); null quando respondeu. */
+      gap: z.string().nullable(),
+    }),
+  ),
+});
+export type ApplicationAnswerOutput = z.infer<typeof ApplicationAnswerOutputSchema>;
+
+/** Resposta guardada (F12/M4): a versão mais nova por pergunta vale; origens com os ids reais dos fatos. */
+export const ApplicationAnswerSchema = z.object({
+  questionId: z.string(),
+  version: z.number().int().positive(),
+  answer: z.string().nullable(),
+  origins: z.array(z.object({ kind: z.string(), id: z.string() })),
+  gap: z.string().nullable(),
+  source: z.enum(["model", "chat", "edited"]),
+  createdAt: z.string(),
+});
+export type ApplicationAnswer = z.infer<typeof ApplicationAnswerSchema>;
+
+export const ANSWERS_STATUSES = ["idle", "answering", "ready", "error"] as const;
+export const AnswersStatusSchema = z.enum(ANSWERS_STATUSES);

@@ -3,17 +3,17 @@ import { describe, expect, it } from "vitest";
 import { MODEL_IDS, promptCatalog } from "../src/evals/prompt-catalog";
 import { syncPrompts } from "../src/evals/prompt-sync";
 
-/** Avaliações no Phoenix (M2, decisão AV-4): os 31 prompts do repositório versionados no Phoenix (F06-8: + especializado; F06/M4: + 3 da vaga; F06/M5: skill e nota da análise; F05: CV, carta, revisão e skill gerar-cv; nota do feedback do documento; F12: perguntas do formulário). */
+/** Avaliações no Phoenix (M2, decisão AV-4): os 32 prompts do repositório versionados no Phoenix (F06-8: + especializado; F06/M4: + 3 da vaga; F06/M5: skill e nota da análise; F05: CV, carta, revisão e skill gerar-cv; nota do feedback do documento; F12: perguntas e respostas do formulário). */
 describe("catálogo de prompts", () => {
-  it("31 prompts: 16 estruturados, 2 agentes, 6 notas e 7 skills; nomes únicos narnia-*", () => {
+  it("32 prompts: 17 estruturados, 2 agentes, 6 notas e 7 skills; nomes únicos narnia-*", () => {
     const c = promptCatalog();
-    expect(c).toHaveLength(31);
+    expect(c).toHaveLength(32);
     const kinds = c.reduce<Record<string, number>>((acc, p) => {
       acc[p.kind] = (acc[p.kind] ?? 0) + 1;
       return acc;
     }, {});
-    expect(kinds).toEqual({ structured: 16, agent: 2, note: 6, skill: 7 });
-    expect(new Set(c.map((p) => p.name)).size).toBe(31);
+    expect(kinds).toEqual({ structured: 17, agent: 2, note: 6, skill: 7 });
+    expect(new Set(c.map((p) => p.name)).size).toBe(32);
     for (const p of c) {
       expect(p.name).toMatch(/^narnia-[a-z0-9-]+$/);
       expect(p.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -111,7 +111,7 @@ function fakePhoenix() {
 }
 
 describe("sincronização com o Phoenix", () => {
-  it("primeira vez cria os 31 com a tag production, na ponte e com o commit; depois nada muda", async () => {
+  it("primeira vez cria os 32 com a tag production, na ponte e com o commit; depois nada muda", async () => {
     const px = fakePhoenix();
     const o = {
       baseUrl: "http://phoenix:6006",
@@ -120,7 +120,7 @@ describe("sincronização com o Phoenix", () => {
       commit: "abc1234",
     };
     const first = await syncPrompts(promptCatalog(), o);
-    expect(first.filter((r) => r.action === "created")).toHaveLength(31);
+    expect(first.filter((r) => r.action === "created")).toHaveLength(32);
     const create = px.calls.find(
       (c) => c.op === "create" && c.vars?.name === "narnia-extract-facts",
     );

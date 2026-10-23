@@ -219,7 +219,7 @@ describe("F12/M3 · formulário no banco", () => {
   it("cria organizando, guarda as perguntas ou o erro, acha pela captura; 0020 entra sobre o banco anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0019_extension_capture_analysis" });
-    expect(migrate(db).applied).toEqual(["0020_application_form"]);
+    expect(migrate(db).applied).toEqual(expect.arrayContaining(["0020_application_form"]));
     const repos = createRepos(db);
     const f = repos.applications.create({
       captureId: "c1",

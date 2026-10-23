@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  AnswersStatusSchema,
+  ApplicationAnswerSchema,
   ApplicationQuestionSchema,
   ApplicationStatusSchema,
   FormSnapshotSchema,
@@ -887,8 +889,13 @@ export const ApplicationFormViewSchema = z.object({
     ApplicationQuestionSchema.extend({
       /** Valor tirado dos dados da pessoa (campos óbvios), pronto para copiar. */
       prefill: z.string().nullable(),
+      /** Resposta sugerida mais nova (F12/M4), com a origem ou a lacuna. */
+      answer: ApplicationAnswerSchema.nullable(),
     }),
   ),
+  /** Geração das respostas (F12/M4): só com a vaga ligada (F12-11). */
+  answersStatus: AnswersStatusSchema,
+  answersError: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -353,6 +353,8 @@ export const POSTING_MODEL_KEYS = [
   "cv_review",
   // F12/M3: Haiku organiza as perguntas do formulário de candidatura
   "application_locate",
+  // F12/M4: Sonnet escreve as respostas sugeridas
+  "application_answer",
 ] as const;
 export const PostingModelsSchema = z.object(
   Object.fromEntries(POSTING_MODEL_KEYS.map((k) => [k, ClaudeModelSchema])) as Record<

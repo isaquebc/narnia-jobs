@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type BrowserContext, chromium, expect, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../helpers/api";
 import { freshStart } from "../helpers/ingest";
+import { intake } from "../helpers/postings";
 import { login } from "../helpers/profiles";
 
 /**
@@ -28,6 +29,7 @@ const FORM_PAGE = `<!doctype html><html><head><title>Candidatura · Acme</title>
   <label for="raca">Raça/cor</label><select id="raca" name="raca"><option value="">Selecione</option>
     <option value="1">Branca</option><option value="9">Prefiro não informar</option></select>
   <label><input type="checkbox" name="lgpd"> Li e aceito a política de privacidade</label>
+  <label for="cv">Currículo (PDF)</label><input id="cv" type="file" accept=".pdf">
   <input type="hidden" name="csrf" value="segredo">
   <button type="submit">Enviar</button>
 </form></body></html>`;
@@ -67,8 +69,8 @@ async function pair(page: Page, extensionId: string) {
   await options.close();
 }
 
-test("F12/E2E-03 extensão: formulário de candidatura → perguntas na janela → copiar", async () => {
-  test.setTimeout(120_000);
+test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar, preencher, respostas e CV anexado", async () => {
+  test.setTimeout(240_000);
   await freshStart("engineer");
   const ext = join(dir, "dist");
   context = await chromium.launchPersistentContext(join(dir, "perfil"), {
@@ -119,7 +121,7 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas na janela �
   const list = popup.getByRole("list", { name: "Perguntas do formulário" });
   await expect(list).toBeVisible({ timeout: 60_000 });
   const items = list.getByRole("listitem");
-  await expect(items).toHaveCount(6);
+  await expect(items).toHaveCount(7);
   await expect(items.nth(0)).toContainText("Nome completo");
   await expect(items.nth(0)).toContainText("Ana Maria Exemplo");
   await expect(items.nth(1)).toContainText("ana.exemplo@example.com");
@@ -161,6 +163,31 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas na janela �
   await expect(tabs.getByRole("tab")).toHaveCount(2, { timeout: 30_000 });
   await tabs.getByRole("tab").first().click();
   await expect(popup.getByRole("list", { name: "Perguntas do formulário" })).toBeVisible();
+
+  // F12/M4: ligada a uma vaga salva, as respostas sugeridas chegam (mock do Sonnet) e entram no Preencher todos
+  await intake({ fields: { title: "Engenheira Backend Sênior", company: "Acme Pagamentos" } });
+  await popup.getByRole("button", { name: "Ligar a uma vaga salva" }).click();
+  await popup
+    .getByRole("combobox", { name: "Vaga salva" })
+    .selectOption({ label: "Engenheira Backend Sênior · Acme Pagamentos" });
+  await expect(items.nth(2)).toContainText("trabalhei como", { timeout: 60_000 });
+  await expect(items.nth(3)).toContainText("Sim");
+  await popup.getByRole("button", { name: "Preencher todos" }).click();
+  await expect(job.locator('textarea[name="motivo"]')).toHaveValue(/trabalhei como/);
+  await expect(job.getByLabel("Sim")).toBeChecked();
+
+  // o campo do currículo anexa o PDF do CV da vaga
+  const docs = popup.getByRole("region", { name: "Currículo e carta" });
+  await docs.getByRole("button", { name: "Gerar CV", exact: true }).click();
+  await expect(docs.getByRole("link", { name: "Baixar o CV" })).toBeVisible({ timeout: 120_000 });
+  await items.nth(6).getByRole("button", { name: "Anexar o CV" }).click();
+  await expect(popup.getByText("Preenchido na página.")).toBeVisible();
+  expect(
+    await job.evaluate(() => {
+      const f = (document.getElementById("cv") as HTMLInputElement).files?.[0];
+      return f ? [f.name, f.type, f.size > 100] : null;
+    }),
+  ).toEqual(["curriculo.pdf", "application/pdf", true]);
   expect(
     await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);

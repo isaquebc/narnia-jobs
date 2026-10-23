@@ -2,6 +2,7 @@ import type {
   AnalyzeProfilesInput,
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
+  ApplicationAnswerOutput,
   ApplicationLocateOutput,
   BuildDigestOutput,
   ChatTitleOutput,
@@ -165,6 +166,23 @@ export interface ApplicationLocateInput {
   model: string;
 }
 
+/** F12/M4: perguntas do formulário que o modelo responde, com o resumo do CV (ids curtos) e os dados da pessoa. */
+export interface ApplicationAnswerInput {
+  brief: CvBrief;
+  /** Dados pessoais que o resumo do CV não traz (cidade, modelo de trabalho, faixa salarial, disponibilidade). */
+  person: Record<string, unknown>;
+  questions: Array<{
+    questionId: string;
+    question: string;
+    kind: string;
+    options: string[];
+    maxChars: number | null;
+    required: boolean;
+  }>;
+  locale: string;
+  model: string;
+}
+
 /** F05-11: conteúdo do CV e da carta a partir do resumo montado pelo código (Sonnet por padrão). */
 export interface CvGenerateInput {
   brief: CvBrief;
@@ -230,6 +248,10 @@ export interface Provider {
   applicationLocate(
     input: ApplicationLocateInput,
   ): Promise<ProviderResult<ApplicationLocateOutput>>;
+  /** F12/M4: respostas sugeridas do formulário (Sonnet). */
+  applicationAnswer(
+    input: ApplicationAnswerInput,
+  ): Promise<ProviderResult<ApplicationAnswerOutput>>;
   /** F05: conteúdo do CV e da carta de apresentação (Sonnet). */
   cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>>;
   coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;

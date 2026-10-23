@@ -9,6 +9,8 @@ import {
   type AnalyzeRepoOutput,
   AnalyzeRepoOutputSchema,
   APPLICATION_OUTPUT_JSON_SCHEMAS,
+  type ApplicationAnswerOutput,
+  ApplicationAnswerOutputSchema,
   type ApplicationLocateOutput,
   ApplicationLocateOutputSchema,
   type BuildDigestOutput,
@@ -66,6 +68,7 @@ import {
 import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
+  type ApplicationAnswerInput,
   type ApplicationLocateInput,
   type AuthMethod,
   type BuildDigestInput,
@@ -877,6 +880,19 @@ export class ClaudeCodeProvider implements Provider {
       APPLICATION_OUTPUT_JSON_SCHEMAS.applicationLocate,
       ApplicationLocateOutputSchema,
       "applicationLocate",
+    );
+  }
+
+  applicationAnswer(
+    input: ApplicationAnswerInput,
+  ): Promise<ProviderResult<ApplicationAnswerOutput>> {
+    return this.single(
+      renderStructuredPrompt("applicationAnswer", input),
+      input.model,
+      PROMPTS.applicationAnswer(),
+      APPLICATION_OUTPUT_JSON_SCHEMAS.applicationAnswer,
+      ApplicationAnswerOutputSchema,
+      "applicationAnswer",
     );
   }
 

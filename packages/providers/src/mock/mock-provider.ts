@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type {
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
+  ApplicationAnswerOutput,
   ApplicationLocateOutput,
   BuildDigestOutput,
   ChatTitleOutput,
@@ -27,6 +28,7 @@ import { type ChatEvent, type ChatHandle, type ChatOpenOptions, createAsyncQueue
 import {
   type AnalyzeProfilesProviderInput,
   type AnalyzeRepoInput,
+  type ApplicationAnswerInput,
   type ApplicationLocateInput,
   type AuthMethod,
   approxTokens,
@@ -76,6 +78,7 @@ export type MockOperation =
   | "postingMerge"
   | "postingDuplicate"
   | "applicationLocate"
+  | "applicationAnswer"
   | "cvGenerate"
   | "coverLetterGenerate"
   | "cvReview"
@@ -873,6 +876,40 @@ export class MockProvider implements Provider {
       JSON.stringify(input.fields),
       input.model,
     );
+  }
+
+  /**
+   * Respostas previsíveis (F12/M4): texto cita a primeira experiência do resumo (com a origem), escolha pega a primeira
+   * opção, número fica como lacuna (o real calcula pelas datas quando dá).
+   */
+  async applicationAnswer(
+    input: ApplicationAnswerInput,
+  ): Promise<ProviderResult<ApplicationAnswerOutput>> {
+    await this.gate("applicationAnswer");
+    const exp = input.brief.experiences[0];
+    const en = input.locale.startsWith("en");
+    const answers = input.questions.map((q) => {
+      if (q.options.length)
+        return { questionId: q.questionId, answer: q.options[0] as string, origins: [], gap: null };
+      if (q.kind === "yes_no")
+        return { questionId: q.questionId, answer: en ? "Yes" : "Sim", origins: [], gap: null };
+      if (q.kind === "number" || !exp)
+        return {
+          questionId: q.questionId,
+          answer: null,
+          origins: [],
+          gap: en ? "The data does not say." : "Os dados não dizem isso.",
+        };
+      return {
+        questionId: q.questionId,
+        answer: en
+          ? `At ${exp.company} I worked as ${exp.title}.`
+          : `Na ${exp.company}, trabalhei como ${exp.title}.`,
+        origins: [exp.id],
+        gap: null,
+      };
+    });
+    return this.result({ answers }, JSON.stringify(input.questions), input.model);
   }
 
   /** Duplicata previsível: JD igual (sem espaços e caixa) = mesma vaga com 95%; diferente = 55%, com as diferenças. */

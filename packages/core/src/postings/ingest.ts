@@ -262,5 +262,6 @@ export const POSTING_MODEL_DEFAULTS = {
   cv_generate: "sonnet",
   cv_review: "haiku",
   application_locate: "haiku",
+  application_answer: "sonnet",
 } as const;
 export type PostingModelKey = keyof typeof POSTING_MODEL_DEFAULTS;

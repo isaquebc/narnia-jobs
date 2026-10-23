@@ -1,4 +1,6 @@
 import {
+  APPLICATION_ANSWER_TASK,
+  answerableQuestions,
   assembleQuestions,
   heuristicQuestions,
   POSTING_MODEL_DEFAULTS,
@@ -49,6 +51,16 @@ export const applicationLocate: TaskHandler = async (data, ctx, deps) => {
     }
     const questions = assembleQuestions(form.fields, h, model);
     repos.applications.setQuestions(id, questions, warning);
+    // F12/M4: com a vaga ligada, as respostas sugeridas vêm em seguida (sem vaga, a janela pede para ligar, F12-11)
+    if (form.postingId && answerableQuestions(questions).length) {
+      repos.applications.setAnswersStatus(id, "answering");
+      await deps.enqueueTask({
+        queue: "extract",
+        type: APPLICATION_ANSWER_TASK,
+        key: `${id}-${Date.now()}`,
+        payload: { applicationId: id },
+      });
+    }
     await deps.publish({ type: "application.updated", applicationId: id });
     return { applicationId: id, questions: questions.length, model: model !== null };
   } catch (e) {

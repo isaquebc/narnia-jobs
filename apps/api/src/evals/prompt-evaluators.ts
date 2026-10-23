@@ -1,4 +1,5 @@
 import {
+  answerChecks,
   checkVerdicts,
   cvFactIds,
   cvNoGapTerms,
@@ -204,6 +205,19 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
   postingMerge: (op) => [schemaRule(op), years(["text"]), coverage(0.75)],
   postingDuplicate: (op) => [schemaRule(op), lang(["rationale"]), coverage(1)],
   applicationLocate: (op) => [schemaRule(op), ...locate],
+  applicationAnswer: (op) => [
+    schemaRule(op),
+    {
+      name: "respostas_conferidas",
+      description:
+        "F12/M4: uma resposta por pergunta, opção da lista, limite de caracteres, origens do resumo; lacuna onde os dados não dizem.",
+      module: "application-locate",
+      fn: "answerChecks",
+      config: null,
+      impl: answerChecks as Rule["impl"],
+    },
+    lang(["answer", "gap"]),
+  ],
   cvGenerate: (op) => [
     schemaRule(op),
     cvIds,

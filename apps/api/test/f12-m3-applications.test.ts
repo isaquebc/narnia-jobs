@@ -222,6 +222,48 @@ describe("F12/M3 · formulário de candidatura", () => {
     expect((await view(t, got.capture.applicationId)).application.postingId).toBe(p.id);
   });
 
+  it("F12/M4: respostas na leitura; gerar de novo exige vaga (F12-11); ligar a vaga pede as respostas", async () => {
+    t = makeTestApp();
+    const ids = seedFixture(t.repos, "engineer");
+    const { applicationId } = await capture(t, { form: FORM });
+    const id = applicationId as string;
+    const fields = FORM.fields;
+    const qs = assembleQuestions(fields, heuristicQuestions(fields), null);
+    t.repos.applications.setQuestions(id, qs);
+    const gen = () => t?.api(`/api/applications/${id}/answers`, { method: "POST" });
+    expect((await gen())?.status).toBe(422);
+    const p = t.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    await t.api(`/api/applications/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ postingId: p.id }),
+    });
+    expect(t.queue.tasks.filter((x) => x.type === "application.answer")).toHaveLength(1);
+    expect((await view(t, id)).application).toMatchObject({ answersStatus: "answering" });
+    const motivo = qs.find((q) => q.kind === "long_text") as (typeof qs)[number];
+    t.repos.applications.addAnswers(id, [
+      {
+        questionId: motivo.id,
+        answer: "Quero trabalhar com pagamentos.",
+        origins: [{ kind: "experience", id: ids.experienceIds[0] as string }],
+        gap: null,
+        source: "model",
+      },
+    ]);
+    t.repos.applications.setAnswersStatus(id, "ready");
+    const got = (await view(t, id)).application as unknown as {
+      answersStatus: string;
+      questions: Array<{ id: string; answer: { answer: string; version: number } | null }>;
+    };
+    expect(got.answersStatus).toBe("ready");
+    expect(got.questions.find((q) => q.id === motivo.id)?.answer).toMatchObject({
+      answer: "Quero trabalhar com pagamentos.",
+      version: 1,
+    });
+    expect((await gen())?.status).toBe(202);
+    expect(t.queue.tasks.filter((x) => x.type === "application.answer")).toHaveLength(2);
+  });
+
   it("ler de novo pede as perguntas outra vez; formulário inexistente dá 404", async () => {
     t = makeTestApp();
     const { applicationId } = await capture(t, { form: FORM });

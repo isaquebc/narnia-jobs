@@ -11,6 +11,7 @@ import {
 import type {
   AnalyzeProfilesProviderInput,
   AnalyzeRepoInput,
+  ApplicationAnswerInput,
   ApplicationLocateInput,
   BuildDigestInput,
   ChatTitleInput,
@@ -195,6 +196,17 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.applicationLocate,
     tools: [],
   }),
+  applicationAnswer: spec("applicationAnswer", {
+    name: "narnia-application-answer",
+    description:
+      "F12/M4: respostas sugeridas do formulário de candidatura a partir do resumo do CV e dos dados da pessoa, com origem ou lacuna (nada inventado).",
+    file: FILE("application-answer"),
+    userTemplate:
+      "<locale>{{locale}}</locale>\n\n<resumo>\n{{brief_json}}\n</resumo>\n\n<pessoa>\n{{person_json}}\n</pessoa>\n\n<perguntas>\n{{questions_json}}\n</perguntas>",
+    defaultModel: "sonnet",
+    jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.applicationAnswer,
+    tools: [],
+  }),
   cvGenerate: spec("cvGenerate", {
     name: "narnia-cv-generate",
     description:
@@ -286,6 +298,12 @@ export const structuredPromptVars = {
       null,
       1,
     ),
+  }),
+  applicationAnswer: (i: ApplicationAnswerInput) => ({
+    locale: i.locale,
+    brief_json: JSON.stringify(i.brief, null, 1),
+    person_json: JSON.stringify(i.person, null, 1),
+    questions_json: JSON.stringify(i.questions, null, 1),
   }),
   cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
   coverLetterGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),

@@ -16,6 +16,8 @@ const PREFIX: Record<string, string> = {
 
 export interface BriefAliases {
   brief: CvBrief;
+  /** Id curto → o fato de verdade (respostas do formulário, F12/M4); desconhecido = null. */
+  resolve(short: string): { kind: string; id: string } | null;
   restoreCv(draft: CvDraft): CvDraft;
   restoreLetter(draft: CoverLetterDraft): CoverLetterDraft;
 }
@@ -73,6 +75,13 @@ export function aliasBriefIds(brief: CvBrief): BriefAliases {
   }));
   return {
     brief: short,
+    resolve: (sh) => {
+      for (const kind of Object.keys(PREFIX)) {
+        const id = toReal.get(`${kind}:${sh}`);
+        if (id) return { kind, id };
+      }
+      return null;
+    },
     restoreCv: (d) => ({
       ...d,
       experiences: d.experiences.map((e) => ({

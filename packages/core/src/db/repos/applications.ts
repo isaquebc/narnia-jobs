@@ -1,4 +1,4 @@
-import type { ApplicationQuestion, FormField } from "@narnia-jobs/shared";
+import type { ApplicationAnswer, ApplicationQuestion, FormField } from "@narnia-jobs/shared";
 import { newId } from "../../ids";
 import type { Db } from "../open";
 import { json, type Row, str } from "../sql";
@@ -15,6 +15,9 @@ export interface ApplicationFormRecord {
   questions: ApplicationQuestion[];
   status: "locating" | "ready" | "error";
   error: string | null;
+  /** Geração das respostas (F12/M4). */
+  answersStatus: "idle" | "answering" | "ready" | "error";
+  answersError: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +45,20 @@ export interface ApplicationsRepo {
   setError(id: string, error: string, now?: Date): void;
   /** Liga (ou desliga) o formulário a uma vaga salva, escolhida na janela. */
   setPosting(id: string, postingId: string | null, now?: Date): void;
+  setAnswersStatus(
+    id: string,
+    status: ApplicationFormRecord["answersStatus"],
+    error?: string | null,
+    now?: Date,
+  ): void;
+  /** Grava uma versão nova de cada resposta (a anterior fica no histórico). */
+  addAnswers(
+    formId: string,
+    answers: Array<Omit<ApplicationAnswer, "version" | "createdAt">>,
+    now?: Date,
+  ): void;
+  /** A versão mais nova de cada pergunta. */
+  latestAnswers(formId: string): ApplicationAnswer[];
   /** Pede a organização de novo (Ler de novo). */
   setLocating(id: string, now?: Date): void;
 }
@@ -58,6 +75,8 @@ function map(r: Row): ApplicationFormRecord {
     questions: json<ApplicationQuestion[]>(r.questions_json, []),
     status: String(r.status) as ApplicationFormRecord["status"],
     error: str(r.error),
+    answersStatus: (str(r.answers_status) ?? "idle") as ApplicationFormRecord["answersStatus"],
+    answersError: str(r.answers_error),
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   };
@@ -113,6 +132,53 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
         now.toISOString(),
         id,
       );
+    },
+    setAnswersStatus(id, status, error = null, now = new Date()) {
+      db.prepare(
+        "update application_form set answers_status = ?, answers_error = ?, updated_at = ? where id = ?",
+      ).run(status, error, now.toISOString(), id);
+    },
+    addAnswers(formId, answers, now = new Date()) {
+      const next = db.prepare(
+        "select coalesce(max(version), 0) + 1 as v from application_answer where form_id = ? and question_id = ?",
+      );
+      const insert = db.prepare(
+        `insert into application_answer (id, form_id, question_id, version, answer, origins_json, gap, source, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      for (const a of answers) {
+        const v = Number((next.get(formId, a.questionId) as Row).v);
+        insert.run(
+          newId(),
+          formId,
+          a.questionId,
+          v,
+          a.answer,
+          JSON.stringify(a.origins),
+          a.gap,
+          a.source,
+          now.toISOString(),
+        );
+      }
+    },
+    latestAnswers(formId) {
+      const rows = db
+        .prepare(
+          `select a.* from application_answer a
+           where a.form_id = ? and a.version = (select max(b.version) from application_answer b
+             where b.form_id = a.form_id and b.question_id = a.question_id)
+           order by a.question_id`,
+        )
+        .all(formId) as Row[];
+      return rows.map((r) => ({
+        questionId: String(r.question_id),
+        version: Number(r.version),
+        answer: str(r.answer),
+        origins: json<Array<{ kind: string; id: string }>>(r.origins_json, []),
+        gap: str(r.gap),
+        source: String(r.source) as ApplicationAnswer["source"],
+        createdAt: String(r.created_at),
+      }));
     },
     setLocating(id, now = new Date()) {
       db.prepare(

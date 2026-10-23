@@ -114,13 +114,13 @@ async function fillTab(tabId: number, items: FillItem[]) {
     const local = items
       .map((i) => ({ ...i, n: Number(i.ref.slice(1)) - offset }))
       .filter((i) => i.n >= 1 && i.n <= count)
-      .map((i) => ({ ref: `f${i.n}`, value: i.value, global: i.ref }));
+      .map((i) => ({ ref: `f${i.n}`, value: i.value, file: i.file, global: i.ref }));
     if (local.length && f.frameId !== undefined) {
       const [r] = await chrome.scripting.executeScript({
         target: { tabId, frameIds: [f.frameId] },
         func: (list: FillItem[]) =>
           (globalThis as { __narniaFill?: (l: FillItem[]) => unknown }).__narniaFill?.(list),
-        args: [local.map(({ ref, value }) => ({ ref, value }))],
+        args: [local.map(({ ref, value, file }) => (file ? { ref, value, file } : { ref, value }))],
       });
       const done = new Set((r?.result as { filled?: string[] } | undefined)?.filled ?? []);
       for (const l of local)

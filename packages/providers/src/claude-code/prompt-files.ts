@@ -20,6 +20,7 @@ export const PROMPTS = {
   postingMerge: () => loadPrompt("posting-merge"),
   postingDuplicate: () => loadPrompt("posting-duplicate"),
   applicationLocate: () => loadPrompt("application-locate"),
+  applicationAnswer: () => loadPrompt("application-answer"),
   cvGenerate: () => loadPrompt("cv-generate"),
   coverLetterGenerate: () => loadPrompt("cover-letter-generate"),
   cvReview: () => loadPrompt("cv-review"),

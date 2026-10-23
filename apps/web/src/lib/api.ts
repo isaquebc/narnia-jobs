@@ -291,6 +291,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ postingId }),
       }),
+    generateApplicationAnswers: (id: string) =>
+      request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/answers`, {
+        method: "POST",
+      }),
     relocateApplication: (id: string) =>
       request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/locate`, {
         method: "POST",
