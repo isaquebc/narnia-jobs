@@ -101,9 +101,12 @@ export const POSTING_TOOLS = {
     z.object({ id: IdSchema, pending: z.boolean() }),
   ),
   "posting.open_analysis": tool(
-    "Abre a conversa própria da análise desta vaga (título empresa/cliente - role) e começa a análise lá. Use quando o usuário pedir a análise numa conversa que não é a da vaga.",
+    "Abre a conversa própria da análise desta vaga (título empresa/cliente - role) e começa a análise lá. Use quando o usuário pedir a análise numa conversa que não é a da vaga. Se esta conversa é nova (a vaga veio na primeira mensagem), ela mesma vira a da vaga: volta `sameSession` e `next`, e você analisa aqui.",
     z.object({ postingId: IdSchema }),
-    z.object({ sessionId: IdSchema, title: z.string(), url: z.string() }),
+    z.union([
+      z.object({ sessionId: IdSchema, title: z.string(), url: z.string() }),
+      z.object({ sameSession: z.literal(true), title: z.string(), next: z.string() }),
+    ]),
   ),
   "analysis.save": tool(
     "Grava a análise da vaga (consolidada de todos os perfis). Cada 'atende' precisa de evidência {kind, id} de um fato que existe; cada lacuna precisa de evidenceChecked: true depois de buscar.",

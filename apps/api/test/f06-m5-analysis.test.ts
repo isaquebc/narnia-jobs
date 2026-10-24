@@ -19,6 +19,13 @@ async function waitFor(events: AnyWsEvent[], pred: (e: AnyWsEvent) => boolean, m
   throw new Error("evento não chegou");
 }
 
+/** Conversa que já teve outro assunto: o link abre a conversa própria da análise (2026-10-24). */
+async function greet(t: TestApp, sid: string) {
+  await t.api(`/api/sessions/${sid}/messages`, json({ text: "Oi, tudo bem?" }));
+  await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === sid);
+  t.events.length = 0;
+}
+
 const JD = `Desenvolvedor(a) Backend Sênior
 Empresa: Globex Consultoria · Cliente: Initech Bank
 São Paulo - SP · Híbrido · CLT
@@ -45,6 +52,7 @@ describe("F06/M5 · análise da vaga", () => {
         session: { id: string };
       }
     ).session.id;
+    await greet(t, sid);
     await t.api(`/api/sessions/${sid}/messages`, json({ text: `analisa esta vaga: ${JD}` }));
     await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === sid);
     const [posting] = t.repos.postings.list();
@@ -256,6 +264,36 @@ describe("F06 · análise não concluída na bandeja (2026-10-15)", () => {
     }
   });
 
+  it("vaga na primeira mensagem: a análise roda na mesma conversa, que ganha o título da vaga", async () => {
+    const t = makeTestApp();
+    try {
+      seedFixture(t.repos, "engineer");
+      const sid = (
+        (await (await t.api("/api/sessions", json({ category: "career" }))).json()) as {
+          session: { id: string };
+        }
+      ).session.id;
+      await t.api(`/api/sessions/${sid}/messages`, json({ text: `analisa esta vaga: ${JD}` }));
+      await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === sid);
+      const [posting] = t.repos.postings.list();
+      expect(t.repos.chatSessions.list().map((x) => x.id)).toEqual([sid]);
+      expect(t.repos.chatSessions.get(sid)).toMatchObject({
+        category: "job",
+        title: "Globex Consultoria/Initech Bank - Backend",
+        postingId: posting?.id,
+      });
+      expect(t.repos.jobAnalyses.latest(posting?.id as string)?.chatSessionId).toBe(sid);
+      expect(
+        t.events.some(
+          (e) => e.type === "chat.session_updated" && e.sessionId === sid && e.category === "job",
+        ),
+      ).toBe(true);
+    } finally {
+      t.sessions.closeAll();
+      t.cleanup();
+    }
+  });
+
   it("conversa de vaga que já tem a análise gravada não vira pendência", async () => {
     const t = makeTestApp();
     try {
@@ -265,6 +303,7 @@ describe("F06 · análise não concluída na bandeja (2026-10-15)", () => {
           session: { id: string };
         }
       ).session.id;
+      await greet(t, sid);
       await t.api(`/api/sessions/${sid}/messages`, json({ text: `analisa esta vaga: ${JD}` }));
       const job = async () => t.repos.chatSessions.list().find((s) => s.category === "job");
       await waitFor(t.events, (e) => e.type === "chat.turn_end" && e.sessionId === sid);
@@ -303,6 +342,88 @@ describe("F06/M5 · conversa da vaga não abre outra", () => {
         /analise aqui/,
       );
       expect(t.repos.chatSessions.get(s.id)?.postingId).toBe(p.id);
+    } finally {
+      t.cleanup();
+    }
+  });
+});
+
+describe("link de vaga no chat: conversa nova continua nela (pedido do dono, 2026-10-24)", () => {
+  const setup = (t: TestApp, userTurns: number) => {
+    const p = t.repos.postings.create({ company: "Vitalis", title: "Senior Software Engineer" });
+    const s = t.repos.chatSessions.create({
+      profileId: null,
+      category: "career",
+      title: "Nova conversa",
+      provider: "mock",
+      model: "sonnet",
+    });
+    for (let i = 0; i < userTurns; i++) {
+      t.repos.chatMessages.add({
+        sessionId: s.id,
+        turnIndex: i,
+        role: "user",
+        contentMd: i === userTurns - 1 ? "https://jobs.example/vitalis/1" : "Oi, tudo bem?",
+        toolCalls: [],
+        usage: null,
+      });
+      if (i < userTurns - 1)
+        t.repos.chatMessages.add({
+          sessionId: s.id,
+          turnIndex: i,
+          role: "assistant",
+          contentMd: "Tudo, e você?",
+          toolCalls: [],
+          usage: null,
+        });
+    }
+    const opened: string[] = [];
+    const changed: string[] = [];
+    const tools = createPostingTools(t.repos, {
+      sessionId: s.id,
+      ports: {
+        intake: async () => ({ ok: false, code: "x", message: "x" }),
+        openAnalysis: async (id) => {
+          opened.push(id);
+          return { sessionId: "outra", title: "x" };
+        },
+        sessionChanged: (id) => changed.push(id),
+      },
+    });
+    return { p, s, tools, opened, changed };
+  };
+
+  it("primeira mensagem da conversa: a análise segue nela, que vira a conversa da vaga", async () => {
+    const t = makeTestApp();
+    try {
+      const { p, s, tools, opened, changed } = setup(t, 1);
+      const r = (await tools["posting.open_analysis"]({ postingId: p.id })) as Record<
+        string,
+        unknown
+      >;
+      expect(opened).toEqual([]);
+      expect(r).toMatchObject({ sameSession: true, title: "Vitalis - Senior Software Engineer" });
+      expect(r.sessionId).toBeUndefined();
+      expect(String(r.next)).toMatch(/analise aqui/);
+      expect(t.repos.chatSessions.get(s.id)).toMatchObject({
+        category: "job",
+        title: "Vitalis - Senior Software Engineer",
+        postingId: p.id,
+      });
+      expect(changed).toEqual([s.id]);
+    } finally {
+      t.cleanup();
+    }
+  });
+
+  it("conversa que já tinha outro assunto: abre a conversa própria da análise, como antes", async () => {
+    const t = makeTestApp();
+    try {
+      const { p, s, tools, opened } = setup(t, 2);
+      const r = await tools["posting.open_analysis"]({ postingId: p.id });
+      expect(opened).toEqual([p.id]);
+      expect(r).toMatchObject({ sessionId: "outra", url: "/chat/outra" });
+      expect(t.repos.chatSessions.get(s.id)).toMatchObject({ category: "career", postingId: null });
     } finally {
       t.cleanup();
     }

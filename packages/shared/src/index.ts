@@ -3,6 +3,7 @@ export * from "./api-contracts";
 export * from "./errors/friendly";
 export * from "./i18n";
 export * from "./json-schema";
+export * from "./mcp/application";
 export * from "./mcp/chat";
 export * from "./mcp/cv";
 export * from "./mcp/ingest";

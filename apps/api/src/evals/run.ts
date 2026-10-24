@@ -15,6 +15,10 @@ export interface EvalRunOptions {
   turnTimeoutMs?: number;
   /** Todos os fatos do usuário (`knownFactsText`): datas e empresas que o recrutador leu pelas tools não são inventadas. */
   knownFacts?: string;
+  /** F12/M5: cria um formulário novo no sandbox para cada caso aberto pela conversa do formulário. */
+  newApplication?: () => string;
+  /** Vagas salvas (empresa e cargo, uma por linha): citar a empresa da vaga não é inventar (F12/M5). */
+  savedPostings?: string;
 }
 
 export interface EvalCaseReport {
@@ -49,6 +53,17 @@ interface Message {
   toolCalls: Array<{ name: string; subagent?: boolean }>;
 }
 
+/**
+ * Contexto do juiz do recrutador. O juiz não vê o que as ferramentas devolveram, só o nome delas: sem os fatos
+ * registrados, o que veio de uma tool (uma conquista fora do cartão) parecia invenção (falso negativo) e uma empresa
+ * inventada passava (falso positivo). Calibração em `evals/calibration`, 2026-10-24.
+ */
+export function judgeContext(persona: string, knownFacts: string, savedPostings = ""): string {
+  const block = (tag: string, text: string) =>
+    text.trim() ? `\n\n<${tag}>\n${text.trim()}\n</${tag}>` : "";
+  return `${persona}${block("fatos_registrados", knownFacts)}${block("vagas_salvas", savedPostings)}`;
+}
+
 export async function runEvalCases(
   cases: EvalCase[],
   o: EvalRunOptions,
@@ -62,11 +77,13 @@ export async function runEvalCases(
     if (!r.ok) throw new Error(`${init.method ?? "GET"} ${path} → ${r.status} ${await r.text()}`);
     return (await r.json()) as T;
   };
-  // o que o recrutador recebe no system prompt (persona e cartões de todos os perfis): contexto do juiz
-  const context = await call<{ text: string }>("/api/profiles/active/persona-card")
+  // o que o recrutador recebe no system prompt (persona e cartões de todos os perfis)
+  const persona = await call<{ text: string }>("/api/profiles/active/persona-card")
     .then((c) => c.text)
     .catch(() => "");
-  const card = [context, o.knownFacts ?? ""].join("\n");
+  const card = [persona, o.knownFacts ?? "", o.savedPostings ?? ""].join("\n");
+  // contexto do juiz: os cartões e os fatos que as ferramentas podem devolver (calibração, 2026-10-24)
+  const context = judgeContext(persona, o.knownFacts ?? "", o.savedPostings ?? "");
   // tetos e domínios confiáveis valem para a rodada inteira (auditoria E2, 19b)
   const settings = await call<{ settings: { maxBudgetUsd: number | null; maxTurns: number } }>(
     "/api/settings/chat",
@@ -96,7 +113,18 @@ export async function runEvalCases(
     let sessionId = "";
     try {
       let first = 0;
-      if (c.open === "document_feedback") {
+      if (c.open === "application_chat") {
+        // F12/M5: conversa do formulário pela janela da extensão, num formulário novo da vaga do sandbox
+        if (!o.newApplication) throw new Error("sandbox sem formulário para a conversa");
+        sessionId = (
+          await call<{ session: { id: string } }>(`/api/applications/${o.newApplication()}/chat`, {
+            method: "POST",
+            body: JSON.stringify({ message: c.messages[0] }),
+          })
+        ).session.id;
+        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000);
+        first = 1;
+      } else if (c.open === "document_feedback") {
         // "Regerar com mensagem": o CV pronto da vaga do sandbox (um caso anterior pode ter deixado outro CV em
         // geração), com a primeira mensagem como feedback
         const { documents } = await call<{

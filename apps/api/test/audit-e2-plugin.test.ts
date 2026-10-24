@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  APPLICATION_TOOLS,
   CHAT_TOOLS,
   CV_TOOLS,
   INGEST_TOOLS,
@@ -24,6 +25,7 @@ const PUBLISHED = new Set(
     ...Object.keys(CHAT_TOOLS),
     ...Object.keys(POSTING_TOOLS),
     ...Object.keys(CV_TOOLS),
+    ...Object.keys(APPLICATION_TOOLS),
   ].map(publishedName),
 );
 const TOOL_REF = /`([a-z]+_[a-z_]+)`/g;

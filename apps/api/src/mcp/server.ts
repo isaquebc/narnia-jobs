@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
+  createApplicationTools,
   createChatTools,
   createCvTools,
   createIngestTools,
@@ -12,6 +13,8 @@ import {
   type Repos,
 } from "@narnia-jobs/core";
 import {
+  APPLICATION_TOOL_JSON_SCHEMAS,
+  APPLICATION_TOOLS,
   CHAT_TOOL_JSON_SCHEMAS,
   CHAT_TOOLS,
   type ChatCategory,
@@ -107,6 +110,16 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
               }
             : {}),
           changed: (postingId) => deps.bus.emit({ type: "posting.updated", postingId }),
+          sessionChanged: (id) => {
+            const s = deps.repos.chatSessions.get(id);
+            if (s)
+              deps.bus.emit({
+                type: "chat.session_updated",
+                sessionId: id,
+                state: s.state,
+                category: s.category,
+              });
+          },
           notified: (events) => {
             for (const ev of events)
               deps.bus.emit({
@@ -131,6 +144,16 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
               postingId: doc.postingId,
               status,
             }),
+        },
+      }),
+    ),
+    // F12/M5: a conversa do formulário lê as perguntas e grava a resposta combinada
+    ...entries(
+      APPLICATION_TOOLS,
+      APPLICATION_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
+      createApplicationTools(deps.repos, {
+        ports: {
+          changed: (applicationId) => deps.bus.emit({ type: "application.updated", applicationId }),
         },
       }),
     ),

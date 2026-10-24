@@ -16,6 +16,7 @@ import {
   inspectPdf,
   knownFactsText,
   parseEvalCases,
+  type Repos,
   renderDocumentHtml,
   renderPdf,
   renderPdfPages,
@@ -56,6 +57,13 @@ interface Ctx {
   phoenix: string | null;
   customProviderId: string | null;
 }
+
+/** Vagas salvas no sandbox, para os avaliadores e o juiz (F12/M5: a conversa do formulário cita a empresa). */
+export const savedPostingsText = (repos: Repos) =>
+  repos.postings
+    .list()
+    .map((p) => [p.company, p.client, p.title].filter(Boolean).join(" · "))
+    .join("\n");
 
 async function context(): Promise<Ctx> {
   const phoenix = phoenixBaseUrl(process.env);
@@ -99,6 +107,8 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
       baseUrl: sandbox.baseUrl,
       token: sandbox.token,
       knownFacts: knownFactsText(sandbox.repos),
+      newApplication: () => sandbox.newApplication(),
+      savedPostings: savedPostingsText(sandbox.repos),
     });
     const judge = chatJudge();
     for (const r of report) {

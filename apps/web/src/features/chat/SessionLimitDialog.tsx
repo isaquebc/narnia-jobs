@@ -1,4 +1,5 @@
 import type { ChatSession } from "@narnia-jobs/shared";
+import { Link } from "@tanstack/react-router";
 import { useTimezone } from "../../app/context";
 import { Button } from "../../components/ui/button";
 import { Dialog } from "../../components/ui/dialog";
@@ -59,7 +60,15 @@ export function SessionLimitDialog({
           </li>
         ))}
       </ul>
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <Link
+          to="/configuracoes"
+          hash="chat-max-live"
+          className="text-sm text-primary underline-offset-2 hover:underline"
+          onClick={onCancel}
+        >
+          {t("chat.limitSettings")}
+        </Link>
         <Button variant="outline" onClick={onCancel}>
           {t("chat.cancel")}
         </Button>

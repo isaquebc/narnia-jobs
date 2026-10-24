@@ -81,7 +81,7 @@ export async function judgePair(
   judge: JudgeDef,
   ctx: Record<string, unknown>,
   outputs: { approved: unknown; candidate: unknown },
-): Promise<{ outcome: PairOutcome; explanation: string }> {
+): Promise<{ outcome: PairOutcome; explanation: string; picks: [PairPick, PairPick] }> {
   const criteria = pairwiseCriteria(judge, ctx);
   const approved = answerText(judge, outputs.approved);
   const candidate = answerText(judge, outputs.candidate);
@@ -93,6 +93,7 @@ export async function judgePair(
     p === "empate" ? "empate" : p === candidateIs ? "candidata" : "aprovada";
   return {
     outcome: pairOutcome(first.pick, swapped.pick),
+    picks: [first.pick, swapped.pick],
     explanation: `1ª ordem: ${name(first.pick, "B")} (${first.explanation}) · 2ª ordem: ${name(swapped.pick, "A")} (${swapped.explanation})`,
   };
 }

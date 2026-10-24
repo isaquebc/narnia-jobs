@@ -81,6 +81,25 @@ describe("janela da extensão: abas, voltar à página e preencher", () => {
     await waitFor(() => expect(within(tabs).getAllByRole("tab")).toHaveLength(1));
   });
 
+  it("bandeja: o botão no topo abre a bandeja em overlay e os links abrem na janela normal", async () => {
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async (id: string) => ({ capture: capture(id) }) as never,
+      },
+      initialUrl: "/candidatura?captura=c1&aba=7",
+    });
+    await screen.findByRole("heading", { name: "Backend Sr" });
+    await userEvent.click(screen.getByRole("button", { name: "Atividades" }));
+    const tray = await screen.findByRole("dialog", { name: "Atividades" });
+    expect(within(tray).getByRole("link", { name: "Ver todos os processos" })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+    await userEvent.click(within(tray).getByRole("button", { name: "Fechar a bandeja" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Atividades" })).toBeNull());
+  });
+
   it("ir para a página: pede à extensão para focar a aba; sem a extensão, abre o link", async () => {
     const bridge = fakeBridge(() => ({ ok: true, focused: true }));
     renderApp({

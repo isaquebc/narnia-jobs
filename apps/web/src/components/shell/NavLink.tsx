@@ -1,5 +1,11 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
+
+/**
+ * Janela da extensão (F12): sem o menu do narnia, os links abrem na janela normal do Chrome (`target="_blank"`)
+ * em vez de navegar dentro dela.
+ */
+export const ExternalLinksContext = createContext(false);
 
 function withParams(to: string, params?: Record<string, string>): string {
   if (!params) return to;
@@ -39,10 +45,12 @@ export function NavLink({
   children: ReactNode;
 }) {
   const router = useRouter({ warn: false });
-  if (!router) {
+  const external = useContext(ExternalLinksContext);
+  if (!router || external) {
     return (
       <a
         href={withSearch(withParams(to, params), search)}
+        {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
         className={className}
         {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
         {...(onClick ? { onClick } : {})}

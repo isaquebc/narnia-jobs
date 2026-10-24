@@ -1,6 +1,7 @@
 export const CORE_PACKAGE = "@narnia-jobs/core" as const;
 export * from "./applications/answer";
 export * from "./applications/locate";
+export * from "./applications/tools";
 export * from "./budget";
 export * from "./chat/prompt";
 export * from "./chat/recruiter-context";
@@ -31,6 +32,7 @@ export * from "./errors/friendly";
 export * from "./estimate";
 export * from "./evals/baseline";
 export * from "./evals/bridge-settings";
+export * from "./evals/calibration";
 export * from "./evals/graders";
 export * from "./evals/pairwise";
 export * from "./evals/prompt-evaluators";

@@ -104,8 +104,15 @@ switch (cmd) {
         );
       } else code = await runSandboxEvals(sub, rest);
     }
-    if (!["prompts", "chat", "pdf", "cv-review", "all"].includes(sub)) {
-      console.log("narnia-jobs evals prompts|chat|pdf|cv-review|all [nome…] [--strict]");
+    // calibração dos juízes: falsos positivos e negativos em respostas rotuladas (2026-10-24)
+    if (sub === "calibration") {
+      const { runCalibration } = await import("./evals/calibration");
+      code = await runCalibration(rest);
+    }
+    if (!["prompts", "chat", "pdf", "cv-review", "calibration", "all"].includes(sub)) {
+      console.log(
+        "narnia-jobs evals prompts|chat|pdf|cv-review|calibration|all [nome…] [--strict]",
+      );
       code = 2;
     }
     break;

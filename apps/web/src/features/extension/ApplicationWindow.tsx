@@ -10,6 +10,8 @@ import { Select, Textarea } from "../../components/ui/input";
 import { useDocuments } from "../../hooks/useDocuments";
 import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
+import { ChatView } from "../chat/ChatPage";
+import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "../chat/SessionLimitDialog";
 import { bridgeRequest, extensionAvailable } from "./bridge";
 import { CaptureDocuments } from "./CaptureFollowUp";
 
@@ -19,7 +21,9 @@ import { CaptureDocuments } from "./CaptureFollowUp";
  * dados da pessoa; as outras, a resposta sugerida (F12/M4) ou a lacuna. Copiar e Preencher (F12-14), e o campo do
  * currículo anexa o PDF do CV da vaga. Consentimento e autodeclaração ficam com a pessoa (F12-12). Nada é enviado.
  * F12-18: as perguntas abertas chegam escritas como a pessoa, com o que o narnia supôs para ela conferir. F12-19: toda
- * resposta é editável antes de preencher; Preencher usa o texto da caixa, e sair dela guarda a edição.
+ * resposta é editável antes de preencher; Preencher usa o texto da caixa, e sair dela guarda a edição. F12/M5: a aba
+ * "Conversa" é o chat do recrutador numa conversa própria do formulário (nasce na primeira mensagem); o que ele grava
+ * volta para a lista como "Escrita no chat".
  */
 const external = { target: "_blank", rel: "noreferrer" } as const;
 const applicationKey = (id: string) => ["extension", "application", id] as const;
@@ -37,9 +41,15 @@ export interface FormPage {
   tabId: number | null;
 }
 
-/** O valor guardado: a edição da pessoa (F12-19), o dos dados (campo óbvio) ou a resposta sugerida (F12/M4). */
+/**
+ * O valor guardado: a edição da pessoa (F12-19) ou a resposta combinada no chat (F12/M5), o dos dados (campo óbvio)
+ * ou a resposta sugerida (F12/M4).
+ */
 const savedValue = (q: Question) =>
-  (q.answer?.source === "edited" ? q.answer.answer : null) ?? q.prefill ?? q.answer?.answer ?? "";
+  (q.answer?.source === "edited" || q.answer?.source === "chat" ? q.answer.answer : null) ??
+  q.prefill ??
+  q.answer?.answer ??
+  "";
 
 /** O que a pessoa responde pela janela: nunca consentimento, autodeclaração nem arquivo (F12-12). */
 const editable = (q: Question) => !["consent", "self_declaration", "file"].includes(q.kind);
@@ -100,6 +110,13 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
     if (!clean) return;
     if (clean === savedValue(x).trim()) dropDraft(x.id);
     else save.mutate({ questionId: x.id, answer: clean });
+  };
+  // F12/M5: Perguntas | Conversa; "Ajustar no chat" leva a pergunta para o campo da conversa
+  const [view, setView] = useState<"questions" | "chat">("questions");
+  const [chatDraft, setChatDraft] = useState("");
+  const askInChat = (x: Question) => {
+    setChatDraft(t("application.askDraft", { question: x.question }));
+    setView("chat");
   };
   const [fillMessage, setFillMessage] = useState<{ tone: "ok" | "warn"; text: string } | null>(
     null,
@@ -167,8 +184,31 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
         <h1 className="text-lg font-semibold leading-tight">{t("application.title")}</h1>
         <PostingLink application={a} />
       </header>
-      {a.status === "locating" ? <Progress text={t("application.locating")} /> : null}
-      {a.status === "error" ? (
+      <fieldset aria-label={t("application.views")} className="flex gap-1">
+        {(["questions", "chat"] as const).map((v) => (
+          <Button
+            key={v}
+            size="sm"
+            variant={view === v ? "primary" : "outline"}
+            aria-pressed={view === v}
+            onClick={() => setView(v)}
+          >
+            {v === "questions" ? t("application.viewQuestions") : t("application.viewChat")}
+          </Button>
+        ))}
+      </fieldset>
+      {view === "chat" ? (
+        <FormChat
+          applicationId={a.id}
+          sessionId={a.chatSessionId}
+          draft={chatDraft}
+          onOpened={() => qc.invalidateQueries({ queryKey: applicationKey(id) })}
+        />
+      ) : null}
+      {view === "questions" && a.status === "locating" ? (
+        <Progress text={t("application.locating")} />
+      ) : null}
+      {view === "questions" && a.status === "error" ? (
         <Alert tone="warn" className="flex flex-col gap-2">
           <span>{t("application.error")}</span>
           {a.error ? (
@@ -179,7 +219,7 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
           {again}
         </Alert>
       ) : null}
-      {a.status === "ready" ? (
+      {view === "questions" && a.status === "ready" ? (
         <>
           {a.warning ? (
             <Alert tone="warn" className="flex flex-col gap-1">
@@ -229,6 +269,7 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
                 onChange={(text) => setDrafts((d) => ({ ...d, [x.id]: text }))}
                 onCommit={(text) => commit(x, text)}
                 onFill={fillable(x) ? () => void fill([x]) : null}
+                onAsk={editable(x) && !x.profileField ? () => askInChat(x) : null}
                 onAttach={
                   x.kind === "file" && docFor(fileKind(x))
                     ? { kind: fileKind(x), run: () => void attach(x) }
@@ -262,8 +303,92 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
         <Alert tone="danger">{(regenerate.error as Error).message}</Alert>
       ) : null}
       {/* pedido do dono (2026-10-23): o CV e a carta da vaga ligada, para anexar, ou o botão de gerar */}
-      {a.postingId ? <PostingDocuments postingId={a.postingId} profileId={a.profileId} /> : null}
+      {view === "questions" && a.postingId ? (
+        <PostingDocuments postingId={a.postingId} profileId={a.profileId} />
+      ) : null}
     </article>
+  );
+}
+
+/**
+ * Conversa do formulário (F12/M5): o chat do recrutador, como no app. Sem conversa ainda, um campo simples: a primeira
+ * mensagem cria a conversa (com o contexto do formulário) e o chat aparece no lugar dele.
+ */
+function FormChat({
+  applicationId,
+  sessionId,
+  draft,
+  onOpened,
+}: {
+  applicationId: string;
+  sessionId: string | null;
+  draft: string;
+  onOpened: () => void;
+}) {
+  const api = useApi();
+  const [text, setText] = useState(draft);
+  const [opened, setOpened] = useState<string | null>(null);
+  const [limit, setLimit] = useState<(SessionLimit & { text: string }) | null>(null);
+  useEffect(() => {
+    if (draft) setText(draft);
+  }, [draft]);
+  const open = useMutation({
+    mutationFn: (message: string) => api.openApplicationChat(applicationId, message),
+    onSuccess: (r) => {
+      setOpened(r.session.id);
+      onOpened();
+    },
+    onError: (e, message) => {
+      setText(message);
+      const l = sessionLimitOf(e);
+      if (l) setLimit({ ...l, text: message });
+    },
+  });
+  const current = sessionId ?? opened;
+  if (current)
+    return (
+      <div className="flex h-[70vh] min-h-96 flex-col">
+        <ChatView sessionId={current} draft={draft} />
+      </div>
+    );
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const v = text.trim();
+    if (!v || open.isPending) return;
+    setText("");
+    open.mutate(v);
+  };
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <p className="text-sm text-muted-fg">{t("application.chatHint")}</p>
+      <Textarea
+        aria-label={t("chat.inputLabel")}
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" disabled={!text.trim() || open.isPending}>
+          {t("application.chatSend")}
+        </Button>
+      </div>
+      {open.isError && !limit ? (
+        <Alert tone="danger">
+          {t("application.chatFailed", { detail: (open.error as Error).message })}
+        </Alert>
+      ) : null}
+      <SessionLimitDialog
+        limit={limit}
+        onCancel={() => setLimit(null)}
+        onChoose={async (id) => {
+          const pending = limit?.text ?? "";
+          setLimit(null);
+          await api.hibernateChat(id);
+          setText("");
+          open.mutate(pending);
+        }}
+      />
+    </form>
   );
 }
 
@@ -290,6 +415,7 @@ function QuestionItem({
   onCommit,
   onFill,
   onAttach,
+  onAsk,
 }: {
   n: number;
   q: Question;
@@ -301,6 +427,7 @@ function QuestionItem({
   onCommit: (text: string) => void;
   onFill: (() => void) | null;
   onAttach: { kind: DocumentKind; run: () => void } | null;
+  onAsk: (() => void) | null;
 }) {
   const details = [
     q.options.length ? q.options.map((o) => o.label).join(" · ") : null,
@@ -333,6 +460,7 @@ function QuestionItem({
           onCommit={onCommit}
           onFill={onFill}
           onAttach={onAttach}
+          onAsk={onAsk}
           answering={answering}
           hasPosting={hasPosting}
         />
@@ -348,12 +476,14 @@ function EditableValue({
   onChange,
   onCommit,
   onFill,
+  onAsk,
 }: {
   q: Question;
   value: string;
   onChange: (text: string) => void;
   onCommit: (text: string) => void;
   onFill: (() => void) | null;
+  onAsk: (() => void) | null;
 }) {
   const label = t("application.answerLabel", { question: q.question });
   const choice = (q.kind === "choice" || q.kind === "yes_no") && q.options.length > 0;
@@ -387,9 +517,14 @@ function EditableValue({
           onBlur={(e) => onCommit(e.target.value)}
         />
       )}
-      {value.trim() ? (
-        <span className="flex justify-end gap-1">
-          <CopyButton text={value.trim()} />
+      {value.trim() || onAsk ? (
+        <span className="flex flex-wrap justify-end gap-1">
+          {onAsk ? (
+            <Button size="sm" variant="ghost" onClick={onAsk}>
+              {t("application.askInChat")}
+            </Button>
+          ) : null}
+          {value.trim() ? <CopyButton text={value.trim()} /> : null}
           {onFill ? (
             <Button size="sm" variant="outline" onClick={onFill}>
               {t("application.fill")}
@@ -408,6 +543,7 @@ function Answer({
   onCommit,
   onFill,
   onAttach,
+  onAsk,
   answering,
   hasPosting,
 }: {
@@ -417,6 +553,7 @@ function Answer({
   onCommit: (text: string) => void;
   onFill: (() => void) | null;
   onAttach: { kind: DocumentKind; run: () => void } | null;
+  onAsk: (() => void) | null;
   answering: boolean;
   hasPosting: boolean;
 }) {
@@ -435,7 +572,7 @@ function Answer({
     );
   const a = q.answer;
   const status = q.profileField
-    ? q.prefill || a?.source === "edited"
+    ? q.prefill || a?.source === "edited" || a?.source === "chat"
       ? null
       : t("application.noData")
     : a?.answer
@@ -467,12 +604,21 @@ function Answer({
           ) : null}
         </div>
       ) : null}
-      {a?.source === "edited" ? (
+      {a?.source === "edited" || a?.source === "chat" ? (
         <span>
-          <Badge tone="neutral">{t("application.edited")}</Badge>
+          <Badge tone="neutral">
+            {a.source === "edited" ? t("application.edited") : t("application.fromChat")}
+          </Badge>
         </span>
       ) : null}
-      <EditableValue q={q} value={value} onChange={onChange} onCommit={onCommit} onFill={onFill} />
+      <EditableValue
+        q={q}
+        value={value}
+        onChange={onChange}
+        onCommit={onCommit}
+        onFill={onFill}
+        onAsk={onAsk}
+      />
     </div>
   );
 }

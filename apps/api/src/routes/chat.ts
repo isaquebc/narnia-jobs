@@ -19,6 +19,7 @@ const STATUS: Record<SessionStateError["code"], 404 | 409> = {
   budget_exhausted: 409,
   posting_not_found: 404,
   document_not_found: 404,
+  application_not_found: 404,
   busy: 409,
 };
 
@@ -176,6 +177,20 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
       try {
         const { message } = c.req.valid("json");
         return c.json({ session: sessions.openDocumentFeedback(c.req.param("id"), message) }, 201);
+      } catch (e) {
+        return sessionError(c, e);
+      }
+    },
+  );
+
+  // F12/M5: conversa do formulário na janela da extensão; a primeira mensagem cria, as próximas seguem nela
+  app.post(
+    "/api/applications/:id/chat",
+    validate("json", z.object({ message: z.string().trim().min(1).max(4000) })),
+    (c) => {
+      try {
+        const { message } = c.req.valid("json");
+        return c.json({ session: sessions.openApplicationChat(c.req.param("id"), message) }, 201);
       } catch (e) {
         return sessionError(c, e);
       }

@@ -32,6 +32,38 @@ interface Ctx {
   /** F05: documento gerado por cv_generate e o conteúdo lido por cv_get (para o cv_edit). */
   documentId?: string;
   draft?: unknown;
+  /** F12/M5: formulário lido pela extensão, com uma pergunta aberta. */
+  applicationId?: string;
+}
+
+/** Formulário como a extensão deixa (a captura e o leitor rodam fora daqui). */
+function application(c: Ctx): string {
+  if (c.applicationId) return c.applicationId;
+  const f = c.t.repos.applications.create({
+    captureId: "captura-auditoria",
+    postingId: c.postingId ?? null,
+    profileId: c.ids.profileId,
+    url: "https://vagas.example/apply",
+    title: "Candidatura",
+    fields: [],
+  });
+  c.t.repos.applications.setQuestions(f.id, [
+    {
+      id: "motivo",
+      question: "Por que você quer trabalhar aqui?",
+      kind: "long_text",
+      options: [],
+      required: true,
+      maxChars: 500,
+      fieldRefs: ["f1"],
+      section: null,
+      profileField: null,
+      topic: null,
+      source: "model",
+    },
+  ]);
+  c.applicationId = f.id;
+  return f.id;
 }
 
 interface Case {
@@ -319,6 +351,16 @@ const CASES: Record<string, Case> = {
       action: "document.open",
       label: "Abrir o CV",
       params: { documentId: c.documentId },
+    }),
+  },
+  // F12/M5: conversa do formulário
+  application_get: { where: "career", args: (c) => ({ applicationId: application(c) }) },
+  application_answer_save: {
+    where: "career",
+    args: (c) => ({
+      applicationId: application(c),
+      questionId: "motivo",
+      answer: "Quero levar a experiência em pagamentos para um produto de saúde.",
     }),
   },
   // mudam o estado global ou da sessão: por último

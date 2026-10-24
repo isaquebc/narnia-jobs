@@ -18,6 +18,8 @@ export interface ApplicationFormRecord {
   /** Geração das respostas (F12/M4). */
   answersStatus: "idle" | "answering" | "ready" | "error";
   answersError: string | null;
+  /** Conversa do formulário com o recrutador (F12/M5), criada na primeira mensagem. */
+  chatSessionId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +66,7 @@ export interface ApplicationsRepo {
    * Só os longos (frases, não "Sim"), os mais novos primeiro.
    */
   editedTexts(opts: { excludeFormId: string; limit: number }): string[];
+  setChatSession(id: string, sessionId: string, now?: Date): void;
   /** Pede a organização de novo (Ler de novo). */
   setLocating(id: string, now?: Date): void;
 }
@@ -85,6 +88,7 @@ function map(r: Row): ApplicationFormRecord {
     error: str(r.error),
     answersStatus: (str(r.answers_status) ?? "idle") as ApplicationFormRecord["answersStatus"],
     answersError: str(r.answers_error),
+    chatSessionId: str(r.chat_session_id),
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   };
@@ -133,6 +137,11 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
       db.prepare(
         "update application_form set status = 'error', error = ?, updated_at = ? where id = ?",
       ).run(error, now.toISOString(), id);
+    },
+    setChatSession(id, sessionId, now = new Date()) {
+      db.prepare(
+        "update application_form set chat_session_id = ?, updated_at = ? where id = ?",
+      ).run(sessionId, now.toISOString(), id);
     },
     setPosting(id, postingId, now = new Date()) {
       db.prepare("update application_form set posting_id = ?, updated_at = ? where id = ?").run(

@@ -198,7 +198,7 @@ describe("F12-18/F12-19 · respostas no banco", () => {
       `insert into application_answer (id, form_id, question_id, version, answer, origins_json, gap, source, created_at)
        values ('old', 'f0', 'q1', 1, 'resposta antiga', '[]', null, 'model', '2026-10-23T00:00:00.000Z')`,
     ).run();
-    expect(migrate(db).applied).toEqual(["0022_application_roleplay"]);
+    expect(migrate(db).applied).toEqual(expect.arrayContaining(["0022_application_roleplay"]));
     const repos = createRepos(db);
     expect(repos.applications.latestAnswers("f0")).toEqual([
       expect.objectContaining({ answer: "resposta antiga", assumptions: [], source: "model" }),

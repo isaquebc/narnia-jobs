@@ -44,6 +44,15 @@ import {
 } from "../plugin";
 import { TurnTrace } from "./turn-trace";
 
+/** Site do formulário para o título da conversa ("jobs.example"). */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 export class SessionLimitError extends Error {
   constructor(
     readonly max: number,
@@ -62,6 +71,7 @@ export class SessionStateError extends Error {
       | "budget_exhausted"
       | "posting_not_found"
       | "document_not_found"
+      | "application_not_found"
       | "busy",
     message: string,
   ) {
@@ -349,6 +359,44 @@ export class SessionManager {
       vaga: posting ? ` para a vaga ${posting.id} ("${postingSessionTitle(posting)}")` : "",
       ler_vaga: posting ? ` e a vaga com \`posting_get\` (id ${posting.id})` : "",
       posting_arg: posting ? `, postingId ${posting.id}` : "",
+      mensagem: message.trim(),
+    });
+    this.send(session.id, note, { display: message.trim(), asUser: true });
+    this.emitState(session.id, session.state, session.category);
+    return this.get(session.id);
+  }
+
+  /**
+   * Conversa do formulário (F12/M5, decisão do dono 2026-10-24): uma por formulário, categoria `job`, ligada à vaga
+   * quando há. Nasce na primeira mensagem da pessoa, com a nota do formulário e o procedimento da skill
+   * `responder-candidatura` (fonte única dos modos A e B); as próximas mensagens vão para a mesma conversa.
+   */
+  openApplicationChat(applicationId: string, message: string): ChatSession {
+    const f = this.repos.applications.get(applicationId);
+    if (!f) throw new SessionStateError("application_not_found", "Formulário não encontrado.");
+    const current = f.chatSessionId ? this.repos.chatSessions.get(f.chatSessionId) : null;
+    if (current && current.state !== "archived") {
+      this.send(current.id, message.trim());
+      return this.get(current.id);
+    }
+    const posting = f.postingId ? this.repos.postings.get(f.postingId) : null;
+    const site = hostOf(f.url);
+    const title = posting ? `${postingSessionTitle(posting)} · Formulário` : `Formulário · ${site}`;
+    const session = this.create({
+      category: "job",
+      title,
+      ...(f.profileId ? { profileId: f.profileId } : {}),
+    });
+    if (posting) this.repos.chatSessions.setPosting(session.id, posting.id);
+    this.repos.applications.setChatSession(f.id, session.id);
+    const note = renderNote(readPluginFile("prompts/candidatura-contexto.md"), {
+      application_id: f.id,
+      titulo: f.title ?? site,
+      url: f.url,
+      vaga: posting
+        ? `, ligado à vaga ${posting.id} ("${postingSessionTitle(posting)}")`
+        : ", sem vaga ligada",
+      instrucoes: stripFrontmatter(readPluginFile("skills/responder-candidatura/SKILL.md")).trim(),
       mensagem: message.trim(),
     });
     this.send(session.id, note, { display: message.trim(), asUser: true });

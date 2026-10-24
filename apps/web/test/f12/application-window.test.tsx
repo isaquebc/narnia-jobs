@@ -2,6 +2,7 @@ import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { shellApi } from "../f03/shell-api";
+import { message, session } from "../f04/fixtures";
 import { renderApp } from "../router-helpers";
 
 /**
@@ -257,5 +258,78 @@ describe("F12/M3 · janela: formulário de candidatura", () => {
     expect(screen.getByText(/Nenhuma vaga ligada/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Ler de novo" }));
     expect(relocateApplication).toHaveBeenCalledWith("a1");
+  });
+});
+
+describe("F12/M5 · conversa do formulário na janela", () => {
+  const chat = {
+    getChatSession: vi.fn(async (id: string) => ({
+      session: session(id, { title: "Acme - Backend · Formulário", category: "job" }),
+    })),
+    listChatMessages: vi.fn(async () => ({
+      messages: [message("m1", { role: "user", contentMd: "Deixa a motivação mais curta." })],
+    })),
+    sendChatMessage: vi.fn(async () => ({ turnIndex: 1 })),
+    listResearch: vi.fn(async () => ({ sources: [] })),
+    getProfileCard: vi.fn(async () => ({
+      profileId: "p1",
+      text: "",
+      tokensEst: 0,
+      hash: "h",
+      factsVersion: 1,
+      builtAt: "2026-10-11T12:00:00.000Z",
+      valid: true,
+    })),
+  };
+
+  it("Perguntas | Conversa: a primeira mensagem cria a conversa do formulário e o chat do recrutador aparece", async () => {
+    let current = application({ chatSessionId: null });
+    const openApplicationChat = vi.fn(async (_id: string, _m: string) => {
+      current = application({ chatSessionId: "s-form" });
+      return { session: session("s-form", { category: "job" }) };
+    });
+    renderApp({
+      api: {
+        ...shellApi,
+        ...chat,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () => ({ application: current }) as never,
+        openApplicationChat,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    await screen.findByRole("list", { name: "Perguntas do formulário" });
+    await userEvent.click(screen.getByRole("button", { name: "Conversa" }));
+    expect(screen.queryByRole("list", { name: "Perguntas do formulário" })).toBeNull();
+    const box = screen.getByRole("textbox", { name: "Mensagem para o recrutador" });
+    await userEvent.type(box, "Deixa a motivação mais curta.");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(openApplicationChat).toHaveBeenCalledWith("a1", "Deixa a motivação mais curta.");
+    // o chat do recrutador, com a mensagem, no lugar do campo inicial
+    expect(await screen.findByText("Deixa a motivação mais curta.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Perguntas" }));
+    expect(
+      await screen.findByRole("list", { name: "Perguntas do formulário" }),
+    ).toBeInTheDocument();
+  });
+
+  it("'Ajustar no chat' numa resposta abre a conversa com a pergunta no campo", async () => {
+    renderApp({
+      api: {
+        ...shellApi,
+        ...chat,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () =>
+          ({ application: application({ chatSessionId: null }) }) as never,
+        openApplicationChat: vi.fn(),
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    const list = await screen.findByRole("list", { name: "Perguntas do formulário" });
+    const motivo = within(list).getAllByRole("listitem")[2] as HTMLElement;
+    await userEvent.click(within(motivo).getByRole("button", { name: "Ajustar no chat" }));
+    expect(screen.getByRole("textbox", { name: "Mensagem para o recrutador" })).toHaveValue(
+      'Sobre a pergunta "Por que você quer trabalhar aqui?": ',
+    );
   });
 });

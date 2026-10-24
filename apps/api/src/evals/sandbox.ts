@@ -35,6 +35,8 @@ export interface EvalSandbox {
   token: string;
   dir: string;
   repos: Repos;
+  /** F12/M5: formulário de candidatura novo, ligado à vaga do sandbox (um por caso: a conversa é por formulário). */
+  newApplication(): string;
   close(): Promise<void>;
 }
 
@@ -126,6 +128,7 @@ export async function openEvalSandbox(o: {
     token,
     dir,
     repos,
+    newApplication: () => seedApplicationForm(repos, seeded.profileId),
     async close() {
       if (closed) return;
       closed = true;
@@ -141,6 +144,72 @@ export async function openEvalSandbox(o: {
  * Vaga com um CV pronto (casos `open: document_feedback`): o rascunho é o do mock, determinístico, mesmo quando a
  * rodada usa o modelo real (o preparo não gasta tokens; o que se avalia é a conversa de feedback).
  */
+/**
+ * Formulário fictício da vaga do sandbox (F12/M5), como a extensão deixa depois de organizar e responder: a motivação
+ * com limite e a resposta do roleplay, o modelo de trabalho (escolha) e o consentimento (fica com a pessoa).
+ */
+function seedApplicationForm(repos: Repos, profileId: string): string {
+  const posting = repos.postings.list().find((p) => p.company === "Globex Consultoria");
+  const f = repos.applications.create({
+    captureId: `avaliacao-${randomBytes(4).toString("hex")}`,
+    postingId: posting?.id ?? null,
+    profileId,
+    url: "https://vagas.example/globex/backend/aplicar",
+    title: "Candidatura · Globex Consultoria",
+    fields: [],
+  });
+  const base = {
+    options: [] as Array<{ value: string; label: string }>,
+    required: true,
+    maxChars: null as number | null,
+    section: null,
+    profileField: null,
+    topic: null,
+    source: "model" as const,
+  };
+  repos.applications.setQuestions(f.id, [
+    {
+      ...base,
+      id: "motivo",
+      question: "Por que você quer trabalhar na Globex?",
+      kind: "long_text",
+      maxChars: 500,
+      fieldRefs: ["f1"],
+    },
+    {
+      ...base,
+      id: "modelo",
+      question: "Modelo de trabalho preferido",
+      kind: "choice",
+      options: [
+        { value: "remoto", label: "Remoto" },
+        { value: "hibrido", label: "Híbrido" },
+        { value: "presencial", label: "Presencial" },
+      ],
+      fieldRefs: ["f2"],
+    },
+    {
+      ...base,
+      id: "lgpd",
+      question: "Concordo com a política de privacidade",
+      kind: "consent",
+      fieldRefs: ["f3"],
+    },
+  ]);
+  repos.applications.addAnswers(f.id, [
+    {
+      questionId: "motivo",
+      answer:
+        "Trabalho com pagamentos há alguns anos e quero levar essa experiência para os projetos da Globex com bancos.",
+      origins: [],
+      gap: null,
+      assumptions: ["Que você quer continuar em pagamentos."],
+      source: "roleplay",
+    },
+  ]);
+  return f.id;
+}
+
 async function seedPostingCv(repos: Repos, profileId: string) {
   const posting = repos.postings.create({
     company: "Globex Consultoria",

@@ -296,6 +296,13 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         method: "POST",
       }),
     /** A pessoa editou a resposta antes de preencher (F12-19). */
+    /** Conversa do formulário (F12/M5): a primeira mensagem cria, as próximas seguem nela. */
+    openApplicationChat: (id: string, message: string) =>
+      request<{ session: ChatSession }>(`/api/applications/${encodeURIComponent(id)}/chat`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message }),
+      }),
     editApplicationAnswer: (id: string, questionId: string, answer: string) =>
       request<{ application: ApplicationFormView }>(
         `/api/applications/${encodeURIComponent(id)}/answers/${encodeURIComponent(questionId)}`,

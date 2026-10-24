@@ -249,11 +249,15 @@ function ToolChip({
 }
 
 /** Conversa aberta (L2); também usada dentro do wizard pela entrevista de descoberta (auditoria E2). */
-export function ChatView({ sessionId }: { sessionId: string }) {
+/** `draft`: texto inicial do campo (janela do formulário, "Ajustar no chat"). */
+export function ChatView({ sessionId, draft }: { sessionId: string; draft?: string }) {
   const chat = useChatSession(sessionId);
   const api = useApi();
   const names = useRecruiterNames(chat.session?.profileId);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(draft ?? "");
+  useEffect(() => {
+    if (draft) setText(draft);
+  }, [draft]);
   // teto de conversas ao enviar numa conversa hibernada (F04-3): pergunta qual encerrar e reenvia a mensagem
   const [limit, setLimit] = useState<(SessionLimit & { text: string }) | null>(null);
   const s = chat.session;

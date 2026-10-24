@@ -38,6 +38,8 @@ export interface PostingToolPorts {
   }): Promise<IntakeOutcome>;
   /** Conversa própria da análise (modo A). Ausente no terminal: a análise segue na mesma conversa. */
   openAnalysis?(postingId: string): Promise<{ sessionId: string; title: string }>;
+  /** A conversa mudou de categoria ou título (virou a da vaga): a api avisa a web (`chat.session_updated`). */
+  sessionChanged?(sessionId: string): void;
   /** Vaga criada ou alterada pela conversa: a api avisa a web (`posting.updated`). */
   changed?(postingId: string): void;
   /** Pendências criadas ou resolvidas (nota do usuário editada pelo recrutador, F06-17). */
@@ -365,6 +367,23 @@ export function createPostingTools(
           "already_in_analysis",
           "Esta conversa já é a da análise desta vaga: analise aqui mesmo (posting_get, recrutador-especializado, analysis_save).",
         );
+      }
+      // conversa nova (a mensagem com a vaga é a primeira do usuário): vira a da vaga em vez de abrir outra (2026-10-24)
+      if (
+        current &&
+        repos.chatMessages.list(current.id).filter((m) => m.role === "user").length <= 1
+      ) {
+        const posting = repos.postings.get(i.postingId);
+        const title = posting ? postingSessionTitle(posting) : current.title;
+        repos.chatSessions.setCategory(current.id, "job");
+        repos.chatSessions.setTitle(current.id, title);
+        repos.chatSessions.setPosting(current.id, i.postingId);
+        ctx.ports.sessionChanged?.(current.id);
+        return {
+          sameSession: true,
+          title,
+          next: "Esta conversa era nova e virou a da análise desta vaga: analise aqui mesmo (posting_get, recrutador-especializado, analysis_save), sem abrir outra.",
+        };
       }
       if (!ctx.ports.openAnalysis)
         throw new PostingToolError(

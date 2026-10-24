@@ -201,4 +201,24 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar,
   expect(
     await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
+
+  // F12/M5: a conversa do formulário (o recrutador do mock lê as perguntas e grava a resposta nova na lista)
+  await popup.getByRole("button", { name: "Conversa" }).click();
+  await popup
+    .getByRole("textbox", { name: "Mensagem para o recrutador" })
+    .fill("Reescreve a motivação, por favor.");
+  await popup.getByRole("button", { name: "Enviar" }).click();
+  await expect(
+    popup.getByText("Gravei a resposta nova; ela está na janela, em Perguntas."),
+  ).toBeVisible({ timeout: 60_000 });
+  await popup.getByRole("button", { name: "Perguntas" }).click();
+  await expect(items.nth(2)).toContainText("Escrita no chat");
+  await expect(motivo).toHaveValue(/Resposta combinada no chat/);
+
+  // a bandeja do app, em overlay sobre a janela
+  await popup.getByRole("button", { name: "Atividades" }).click();
+  const tray = popup.getByRole("dialog", { name: "Atividades" });
+  await expect(tray).toBeVisible();
+  await tray.getByRole("button", { name: "Fechar a bandeja" }).click();
+  await expect(tray).toBeHidden();
 });

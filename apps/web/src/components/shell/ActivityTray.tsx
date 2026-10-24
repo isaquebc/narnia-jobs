@@ -1,6 +1,6 @@
 import type { Job, RunStatus } from "@narnia-jobs/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity } from "lucide-react";
+import { Activity, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApi, useWs } from "../../app/context";
 import { runHeadline } from "../../features/ingestion/runHeadline";
@@ -162,7 +162,14 @@ function useDocumentNotices() {
 const useStoppedRuns = () => useRunsByStatus("stopped", STOPPED_STATUSES);
 const useRunningRuns = () => useRunsByStatus("running", RUNNING_STATUSES);
 
-export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean }) {
+/** `overlay`: na janela da extensão (F12), a bandeja cobre a janela inteira, com botão de fechar. */
+export function ActivityTray({
+  defaultOpen = false,
+  overlay = false,
+}: {
+  defaultOpen?: boolean;
+  overlay?: boolean;
+}) {
   const { jobs, activeCount, cancel, retry } = useJobs();
   const stopped = useStoppedRuns();
   const running = useRunningRuns();
@@ -188,13 +195,30 @@ export function ActivityTray({ defaultOpen = false }: { defaultOpen?: boolean })
       {open ? (
         <section
           aria-label={t("activity.title")}
-          className="absolute right-0 z-30 mt-2 max-h-[calc(100vh-5rem)] w-96 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-lg"
+          {...(overlay ? { role: "dialog", "aria-modal": true } : {})}
+          className={
+            overlay
+              ? "fixed inset-0 z-40 overflow-y-auto bg-card p-4"
+              : "absolute right-0 z-30 mt-2 max-h-[calc(100vh-5rem)] w-96 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-lg"
+          }
         >
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">{t("activity.title")}</h3>
-            <NavLink to="/processos" className="text-xs underline" onClick={() => setOpen(false)}>
-              {t("processes.trayLink")}
-            </NavLink>
+            <span className="flex items-center gap-2">
+              <NavLink to="/processos" className="text-xs underline" onClick={() => setOpen(false)}>
+                {t("processes.trayLink")}
+              </NavLink>
+              {overlay ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t("activity.closeTray")}
+                  onClick={() => setOpen(false)}
+                >
+                  <X size={16} />
+                </Button>
+              ) : null}
+            </span>
           </div>
           {waiting.length > 0 ? (
             <ul aria-label={t("tray.waiting")} className="mb-2 flex flex-col gap-2">

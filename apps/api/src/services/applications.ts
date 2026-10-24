@@ -53,6 +53,7 @@ export function applicationView(repos: Repos, f: ApplicationFormRecord): Applica
     })),
     answersStatus: f.answersStatus,
     answersError: f.answersError,
+    chatSessionId: f.chatSessionId,
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
   };

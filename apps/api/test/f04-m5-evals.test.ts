@@ -87,6 +87,7 @@ describe("F04/M5 · avaliações do chat", () => {
       token: TOKEN,
       fetch: (url, init) => Promise.resolve(app.fetch(new Request(url, init))),
       turnTimeoutMs: 5000,
+      savedPostings: "Globex Consultoria",
     });
     expect(r?.error).toBeUndefined();
     expect(r?.results.map((g) => [g.type, g.passed, g.detail])).toEqual([
@@ -95,6 +96,8 @@ describe("F04/M5 · avaliações do chat", () => {
       ["no_unknown_companies", true, "sem empresas fora do perfil"],
     ]);
     expect(r?.startedAt).toBeTruthy();
+    // F12/M5: as vagas salvas entram no contexto (a empresa da vaga do formulário é conhecida)
+    expect(r?.context).toContain("<vagas_salvas>\nGlobex Consultoria\n</vagas_salvas>");
     expect(r?.endedAt).toBeTruthy();
   });
 

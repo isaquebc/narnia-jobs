@@ -141,6 +141,10 @@ describe("F04/M4 · chat com o recrutador", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Você tem 5 conversas abertas. Qual encerrar?",
     });
+    // o limite muda em Configurações › Chat (pedido do dono, 2026-10-24)
+    expect(
+      within(dialog).getByRole("link", { name: "Mudar o limite em Configurações" }),
+    ).toHaveAttribute("href", "/configuracoes#chat-max-live");
     await userEvent.click(within(dialog).getByRole("button", { name: "Encerrar Conversa 3" }));
     await waitFor(() => expect(api.hibernateChat).toHaveBeenCalledWith("s3"));
     await waitFor(() => expect(api.createChatSession).toHaveBeenCalledTimes(2));

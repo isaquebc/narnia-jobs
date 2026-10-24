@@ -29,9 +29,10 @@ const EvalCaseSchema = z.object({
   category: z.enum(["career", "ingest", "clarify", "discovery", "job"]).default("career"),
   /**
    * Como a conversa abre: padrão, uma sessão nova; `document_feedback`, pelo "Regerar com mensagem" do CV da vaga do
-   * sandbox (a primeira mensagem é o feedback; a nota com o contexto vai junto).
+   * sandbox (a primeira mensagem é o feedback; a nota com o contexto vai junto); `application_chat`, pela conversa de
+   * um formulário novo da vaga do sandbox (F12/M5, janela da extensão).
    */
-  open: z.enum(["document_feedback"]).optional(),
+  open: z.enum(["document_feedback", "application_chat"]).optional(),
   messages: z.array(z.string().min(1)).min(1),
   graders: z.array(GraderSchema).min(1),
 });
@@ -114,6 +115,28 @@ const hostOf = (url: string): string | null => {
 };
 const URLS = /https?:\/\/[^\s)>\]"'`]+/g;
 
+/**
+ * Calibração (2026-10-24, `test/evals/graders-calibration.test.ts`): o texto sem citações ("…", `…`) e sem títulos,
+ * em frases. Uma interrogação dentro de uma citação ou num título não é pergunta à pessoa.
+ */
+const sentences = (text: string) =>
+  text
+    .replace(/^#{1,6} .*$/gm, "")
+    .replace(/"[^"\n]*"|“[^”\n]*”|`[^`\n]*`/g, "")
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+// "fonte" afirmada, não negada ("sem fonte", "não tenho fonte", "nenhuma fonte")
+const SOURCE_WORD =
+  /(?<!\b(?:sem|nenhuma|tenho|há|achei)\s)\bfontes?\b(?=\s*:|\s+(?:d[aeo]s?|é|são|foi|foram|registrad))/i;
+const SOURCE_DOMAIN = /\b[a-z0-9-]+\.(gov|org|com|fyi|io)(\.br)?\b/i;
+// fato do registro da pessoa: experiência/conquista com nome ou id, ou o cartão, perfil ou registro dela
+const SOURCE_RECORD =
+  /\b(?:experiência|conquista|projeto|formação|skill)\s+(?:[a-z]\d+\b|(?:n[ao]|d[ao]|em)\s+[A-ZÀ-Ú])|\((?:experiência|conquista|projeto|skill)\s+[a-z]?\d+\)|\b(?:d[oa]|n[oa]|pel[oa])\s+seu\s+(?:cartão|perfil|registro|histórico)\b/i;
+const ASK_IMPERATIVE =
+  /\b(?:me\s+(?:conte|diga|fale|mande|passe|explique)|pode\s+me\s+(?:dizer|contar|passar|mandar))\b/i;
+const CONFIRM_WORDS = /confirm|aprova|posso|quer que|pode ser|de acordo|devo|sigo com/i;
+
 export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[] {
   const all = t.replies.join("\n");
   return graders.map((g): GradeResult => {
@@ -130,11 +153,15 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
         };
       }
       case "cites_source": {
-        const passed = /fonte|https?:\/\/|\b[a-z0-9-]+\.(gov|org|com)(\.br)?\b/i.test(all);
+        const passed =
+          /https?:\/\//.test(all) ||
+          SOURCE_DOMAIN.test(all) ||
+          SOURCE_WORD.test(all) ||
+          SOURCE_RECORD.test(all);
         return { type: g.type, passed, detail: passed ? "cita fonte" : "nenhuma fonte citada" };
       }
       case "asks_question": {
-        const passed = all.includes("?");
+        const passed = sentences(all).some((x) => x.endsWith("?") || ASK_IMPERATIVE.test(x));
         return {
           type: g.type,
           passed,
@@ -142,8 +169,8 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
         };
       }
       case "asks_confirmation": {
-        const passed =
-          /\?/.test(all) && /confirm|aprova|posso|quer que|pode ser|de acordo/i.test(all);
+        // a mesma frase pergunta e pede o aval (antes: um "?" e um "posso" em qualquer lugar do texto)
+        const passed = sentences(all).some((x) => x.endsWith("?") && CONFIRM_WORDS.test(x));
         return {
           type: g.type,
           passed,
@@ -259,16 +286,22 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
 export function knownFactsText(repos: Repos): string {
   const f = repos.facts;
   const span = (a?: string, b?: string) => [a, b].filter(Boolean).join("–");
+  // conquistas embaixo da experiência e skills com o nível: o juiz confere "liderou X na Acme" e "nível 3"
+  // (calibração, 2026-10-24)
   return [
     ...f.experiences
       .list()
-      .map((e) => `${e.company} · ${e.title} · ${span(e.startDate, e.endDate)}`),
-    ...f.achievements.list().map((a) => `${a.text} ${a.metric ?? ""}`),
+      .flatMap((e) => [
+        `${e.company} · ${e.title} · ${span(e.startDate, e.endDate ?? "atual")}`,
+        ...f.achievements
+          .listByExperience(e.id)
+          .map((a) => `  - ${a.text}${a.metric ? ` (${a.metric})` : ""}`),
+      ]),
     ...f.education
       .list()
       .map((e) => `${e.institution} · ${e.course} · ${span(e.startDate, e.endDate)}`),
     ...f.projects.list().map((p) => `${p.name} · ${span(p.startDate, p.endDate)}`),
-    ...f.languages.list().map((l) => l.name),
-    ...f.skills.list().map((s) => s.name),
+    ...f.languages.list().map((l) => (l.level ? `${l.name} (${l.level})` : l.name)),
+    ...f.skills.list().map((s) => (s.level ? `${s.name} (nível ${s.level})` : s.name)),
   ].join("\n");
 }

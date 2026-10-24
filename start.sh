@@ -577,7 +577,7 @@ cmd_extension() {
 # avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
 cmd_evals() {
   require_docker
-  [[ ${1:-} =~ ^(prompts|chat|pdf|cv-review|all)$ ]] || die "uso: ./start.sh evals prompts|chat|pdf|cv-review|all [nome…] [--strict]"
+  [[ ${1:-} =~ ^(prompts|chat|pdf|cv-review|calibration|all)$ ]] || die "uso: ./start.sh evals prompts|chat|pdf|cv-review|calibration|all [nome…] [--strict]"
   if [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then
     "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals "$@"
   elif stack_running; then

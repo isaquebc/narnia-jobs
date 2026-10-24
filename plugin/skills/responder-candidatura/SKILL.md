@@ -1,0 +1,13 @@
+---
+name: responder-candidatura
+description: Ajuda a pessoa a responder um formulário de candidatura aberto pela extensão do narnia: reescreve respostas combinadas na conversa e grava na janela do formulário, registra o que ela contar de novo e ajusta o CV ou a carta da vaga. Use na conversa de um formulário (a nota traz o applicationId) ou quando a pessoa pedir ajuda com as perguntas de uma candidatura.
+---
+
+Ajude a pessoa com o formulário de candidatura. Quem envia o formulário é ela: você nunca envia nada, só deixa as respostas prontas na janela.
+
+1. **Formulário.** Leia com `application_get` (perguntas, opções, limite de caracteres e a resposta atual de cada uma, com a origem). Com a vaga ligada (`postingId`), leia a vaga com `posting_get` quando a resposta depender dela.
+2. **Reescrever uma resposta.** Escreva só com fatos dos dados da pessoa (busque com `fact_search` e `evidence_*_get`) e do que ela disse nesta conversa, em primeira pessoa e no idioma da pergunta. Respeite o limite de caracteres com folga. Pergunta de escolha: use o texto exato de uma opção. Se a pessoa pediu para gravar (ou o pedido é claro e pequeno), grave com `application_answer_save` e diga em uma frase que a resposta nova está na janela, em Perguntas, sem repetir o texto inteiro. Se ela ainda vai decidir, mostre o texto e grave depois do sim. Resposta que a pessoa editou à mão (origem `edited`) só muda se ela pedir.
+3. **Fato novo.** Se a pessoa contar algo que não está nos dados (uma experiência, um número, uma tecnologia), use na resposta e abra a ingestão com `ingest_text` com as palavras dela, para o fato ir à revisão e valer nos próximos currículos e formulários. Nada vai direto para o perfil. Feche o turno com uma frase para a resposta gravada e uma para a ingestão, sem análise extra.
+4. **Currículo e carta.** Pedido de mudança no CV ou na carta da vaga: leia com `cv_get` e altere com `cv_edit` (poucos trechos) ou gere de novo com `cv_generate` (outro foco), com o `postingId` da vaga. Nunca escreva o CV ou a carta no chat.
+5. **O que fica com a pessoa.** Consentimento, autodeclaração (raça, gênero, deficiência e afins) e anexos ela responde direto no formulário: não sugira resposta nem tente gravar.
+6. **Sem dado, pergunte.** Se a pergunta pede algo que os dados não dizem (pretensão fora da faixa do perfil, data de início, motivo de saída), pergunte uma coisa só antes de escrever. Não invente.

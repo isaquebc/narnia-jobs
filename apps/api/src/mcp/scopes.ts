@@ -1,4 +1,5 @@
 import {
+  APPLICATION_TOOLS,
   CHAT_TOOLS,
   type ChatCategory,
   CV_TOOLS,
@@ -27,6 +28,7 @@ const CAREER = [
   "analysis.",
   // F05: CV e carta (gerar, ler, alterar) e botões sugeridos na mensagem
   "cv.",
+  "application.",
   "ui.",
   "evidence.",
   "fact.",
@@ -91,6 +93,7 @@ export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
 };
 
 const ALL_TOOLS = [
+  ...Object.keys(APPLICATION_TOOLS),
   ...Object.keys(CV_TOOLS),
   ...Object.keys(POSTING_TOOLS),
   ...Object.keys(PROFILE_TOOLS),

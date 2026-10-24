@@ -649,7 +649,10 @@ export class MockProvider implements Provider {
       };
       const opened = (await step("posting_open_analysis", { postingId: created.postingId })) as {
         title: string;
+        sameSession?: boolean;
       };
+      // conversa nova: ela mesma virou a da vaga, a análise segue aqui
+      if (opened.sameSession) return await analyzePosting(created.postingId);
       const reply = `Salvei a vaga e abri a conversa "${opened.title}" para a análise; ela já está rodando lá.`;
       for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
         out.push({ type: "delta", text: piece });
@@ -661,6 +664,30 @@ export class MockProvider implements Provider {
         usage: { ...emptyUsage(opts.model), inputTokens: 500, outputTokens: 80 },
       });
     };
+    const answerForm = async (applicationId: string) => {
+      const form = (await step("application_get", { applicationId })) as {
+        questions: Array<{ questionId: string; kind: string; editable: boolean }>;
+      };
+      const open = form.questions.find((q) => q.editable && q.kind === "long_text");
+      if (open)
+        await step("application_answer_save", {
+          applicationId,
+          questionId: open.questionId,
+          answer: "Resposta combinada no chat: pagamentos com alta disponibilidade.",
+        });
+      const reply = open
+        ? "Gravei a resposta nova; ela está na janela, em Perguntas."
+        : "Li o formulário: não há pergunta aberta para reescrever.";
+      for (const piece of reply.match(/[^ ]+ ?/g) ?? [reply])
+        out.push({ type: "delta", text: piece });
+      out.push({
+        type: "turn_end",
+        text: reply,
+        providerSessionId,
+        costUsd: 0,
+        usage: { ...emptyUsage(opts.model), inputTokens: 400, outputTokens: 40 },
+      });
+    };
     const turn = async (text: string) => {
       running = true;
       aborted = false;
@@ -670,6 +697,10 @@ export class MockProvider implements Provider {
         // análise de vaga (F06): o mock percorre o procedimento da skill (ler a vaga, perfis, evidências, gravar)
         const job = /^\(nota do sistema: esta conversa é a análise da vaga ([^\s(]+)/.exec(text);
         if (job) return await analyzePosting(job[1] as string);
+        // conversa do formulário (F12/M5): lê as perguntas e grava a primeira resposta aberta, combinada no chat
+        const form =
+          /^\(nota do sistema: esta conversa é a do formulário de candidatura ([^\s(]+)/.exec(text);
+        if (form) return await answerForm(form[1] as string);
         // pedido de análise numa conversa comum: salva a vaga e abre a conversa própria dela (F06 §1.1)
         const ask = /analis[ae]\s+(?:esta|essa|a)\s+vaga[:\s]+([\s\S]+)/i.exec(text);
         if (ask && opts.category !== "job")

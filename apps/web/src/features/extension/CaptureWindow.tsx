@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useApi } from "../../app/context";
+import { ActivityTray } from "../../components/shell/ActivityTray";
+import { ExternalLinksContext } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Button, buttonClass } from "../../components/ui/button";
 import { t } from "../../i18n";
@@ -45,58 +47,64 @@ export function CaptureWindow({
     if (next) go(next);
   };
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-4 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-fg">
-        {t("capture.title")}
-      </p>
-      {tabs.length > 0 ? (
-        <div
-          role="tablist"
-          aria-label={t("capture.tabs")}
-          className="-mx-1 flex gap-1 overflow-x-auto pb-1"
-        >
-          {tabs.map((x) => {
-            const label = x.label ?? t("capture.loading");
-            const selected = x.captureId === captureId;
-            return (
-              <span
-                key={x.captureId}
-                className={`flex shrink-0 items-center rounded-md border text-xs ${selected ? "border-primary bg-primary/10" : "border-border"}`}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  className="max-w-40 truncate px-2 py-1"
-                  onClick={() => go(x)}
-                >
-                  {label}
-                </button>
-                <button
-                  type="button"
-                  aria-label={t("capture.closeTab", { name: label })}
-                  className="px-1.5 py-1 text-muted-fg hover:text-fg"
-                  onClick={() => closeTab(x)}
-                >
-                  ×
-                </button>
-              </span>
-            );
-          })}
+    <ExternalLinksContext.Provider value={true}>
+      <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-4 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-fg">
+            {t("capture.title")}
+          </p>
+          {/* a bandeja do app, em overlay (pedido do dono, 2026-10-24) */}
+          <ActivityTray overlay />
         </div>
-      ) : null}
-      {captureId && !error ? (
-        <CaptureView
-          id={captureId}
-          tabId={current?.tabId ?? tabId ?? null}
-          onLabel={(label) => setLabel(captureId, label)}
-        />
-      ) : (
-        <Alert tone="warn">
-          {error === "envio" ? t("capture.sendFailed") : t("capture.readFailed")}
-        </Alert>
-      )}
-    </div>
+        {tabs.length > 0 ? (
+          <div
+            role="tablist"
+            aria-label={t("capture.tabs")}
+            className="-mx-1 flex gap-1 overflow-x-auto pb-1"
+          >
+            {tabs.map((x) => {
+              const label = x.label ?? t("capture.loading");
+              const selected = x.captureId === captureId;
+              return (
+                <span
+                  key={x.captureId}
+                  className={`flex shrink-0 items-center rounded-md border text-xs ${selected ? "border-primary bg-primary/10" : "border-border"}`}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    className="max-w-40 truncate px-2 py-1"
+                    onClick={() => go(x)}
+                  >
+                    {label}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("capture.closeTab", { name: label })}
+                    className="px-1.5 py-1 text-muted-fg hover:text-fg"
+                    onClick={() => closeTab(x)}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
+        {captureId && !error ? (
+          <CaptureView
+            id={captureId}
+            tabId={current?.tabId ?? tabId ?? null}
+            onLabel={(label) => setLabel(captureId, label)}
+          />
+        ) : (
+          <Alert tone="warn">
+            {error === "envio" ? t("capture.sendFailed") : t("capture.readFailed")}
+          </Alert>
+        )}
+      </div>
+    </ExternalLinksContext.Provider>
   );
 }
 

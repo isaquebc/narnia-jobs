@@ -896,6 +896,8 @@ export const ApplicationFormViewSchema = z.object({
   /** Geração das respostas (F12/M4): só com a vaga ligada (F12-11). */
   answersStatus: AnswersStatusSchema,
   answersError: z.string().nullable(),
+  /** Conversa do formulário com o recrutador (F12/M5): nasce na primeira mensagem. */
+  chatSessionId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
