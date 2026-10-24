@@ -75,6 +75,17 @@
     "commit": "75ace96",
     "updatedAt": "2026-10-23T20:15:25.211Z"
   },
+  "narnia-application-roleplay": {
+    "scores": {
+      "idioma": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 1,
+      "roleplay_conferido": 1
+    },
+    "versionId": "6b62058664a2fb80eb05dd8e3c1a966673299a8ac4303d28b0af19e54d6ef698",
+    "commit": "403adc6",
+    "updatedAt": "2026-10-24T11:52:31.429Z"
+  },
   "narnia-chat-title": {
     "scores": {
       "cobertura_da_referencia": 0.667,

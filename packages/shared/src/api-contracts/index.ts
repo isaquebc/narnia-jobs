@@ -902,6 +902,10 @@ export const ApplicationFormViewSchema = z.object({
 export type ApplicationFormView = z.infer<typeof ApplicationFormViewSchema>;
 /** Ligar o formulário a uma vaga salva (ou desligar, `null`) na janela. */
 export const ApplicationPatchSchema = z.object({ postingId: z.string().min(1).nullable() });
+/** A pessoa editou a resposta na janela antes de preencher (F12-19): vira uma versão `edited`. */
+export const ApplicationAnswerEditSchema = z.object({
+  answer: z.string().trim().min(1).max(20000),
+});
 export const TrustedDomainCreateRequestSchema = TrustedDomainSchema.pick({
   pattern: true,
   trustTag: true,

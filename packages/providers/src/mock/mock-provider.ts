@@ -6,6 +6,7 @@ import type {
   AnalyzeRepoOutput,
   ApplicationAnswerOutput,
   ApplicationLocateOutput,
+  ApplicationRoleplayOutput,
   BuildDigestOutput,
   ChatTitleOutput,
   CheckProposalsOutput,
@@ -30,6 +31,7 @@ import {
   type AnalyzeRepoInput,
   type ApplicationAnswerInput,
   type ApplicationLocateInput,
+  type ApplicationRoleplayInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,
@@ -79,6 +81,7 @@ export type MockOperation =
   | "postingDuplicate"
   | "applicationLocate"
   | "applicationAnswer"
+  | "applicationRoleplay"
   | "cvGenerate"
   | "coverLetterGenerate"
   | "cvReview"
@@ -909,6 +912,40 @@ export class MockProvider implements Provider {
         gap: null,
       };
     });
+    return this.result({ answers }, JSON.stringify(input.questions), input.model);
+  }
+
+  /**
+   * Roleplay previsível (F12-18): em primeira pessoa, liga a empresa da vaga à primeira experiência do resumo (com a
+   * origem) e diz a suposição sobre o interesse; sem experiência, lacuna.
+   */
+  async applicationRoleplay(
+    input: ApplicationRoleplayInput,
+  ): Promise<ProviderResult<ApplicationRoleplayOutput>> {
+    await this.gate("applicationRoleplay");
+    const exp = input.brief.experiences[0];
+    const company =
+      input.brief.posting?.company ?? (input.locale.startsWith("en") ? "you" : "vocês");
+    const en = input.locale.startsWith("en");
+    const answers = input.questions.map((q) =>
+      exp
+        ? {
+            questionId: q.questionId,
+            answer: en
+              ? `I want to join ${company} because my work as ${exp.title} at ${exp.company} is close to what you need.`
+              : `Quero trabalhar na ${company} porque o que fiz como ${exp.title} na ${exp.company} é perto do que vocês precisam.`,
+            assumptions: [`Que o trabalho na ${company} te interessa pelo que você já fez.`],
+            origins: [exp.id],
+            gap: null,
+          }
+        : {
+            questionId: q.questionId,
+            answer: null,
+            assumptions: [],
+            origins: [],
+            gap: "Os dados não têm experiência para contar.",
+          },
+    );
     return this.result({ answers }, JSON.stringify(input.questions), input.model);
   }
 

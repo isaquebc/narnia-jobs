@@ -2,6 +2,7 @@ import type {
   ApplicationAnswer,
   ApplicationAnswerOutput,
   ApplicationQuestion,
+  ApplicationRoleplayOutput,
   CvLocale,
 } from "@narnia-jobs/shared";
 
@@ -18,6 +19,22 @@ const NOT_FOR_MODEL = new Set(["consent", "self_declaration", "file"]);
 
 export function answerableQuestions(questions: ApplicationQuestion[]): ApplicationQuestion[] {
   return questions.filter((q) => !q.profileField && !NOT_FOR_MODEL.has(q.kind));
+}
+
+/**
+ * Pergunta aberta (F12-18): texto longo, ou texto curto que pede motivação ou apresentação ("why are you interested",
+ * "por que você quer", "conte sobre você"). Escolha nunca é aberta: a resposta é uma opção da página.
+ */
+const OPEN =
+  /(\bwhy\b|por ?qu[eê]|interess|motiva|excit|empolga|tell us|tell me|about yourself|sobre voc[eê]|conte|describe|descreva|fale sobre|what makes you|o que te (atrai|faz)|apresente-se)/i;
+
+export function splitOpenQuestions(questions: ApplicationQuestion[]): {
+  facts: ApplicationQuestion[];
+  open: ApplicationQuestion[];
+} {
+  const isOpen = (q: ApplicationQuestion) =>
+    q.kind === "long_text" || (q.kind === "short_text" && OPEN.test(q.question));
+  return { facts: questions.filter((q) => !isOpen(q)), open: questions.filter(isOpen) };
 }
 
 const EN = /\b(the|you|your|do|are|have|what|why|how|with|of|to|and|years|experience|please)\b/gi;
@@ -43,7 +60,7 @@ const YES_NO = new Map([
 ]);
 
 /** Corta no fim da última frase que cabe; sem frase inteira, na última palavra que cabe. */
-function fitToLimit(text: string, max: number): string {
+export function fitToLimit(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const sentence = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
@@ -63,7 +80,7 @@ export function assembleAnswers(
   const byId = new Map(output.answers.map((a) => [a.questionId, a]));
   return questions.map((q): Draft => {
     const a = byId.get(q.id);
-    const base = { questionId: q.id, source: "model" as const };
+    const base = { questionId: q.id, source: "model" as const, assumptions: [] };
     if (!a)
       return { ...base, answer: null, origins: [], gap: "O modelo não respondeu esta pergunta." };
     const origins = a.origins
@@ -87,5 +104,41 @@ export function assembleAnswers(
     if (answer && q.maxChars) answer = fitToLimit(answer, q.maxChars);
     if (!answer && !gap) gap = "Sem dados para responder.";
     return { ...base, answer, origins, gap: answer ? null : gap };
+  });
+}
+
+/**
+ * Rascunhos do roleplay (F12-18): o texto cabe no limite, as origens são conferidas como no redator e as suposições
+ * vão limpas (no máximo 4) para a janela mostrar "Confira". Pergunta esquecida ou texto vazio vira lacuna.
+ */
+export function assembleRoleplay(
+  questions: ApplicationQuestion[],
+  output: ApplicationRoleplayOutput,
+  resolve: (shortId: string) => { kind: string; id: string } | null,
+): Draft[] {
+  const byId = new Map(output.answers.map((a) => [a.questionId, a]));
+  return questions.map((q): Draft => {
+    const a = byId.get(q.id);
+    const base = { questionId: q.id, source: "roleplay" as const };
+    let answer = a?.answer?.trim() || null;
+    if (answer && q.maxChars) answer = fitToLimit(answer, q.maxChars);
+    if (!a || !answer)
+      return {
+        ...base,
+        answer: null,
+        origins: [],
+        assumptions: [],
+        gap: a?.gap?.trim() || "O roleplay não escreveu esta resposta.",
+      };
+    return {
+      ...base,
+      answer,
+      origins: a.origins.map(resolve).filter((o): o is { kind: string; id: string } => o !== null),
+      assumptions: a.assumptions
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .slice(0, 4),
+      gap: null,
+    };
   });
 }

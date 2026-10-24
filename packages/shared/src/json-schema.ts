@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ApplicationAnswerOutputSchema,
   ApplicationLocateOutputSchema,
+  ApplicationRoleplayOutputSchema,
 } from "./schemas/application";
 import { ChatTitleOutputSchema } from "./schemas/chat";
 import { CoverLetterDraftSchema, CvDraftSchema, CvReviewOutputSchema } from "./schemas/cv";
@@ -66,6 +67,7 @@ export const POSTING_OUTPUT_JSON_SCHEMAS = {
 export const APPLICATION_OUTPUT_JSON_SCHEMAS = {
   applicationLocate: toJsonSchema(ApplicationLocateOutputSchema),
   applicationAnswer: toJsonSchema(ApplicationAnswerOutputSchema),
+  applicationRoleplay: toJsonSchema(ApplicationRoleplayOutputSchema),
 } as const;
 
 /** Saídas do gerador da F05 (conteúdo do CV e da carta; o código monta o resto). */

@@ -199,6 +199,7 @@ describe("janela da extensão: abas, voltar à página e preencher", () => {
       answer: text,
       origins: [],
       gap,
+      assumptions: [],
       source: "model",
       createdAt: "2026-10-23T12:00:00.000Z",
     });
@@ -276,7 +277,9 @@ describe("janela da extensão: abas, voltar à página e preencher", () => {
     });
     const list = await screen.findByRole("list", { name: "Perguntas do formulário" });
     const items = within(list).getAllByRole("listitem");
-    expect(items[1]).toHaveTextContent("Porque pagamentos.");
+    expect(
+      within(items[1] as HTMLElement).getByRole("textbox", { name: "Resposta: Por que a Acme?" }),
+    ).toHaveValue("Porque pagamentos.");
     expect(items[2]).toHaveTextContent("Falta: Os dados não dizem.");
     await userEvent.click(
       within(items[1] as HTMLElement).getByRole("button", { name: "Preencher" }),
@@ -301,6 +304,126 @@ describe("janela da extensão: abas, voltar à página e preencher", () => {
     await userEvent.click(screen.getByRole("button", { name: "Gerar respostas de novo" }));
     expect(generateApplicationAnswers).toHaveBeenCalledWith("a1");
     vi.unstubAllGlobals();
+    bridge.stop();
+  });
+  it("F12-18/F12-19: o rascunho escrito como você mostra o que supôs; você edita, guarda e preenche o texto editado", async () => {
+    const bridge = fakeBridge(() => ({ ok: true, filled: ["f1"], failed: [] }));
+    const editApplicationAnswer = vi.fn(async (_id: string, _q: string, answer: string) => {
+      const f = form(answer);
+      return { application: { ...f, questions: [motivo(answer, "edited", []), f.questions[1]] } };
+    });
+    const motivo = (text: string, source: string, assumptions: string[]) => ({
+      id: "q1",
+      question: "Briefly describe why you are interested in Vitalis.",
+      kind: "short_text",
+      options: [],
+      required: true,
+      maxChars: null,
+      fieldRefs: ["f1"],
+      section: null,
+      profileField: null,
+      topic: null,
+      source: "model",
+      prefill: null,
+      answer: {
+        questionId: "q1",
+        version: source === "edited" ? 2 : 1,
+        answer: text,
+        origins: [],
+        gap: null,
+        assumptions,
+        source,
+        createdAt: "2026-10-24T12:00:00.000Z",
+      },
+    });
+    const form = (text: string) => ({
+      id: "a1",
+      captureId: "c1",
+      url: "https://vagas.example/c1",
+      title: null,
+      status: "ready",
+      error: null,
+      warning: null,
+      postingId: "v1",
+      posting: { title: "Senior Software Engineer", company: "Vitalis" },
+      profileId: "p1",
+      answersStatus: "ready",
+      answersError: null,
+      createdAt: "2026-10-24T12:00:00.000Z",
+      updatedAt: "2026-10-24T12:00:00.000Z",
+      questions: [
+        motivo(text, "roleplay", ["Que você quer trabalhar com saúde."]),
+        {
+          ...motivo("", "model", []),
+          id: "q2",
+          question: "Anos de Rust",
+          kind: "number",
+          fieldRefs: ["f2"],
+          answer: {
+            ...motivo("", "model", []).answer,
+            questionId: "q2",
+            answer: null,
+            gap: "Os dados não dizem.",
+          },
+        },
+      ],
+    });
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async (id: string) =>
+          ({ capture: capture(id, { applicationId: "a1", mode: "form" }) }) as never,
+        getApplication: async () =>
+          ({ application: form("I want to help people with HSA.") }) as never,
+        getPosting: async () =>
+          ({ posting: { id: "v1" }, contacts: [], notes: [], duplicates: [] }) as never,
+        listPostingAnalyses: async () => ({ analyses: [] }),
+        listDocuments: async () => ({ documents: [] }) as never,
+        editApplicationAnswer,
+      } as never,
+      initialUrl: "/candidatura?captura=c1&aba=7",
+    });
+    const list = await screen.findByRole("list", { name: "Perguntas do formulário" });
+    const first = within(list).getAllByRole("listitem")[0] as HTMLElement;
+    expect(first).toHaveTextContent("Escrita como você");
+    expect(first).toHaveTextContent("Confira antes de preencher");
+    expect(first).toHaveTextContent("Que você quer trabalhar com saúde.");
+    const box = within(first).getByRole("textbox", {
+      name: "Resposta: Briefly describe why you are interested in Vitalis.",
+    });
+    await userEvent.clear(box);
+    await userEvent.type(box, "Vitalis makes health spending simpler.");
+    // preencher usa o texto editado, mesmo antes de guardar
+    await userEvent.click(within(first).getByRole("button", { name: "Preencher" }));
+    await waitFor(() =>
+      expect(bridge.seen.at(-1)?.items).toEqual([
+        { ref: "f1", value: "Vitalis makes health spending simpler." },
+      ]),
+    );
+    // sair do campo guarda a edição como versão sua
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(editApplicationAnswer).toHaveBeenCalledWith(
+        "a1",
+        "q1",
+        "Vitalis makes health spending simpler.",
+      ),
+    );
+    expect(await within(first).findByText("Editada por você")).toBeInTheDocument();
+    // lacuna: dá para escrever a própria resposta
+    const second = within(list).getAllByRole("listitem")[1] as HTMLElement;
+    expect(second).toHaveTextContent("Falta: Os dados não dizem.");
+    await userEvent.type(
+      within(second).getByRole("textbox", { name: "Resposta: Anos de Rust" }),
+      "2",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Preencher todos" }));
+    await waitFor(() =>
+      expect(bridge.seen.at(-1)?.items).toEqual([
+        { ref: "f1", value: "Vitalis makes health spending simpler." },
+        { ref: "f2", value: "2" },
+      ]),
+    );
     bridge.stop();
   });
 });

@@ -1,5 +1,5 @@
 /** Avaliadores de código dos prompts estruturados (M3): módulos puros, publicados no Phoenix como arquivo único. */
-export { answerChecks, locateKinds, locateRefs } from "./application-locate";
+export { answerChecks, locateKinds, locateRefs, roleplayChecks } from "./application-locate";
 export { checkVerdicts } from "./check-verdicts";
 export { cvFactIds, cvNoGapTerms, cvSourceTitles, letterWordCount } from "./cv-honesty";
 export { jsonSchema } from "./json-schema";

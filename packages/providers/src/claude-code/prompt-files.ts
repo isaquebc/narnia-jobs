@@ -21,6 +21,7 @@ export const PROMPTS = {
   postingDuplicate: () => loadPrompt("posting-duplicate"),
   applicationLocate: () => loadPrompt("application-locate"),
   applicationAnswer: () => loadPrompt("application-answer"),
+  applicationRoleplay: () => loadPrompt("application-roleplay"),
   cvGenerate: () => loadPrompt("cv-generate"),
   coverLetterGenerate: () => loadPrompt("cover-letter-generate"),
   cvReview: () => loadPrompt("cv-review"),

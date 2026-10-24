@@ -13,6 +13,7 @@ import type {
   AnalyzeRepoInput,
   ApplicationAnswerInput,
   ApplicationLocateInput,
+  ApplicationRoleplayInput,
   BuildDigestInput,
   ChatTitleInput,
   CheckProposalsInput,
@@ -207,6 +208,17 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.applicationAnswer,
     tools: [],
   }),
+  applicationRoleplay: spec("applicationRoleplay", {
+    name: "narnia-application-roleplay",
+    description:
+      "F12-18: perguntas abertas do formulário (motivação, apresentação) escritas como a pessoa, com as suposições para ela conferir.",
+    file: FILE("application-roleplay"),
+    userTemplate:
+      "<locale>{{locale}}</locale>\n\n<resumo>\n{{brief_json}}\n</resumo>\n\n<pessoa>\n{{person_json}}\n</pessoa>\n\n<empresa>\n{{company_json}}\n</empresa>\n\n<voz>\n{{voice_json}}\n</voz>\n\n<perguntas>\n{{questions_json}}\n</perguntas>",
+    defaultModel: "sonnet",
+    jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.applicationRoleplay,
+    tools: [],
+  }),
   cvGenerate: spec("cvGenerate", {
     name: "narnia-cv-generate",
     description:
@@ -303,6 +315,14 @@ export const structuredPromptVars = {
     locale: i.locale,
     brief_json: JSON.stringify(i.brief, null, 1),
     person_json: JSON.stringify(i.person, null, 1),
+    questions_json: JSON.stringify(i.questions, null, 1),
+  }),
+  applicationRoleplay: (i: ApplicationRoleplayInput) => ({
+    locale: i.locale,
+    brief_json: JSON.stringify(i.brief, null, 1),
+    person_json: JSON.stringify(i.person, null, 1),
+    company_json: JSON.stringify(i.company, null, 1),
+    voice_json: JSON.stringify(i.voice, null, 1),
     questions_json: JSON.stringify(i.questions, null, 1),
   }),
   cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),

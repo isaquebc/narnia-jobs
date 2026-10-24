@@ -295,6 +295,16 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/answers`, {
         method: "POST",
       }),
+    /** A pessoa editou a resposta antes de preencher (F12-19). */
+    editApplicationAnswer: (id: string, questionId: string, answer: string) =>
+      request<{ application: ApplicationFormView }>(
+        `/api/applications/${encodeURIComponent(id)}/answers/${encodeURIComponent(questionId)}`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ answer }),
+        },
+      ),
     relocateApplication: (id: string) =>
       request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/locate`, {
         method: "POST",

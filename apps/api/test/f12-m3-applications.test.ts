@@ -247,6 +247,7 @@ describe("F12/M3 · formulário de candidatura", () => {
         answer: "Quero trabalhar com pagamentos.",
         origins: [{ kind: "experience", id: ids.experienceIds[0] as string }],
         gap: null,
+        assumptions: [],
         source: "model",
       },
     ]);
@@ -262,6 +263,52 @@ describe("F12/M3 · formulário de candidatura", () => {
     });
     expect((await gen())?.status).toBe(202);
     expect(t.queue.tasks.filter((x) => x.type === "application.answer")).toHaveLength(2);
+  });
+
+  it("F12-19: a pessoa edita a resposta antes de preencher; vira versão editada (consentimento e autodeclaração não)", async () => {
+    t = makeTestApp();
+    seedFixture(t.repos, "engineer");
+    const { applicationId } = await capture(t, { form: FORM });
+    const id = applicationId as string;
+    const qs = assembleQuestions(FORM.fields, heuristicQuestions(FORM.fields), null);
+    t.repos.applications.setQuestions(id, qs);
+    const edit = (questionId: string, answer: string) =>
+      t?.api(`/api/applications/${id}/answers/${questionId}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ answer }),
+      });
+    const motivo = qs.find((q) => q.kind === "long_text") as (typeof qs)[number];
+    t.repos.applications.addAnswers(id, [
+      {
+        questionId: motivo.id,
+        answer: "Rascunho do roleplay.",
+        origins: [],
+        gap: null,
+        assumptions: ["Que você gosta de pagamentos."],
+        source: "roleplay",
+      },
+    ]);
+    const r = await edit(motivo.id, "  Meu texto, do meu jeito.  ");
+    expect(r?.status).toBe(200);
+    const got = (await r?.json()) as {
+      application: { questions: Array<{ id: string; answer: Record<string, unknown> | null }> };
+    };
+    expect(got.application.questions.find((q) => q.id === motivo.id)?.answer).toMatchObject({
+      answer: "Meu texto, do meu jeito.",
+      source: "edited",
+      version: 2,
+      assumptions: [],
+    });
+    // campo óbvio também: o texto editado vale sobre o dos dados
+    const nome = qs.find((q) => q.profileField === "full_name") as (typeof qs)[number];
+    expect((await edit(nome.id, "Ana M. Exemplo"))?.status).toBe(200);
+    const consent = qs.find((q) => q.kind === "consent") as (typeof qs)[number];
+    expect((await edit(consent.id, "Sim"))?.status).toBe(422);
+    const self = qs.find((q) => q.kind === "self_declaration") as (typeof qs)[number];
+    expect((await edit(self.id, "Parda"))?.status).toBe(422);
+    expect((await edit("q99", "x"))?.status).toBe(404);
+    expect((await edit(motivo.id, "   "))?.status).toBe(400);
   });
 
   it("ler de novo pede as perguntas outra vez; formulário inexistente dá 404", async () => {

@@ -4,6 +4,7 @@ import type {
   AnalyzeRepoOutput,
   ApplicationAnswerOutput,
   ApplicationLocateOutput,
+  ApplicationRoleplayOutput,
   BuildDigestOutput,
   ChatTitleOutput,
   CheckProposalsOutput,
@@ -183,6 +184,20 @@ export interface ApplicationAnswerInput {
   model: string;
 }
 
+/**
+ * F12-18: perguntas abertas escritas como a pessoa (roleplay), com o resumo do CV (ids curtos), a empresa, a descrição
+ * da vaga e amostras do jeito como a pessoa escreve (textos que ela editou em outros formulários).
+ */
+export interface ApplicationRoleplayInput {
+  brief: CvBrief;
+  person: Record<string, unknown>;
+  company: { summary: string | null; url: string | null; description: string | null };
+  voice: string[];
+  questions: ApplicationAnswerInput["questions"];
+  locale: string;
+  model: string;
+}
+
 /** F05-11: conteúdo do CV e da carta a partir do resumo montado pelo código (Sonnet por padrão). */
 export interface CvGenerateInput {
   brief: CvBrief;
@@ -252,6 +267,10 @@ export interface Provider {
   applicationAnswer(
     input: ApplicationAnswerInput,
   ): Promise<ProviderResult<ApplicationAnswerOutput>>;
+  /** F12-18: perguntas abertas escritas como a pessoa (Sonnet). */
+  applicationRoleplay(
+    input: ApplicationRoleplayInput,
+  ): Promise<ProviderResult<ApplicationRoleplayOutput>>;
   /** F05: conteúdo do CV e da carta de apresentação (Sonnet). */
   cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>>;
   coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;

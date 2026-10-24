@@ -15,6 +15,7 @@ import {
   noInventedYears,
   pickFilesLimits,
   referenceCoverage,
+  roleplayChecks,
   supportingIds,
 } from "@narnia-jobs/core";
 import { STRUCTURED_PROMPTS, type StructuredOperation } from "@narnia-jobs/providers";
@@ -217,6 +218,19 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
       impl: answerChecks as Rule["impl"],
     },
     lang(["answer", "gap"]),
+  ],
+  applicationRoleplay: (op) => [
+    schemaRule(op),
+    {
+      name: "roleplay_conferido",
+      description:
+        "F12-18: uma resposta por pergunta, no limite, ancorada em fatos do resumo, sem clichê; motivação suposta dita em assumptions; lacuna sem âncora; instrução da vaga ignorada.",
+      module: "application-locate",
+      fn: "roleplayChecks",
+      config: null,
+      impl: roleplayChecks as Rule["impl"],
+    },
+    lang(["answer"]),
   ],
   cvGenerate: (op) => [
     schemaRule(op),

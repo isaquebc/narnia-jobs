@@ -13,6 +13,8 @@ import {
   ApplicationAnswerOutputSchema,
   type ApplicationLocateOutput,
   ApplicationLocateOutputSchema,
+  type ApplicationRoleplayOutput,
+  ApplicationRoleplayOutputSchema,
   type BuildDigestOutput,
   BuildDigestOutputSchema,
   CHAT_OUTPUT_JSON_SCHEMAS,
@@ -70,6 +72,7 @@ import {
   type AnalyzeRepoInput,
   type ApplicationAnswerInput,
   type ApplicationLocateInput,
+  type ApplicationRoleplayInput,
   type AuthMethod,
   type BuildDigestInput,
   type ChatTitleInput,
@@ -893,6 +896,19 @@ export class ClaudeCodeProvider implements Provider {
       APPLICATION_OUTPUT_JSON_SCHEMAS.applicationAnswer,
       ApplicationAnswerOutputSchema,
       "applicationAnswer",
+    );
+  }
+
+  applicationRoleplay(
+    input: ApplicationRoleplayInput,
+  ): Promise<ProviderResult<ApplicationRoleplayOutput>> {
+    return this.single(
+      renderStructuredPrompt("applicationRoleplay", input),
+      input.model,
+      PROMPTS.applicationRoleplay(),
+      APPLICATION_OUTPUT_JSON_SCHEMAS.applicationRoleplay,
+      ApplicationRoleplayOutputSchema,
+      "applicationRoleplay",
     );
   }
 

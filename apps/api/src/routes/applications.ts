@@ -1,5 +1,5 @@
 import { answerableQuestions, type Repos } from "@narnia-jobs/core";
-import { ApplicationPatchSchema } from "@narnia-jobs/shared";
+import { ApplicationAnswerEditSchema, ApplicationPatchSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
@@ -57,6 +57,37 @@ export function applicationsRoutes(deps: {
     deps.bus?.emit({ type: "application.updated", applicationId: f.id });
     return c.json({ job }, 202);
   });
+
+  // a pessoa editou a resposta na janela antes de preencher (F12-19): versão nova, que gerar de novo não refaz
+  app.put(
+    "/api/applications/:id/answers/:questionId",
+    validate("json", ApplicationAnswerEditSchema),
+    (c) => {
+      const f = deps.repos.applications.get(c.req.param("id"));
+      if (!f) return apiError(c, 404, "not_found", "Formulário não encontrado");
+      const q = f.questions.find((x) => x.id === c.req.param("questionId"));
+      if (!q) return apiError(c, 404, "question_not_found", "Pergunta não encontrada");
+      if (q.kind === "consent" || q.kind === "self_declaration" || q.kind === "file")
+        return apiError(
+          c,
+          422,
+          "not_editable",
+          "Consentimento, autodeclaração e anexo ficam com você, direto no formulário.",
+        );
+      deps.repos.applications.addAnswers(f.id, [
+        {
+          questionId: q.id,
+          answer: c.req.valid("json").answer,
+          origins: [],
+          gap: null,
+          assumptions: [],
+          source: "edited",
+        },
+      ]);
+      deps.bus?.emit({ type: "application.updated", applicationId: f.id });
+      return c.json({ application: applicationView(deps.repos, f) });
+    },
+  );
 
   app.post("/api/applications/:id/locate", async (c) => {
     const f = deps.repos.applications.get(c.req.param("id"));

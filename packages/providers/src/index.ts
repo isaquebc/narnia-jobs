@@ -73,6 +73,7 @@ export {
   type AnalyzeRepoInput,
   type ApplicationAnswerInput,
   type ApplicationLocateInput,
+  type ApplicationRoleplayInput,
   type AuthMethod,
   approxTokens,
   type BuildDigestInput,

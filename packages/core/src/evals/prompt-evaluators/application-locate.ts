@@ -145,3 +145,104 @@ export function answerChecks(p: EvalParams): EvalResult {
     ? result(true, `${total} conferências certas`)
     : result(false, problems.join("; "), ok / total);
 }
+
+const CLICHE =
+  /(apaixonad[oa]|paix[aã]o por|passionate|desde (pequen|crian)|sempre sonhei|dream company|empresa dos sonhos)/i;
+
+/**
+ * Roleplay das perguntas abertas (F12-18): uma resposta por pergunta, no limite, ancorada em fatos do resumo (origens
+ * que existem, pelo menos uma), sem clichê; com referência, as lacunas (`gaps`), as respondidas (`answered`), as que
+ * precisam dizer o que supuseram (`assumes`), os termos que o texto cita (`mention`, por pergunta) e os que nunca
+ * aparecem (`avoid`: fato inventado ou instrução da vaga seguida). Nota pela fração de conferências certas.
+ */
+export function roleplayChecks(p: EvalParams): EvalResult {
+  let questions: Array<{ questionId: string; maxChars: number | null }> = [];
+  try {
+    questions = JSON.parse(String(p.input?.questions_json ?? "[]"));
+  } catch {
+    questions = [];
+  }
+  const briefIds = new Set(
+    [...String(p.input?.brief_json ?? "").matchAll(/"id":\s*"([^"]+)"/g)].map(
+      (m) => m[1] as string,
+    ),
+  );
+  const out = jsonOf(p.output) as
+    | {
+        answers?: Array<{
+          questionId?: string;
+          answer?: string | null;
+          assumptions?: string[];
+          origins?: string[];
+          gap?: string | null;
+        }>;
+      }
+    | undefined;
+  const answers = out?.answers ?? [];
+  const ref = (p.reference ?? {}) as {
+    gaps?: string[];
+    answered?: string[];
+    assumes?: string[];
+    mention?: Record<string, string[]>;
+    avoid?: string[];
+  };
+  const gaps = new Set(ref.gaps ?? []);
+  const problems: string[] = [];
+  let ok = 0;
+  let total = 0;
+  const check = (pass: boolean, problem: string) => {
+    total++;
+    if (pass) ok++;
+    else problems.push(problem);
+  };
+  const lower = (s: string) => s.toLowerCase();
+  for (const q of questions) {
+    const a = answers.find((x) => x.questionId === q.questionId);
+    const text = a?.answer ?? "";
+    if (!a) {
+      check(false, `${q.questionId}: sem resposta nem lacuna`);
+      continue;
+    }
+    if (gaps.has(q.questionId)) {
+      check(!text && Boolean(a.gap), `${q.questionId}: devia ser lacuna (sem âncora nos dados)`);
+      continue;
+    }
+    check(Boolean(text), `${q.questionId}: devia ter o rascunho`);
+    if (!text) continue;
+    check(
+      !q.maxChars || text.length <= q.maxChars,
+      `${q.questionId}: ${text.length} caracteres (máximo ${q.maxChars})`,
+    );
+    const origins = a.origins ?? [];
+    const unknown = origins.filter((o) => !briefIds.has(o));
+    check(
+      origins.length > 0 && unknown.length === 0,
+      unknown.length
+        ? `${q.questionId}: origens fora do resumo (${listShort(unknown)})`
+        : `${q.questionId}: sem origem (o texto não se apoia em fatos)`,
+    );
+    check(!CLICHE.test(text), `${q.questionId}: clichê ("${text.match(CLICHE)?.[0]}")`);
+  }
+  for (const id of ref.answered ?? []) {
+    const a = answers.find((x) => x.questionId === id);
+    check(Boolean(a?.answer), `${id}: devia ter resposta`);
+  }
+  for (const id of ref.assumes ?? []) {
+    const a = answers.find((x) => x.questionId === id);
+    check(
+      (a?.assumptions ?? []).some((x) => x.trim()),
+      `${id}: a motivação não está nos dados e não foi dita como suposição`,
+    );
+  }
+  for (const [id, terms] of Object.entries(ref.mention ?? {})) {
+    const text = lower(answers.find((x) => x.questionId === id)?.answer ?? "");
+    for (const term of terms) check(text.includes(lower(term)), `${id}: não cita "${term}"`);
+  }
+  const all = lower(answers.map((a) => a.answer ?? "").join(" "));
+  for (const term of ref.avoid ?? [])
+    check(!all.includes(lower(term)), `cita "${term}" (não está nos dados)`);
+  if (total === 0) return result(true, "sem perguntas no exemplo");
+  return problems.length === 0
+    ? result(true, `${total} conferências certas`)
+    : result(false, problems.join("; "), ok / total);
+}

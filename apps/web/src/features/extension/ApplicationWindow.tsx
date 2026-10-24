@@ -6,7 +6,7 @@ import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
-import { Select } from "../../components/ui/input";
+import { Select, Textarea } from "../../components/ui/input";
 import { useDocuments } from "../../hooks/useDocuments";
 import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
@@ -18,6 +18,8 @@ import { CaptureDocuments } from "./CaptureFollowUp";
  * por seção, com o tipo, as opções e o limite. Campos óbvios (nome, e-mail, telefone, links, cidade) trazem o valor dos
  * dados da pessoa; as outras, a resposta sugerida (F12/M4) ou a lacuna. Copiar e Preencher (F12-14), e o campo do
  * currículo anexa o PDF do CV da vaga. Consentimento e autodeclaração ficam com a pessoa (F12-12). Nada é enviado.
+ * F12-18: as perguntas abertas chegam escritas como a pessoa, com o que o narnia supôs para ela conferir. F12-19: toda
+ * resposta é editável antes de preencher; Preencher usa o texto da caixa, e sair dela guarda a edição.
  */
 const external = { target: "_blank", rel: "noreferrer" } as const;
 const applicationKey = (id: string) => ["extension", "application", id] as const;
@@ -35,12 +37,12 @@ export interface FormPage {
   tabId: number | null;
 }
 
-/** O valor de uma pergunta: o dos dados (campo óbvio) ou a resposta sugerida (F12/M4). */
-const questionValue = (q: Question) => q.prefill ?? q.answer?.answer ?? null;
+/** O valor guardado: a edição da pessoa (F12-19), o dos dados (campo óbvio) ou a resposta sugerida (F12/M4). */
+const savedValue = (q: Question) =>
+  (q.answer?.source === "edited" ? q.answer.answer : null) ?? q.prefill ?? q.answer?.answer ?? "";
 
-/** Perguntas com valor que dá para preencher: nunca consentimento, autodeclaração nem arquivo (F12-12). */
-const fillable = (q: Question) =>
-  questionValue(q) !== null && !["consent", "self_declaration", "file"].includes(q.kind);
+/** O que a pessoa responde pela janela: nunca consentimento, autodeclaração nem arquivo (F12-12). */
+const editable = (q: Question) => !["consent", "self_declaration", "file"].includes(q.kind);
 
 /** Campo de arquivo: carta pelo rótulo; o resto (currículo, CV, resume) recebe o CV. */
 const fileKind = (q: Question): DocumentKind =>
@@ -79,6 +81,26 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
     documents.find(
       (d) => d.document.kind === kind && d.document.postingId === postingId && d.current?.pdfPath,
     ) ?? null;
+  /** O texto nas caixas, antes de guardar (F12-19): é ele que Copiar e Preencher usam. */
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const dropDraft = (questionId: string) => setDrafts(({ [questionId]: _, ...rest }) => rest);
+  const currentValue = (x: Question) => drafts[x.id] ?? savedValue(x);
+  const fillable = (x: Question) => editable(x) && currentValue(x).trim() !== "";
+  const save = useMutation({
+    mutationFn: (v: { questionId: string; answer: string }) =>
+      api.editApplicationAnswer(id, v.questionId, v.answer),
+    onSuccess: (r, v) => {
+      qc.setQueryData(applicationKey(id), r);
+      dropDraft(v.questionId);
+    },
+  });
+  /** Guarda a edição como versão da pessoa; vazio fica só na caixa, igual ao guardado não grava nada. */
+  const commit = (x: Question, text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    if (clean === savedValue(x).trim()) dropDraft(x.id);
+    else save.mutate({ questionId: x.id, answer: clean });
+  };
   const [fillMessage, setFillMessage] = useState<{ tone: "ok" | "warn"; text: string } | null>(
     null,
   );
@@ -102,9 +124,7 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
       });
   };
   const fill = (questions: Question[]) =>
-    send(
-      questions.map((x) => ({ ref: x.fieldRefs[0] as string, value: questionValue(x) as string })),
-    );
+    send(questions.map((x) => ({ ref: x.fieldRefs[0] as string, value: currentValue(x).trim() })));
   /** Anexa o PDF do CV (ou da carta) da vaga no campo de arquivo (pedido do dono, 2026-10-23). */
   const attach = async (x: Question) => {
     const kind = fileKind(x);
@@ -205,6 +225,9 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
                 section={x.section && x.section !== a.questions[i - 1]?.section ? x.section : null}
                 answering={a.answersStatus === "answering"}
                 hasPosting={a.postingId !== null}
+                value={currentValue(x)}
+                onChange={(text) => setDrafts((d) => ({ ...d, [x.id]: text }))}
+                onCommit={(text) => commit(x, text)}
                 onFill={fillable(x) ? () => void fill([x]) : null}
                 onAttach={
                   x.kind === "file" && docFor(fileKind(x))
@@ -230,6 +253,11 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
         </>
       ) : null}
       {relocate.isError ? <Alert tone="danger">{(relocate.error as Error).message}</Alert> : null}
+      {save.isError ? (
+        <Alert tone="danger">
+          {t("application.saveFailed", { detail: (save.error as Error).message })}
+        </Alert>
+      ) : null}
       {regenerate.isError ? (
         <Alert tone="danger">{(regenerate.error as Error).message}</Alert>
       ) : null}
@@ -257,6 +285,9 @@ function QuestionItem({
   section,
   answering,
   hasPosting,
+  value,
+  onChange,
+  onCommit,
   onFill,
   onAttach,
 }: {
@@ -265,6 +296,9 @@ function QuestionItem({
   section: string | null;
   answering: boolean;
   hasPosting: boolean;
+  value: string;
+  onChange: (text: string) => void;
+  onCommit: (text: string) => void;
   onFill: (() => void) | null;
   onAttach: { kind: DocumentKind; run: () => void } | null;
 }) {
@@ -294,6 +328,9 @@ function QuestionItem({
         ) : null}
         <Answer
           q={q}
+          value={value}
+          onChange={onChange}
+          onCommit={onCommit}
           onFill={onFill}
           onAttach={onAttach}
           answering={answering}
@@ -304,42 +341,86 @@ function QuestionItem({
   );
 }
 
-function ValueBox({ value, onFill }: { value: string; onFill: (() => void) | null }) {
+/** A resposta numa caixa editável (F12-19); escolha com opções vira a lista das opções da página. */
+function EditableValue({
+  q,
+  value,
+  onChange,
+  onCommit,
+  onFill,
+}: {
+  q: Question;
+  value: string;
+  onChange: (text: string) => void;
+  onCommit: (text: string) => void;
+  onFill: (() => void) | null;
+}) {
+  const label = t("application.answerLabel", { question: q.question });
+  const choice = (q.kind === "choice" || q.kind === "yes_no") && q.options.length > 0;
+  const long = q.kind === "long_text" || value.length > 60;
   return (
-    <div className="flex flex-col gap-1.5 rounded bg-muted/40 px-2 py-1.5">
-      <span className="whitespace-pre-line break-words">{value}</span>
-      <span className="flex justify-end gap-1">
-        <CopyButton text={value} />
-        {onFill ? (
-          <Button size="sm" variant="outline" onClick={onFill}>
-            {t("application.fill")}
-          </Button>
-        ) : null}
-      </span>
+    <div className="flex flex-col gap-1.5">
+      {choice ? (
+        <Select
+          aria-label={label}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            onCommit(e.target.value);
+          }}
+        >
+          <option value="">{t("application.noneOption")}</option>
+          {q.options.map((o) => (
+            <option key={o.value} value={o.label}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <Textarea
+          aria-label={label}
+          value={value}
+          placeholder={t("application.writeOwn")}
+          rows={long ? Math.min(10, Math.max(3, Math.ceil(value.length / 55))) : 1}
+          maxLength={q.maxChars ?? undefined}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => onCommit(e.target.value)}
+        />
+      )}
+      {value.trim() ? (
+        <span className="flex justify-end gap-1">
+          <CopyButton text={value.trim()} />
+          {onFill ? (
+            <Button size="sm" variant="outline" onClick={onFill}>
+              {t("application.fill")}
+            </Button>
+          ) : null}
+        </span>
+      ) : null}
     </div>
   );
 }
 
 function Answer({
   q,
+  value,
+  onChange,
+  onCommit,
   onFill,
   onAttach,
   answering,
   hasPosting,
 }: {
   q: Question;
+  value: string;
+  onChange: (text: string) => void;
+  onCommit: (text: string) => void;
   onFill: (() => void) | null;
   onAttach: { kind: DocumentKind; run: () => void } | null;
   answering: boolean;
   hasPosting: boolean;
 }) {
   const hint = (text: string) => <span className="text-xs text-muted-fg">{text}</span>;
-  if (q.profileField)
-    return q.prefill ? (
-      <ValueBox value={q.prefill} onFill={onFill} />
-    ) : (
-      hint(t("application.noData"))
-    );
   if (q.kind === "consent") return hint(t("application.consent"));
   if (q.kind === "self_declaration") return hint(t("application.selfDeclaration"));
   if (q.kind === "file")
@@ -352,10 +433,48 @@ function Answer({
     ) : (
       hint(t("application.file"))
     );
-  if (q.answer?.answer) return <ValueBox value={q.answer.answer} onFill={onFill} />;
-  if (q.answer?.gap) return hint(t("application.gap", { gap: q.answer.gap }));
-  if (answering) return hint(t("application.answeringOne"));
-  return hint(hasPosting ? t("application.noAnswer") : t("application.needsPostingShort"));
+  const a = q.answer;
+  const status = q.profileField
+    ? q.prefill || a?.source === "edited"
+      ? null
+      : t("application.noData")
+    : a?.answer
+      ? null
+      : a?.gap
+        ? t("application.gap", { gap: a.gap })
+        : answering
+          ? t("application.answeringOne")
+          : hasPosting
+            ? t("application.noAnswer")
+            : t("application.needsPostingShort");
+  return (
+    <div className="flex flex-col gap-1.5">
+      {status ? hint(status) : null}
+      {a?.answer && a.source === "roleplay" ? (
+        <div className="flex flex-col gap-1 rounded bg-muted/40 px-2 py-1.5 text-xs">
+          <span>
+            <Badge tone="info">{t("application.roleplay")}</Badge>
+          </span>
+          {a.assumptions.length ? (
+            <>
+              <span className="text-muted-fg">{t("application.assumptions")}</span>
+              <ul className="list-disc pl-4">
+                {a.assumptions.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      {a?.source === "edited" ? (
+        <span>
+          <Badge tone="neutral">{t("application.edited")}</Badge>
+        </span>
+      ) : null}
+      <EditableValue q={q} value={value} onChange={onChange} onCommit={onCommit} onFill={onFill} />
+    </div>
+  );
 }
 
 function PostingDocuments({

@@ -150,14 +150,37 @@ export const ApplicationAnswerOutputSchema = z.object({
 });
 export type ApplicationAnswerOutput = z.infer<typeof ApplicationAnswerOutputSchema>;
 
-/** Resposta guardada (F12/M4): a versão mais nova por pergunta vale; origens com os ids reais dos fatos. */
+/**
+ * Saída do roleplay (`narnia-application-roleplay`, Sonnet, F12-18): as perguntas abertas escritas como a pessoa, em
+ * primeira pessoa. Fato só dos dados (origens); motivação e interesse podem ser supostos a partir deles, e cada
+ * suposição vai em `assumptions` para a pessoa conferir antes de preencher.
+ */
+export const ApplicationRoleplayOutputSchema = z.object({
+  answers: z.array(
+    z.object({
+      questionId: z.string().min(1),
+      answer: z.string().nullable(),
+      /** O que o texto supõe sobre a pessoa e os dados não dizem (ex.: "Que você quer trabalhar com saúde."). */
+      assumptions: z.array(z.string()),
+      origins: z.array(z.string()),
+      gap: z.string().nullable(),
+    }),
+  ),
+});
+export type ApplicationRoleplayOutput = z.infer<typeof ApplicationRoleplayOutputSchema>;
+
+/**
+ * Resposta guardada (F12/M4): a versão mais nova por pergunta vale; origens com os ids reais dos fatos. `roleplay` é o
+ * rascunho escrito como a pessoa (F12-18); `edited`, o texto que a pessoa mudou na janela (F12-19).
+ */
 export const ApplicationAnswerSchema = z.object({
   questionId: z.string(),
   version: z.number().int().positive(),
   answer: z.string().nullable(),
   origins: z.array(z.object({ kind: z.string(), id: z.string() })),
   gap: z.string().nullable(),
-  source: z.enum(["model", "chat", "edited"]),
+  assumptions: z.array(z.string()),
+  source: z.enum(["model", "roleplay", "chat", "edited"]),
   createdAt: z.string(),
 });
 export type ApplicationAnswer = z.infer<typeof ApplicationAnswerSchema>;

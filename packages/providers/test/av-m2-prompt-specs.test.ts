@@ -30,7 +30,7 @@ function capture() {
 }
 
 describe("registro dos prompts estruturados", () => {
-  it("17 operações (F06: + 3 da vaga; F05: CV, carta e revisão; F12: perguntas e respostas do formulário), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
+  it("18 operações (F06: + 3 da vaga; F05: CV, carta e revisão; F12: perguntas, respostas e roleplay do formulário), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
     const ops = Object.keys(STRUCTURED_PROMPTS).sort();
     expect(ops).toEqual(
       [
@@ -38,6 +38,7 @@ describe("registro dos prompts estruturados", () => {
         "analyzeRepo",
         "applicationAnswer",
         "applicationLocate",
+        "applicationRoleplay",
         "buildDigest",
         "chatTitle",
         "checkProposals",

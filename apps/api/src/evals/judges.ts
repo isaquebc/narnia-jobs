@@ -48,6 +48,14 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
     perguntas: "input.questions_json",
     resposta: OUTPUT,
   },
+  applicationRoleplay: {
+    resumo: "input.brief_json",
+    pessoa: "input.person_json",
+    empresa: "input.company_json",
+    voz: "input.voice_json",
+    perguntas: "input.questions_json",
+    resposta: OUTPUT,
+  },
   cvGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   coverLetterGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   cvReview: {

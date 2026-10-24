@@ -59,9 +59,17 @@ export interface ApplicationsRepo {
   ): void;
   /** A versão mais nova de cada pergunta. */
   latestAnswers(formId: string): ApplicationAnswer[];
+  /**
+   * Textos que a pessoa escreveu ao editar respostas de outros formulários (F12-18): o roleplay imita a escrita dela.
+   * Só os longos (frases, não "Sim"), os mais novos primeiro.
+   */
+  editedTexts(opts: { excludeFormId: string; limit: number }): string[];
   /** Pede a organização de novo (Ler de novo). */
   setLocating(id: string, now?: Date): void;
 }
+
+/** Abaixo disso a edição não mostra jeito de escrever ("Sim", um número, uma cidade). */
+const MIN_SAMPLE_CHARS = 60;
 
 function map(r: Row): ApplicationFormRecord {
   return {
@@ -143,8 +151,9 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
         "select coalesce(max(version), 0) + 1 as v from application_answer where form_id = ? and question_id = ?",
       );
       const insert = db.prepare(
-        `insert into application_answer (id, form_id, question_id, version, answer, origins_json, gap, source, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `insert into application_answer
+           (id, form_id, question_id, version, answer, origins_json, gap, assumptions_json, source, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const a of answers) {
         const v = Number((next.get(formId, a.questionId) as Row).v);
@@ -156,6 +165,7 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
           a.answer,
           JSON.stringify(a.origins),
           a.gap,
+          JSON.stringify(a.assumptions),
           a.source,
           now.toISOString(),
         );
@@ -176,9 +186,20 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
         answer: str(r.answer),
         origins: json<Array<{ kind: string; id: string }>>(r.origins_json, []),
         gap: str(r.gap),
+        assumptions: json<string[]>(r.assumptions_json, []),
         source: String(r.source) as ApplicationAnswer["source"],
         createdAt: String(r.created_at),
       }));
+    },
+    editedTexts({ excludeFormId, limit }) {
+      const rows = db
+        .prepare(
+          `select answer from application_answer
+           where source = 'edited' and form_id != ? and length(answer) >= ?
+           order by created_at desc, version desc limit ?`,
+        )
+        .all(excludeFormId, MIN_SAMPLE_CHARS, limit) as Row[];
+      return rows.map((r) => String(r.answer));
     },
     setLocating(id, now = new Date()) {
       db.prepare(

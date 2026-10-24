@@ -120,7 +120,8 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar,
   await expect(popup.getByRole("heading", { name: "Formulário de candidatura" })).toBeVisible();
   const list = popup.getByRole("list", { name: "Perguntas do formulário" });
   await expect(list).toBeVisible({ timeout: 60_000 });
-  const items = list.getByRole("listitem");
+  // só as perguntas: as suposições do roleplay são uma lista dentro do item
+  const items = list.locator(":scope > li");
   await expect(items).toHaveCount(7);
   await expect(items.nth(0)).toContainText("Nome completo");
   await expect(items.nth(0)).toContainText("Ana Maria Exemplo");
@@ -170,10 +171,19 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar,
   await popup
     .getByRole("combobox", { name: "Vaga salva" })
     .selectOption({ label: "Engenheira Backend Sênior · Acme Pagamentos" });
-  await expect(items.nth(2)).toContainText("trabalhei como", { timeout: 60_000 });
+  // F12-18/19: a pergunta aberta vem do roleplay (com as suposições) e a pessoa edita antes de preencher
+  const motivo = popup.getByLabel("Resposta: Por que você quer trabalhar na Acme?");
+  await expect(motivo).toHaveValue(/Quero trabalhar na Acme Pagamentos/, { timeout: 60_000 });
+  await expect(items.nth(2)).toContainText("Escrita como você");
+  await expect(items.nth(2)).toContainText("Confira antes de preencher (o narnia supôs):");
   await expect(items.nth(3)).toContainText("Sim");
+  await motivo.fill("Quero trabalhar na Acme porque pagamentos é o que eu faço melhor.");
+  await motivo.blur();
+  await expect(items.nth(2)).toContainText("Editada por você");
   await popup.getByRole("button", { name: "Preencher todos" }).click();
-  await expect(job.locator('textarea[name="motivo"]')).toHaveValue(/trabalhei como/);
+  await expect(job.locator('textarea[name="motivo"]')).toHaveValue(
+    "Quero trabalhar na Acme porque pagamentos é o que eu faço melhor.",
+  );
   await expect(job.getByLabel("Sim")).toBeChecked();
 
   // o campo do currículo anexa o PDF do CV da vaga

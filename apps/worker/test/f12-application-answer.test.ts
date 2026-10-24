@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createRepos, migrate, openDatabase, type Repos, seedFixture } from "@narnia-jobs/core";
 import { MockProvider } from "@narnia-jobs/providers";
 import type { FormField, WsEvent } from "@narnia-jobs/shared";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkerDeps } from "../src/pipeline";
 import { processTask, type TaskContext } from "../src/tasks";
 
@@ -120,20 +120,61 @@ describe("F12/M4 worker · application.answer", () => {
     const q = done?.questions ?? [];
     const by = (ref: string) =>
       answers.find((a) => a.questionId === q.find((x) => x.fieldRefs[0] === ref)?.id);
+    // pergunta aberta: o roleplay escreve como a pessoa e diz o que supôs (F12-18)
     expect(by("f2")).toMatchObject({
       answer: expect.stringContaining("Acme Pagamentos"),
+      source: "roleplay",
+      assumptions: [expect.any(String)],
       version: 1,
     });
     expect(by("f2")?.origins).toEqual([{ kind: "experience", id: expect.any(String) }]);
+    expect(by("f3")?.source).toBe("model");
     expect(by("f3")?.answer).toBe("Imediato");
     // campo óbvio e consentimento não vão para o modelo
     expect(by("f1")).toBeUndefined();
     expect(by("f4")).toBeUndefined();
-    expect(h.repos.usageEvents.list().map((u) => u.category)).toContain("application.answer");
+    expect(h.repos.usageEvents.list().map((u) => u.category)).toEqual(
+      expect.arrayContaining(["application.answer", "application.roleplay"]),
+    );
     // gerar de novo cria a versão 2
     await run(h, "application.answer", f.id);
     expect(by("f2")).toBeDefined();
     expect(h.repos.applications.latestAnswers(f.id).every((a) => a.version === 2)).toBe(true);
+  });
+
+  it("F12-19: a resposta editada pela pessoa fica ao gerar de novo; o roleplay recebe a escrita dela", async () => {
+    const provider = new MockProvider();
+    const roleplay = vi.spyOn(provider, "applicationRoleplay");
+    const answer = vi.spyOn(provider, "applicationAnswer");
+    h = harness(provider);
+    const p = h.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    const own =
+      "Gosto de problemas difíceis de pagamentos e quero continuar nisso, perto do produto e do time.";
+    h.repos.applications.addAnswers("outro-formulario", [
+      { questionId: "q1", answer: own, origins: [], gap: null, assumptions: [], source: "edited" },
+    ]);
+    const f = form(p.id);
+    await run(h, "application.locate", f.id);
+    const q = h.repos.applications.get(f.id)?.questions ?? [];
+    const select = q.find((x) => x.fieldRefs[0] === "f3")?.id as string;
+    h.repos.applications.addAnswers(f.id, [
+      {
+        questionId: select,
+        answer: "30 dias",
+        origins: [],
+        gap: null,
+        assumptions: [],
+        source: "edited",
+      },
+    ]);
+    await run(h, "application.answer", f.id);
+    const latest = h.repos.applications.latestAnswers(f.id);
+    expect(latest.find((a) => a.questionId === select)).toMatchObject({
+      answer: "30 dias",
+      source: "edited",
+    });
+    expect(roleplay.mock.calls[0]?.[0]).toMatchObject({ voice: [own] });
+    expect(JSON.stringify(answer.mock.calls[0]?.[0] ?? {})).not.toContain("Quando pode começar");
   });
 
   it("sem vaga ligada (F12-11): não pede nem gera respostas", async () => {
@@ -143,6 +184,16 @@ describe("F12/M4 worker · application.answer", () => {
     expect(h.enqueued).toEqual([]);
     expect(await run(h, "application.answer", f.id)).toMatchObject({ skipped: "no_posting" });
     expect(h.repos.applications.latestAnswers(f.id)).toEqual([]);
+  });
+
+  it("o roleplay falhou: as outras respostas ficam e o erro aparece com o motivo", async () => {
+    h = harness(new MockProvider({ errors: { applicationRoleplay: "roleplay fora do ar" } }));
+    const p = h.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    const f = form(p.id);
+    await run(h, "application.locate", f.id);
+    await expect(run(h, "application.answer", f.id)).rejects.toThrow(/roleplay fora do ar/);
+    expect(h.repos.applications.get(f.id)).toMatchObject({ answersStatus: "error" });
+    expect(h.repos.applications.latestAnswers(f.id).map((a) => a.answer)).toContain("Imediato");
   });
 
   it("modelo falhou: respostas em erro com o motivo", async () => {
