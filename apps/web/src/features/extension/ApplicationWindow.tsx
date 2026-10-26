@@ -1,4 +1,8 @@
-import type { ApplicationFormView, DocumentKind } from "@narnia-jobs/shared";
+import {
+  type ApplicationFormView,
+  assumptionAsMotivation,
+  type DocumentKind,
+} from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useState } from "react";
 import { useApi, useWs } from "../../app/context";
@@ -12,6 +16,7 @@ import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { ChatView } from "../chat/ChatPage";
 import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "../chat/SessionLimitDialog";
+import { AddressSelect, MotivationsEditor, PhraseEditor } from "../profiles/MotivationsEditor";
 import { bridgeRequest, extensionAvailable } from "./bridge";
 import { CaptureDocuments } from "./CaptureFollowUp";
 
@@ -87,6 +92,14 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
   const regenerate = useMutation({
     mutationFn: () => api.generateApplicationAnswers(id),
     onSettled: () => qc.invalidateQueries({ queryKey: applicationKey(id) }),
+  });
+  // F12-23: suposição do roleplay aceita (vira motivação do perfil) ou recusada (a pergunta é refeita)
+  const decide = useMutation({
+    mutationFn: (v: {
+      questionId: string;
+      body: { index: number; action: "accept" | "refuse"; text?: string };
+    }) => api.decideAssumption(id, v.questionId, v.body),
+    onSuccess: (r) => qc.setQueryData(applicationKey(id), r),
   });
   const postingId = q.data?.application.postingId ?? null;
   const { documents } = useDocuments({ postingId: postingId ?? "sem-vaga" });
@@ -239,6 +252,12 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
             </Alert>
           ) : null}
           {a.answersStatus === "answering" ? <Progress text={t("application.answering")} /> : null}
+          {a.answersStatus === "motivations" && a.answersProfileId ? (
+            <MotivationsStep
+              profileId={a.answersProfileId}
+              onDone={() => qc.invalidateQueries({ queryKey: applicationKey(id) })}
+            />
+          ) : null}
           {a.answersStatus === "error" ? (
             <Alert tone="warn" className="flex flex-col gap-1">
               <span>{t("application.answersError")}</span>
@@ -302,6 +321,12 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
                     ? { kind: fileKind(x), run: () => void attach(x) }
                     : null
                 }
+                onAssumption={(index, action, text) =>
+                  decide.mutate({
+                    questionId: x.id,
+                    body: { index, action, ...(text ? { text } : {}) },
+                  })
+                }
               />
             ))}
           </ol>
@@ -328,6 +353,11 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
       ) : null}
       {regenerate.isError ? (
         <Alert tone="danger">{(regenerate.error as Error).message}</Alert>
+      ) : null}
+      {decide.isError ? (
+        <Alert tone="danger">
+          {t("motivations.failed", { detail: (decide.error as Error).message })}
+        </Alert>
       ) : null}
       {/* pedido do dono (2026-10-23): o CV e a carta da vaga ligada, para anexar, ou o botão de gerar */}
       {view === "questions" && a.postingId ? (
@@ -443,6 +473,7 @@ function QuestionItem({
   onFill,
   onAttach,
   onAsk,
+  onAssumption,
 }: {
   n: number;
   q: Question;
@@ -455,6 +486,7 @@ function QuestionItem({
   onFill: (() => void) | null;
   onAttach: { kind: DocumentKind; run: () => void } | null;
   onAsk: (() => void) | null;
+  onAssumption: AssumptionDecide;
 }) {
   const details = [
     q.options.length ? q.options.map((o) => o.label).join(" · ") : null,
@@ -488,6 +520,7 @@ function QuestionItem({
           onFill={onFill}
           onAttach={onAttach}
           onAsk={onAsk}
+          onAssumption={onAssumption}
           answering={answering}
           hasPosting={hasPosting}
         />
@@ -571,6 +604,7 @@ function Answer({
   onFill,
   onAttach,
   onAsk,
+  onAssumption,
   answering,
   hasPosting,
 }: {
@@ -581,6 +615,7 @@ function Answer({
   onFill: (() => void) | null;
   onAttach: { kind: DocumentKind; run: () => void } | null;
   onAsk: (() => void) | null;
+  onAssumption: AssumptionDecide;
   answering: boolean;
   hasPosting: boolean;
 }) {
@@ -647,11 +682,17 @@ function Answer({
           {a.assumptions.length ? (
             <>
               <span className="text-muted-fg">{t("application.assumptions")}</span>
-              <ul className="list-disc pl-4">
-                {a.assumptions.map((x) => (
-                  <li key={x}>{x}</li>
+              <ul aria-label={t("application.assumptionsList")} className="flex flex-col gap-1">
+                {a.assumptions.map((x, i) => (
+                  <AssumptionItem
+                    key={x}
+                    text={x}
+                    status={q.assumptionStatus?.[i] ?? null}
+                    onDecide={(action, text) => onAssumption(i, action, text)}
+                  />
                 ))}
               </ul>
+              <span className="text-muted-fg">{t("application.assumptionHint")}</span>
             </>
           ) : null}
         </div>
@@ -672,6 +713,96 @@ function Answer({
         onAsk={onAsk}
       />
     </div>
+  );
+}
+
+type AssumptionDecide = (index: number, action: "accept" | "refuse", text?: string) => void;
+
+/** Uma suposição do roleplay (F12-23): aceitar, editar (aceita no texto da pessoa) ou recusar; decidida mostra o estado. */
+function AssumptionItem({
+  text,
+  status,
+  onDecide,
+}: {
+  text: string;
+  status: "accepted" | "refused" | null;
+  onDecide: (action: "accept" | "refuse", text?: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (editing)
+    return (
+      <li>
+        <PhraseEditor
+          initial={assumptionAsMotivation(text)}
+          onSave={(own) => {
+            onDecide("accept", own);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      </li>
+    );
+  return (
+    <li className="flex flex-col gap-1">
+      <span>{text}</span>
+      {status ? (
+        <span>
+          <Badge tone={status === "accepted" ? "ok" : "neutral"}>
+            {status === "accepted"
+              ? t("application.assumptionAccepted")
+              : t("application.assumptionRefused")}
+          </Badge>
+        </span>
+      ) : (
+        <span className="flex flex-wrap gap-1">
+          <Button size="sm" variant="outline" onClick={() => onDecide("accept")}>
+            {t("application.assumptionAccept")}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            {t("application.assumptionEdit")}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onDecide("refuse")}>
+            {t("application.assumptionRefuse")}
+          </Button>
+        </span>
+      )}
+    </li>
+  );
+}
+
+/**
+ * F12-23: sem as motivações do perfil revisadas, a janela pergunta antes de escrever as respostas abertas; seguir libera
+ * as respostas (mesmo sem aceitar nenhuma frase).
+ */
+function MotivationsStep({ profileId, onDone }: { profileId: string; onDone: () => void }) {
+  const api = useApi();
+  const headingId = useId();
+  const review = useMutation({
+    mutationFn: () => api.reviewMotivations(profileId),
+    onSettled: onDone,
+  });
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="flex flex-col gap-2 rounded-md border border-primary/40 p-3 text-sm"
+    >
+      <h2 id={headingId} className="font-semibold">
+        {t("motivations.stepTitle")}
+      </h2>
+      <p className="text-xs text-muted-fg">{t("motivations.stepHint")}</p>
+      <AddressSelect />
+      <MotivationsEditor profileId={profileId} />
+      <span>
+        <Button size="sm" disabled={review.isPending} onClick={() => review.mutate()}>
+          {t("motivations.continue")}
+        </Button>
+      </span>
+      {review.isError ? (
+        <Alert tone="danger">
+          {t("motivations.failed", { detail: (review.error as Error).message })}
+        </Alert>
+      ) : null}
+    </section>
   );
 }
 

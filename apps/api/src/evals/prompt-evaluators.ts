@@ -12,6 +12,7 @@ import {
   literalQuotes,
   locateKinds,
   locateRefs,
+  motivationChecks,
   noInventedYears,
   pickFilesLimits,
   referenceCoverage,
@@ -231,6 +232,19 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
       impl: roleplayChecks as Rule["impl"],
     },
     lang(["answer"]),
+  ],
+  profileMotivations: (op) => [
+    schemaRule(op),
+    {
+      name: "motivacoes_conferidas",
+      description:
+        "F12-23: até a quantidade pedida, curtas, com origem no resumo, sem repetir aceitas nem recusadas e no tratamento do cadastro.",
+      module: "motivations",
+      fn: "motivationChecks",
+      config: null,
+      impl: motivationChecks as Rule["impl"],
+    },
+    lang(["text"]),
   ],
   cvGenerate: (op) => [
     schemaRule(op),

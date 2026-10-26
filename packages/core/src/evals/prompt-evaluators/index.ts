@@ -7,6 +7,7 @@ export { language } from "./language";
 export type { EvalParams, EvalResult } from "./lib";
 export { jsonOf, textOf, validateSchema } from "./lib";
 export { literalQuotes } from "./literal-quotes";
+export { motivationChecks } from "./motivations";
 export { noInventedYears } from "./no-invented-years";
 export { pickFilesLimits } from "./pick-files";
 export { referenceCoverage } from "./reference-coverage";

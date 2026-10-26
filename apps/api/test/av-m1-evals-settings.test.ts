@@ -167,7 +167,7 @@ describe("Configurações › Avaliações (/api/settings/evals)", () => {
         providerRegistered: false,
         anthropicKeySet: false,
       },
-      prompts: { count: 35, lastSync: null },
+      prompts: { count: 36, lastSync: null },
     });
   });
 

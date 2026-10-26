@@ -22,6 +22,7 @@ import {
   PostingExtractOutputSchema,
   PostingMergeOutputSchema,
 } from "./schemas/posting";
+import { ProfileMotivationsOutputSchema } from "./schemas/profile";
 
 /**
  * JSON Schema para `outputFormat: { type: "json_schema", schema }` do Agent SDK.
@@ -68,6 +69,7 @@ export const APPLICATION_OUTPUT_JSON_SCHEMAS = {
   applicationLocate: toJsonSchema(ApplicationLocateOutputSchema),
   applicationAnswer: toJsonSchema(ApplicationAnswerOutputSchema),
   applicationRoleplay: toJsonSchema(ApplicationRoleplayOutputSchema),
+  profileMotivations: toJsonSchema(ProfileMotivationsOutputSchema),
 } as const;
 
 /** Saídas do gerador da F05 (conteúdo do CV e da carta; o código monta o resto). */

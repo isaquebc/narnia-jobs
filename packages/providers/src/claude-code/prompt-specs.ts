@@ -24,6 +24,7 @@ import type {
   PostingDuplicateInput,
   PostingExtractInput,
   PostingMergeInput,
+  ProfileMotivationsInput,
   ReadDocumentInput,
   SynthesizeRunInput,
 } from "../provider";
@@ -219,6 +220,17 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.applicationRoleplay,
     tools: [],
   }),
+  profileMotivations: spec("profileMotivations", {
+    name: "narnia-profile-motivations",
+    description:
+      "F12-23: frases curtas sobre o que move a pessoa, sugeridas pelo histórico do perfil, para ela aceitar, editar ou recusar.",
+    file: FILE("profile-motivations"),
+    userTemplate:
+      "<tratamento>{{address}}</tratamento>\n\n<quantas>{{count}}</quantas>\n\n<resumo>\n{{brief_json}}\n</resumo>\n\n<aceitas>\n{{accepted_json}}\n</aceitas>\n\n<recusadas>\n{{refused_json}}\n</recusadas>",
+    defaultModel: "sonnet",
+    jsonSchema: APPLICATION_OUTPUT_JSON_SCHEMAS.profileMotivations,
+    tools: [],
+  }),
   cvGenerate: spec("cvGenerate", {
     name: "narnia-cv-generate",
     description:
@@ -324,6 +336,13 @@ export const structuredPromptVars = {
     company_json: JSON.stringify(i.company, null, 1),
     voice_json: JSON.stringify(i.voice, null, 1),
     questions_json: JSON.stringify(i.questions, null, 1),
+  }),
+  profileMotivations: (i: ProfileMotivationsInput) => ({
+    address: i.address,
+    count: String(i.count),
+    brief_json: JSON.stringify(i.brief, null, 1),
+    accepted_json: JSON.stringify(i.accepted, null, 1),
+    refused_json: JSON.stringify(i.refused, null, 1),
   }),
   cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
   coverLetterGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),

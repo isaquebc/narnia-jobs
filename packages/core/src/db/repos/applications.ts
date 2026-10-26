@@ -1,4 +1,9 @@
-import type { ApplicationAnswer, ApplicationQuestion, FormField } from "@narnia-jobs/shared";
+import type {
+  AnswersStatus,
+  ApplicationAnswer,
+  ApplicationQuestion,
+  FormField,
+} from "@narnia-jobs/shared";
 import { newId } from "../../ids";
 import type { Db } from "../open";
 import { json, type Row, str } from "../sql";
@@ -16,7 +21,7 @@ export interface ApplicationFormRecord {
   status: "locating" | "ready" | "error";
   error: string | null;
   /** Geração das respostas (F12/M4). */
-  answersStatus: "idle" | "answering" | "ready" | "error";
+  answersStatus: AnswersStatus;
   answersError: string | null;
   /** Conversa do formulário com o recrutador (F12/M5), criada na primeira mensagem. */
   chatSessionId: string | null;
@@ -35,6 +40,8 @@ export interface ApplicationsRepo {
   get(id: string): ApplicationFormRecord | null;
   /** Os mais recentes primeiro (modo B: achar o formulário pela conversa no terminal). */
   listRecent(limit: number): ApplicationFormRecord[];
+  /** Formulários num estado das respostas (F12-23: os que esperam as motivações do perfil). */
+  withAnswersStatus(status: AnswersStatus): ApplicationFormRecord[];
   byCapture(captureId: string): ApplicationFormRecord | null;
   /**
    * Perguntas organizadas: o formulário fica pronto. `warning` (o modelo falhou e as perguntas saíram pelos rótulos)
@@ -139,6 +146,13 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
       db.prepare(
         "update application_form set status = 'error', error = ?, updated_at = ? where id = ?",
       ).run(error, now.toISOString(), id);
+    },
+    withAnswersStatus(status) {
+      return (
+        db
+          .prepare("select * from application_form where answers_status = ? order by updated_at")
+          .all(status) as Row[]
+      ).map(map);
     },
     listRecent(limit) {
       return (

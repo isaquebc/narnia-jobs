@@ -1,5 +1,5 @@
 import { PhoneError, parsePhone, type Repos, trackInvalidation } from "@narnia-jobs/core";
-import { UserUpsertRequestSchema } from "@narnia-jobs/shared";
+import { AddressFormSchema, UserUpsertRequestSchema } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { apiError } from "../errors";
@@ -35,6 +35,13 @@ export function userRoutes(deps: { repos: Repos; bus: EventBus }) {
       }),
     );
     emitInvalidated(deps.bus, flipped);
+    return c.json({ user });
+  });
+  // F12-23: como o narnia se refere à pessoa (roleplay e motivações); nunca deduzido do nome
+  app.put("/api/user/address", validate("json", z.object({ address: AddressFormSchema })), (c) => {
+    if (!deps.repos.users.get())
+      return apiError(c, 404, "user_not_found", "Cadastro não encontrado");
+    const user = deps.repos.users.upsert({ pronouns: c.req.valid("json").address });
     return c.json({ user });
   });
   // F05-19: atalho do CV para cadastrar o link que falta (LinkedIn, GitHub, portfólio) sem refazer o cadastro inteiro

@@ -91,6 +91,7 @@ export {
   type PostingExtractInput,
   type PostingMergeInput,
   type ProfileExperienceRef,
+  type ProfileMotivationsInput,
   type Provider,
   ProviderError,
   type ProviderErrorCode,

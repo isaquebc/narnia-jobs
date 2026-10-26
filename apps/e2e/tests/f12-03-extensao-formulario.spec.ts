@@ -69,7 +69,7 @@ async function pair(page: Page, extensionId: string) {
   await options.close();
 }
 
-test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar, preencher, respostas e CV anexado", async () => {
+test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar, preencher, motivações, respostas e CV anexado", async () => {
   test.setTimeout(240_000);
   await freshStart("engineer");
   const ext = join(dir, "dist");
@@ -171,11 +171,31 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar,
   await popup
     .getByRole("combobox", { name: "Vaga salva" })
     .selectOption({ label: "Engenheira Backend Sênior · Acme Pagamentos" });
+  // F12-23: o perfil ainda não tem motivações; antes das respostas, a janela sugere frases pelo histórico (mock)
+  const step = popup.getByRole("region", { name: "Antes das respostas: o que te move" });
+  const phrases = step.getByRole("list", { name: "Motivações" }).getByRole("listitem");
+  await expect(phrases.first()).toBeVisible({ timeout: 60_000 });
+  const before = await phrases.count();
+  await phrases.first().getByRole("button", { name: "Aceitar" }).click();
+  await expect(phrases.first()).toContainText("Aceita");
+  // recusada: fica guardada e outra vem no lugar
+  await phrases.nth(1).getByRole("button", { name: "Recusar" }).click();
+  await expect(step.getByText("1 recusada(s)")).toBeVisible();
+  await expect(phrases).toHaveCount(before, { timeout: 60_000 });
+  await step
+    .getByRole("combobox", { name: "Como o narnia se refere a você" })
+    .selectOption("feminino");
+  await step.getByRole("button", { name: "Escrever as respostas" }).click();
+  await expect(step).toBeHidden({ timeout: 30_000 });
   // F12-18/19: a pergunta aberta vem do roleplay (com as suposições) e a pessoa edita antes de preencher
   const motivo = popup.getByLabel("Resposta: Por que você quer trabalhar na Acme?");
   await expect(motivo).toHaveValue(/Quero trabalhar na Acme Pagamentos/, { timeout: 60_000 });
   await expect(items.nth(2)).toContainText("Escrita como você");
   await expect(items.nth(2)).toContainText("Confira antes de preencher (o narnia supôs):");
+  // F12-23: a suposição aceita vai para as motivações do perfil
+  const assumptions = items.nth(2).getByRole("list", { name: "O que o narnia supôs" });
+  await assumptions.getByRole("button", { name: "Aceitar" }).first().click();
+  await expect(assumptions.getByText("Aceita")).toBeVisible();
   await expect(items.nth(3)).toContainText("Sim");
   await motivo.fill("Quero trabalhar na Acme porque pagamentos é o que eu faço melhor.");
   await motivo.blur();

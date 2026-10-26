@@ -110,3 +110,38 @@ export function requireCareerFields(p: CareerFields, ctx: z.RefinementCtx): void
 export const ProfileSchema = ProfileBaseSchema.superRefine(requireCareerFields);
 export type Profile = z.infer<typeof ProfileSchema>;
 export type ProfileInput = z.input<typeof ProfileSchema>;
+
+/**
+ * Motivações do perfil (F12-23): frases curtas sobre o que move a pessoa. `suggested` espera a decisão dela; `refused`
+ * fica guardada para não voltar. Origem: sugerida pelo modelo, escrita pela pessoa ou suposição do roleplay aceita.
+ */
+export const MOTIVATION_STATUSES = ["suggested", "accepted", "refused"] as const;
+export const MotivationStatusSchema = z.enum(MOTIVATION_STATUSES);
+export type MotivationStatus = z.infer<typeof MotivationStatusSchema>;
+export const MOTIVATION_SOURCES = ["model", "user", "assumption"] as const;
+export const MotivationSourceSchema = z.enum(MOTIVATION_SOURCES);
+export type MotivationSource = z.infer<typeof MotivationSourceSchema>;
+
+export const ProfileMotivationSchema = z.object({
+  id: z.string(),
+  profileId: z.string(),
+  text: z.string(),
+  status: MotivationStatusSchema,
+  source: MotivationSourceSchema,
+  /** Suposição do roleplay que originou a frase (aceita ou recusada na janela do formulário). */
+  assumption: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type ProfileMotivation = z.infer<typeof ProfileMotivationSchema>;
+
+/** Forma de tratamento (F12-23): do cadastro (`pronouns`), nunca deduzida do nome; sem escolha, neutra. */
+export const ADDRESS_FORMS = ["feminino", "masculino", "neutro"] as const;
+export const AddressFormSchema = z.enum(ADDRESS_FORMS);
+export type AddressForm = z.infer<typeof AddressFormSchema>;
+
+/** Saída do `narnia-profile-motivations`: frases novas, com os ids curtos do histórico que as sustentam. */
+export const ProfileMotivationsOutputSchema = z.object({
+  motivations: z.array(z.object({ text: z.string(), origins: z.array(z.string()) })),
+});
+export type ProfileMotivationsOutput = z.infer<typeof ProfileMotivationsOutputSchema>;

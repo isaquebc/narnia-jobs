@@ -22,6 +22,7 @@ export const PROMPTS = {
   applicationLocate: () => loadPrompt("application-locate"),
   applicationAnswer: () => loadPrompt("application-answer"),
   applicationRoleplay: () => loadPrompt("application-roleplay"),
+  profileMotivations: () => loadPrompt("profile-motivations"),
   cvGenerate: () => loadPrompt("cv-generate"),
   coverLetterGenerate: () => loadPrompt("cover-letter-generate"),
   cvReview: () => loadPrompt("cv-review"),

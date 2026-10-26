@@ -16,7 +16,9 @@ describe("F12-12 · autodeclaração guardada", () => {
   it("guarda por assunto (a mais nova vale), lista e apaga; 0024 entra sobre o banco anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0023_application_chat" });
-    expect(migrate(db).applied).toEqual(["0024_self_declaration"]);
+    expect(migrate(db, { until: "0024_self_declaration" }).applied).toEqual([
+      "0024_self_declaration",
+    ]);
     const repos = createRepos(db);
     expect(repos.selfDeclarations.get("race")).toBeNull();
     repos.selfDeclarations.set("race", "Parda");

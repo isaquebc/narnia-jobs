@@ -1,6 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { MotivationsSection } from "../../../src/features/profiles/MotivationsEditor";
 import { PersonaOverrides } from "../../../src/features/profiles/PersonaOverrides";
 import { PitchEditor } from "../../../src/features/profiles/PitchEditor";
 import { ProfileCardView } from "../../../src/features/profiles/ProfileCardView";
@@ -37,6 +38,46 @@ describe("PitchEditor · narrativa (F02 §4)", () => {
       expect(patchProfile).toHaveBeenCalledWith("p1", { pitch: "Linha 1\nLinha 2" }),
     );
     expect(await screen.findByText("Narrativa salva.")).toBeInTheDocument();
+  });
+});
+
+describe("MotivationsSection · o que te move (F12-23)", () => {
+  it("na narrativa: as aceitas e as sugestões, pedir mais sugestões e o tratamento", async () => {
+    const suggestMotivations = vi.fn(async () => ({ job: null }));
+    renderWithProviders(<MotivationsSection profileId="p1" />, {
+      api: {
+        listMotivations: async () => ({
+          items: [
+            {
+              id: "m1",
+              profileId: "p1",
+              text: "Quero continuar trabalhando com pagamentos.",
+              status: "accepted",
+              source: "model",
+              assumption: null,
+              createdAt: "t",
+              updatedAt: "t",
+            },
+          ],
+          reviewed: true,
+          suggesting: false,
+        }),
+        suggestMotivations,
+        getUser: async () => ({ user: { pronouns: "masculino" } }) as never,
+      } as Partial<ApiClient>,
+    });
+    expect(await screen.findByRole("heading", { name: "O que te move" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Quero continuar trabalhando com pagamentos."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Aceita")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Como o narnia se refere a você" })).toHaveValue(
+        "masculino",
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Sugerir mais" }));
+    expect(suggestMotivations).toHaveBeenCalledWith("p1");
   });
 });
 

@@ -24,11 +24,13 @@ const field = (ref: string, over: Partial<FormField> = {}): FormField => ({
   ...over,
 });
 
-function harness(provider = new MockProvider()) {
+function harness(provider = new MockProvider(), opts: { reviewed?: boolean } = {}) {
   const db = openDatabase(":memory:");
   migrate(db);
   const repos: Repos = createRepos(db);
-  seedFixture(repos, "engineer");
+  const { profileId } = seedFixture(repos, "engineer");
+  // F12-23: os testes das respostas partem do perfil com as motivações já revisadas
+  if (opts.reviewed !== false) repos.profileMotivations.markReviewed(profileId);
   const dataDir = mkdtempSync(join(tmpdir(), "narnia-worker-answer-"));
   const published: WsEvent[] = [];
   const enqueued: string[] = [];
@@ -206,5 +208,185 @@ describe("F12/M4 worker · application.answer", () => {
       answersStatus: "error",
       answersError: expect.stringMatching(/modelo fora do ar/),
     });
+  });
+});
+
+/**
+ * F12-23 · motivações do perfil antes das respostas: com pergunta aberta e o perfil sem motivações revisadas, o worker
+ * não escreve e pede as sugestões; com elas, o roleplay recebe as aceitas e o tratamento do cadastro.
+ */
+describe("F12-23 worker · motivações do perfil", () => {
+  let h: ReturnType<typeof harness>;
+  afterEach(() => h?.cleanup());
+  const openForm = () => {
+    const p = h.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    return h.repos.applications.create({
+      captureId: "c1",
+      postingId: p.id,
+      profileId: h.repos.profiles.active()?.id ?? null,
+      url: "https://acme.example/aplicar",
+      title: "Candidatura",
+      fields: [field("f2", { control: "textarea", label: "Por que você quer trabalhar aqui?" })],
+    });
+  };
+  const profileId = () => h.repos.profiles.active()?.id as string;
+
+  it("perfil sem motivações revisadas: não escreve, marca a espera e pede as sugestões", async () => {
+    h = harness(new MockProvider(), { reviewed: false });
+    const f = openForm();
+    await run(h, "application.locate", f.id);
+    h.enqueued.length = 0;
+    expect(await run(h, "application.answer", f.id)).toMatchObject({ waiting: "motivations" });
+    expect(h.repos.applications.get(f.id)?.answersStatus).toBe("motivations");
+    expect(h.repos.applications.latestAnswers(f.id)).toEqual([]);
+    expect(h.enqueued).toEqual(["profile.motivations"]);
+    // sugestões já na espera: não pede de novo
+    h.repos.profileMotivations.add({
+      profileId: profileId(),
+      text: "Quero continuar em pagamentos.",
+      status: "suggested",
+      source: "model",
+    });
+    h.enqueued.length = 0;
+    await run(h, "application.answer", f.id);
+    expect(h.enqueued).toEqual([]);
+  });
+
+  it("sem pergunta aberta, não espera: as respostas de fato saem", async () => {
+    h = harness(new MockProvider(), { reviewed: false });
+    const p = h.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    const f = h.repos.applications.create({
+      captureId: "c1",
+      postingId: p.id,
+      profileId: h.repos.profiles.active()?.id ?? null,
+      url: "https://acme.example/aplicar",
+      title: "Candidatura",
+      fields: [
+        field("f3", {
+          control: "select",
+          label: "Quando pode começar?",
+          options: [{ value: "1", label: "Imediato" }],
+        }),
+      ],
+    });
+    await run(h, "application.locate", f.id);
+    await run(h, "application.answer", f.id);
+    expect(h.repos.applications.get(f.id)?.answersStatus).toBe("ready");
+  });
+
+  it("tarefa profile.motivations: guarda as sugestões (sem as recusadas) e avisa a janela", async () => {
+    const provider = new MockProvider();
+    const spy = vi.spyOn(provider, "profileMotivations");
+    h = harness(provider, { reviewed: false });
+    h.repos.users.upsert({ pronouns: "ela/dela" });
+    const refused = h.repos.profileMotivations.add({
+      profileId: profileId(),
+      text: "Prefiro times pequenos, com autonomia.",
+      status: "refused",
+      source: "model",
+    });
+    await processTask(
+      { kind: "task", type: "profile.motivations", key: "k", payload: { profileId: profileId() } },
+      h.ctx,
+      h.deps,
+    );
+    const input = spy.mock.calls[0]?.[0];
+    expect(input).toMatchObject({ address: "feminino", refused: [refused.text], count: 4 });
+    expect(input?.brief.posting).toBeNull();
+    const list = h.repos.profileMotivations.list(profileId());
+    const suggested = list.filter((m) => m.status === "suggested");
+    expect(suggested.length).toBeGreaterThan(0);
+    expect(suggested.length).toBeLessThanOrEqual(4);
+    expect(suggested.every((m) => m.source === "model")).toBe(true);
+    expect(suggested.map((m) => m.text)).not.toContain(refused.text);
+    expect(h.published).toContainEqual({
+      type: "profile.motivations.updated",
+      profileId: profileId(),
+    });
+    // pedido de uma no lugar de uma recusada
+    spy.mockClear();
+    await processTask(
+      {
+        kind: "task",
+        type: "profile.motivations",
+        key: "k2",
+        payload: { profileId: profileId(), count: 1 },
+      },
+      h.ctx,
+      h.deps,
+    );
+    expect(spy.mock.calls[0]?.[0].count).toBe(1);
+    // as sugestões ainda pendentes também vão ao modelo (não repetir): uma nova chega no lugar
+    expect(spy.mock.calls[0]?.[0].accepted).toEqual(
+      expect.arrayContaining(suggested.map((m) => m.text)),
+    );
+    expect(h.repos.profileMotivations.list(profileId()).length).toBe(list.length + 1);
+  });
+
+  it("revisadas: o roleplay recebe as aceitas, as recusadas e o tratamento (sem cadastro, neutro)", async () => {
+    const provider = new MockProvider();
+    const roleplay = vi.spyOn(provider, "applicationRoleplay");
+    h = harness(provider, { reviewed: false });
+    h.repos.profileMotivations.add({
+      profileId: profileId(),
+      text: "Quero continuar trabalhando com pagamentos.",
+      status: "accepted",
+      source: "model",
+    });
+    h.repos.profileMotivations.add({
+      profileId: profileId(),
+      text: "Gosto de ser dona dos serviços.",
+      status: "refused",
+      source: "assumption",
+    });
+    const f = openForm();
+    await run(h, "application.locate", f.id);
+    await run(h, "application.answer", f.id);
+    expect(roleplay.mock.calls[0]?.[0].person).toMatchObject({
+      address: "neutro",
+      motivations: ["Quero continuar trabalhando com pagamentos."],
+      refusedMotivations: ["Gosto de ser dona dos serviços."],
+    });
+  });
+
+  it("suposição recusada: refaz só a pergunta dela (questionIds); as outras ficam", async () => {
+    const provider = new MockProvider();
+    const answer = vi.spyOn(provider, "applicationAnswer");
+    h = harness(provider);
+    const p = h.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    const f = h.repos.applications.create({
+      captureId: "c1",
+      postingId: p.id,
+      profileId: h.repos.profiles.active()?.id ?? null,
+      url: "https://acme.example/aplicar",
+      title: "Candidatura",
+      fields: [
+        field("f2", { control: "textarea", label: "Por que você quer trabalhar aqui?" }),
+        field("f3", {
+          control: "select",
+          label: "Quando pode começar?",
+          options: [{ value: "1", label: "Imediato" }],
+        }),
+      ],
+    });
+    await run(h, "application.locate", f.id);
+    await run(h, "application.answer", f.id);
+    const open = h.repos.applications.get(f.id)?.questions.find((q) => q.fieldRefs[0] === "f2");
+    answer.mockClear();
+    await processTask(
+      {
+        kind: "task",
+        type: "application.answer",
+        key: "k",
+        payload: { applicationId: f.id, questionIds: [open?.id] },
+      },
+      h.ctx,
+      h.deps,
+    );
+    expect(answer).not.toHaveBeenCalled();
+    const latest = h.repos.applications.latestAnswers(f.id);
+    expect(latest.find((a) => a.questionId === open?.id)?.version).toBe(2);
+    expect(latest.find((a) => a.questionId !== open?.id)?.version).toBe(1);
+    expect(h.repos.applications.get(f.id)?.answersStatus).toBe("ready");
   });
 });

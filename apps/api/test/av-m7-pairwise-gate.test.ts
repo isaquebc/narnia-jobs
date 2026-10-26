@@ -606,3 +606,59 @@ describe("gate robusto (2026-10-25) · casos afetados, amostras e ruído", () =>
     expect(g.record("chat:juiz", { media: 0.6 })).toHaveLength(1);
   });
 });
+
+/**
+ * Aprovação do dono (2026-10-26): quando o gate reprova e o dono aprova explicitamente na conversa, `--owner-approved`
+ * grava a linha de base e as versões aprovadas mesmo com regressão ou sem upgrade (com o motivo no log). Rodada
+ * incompleta continua sem gravar nada.
+ */
+describe("aprovação do dono (--owner-approved)", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  const KEY = "narnia-application-roleplay";
+  const setup = () => {
+    const d = mkdtempSync(join(tmpdir(), "narnia-dono-"));
+    dirs.push(d);
+    mkdirSync(join(d, "approved"));
+    writeFileSync(
+      join(d, "approved", `${KEY}.jsonl`),
+      serializeApproved([approvedCase("a", "v1")]),
+    );
+    const path = join(d, "baselines.json");
+    writeFileSync(path, JSON.stringify({ [KEY]: { scores: { padrao: 1 }, updatedAt: "t" } }));
+    return { path, file: join(d, "approved", `${KEY}.jsonl`) };
+  };
+
+  it("entra nas flags só quando passada", () => {
+    expect(gateFlags(["--update-baseline", "--owner-approved"]).ownerApproved).toBe(true);
+    expect(gateFlags(["--update-baseline"]).ownerApproved).toBeUndefined();
+  });
+
+  it("com regressão e sem upgrade, grava linha de base e aprovada e diz o que foi aprovado apesar do gate", async () => {
+    const { path, file } = setup();
+    const g = new BaselineGate({ gate: true, update: true, fixes: [], ownerApproved: true }, path);
+    g.record(KEY, { padrao: 0.86 }, { versionId: "v2" });
+    await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: contentJudge().provider,
+      runs: [run("a", "candidata PERDE")],
+    });
+    const log: string[] = [];
+    expect(g.finish((l) => log.push(l))).toBe(false);
+    expect(log.join("\n")).toMatch(/Aprovado pelo dono apesar de/);
+    expect(JSON.parse(readFileSync(path, "utf8"))[KEY].scores).toEqual({ padrao: 0.86 });
+    expect(parseApproved(readFileSync(file, "utf8"))[0]?.versionId).toBe("v2");
+  });
+
+  it("rodada incompleta não grava, nem com a aprovação do dono", () => {
+    const { path } = setup();
+    const g = new BaselineGate({ gate: true, update: true, fixes: [], ownerApproved: true }, path);
+    g.record(KEY, { padrao: 0.9 }, { versionId: "v2", errors: 1 });
+    expect(g.finish(() => undefined)).toBe(true);
+    expect(JSON.parse(readFileSync(path, "utf8"))[KEY].scores).toEqual({ padrao: 1 });
+  });
+});

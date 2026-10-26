@@ -1,4 +1,5 @@
 import type {
+  AddressForm,
   AnalyzeEstimateResponse,
   AnalyzeRequest,
   ApplicationFormView,
@@ -44,6 +45,7 @@ import type {
   IngestSettingsSchema,
   Job,
   JobAnalysis,
+  MotivationStatus,
   NotificationsListResponse,
   OnboardingState,
   Paper,
@@ -60,6 +62,7 @@ import type {
   Profile,
   ProfileCardResponse,
   ProfileCreateRequest,
+  ProfileMotivation,
   ProfilePatchRequest,
   ProfileSuggestionResponseSchema,
   ProviderStatusResponse,
@@ -312,6 +315,56 @@ export function createApiClient(opts: ApiClientOptions = {}) {
           body: JSON.stringify({ answer }),
         },
       ),
+    /** F12-23: suposição do roleplay aceita (vira motivação do perfil) ou recusada (refaz a pergunta). */
+    decideAssumption: (
+      id: string,
+      questionId: string,
+      body: { index: number; action: "accept" | "refuse"; text?: string },
+    ) =>
+      request<{ application: ApplicationFormView }>(
+        `/api/applications/${encodeURIComponent(id)}/answers/${encodeURIComponent(questionId)}/assumptions`,
+        json(body),
+      ),
+    /** F12-23: motivações do perfil, decididas pela pessoa. */
+    listMotivations: (profileId: string) =>
+      request<{ items: ProfileMotivation[]; reviewed: boolean; suggesting: boolean }>(
+        `/api/profiles/${encodeURIComponent(profileId)}/motivations`,
+      ),
+    suggestMotivations: (profileId: string) =>
+      request<{ job: Job | null }>(
+        `/api/profiles/${encodeURIComponent(profileId)}/motivations/suggest`,
+        { method: "POST" },
+      ),
+    addMotivation: (profileId: string, text: string) =>
+      request<{ motivation: ProfileMotivation }>(
+        `/api/profiles/${encodeURIComponent(profileId)}/motivations`,
+        json({ text }),
+      ),
+    patchMotivation: (
+      profileId: string,
+      id: string,
+      patch: { text?: string; status?: MotivationStatus },
+    ) =>
+      request<{ motivation: ProfileMotivation }>(
+        `/api/profiles/${encodeURIComponent(profileId)}/motivations/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      ),
+    reviewMotivations: (profileId: string) =>
+      request<{ reviewed: boolean }>(
+        `/api/profiles/${encodeURIComponent(profileId)}/motivations/review`,
+        { method: "POST" },
+      ),
+    /** F12-23: como o narnia se refere à pessoa (nunca pelo nome). */
+    setAddressForm: (address: AddressForm) =>
+      request<{ user: User }>("/api/user/address", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address }),
+      }),
     relocateApplication: (id: string) =>
       request<{ job: Job | null }>(`/api/applications/${encodeURIComponent(id)}/locate`, {
         method: "POST",

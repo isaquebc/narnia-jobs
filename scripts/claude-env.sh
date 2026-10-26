@@ -115,6 +115,7 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   exec CMD [ARGS…] roda um comando no container de dev da instância (ex.: exec pnpm --filter @narnia-jobs/core exec vitest run x)
   evals [chat] [id…] [--strict]  conversas de referência (evals/chat) num banco temporário isolado; Phoenix :${NARNIA_PHOENIX_PORT:-6106}
   evals chat --gate|--update-baseline [--samples=N]  pairwise só nos casos com dependência mudada, N amostras (5) somadas; --noise mede o ruído por amostra (A contra A, 3); --feature=id,… não-inferioridade para casos novos
+  evals … --update-baseline --owner-approved  grava apesar do gate, só com aprovação explícita do dono
   evals prompts|pdf|cv-review|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, revisor do CV, ou tudo (mock = smoke; real só a pedido)
   evals calibration [id…] [--strict]  calibração dos juízes: falsos positivos e negativos em respostas rotuladas (evals/calibration)
   wipe             remove containers, volumes e ./.claude-data da instância

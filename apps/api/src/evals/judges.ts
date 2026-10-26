@@ -56,6 +56,14 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
     perguntas: "input.questions_json",
     resposta: OUTPUT,
   },
+  profileMotivations: {
+    tratamento: "input.address",
+    quantas: "input.count",
+    resumo: "input.brief_json",
+    aceitas: "input.accepted_json",
+    recusadas: "input.refused_json",
+    resposta: OUTPUT,
+  },
   cvGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   coverLetterGenerate: { resumo: "input.brief_json", resposta: OUTPUT },
   cvReview: {

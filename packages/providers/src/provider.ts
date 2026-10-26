@@ -1,4 +1,5 @@
 import type {
+  AddressForm,
   AnalyzeProfilesInput,
   AnalyzeProfilesOutput,
   AnalyzeRepoOutput,
@@ -21,6 +22,7 @@ import type {
   PostingExtractOutput,
   PostingFields,
   PostingMergeOutput,
+  ProfileMotivationsOutput,
   ReadDocumentOutput,
   RepoReport,
   SynthesizeRunOutput,
@@ -185,6 +187,19 @@ export interface ApplicationAnswerInput {
 }
 
 /**
+ * F12-23: frases curtas sobre o que move a pessoa, sugeridas pelo histórico do perfil (resumo sem vaga, ids curtos),
+ * no tratamento do cadastro, sem repetir as que ela já aceitou nem as que recusou.
+ */
+export interface ProfileMotivationsInput {
+  brief: CvBrief;
+  address: AddressForm;
+  accepted: string[];
+  refused: string[];
+  count: number;
+  model: string;
+}
+
+/**
  * F12-18: perguntas abertas escritas como a pessoa (roleplay), com o resumo do CV (ids curtos), a empresa, a descrição
  * da vaga e amostras do jeito como a pessoa escreve (textos que ela editou em outros formulários).
  */
@@ -271,6 +286,10 @@ export interface Provider {
   applicationRoleplay(
     input: ApplicationRoleplayInput,
   ): Promise<ProviderResult<ApplicationRoleplayOutput>>;
+  /** F12-23: motivações do perfil sugeridas pelo histórico (Sonnet). */
+  profileMotivations(
+    input: ProfileMotivationsInput,
+  ): Promise<ProviderResult<ProfileMotivationsOutput>>;
   /** F05: conteúdo do CV e da carta de apresentação (Sonnet). */
   cvGenerate(input: CvGenerateInput): Promise<ProviderResult<CvDraft>>;
   coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;

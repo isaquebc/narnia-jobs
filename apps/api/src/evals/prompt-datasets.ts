@@ -15,6 +15,7 @@ import type {
   PostingDuplicateInput,
   PostingExtractInput,
   PostingMergeInput,
+  ProfileMotivationsInput,
   ReadDocumentInput,
   StructuredOperation,
   SynthesizeRunInput,
@@ -46,6 +47,7 @@ type Input<Op extends StructuredOperation> = Omit<
     applicationLocate: ApplicationLocateInput;
     applicationAnswer: ApplicationAnswerInput;
     applicationRoleplay: ApplicationRoleplayInput;
+    profileMotivations: ProfileMotivationsInput;
     cvGenerate: CvGenerateInput;
     coverLetterGenerate: CvGenerateInput;
     cvReview: CvReviewInput;
@@ -806,6 +808,53 @@ const NO_ANCHOR_BRIEF = (): CvBrief =>
   }).brief;
 
 export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[] } = {
+  profileMotivations: [
+    {
+      id: "historico-neutro",
+      description:
+        "F12-23: perfil sem motivações e sem tratamento escolhido: quatro frases pelo histórico (pagamentos, desempenho, mentoria, liderança técnica), com origem e sem marcar gênero.",
+      input: {
+        brief: ANSWER_BRIEF(),
+        address: "neutro",
+        accepted: [],
+        refused: [],
+        count: 4,
+      },
+      reference: { min: 3 },
+    },
+    {
+      id: "recusada-nao-volta",
+      description:
+        "Uma aceita e duas recusadas (ser dona dos serviços, startup): duas frases novas, sem repetir nem insistir nos temas recusados.",
+      input: {
+        brief: ANSWER_BRIEF(),
+        address: "feminino",
+        accepted: ["Quero continuar trabalhando com pagamentos."],
+        refused: [
+          "Gosto de ser dona dos serviços de ponta a ponta.",
+          "Quero trabalhar em uma startup.",
+        ],
+        count: 2,
+      },
+      reference: { min: 1, avoid: ["startup", "ponta a ponta"] },
+    },
+    {
+      id: "masculino-uma-frase",
+      description:
+        "Tratamento masculino e uma frase só (a pessoa recusou uma e o narnia pede outra no lugar).",
+      input: {
+        brief: ANSWER_BRIEF(),
+        address: "masculino",
+        accepted: [
+          "Quero continuar trabalhando com pagamentos.",
+          "Gosto de resolver problemas de desempenho.",
+        ],
+        refused: ["Gosto de mentorar pessoas."],
+        count: 1,
+      },
+      reference: { min: 1, avoid: ["mentor"] },
+    },
+  ],
   applicationRoleplay: [
     {
       id: "vitalis-motivacao",
@@ -897,6 +946,48 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
         questions: [aq("q1", "Por que esta vaga?", "long_text", { maxChars: 600 })],
       },
       reference: { answered: ["q1"], avoid: ["Lisboa", "15 anos", "Diretora de Tecnologia"] },
+    },
+    {
+      id: "tratamento-neutro",
+      description:
+        "F12-23: sem tratamento escolhido (neutro) e sem motivações no perfil: o texto em português e as suposições não marcam gênero (nada de 'ser dona').",
+      input: {
+        brief: ANSWER_BRIEF(GLOBEX),
+        person: { ...PERSON, address: "neutro", motivations: [], refusedMotivations: [] },
+        company: {
+          summary: "A Globex faz a plataforma de pagamentos de varejistas no Brasil.",
+          url: null,
+          description: null,
+        },
+        voice: [],
+        locale: "pt-BR",
+        questions: [
+          aq("q1", "Por que você quer trabalhar na Globex?", "long_text", { maxChars: 600 }),
+        ],
+      },
+      reference: { answered: ["q1"], assumes: ["q1"], mention: { q1: ["Globex"] } },
+    },
+    {
+      id: "motivacoes-aceitas",
+      description:
+        "F12-23: com motivações aceitas (pagamentos, desempenho) e uma recusada (startup): o texto usa as aceitas como dado, não as repete como suposição e não fala de startup.",
+      input: {
+        brief: ANSWER_BRIEF(VITALIS, "en-US"),
+        person: {
+          ...PERSON,
+          address: "feminino",
+          motivations: [
+            "Quero continuar trabalhando com pagamentos.",
+            "Gosto de resolver problemas de desempenho.",
+          ],
+          refusedMotivations: ["Quero trabalhar em uma startup."],
+        },
+        company: VITALIS_COMPANY,
+        voice: [],
+        locale: "en-US",
+        questions: [aq("q1", "What excites you about this role?", "long_text", { maxChars: 700 })],
+      },
+      reference: { answered: ["q1"], avoid: ["startup"] },
     },
   ],
   applicationAnswer: [

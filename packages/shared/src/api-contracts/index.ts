@@ -53,6 +53,7 @@ import { PersonaOverridesSchema, PersonaSchema } from "../schemas/persona";
 import {
   ContractTypeSchema,
   LocationPrefSchema,
+  MotivationStatusSchema,
   ProfileBaseSchema,
   ProfileSchema,
   ResearchableFieldSchema,
@@ -891,11 +892,15 @@ export const ApplicationFormViewSchema = z.object({
       prefill: z.string().nullable(),
       /** Resposta sugerida mais nova (F12/M4), com a origem ou a lacuna. */
       answer: ApplicationAnswerSchema.nullable(),
+      /** Decisão da pessoa sobre cada suposição da resposta (F12-23), na mesma ordem; `null` = ainda não decidiu. */
+      assumptionStatus: z.array(z.enum(["accepted", "refused"]).nullable()),
     }),
   ),
   /** Geração das respostas (F12/M4): só com a vaga ligada (F12-11). */
   answersStatus: AnswersStatusSchema,
   answersError: z.string().nullable(),
+  /** Perfil das respostas (F12-23): o das motivações que a janela pede antes de escrever. */
+  answersProfileId: z.string().nullable(),
   /** Conversa do formulário com o recrutador (F12/M5): nasce na primeira mensagem. */
   chatSessionId: z.string().nullable(),
   createdAt: z.string(),
@@ -904,6 +909,18 @@ export const ApplicationFormViewSchema = z.object({
 export type ApplicationFormView = z.infer<typeof ApplicationFormViewSchema>;
 /** Ligar o formulário a uma vaga salva (ou desligar, `null`) na janela. */
 export const ApplicationPatchSchema = z.object({ postingId: z.string().min(1).nullable() });
+/** Motivações do perfil (F12-23): frase escrita pela pessoa, edição ou decisão. */
+const MotivationTextSchema = z.string().trim().min(1).max(140);
+export const MotivationCreateSchema = z.object({ text: MotivationTextSchema });
+export const MotivationPatchSchema = z
+  .object({ text: MotivationTextSchema.optional(), status: MotivationStatusSchema.optional() })
+  .refine((p) => p.text !== undefined || p.status !== undefined, "Mande o texto ou o estado.");
+/** Decisão sobre uma suposição do roleplay na janela (F12-23): aceitar (com o texto dela, se editou) ou recusar. */
+export const AssumptionDecisionSchema = z.object({
+  index: z.number().int().min(0),
+  action: z.enum(["accept", "refuse"]),
+  text: MotivationTextSchema.optional(),
+});
 /** A pessoa editou a resposta na janela antes de preencher (F12-19): vira uma versão `edited`. */
 export const ApplicationAnswerEditSchema = z.object({
   answer: z.string().trim().min(1).max(20000),
@@ -924,6 +941,12 @@ export const PostingUpdatedEventSchema = z.object({
 export const ApplicationUpdatedEventSchema = z.object({
   type: z.literal("application.updated"),
   applicationId: IdSchema,
+});
+
+/** Motivações do perfil sugeridas ou decididas (F12-23): a janela do formulário e a página do perfil recarregam. */
+export const ProfileMotivationsUpdatedEventSchema = z.object({
+  type: z.literal("profile.motivations.updated"),
+  profileId: IdSchema,
 });
 
 /** CV ou carta mudou de etapa ou ficou pronto (F05 §2.7): a web recarrega o documento, a aba do perfil e a vaga. */
@@ -962,6 +985,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   PostingUpdatedEventSchema,
   DocumentUpdatedEventSchema,
   ApplicationUpdatedEventSchema,
+  ProfileMotivationsUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

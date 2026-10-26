@@ -1,4 +1,10 @@
-import type { Link, RemotePref, UserUpsertRequest, WorkAuth } from "@narnia-jobs/shared";
+import {
+  ADDRESS_FORMS,
+  type Link,
+  type RemotePref,
+  type UserUpsertRequest,
+  type WorkAuth,
+} from "@narnia-jobs/shared";
 import { useState } from "react";
 import { Alert } from "../../../components/ui/alert";
 import { Badge } from "../../../components/ui/badge";
@@ -208,6 +214,24 @@ export function IdentityForm({
             onChange={(e) => set("fullName", e.target.value)}
             aria-invalid={Boolean(errors.fullName)}
           />
+        </Field>
+        {/* F12-23: como o narnia se refere à pessoa; nunca deduzido do nome */}
+        <Field
+          label={t("motivations.address")}
+          htmlFor="pronouns"
+          hint={<span className="text-xs text-muted-fg">{t("motivations.addressHint")}</span>}
+        >
+          <Select
+            id="pronouns"
+            value={value.pronouns || "neutro"}
+            onChange={(e) => set("pronouns", e.target.value)}
+          >
+            {ADDRESS_FORMS.map((a) => (
+              <option key={a} value={a}>
+                {t(`motivations.addressOptions.${a}`)}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field
           label={t("identity.email")}

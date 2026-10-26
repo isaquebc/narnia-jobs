@@ -39,6 +39,7 @@ import { githubRoutes } from "./routes/github";
 import { ingestionsRoutes } from "./routes/ingestions";
 import { jobsRoutes } from "./routes/jobs";
 import { modelSettingsRoutes } from "./routes/model-settings";
+import { motivationsRoutes } from "./routes/motivations";
 import { notificationsRoutes } from "./routes/notifications";
 import { onboardingRoutes } from "./routes/onboarding";
 import { personaCardRoutes } from "./routes/persona-card";
@@ -202,6 +203,7 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", applicationsRoutes({ repos: deps.repos, queue: deps.queue, bus: deps.bus }));
+  app.route("/", motivationsRoutes({ repos: deps.repos, queue: deps.queue, bus: deps.bus }));
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",

@@ -185,5 +185,7 @@ export const ApplicationAnswerSchema = z.object({
 });
 export type ApplicationAnswer = z.infer<typeof ApplicationAnswerSchema>;
 
-export const ANSWERS_STATUSES = ["idle", "answering", "ready", "error"] as const;
+/** `motivations` (F12-23): a resposta aberta espera a pessoa revisar as motivações do perfil. */
+export const ANSWERS_STATUSES = ["idle", "answering", "motivations", "ready", "error"] as const;
 export const AnswersStatusSchema = z.enum(ANSWERS_STATUSES);
+export type AnswersStatus = z.infer<typeof AnswersStatusSchema>;

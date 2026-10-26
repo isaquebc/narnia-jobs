@@ -63,6 +63,12 @@ export interface GateFlags {
   feature?: string[];
   /** `--noise`: teste A contra A nos casos sem mudança; grava a fração decidida pelo acaso (`ruido:<chave>`). */
   noise?: boolean;
+  /**
+   * `--owner-approved` (2026-10-26): o gate reprovou e o dono aprovou explicitamente na conversa; com
+   * `--update-baseline`, grava a linha de base e as versões aprovadas mesmo com regressão ou sem upgrade, com o motivo
+   * no log. Só a pedido do dono, registrado no plano; rodada incompleta continua sem gravar.
+   */
+  ownerApproved?: boolean;
 }
 
 export function gateFlags(args: string[]): GateFlags {
@@ -76,6 +82,7 @@ export function gateFlags(args: string[]): GateFlags {
     ...(args.includes("--seed-approved") ? { seed: true } : {}),
     ...(Number.isInteger(samples) && samples > 0 ? { samples } : {}),
     ...(args.includes("--noise") ? { noise: true } : {}),
+    ...(args.includes("--owner-approved") ? { ownerApproved: true } : {}),
     ...(feature ? { feature: feature.split(",").filter(Boolean) } : {}),
   };
 }
@@ -345,7 +352,7 @@ export class BaselineGate {
       report.decision = problems.length
         ? { ...d, passed: false, reason: [d.reason, ...problems].join("; ") }
         : d;
-      if (report.decision.passed) stage();
+      if (report.decision.passed || this.flags.ownerApproved) stage();
     } else {
       report.status = "comparado";
       report.cases = await Promise.all(
@@ -353,7 +360,7 @@ export class BaselineGate {
       );
       const fixes = this.flags.fixes.filter((id) => pairs.some((r) => r.exampleId === id));
       report.decision = pairwiseDecision(report.cases, fixes, this.margin(key, report.cases));
-      if (report.decision.passed) stage();
+      if (report.decision.passed || this.flags.ownerApproved) stage();
     }
     this.comparisons.push(report);
     return report;
@@ -444,8 +451,19 @@ export class BaselineGate {
         log("Versões aprovadas não gravadas: corrija as rodadas incompletas antes.");
       else this.writeStaged(log);
     }
+    const blocked = this.regressions.length > 0 || notUpgrade.length > 0;
+    const owner = Boolean(this.flags.ownerApproved) && incomplete.length === 0;
+    if (this.flags.update && owner && blocked)
+      log(
+        `Aprovado pelo dono apesar de: ${[
+          ...this.regressions.map(
+            (r) => `${r.key} · ${r.evaluator} ${(r.current * 100).toFixed(0)}%`,
+          ),
+          ...notUpgrade.map((c) => `${c.key} sem upgrade`),
+        ].join("; ")}.`,
+      );
     if (this.flags.update) {
-      if (this.regressions.length > 0 || incomplete.length > 0 || notUpgrade.length > 0) {
+      if (incomplete.length > 0 || (blocked && !owner)) {
         log(
           "Linha de base não atualizada: corrija as regressões, as rodadas incompletas e os prompts que não são upgrade antes.",
         );
@@ -465,10 +483,7 @@ export class BaselineGate {
         this.writeStaged(log);
       }
     }
-    return (
-      this.flags.gate &&
-      (this.regressions.length > 0 || incomplete.length > 0 || notUpgrade.length > 0)
-    );
+    return this.flags.gate && (incomplete.length > 0 || (blocked && !owner));
   }
 
   private writeStaged(log: (line: string) => void) {

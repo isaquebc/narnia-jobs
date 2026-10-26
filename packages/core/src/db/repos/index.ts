@@ -46,6 +46,7 @@ import {
   postingNotesRepo,
   postingsRepo,
 } from "./postings";
+import { type ProfileMotivationsRepo, profileMotivationsRepo } from "./profile-motivations";
 import { type ProfilesRepo, profilesRepo } from "./profiles";
 import { type ProposalsRepo, proposalsRepo } from "./proposals";
 import { type ReadingsRepo, readingsRepo } from "./readings";
@@ -103,6 +104,7 @@ export interface Repos {
   applications: ApplicationsRepo;
   /** F12-12: autodeclaração, fora dos fatos. */
   selfDeclarations: SelfDeclarationsRepo;
+  profileMotivations: ProfileMotivationsRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -167,6 +169,7 @@ export function createRepos(db: Db): Repos {
     extension: extensionRepo(db),
     applications: applicationsRepo(db),
     selfDeclarations: selfDeclarationsRepo(db),
+    profileMotivations: profileMotivationsRepo(db),
   };
 }
 

@@ -4,6 +4,7 @@ import {
   DOCUMENT_TASKS,
   INGEST_TASKS,
   POSTING_TASKS,
+  PROFILE_MOTIVATIONS_TASK,
   type StageJobData,
   type TaskJobData,
 } from "@narnia-jobs/core";
@@ -21,6 +22,7 @@ import { applicationAnswer } from "./processors/application-answer";
 import { applicationLocate } from "./processors/application-locate";
 import { cvGenerate } from "./processors/cv-generate";
 import { postingExtract } from "./processors/posting-extract";
+import { profileMotivations } from "./processors/profile-motivations";
 import { templateValidate } from "./processors/template-validate";
 
 /**
@@ -59,6 +61,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [POSTING_TASKS.extract]: postingExtract,
   [APPLICATION_TASKS.locate]: applicationLocate,
   [APPLICATION_ANSWER_TASK]: applicationAnswer,
+  [PROFILE_MOTIVATIONS_TASK]: profileMotivations,
   [DOCUMENT_TASKS.generate]: cvGenerate,
   [DOCUMENT_TASKS.render]: cvGenerate,
   [DOCUMENT_TASKS.validateTemplate]: templateValidate,

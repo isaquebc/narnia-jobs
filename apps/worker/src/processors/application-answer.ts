@@ -1,11 +1,15 @@
 import {
+  addressForm,
   aliasBriefIds,
   answerableQuestions,
+  answerProfileId,
   assembleAnswers,
   assembleRoleplay,
   buildCvBrief,
   detectFormLocale,
+  motivationsReviewed,
   POSTING_MODEL_DEFAULTS,
+  PROFILE_MOTIVATIONS_TASK,
   recordUsage,
   resolveModel,
   splitOpenQuestions,
@@ -42,16 +46,32 @@ export const applicationAnswer: TaskHandler = async (data, ctx, deps) => {
       .filter((a) => a.source === "edited")
       .map((a) => a.questionId),
   );
-  const questions = answerableQuestions(form.questions).filter((q) => !edited.has(q.id));
-  const profileId =
-    repos.jobAnalyses.list(form.postingId)[0]?.recommendedProfileId ??
-    form.profileId ??
-    repos.profiles.active()?.id ??
-    null;
+  // F12-23: suposição recusada na janela refaz só a pergunta dela
+  const only = Array.isArray(data.payload.questionIds)
+    ? new Set((data.payload.questionIds as unknown[]).map(String))
+    : null;
+  const questions = answerableQuestions(form.questions).filter(
+    (q) => !edited.has(q.id) && (!only || only.has(q.id)),
+  );
+  const profileId = answerProfileId(repos, form);
   if (!questions.length || !profileId) {
     repos.applications.setAnswersStatus(id, "ready");
     await deps.publish({ type: "application.updated", applicationId: id });
     return { applicationId: id, answers: 0 };
+  }
+  // F12-23: pergunta aberta escreve como a pessoa; sem as motivações do perfil revisadas, a janela pergunta antes
+  if (splitOpenQuestions(questions).open.length > 0 && !motivationsReviewed(repos, profileId)) {
+    repos.applications.setAnswersStatus(id, "motivations");
+    const pending = repos.profileMotivations.list(profileId).some((m) => m.status === "suggested");
+    if (!pending)
+      await deps.enqueueTask({
+        queue: "extract",
+        type: PROFILE_MOTIVATIONS_TASK,
+        key: `${profileId}-${Date.now()}`,
+        payload: { profileId },
+      });
+    await deps.publish({ type: "application.updated", applicationId: id });
+    return { applicationId: id, waiting: "motivations" };
   }
   try {
     repos.applications.setAnswersStatus(id, "answering");
@@ -69,6 +89,11 @@ export const applicationAnswer: TaskHandler = async (data, ctx, deps) => {
     const aliases = aliasBriefIds(brief);
     const user = repos.users.get();
     const profile = repos.profiles.get(profileId);
+    const decided = (status: "accepted" | "refused") =>
+      repos.profileMotivations
+        .list(profileId)
+        .filter((m) => m.status === status)
+        .map((m) => m.text);
     const person = {
       city: user?.city ?? null,
       region: user?.region ?? null,
@@ -80,6 +105,10 @@ export const applicationAnswer: TaskHandler = async (data, ctx, deps) => {
       contracts: profile?.contractTypes ?? [],
       locations: profile?.locations ?? [],
       availableFrom: profile?.availableFrom ?? null,
+      // F12-23: tratamento do cadastro (nunca pelo nome) e o que move a pessoa, decidido por ela
+      address: addressForm(user?.pronouns),
+      motivations: decided("accepted"),
+      refusedMotivations: decided("refused"),
     };
     await ctx.progress(40, "answering");
     const m = resolveModel(

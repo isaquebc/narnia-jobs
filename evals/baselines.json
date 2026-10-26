@@ -127,12 +127,12 @@
     "scores": {
       "idioma": 1,
       "json_schema": 1,
-      "padrao_de_entrega": 1,
+      "padrao_de_entrega": 0.857,
       "roleplay_conferido": 1
     },
-    "versionId": "6b62058664a2fb80eb05dd8e3c1a966673299a8ac4303d28b0af19e54d6ef698",
-    "commit": "403adc6",
-    "updatedAt": "2026-10-24T11:52:31.429Z"
+    "versionId": "577799157d5d7ccf8d2383d158378a35442924bc7cf3714a136ecbf36dfafb74",
+    "commit": "ceaedec",
+    "updatedAt": "2026-10-26T20:17:05.074Z"
   },
   "narnia-chat-title": {
     "scores": {
@@ -213,6 +213,17 @@
     "versionId": "338cd33d4fbd065be3caf009ca2da256564a1ad93271b519f7a4c32755550688",
     "commit": "c609a8e",
     "updatedAt": "2026-10-15T00:48:21.702Z"
+  },
+  "narnia-profile-motivations": {
+    "scores": {
+      "idioma": 1,
+      "json_schema": 1,
+      "motivacoes_conferidas": 1,
+      "padrao_de_entrega": 1
+    },
+    "versionId": "916ab4c29e1f935925dcc5c967ddfb7ef468e15c892a01f7f391e7baabc8b656",
+    "commit": "ceaedec",
+    "updatedAt": "2026-10-26T20:17:05.074Z"
   },
   "ruido:narnia-chat": {
     "scores": {

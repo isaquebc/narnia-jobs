@@ -46,6 +46,8 @@ import {
   PostingExtractOutputSchema,
   type PostingMergeOutput,
   PostingMergeOutputSchema,
+  type ProfileMotivationsOutput,
+  ProfileMotivationsOutputSchema,
   type ReadDocumentOutput,
   ReadDocumentOutputSchema,
   type SynthesizeRunOutput,
@@ -88,6 +90,7 @@ import {
   type PostingDuplicateInput,
   type PostingExtractInput,
   type PostingMergeInput,
+  type ProfileMotivationsInput,
   type Provider,
   ProviderError,
   type ProviderResult,
@@ -909,6 +912,19 @@ export class ClaudeCodeProvider implements Provider {
       APPLICATION_OUTPUT_JSON_SCHEMAS.applicationRoleplay,
       ApplicationRoleplayOutputSchema,
       "applicationRoleplay",
+    );
+  }
+
+  profileMotivations(
+    input: ProfileMotivationsInput,
+  ): Promise<ProviderResult<ProfileMotivationsOutput>> {
+    return this.single(
+      renderStructuredPrompt("profileMotivations", input),
+      input.model,
+      PROMPTS.profileMotivations(),
+      APPLICATION_OUTPUT_JSON_SCHEMAS.profileMotivations,
+      ProfileMotivationsOutputSchema,
+      "profileMotivations",
     );
   }
 

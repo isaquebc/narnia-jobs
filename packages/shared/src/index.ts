@@ -9,6 +9,7 @@ export * from "./mcp/cv";
 export * from "./mcp/ingest";
 export * from "./mcp/posting";
 export * from "./mcp/profile";
+export * from "./motivations";
 export * from "./schemas";
 export * from "./telemetry";
 export * from "./time";

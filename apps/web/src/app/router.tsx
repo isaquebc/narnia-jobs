@@ -16,6 +16,7 @@ import { Dashboard } from "../features/dashboard/Dashboard";
 import { CaptureWindow } from "../features/extension/CaptureWindow";
 import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { Wizard } from "../features/onboarding/Wizard";
+import { MotivationsSection } from "../features/profiles/MotivationsEditor";
 import { NewProfilePage, type NewProfileSearch } from "../features/profiles/NewProfilePage";
 import { PersonaOverrides } from "../features/profiles/PersonaOverrides";
 import { PitchEditor } from "../features/profiles/PitchEditor";
@@ -156,7 +157,13 @@ const profilePitchRoute = createRoute({
   component: function PitchTab() {
     const { id } = profileRoute.useParams();
     const profile = useProfile(id);
-    return profile.data ? <PitchEditor key={profile.data.id} profile={profile.data} /> : null;
+    // F12-23: as motivações do perfil ficam com a narrativa (o que a pessoa conta de si)
+    return profile.data ? (
+      <div className="flex flex-col gap-6">
+        <PitchEditor key={profile.data.id} profile={profile.data} />
+        <MotivationsSection profileId={profile.data.id} />
+      </div>
+    ) : null;
   },
 });
 const profilePersonaRoute = createRoute({

@@ -22,6 +22,7 @@ import type {
   PostingExtractOutput,
   PostingFields,
   PostingMergeOutput,
+  ProfileMotivationsOutput,
   ReadDocumentOutput,
   SynthesizeRunOutput,
 } from "@narnia-jobs/shared";
@@ -48,6 +49,7 @@ import {
   type PostingDuplicateInput,
   type PostingExtractInput,
   type PostingMergeInput,
+  type ProfileMotivationsInput,
   type Provider,
   ProviderError,
   type ProviderResult,
@@ -82,6 +84,7 @@ export type MockOperation =
   | "applicationLocate"
   | "applicationAnswer"
   | "applicationRoleplay"
+  | "profileMotivations"
   | "cvGenerate"
   | "coverLetterGenerate"
   | "cvReview"
@@ -978,6 +981,32 @@ export class MockProvider implements Provider {
           },
     );
     return this.result({ answers }, JSON.stringify(input.questions), input.model);
+  }
+
+  /**
+   * Motivações previsíveis (F12-23): uma frase por experiência e o cargo-alvo, com a origem; tira as já aceitas e as
+   * recusadas (a conferência por código também tira) e devolve até `count`.
+   */
+  async profileMotivations(
+    input: ProfileMotivationsInput,
+  ): Promise<ProviderResult<ProfileMotivationsOutput>> {
+    await this.gate("profileMotivations");
+    const known = new Set([...input.accepted, ...input.refused].map((t) => t.toLowerCase()));
+    const candidates = [
+      ...(input.brief.profile.targetTitle
+        ? [{ text: `Quero crescer como ${input.brief.profile.targetTitle}.`, origins: [] }]
+        : []),
+      ...input.brief.experiences.map((e) => ({
+        text: `Gosto do tipo de trabalho que fiz na ${e.company}.`,
+        origins: [e.id],
+      })),
+      { text: "Prefiro times pequenos, com autonomia.", origins: [] },
+      { text: "Quero aprender tecnologias novas no dia a dia.", origins: [] },
+    ];
+    const motivations = candidates
+      .filter((c) => !known.has(c.text.toLowerCase()))
+      .slice(0, input.count);
+    return this.result({ motivations }, JSON.stringify(input.brief.profile), input.model);
   }
 
   /** Duplicata previsível: JD igual (sem espaços e caixa) = mesma vaga com 95%; diferente = 55%, com as diferenças. */

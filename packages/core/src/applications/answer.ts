@@ -5,6 +5,7 @@ import type {
   ApplicationRoleplayOutput,
   CvLocale,
 } from "@narnia-jobs/shared";
+import type { Repos } from "../db";
 
 /**
  * Respostas sugeridas do formulário (F12/M4, §4.6-3). O Sonnet (`narnia-application-answer`) responde só o que é dele:
@@ -141,4 +142,20 @@ export function assembleRoleplay(
       gap: null,
     };
   });
+}
+
+/**
+ * Perfil das respostas do formulário: o recomendado pela análise da vaga, o do formulário ou o ativo (F12/M4). A janela
+ * usa o mesmo para pedir as motivações (F12-23).
+ */
+export function answerProfileId(
+  repos: Repos,
+  form: { postingId: string | null; profileId: string | null },
+): string | null {
+  return (
+    (form.postingId ? repos.jobAnalyses.list(form.postingId)[0]?.recommendedProfileId : null) ??
+    form.profileId ??
+    repos.profiles.active()?.id ??
+    null
+  );
 }

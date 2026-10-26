@@ -1,4 +1,12 @@
-import { type EvalParams, type EvalResult, jsonOf, listShort, result } from "./lib";
+import {
+  type EvalParams,
+  type EvalResult,
+  genderMarks,
+  jsonOf,
+  listShort,
+  repeatsPhrase,
+  result,
+} from "./lib";
 
 /**
  * Localizador do formulário (F12/M3): toda referência devolvida existe nos campos enviados, nenhum campo fica sem
@@ -238,6 +246,28 @@ export function roleplayChecks(p: EvalParams): EvalResult {
     const text = lower(answers.find((x) => x.questionId === id)?.answer ?? "");
     for (const term of terms) check(text.includes(lower(term)), `${id}: não cita "${term}"`);
   }
+  // F12-23: com o tratamento do cadastro, as suposições seguem ele; motivação já aceita no perfil não é suposição
+  let person: { address?: string; motivations?: string[] } = {};
+  try {
+    person = JSON.parse(String(p.input?.person_json ?? "{}"));
+  } catch {
+    person = {};
+  }
+  for (const a of answers)
+    for (const s of a.assumptions ?? []) {
+      if (person.address) {
+        const marks = genderMarks(s, person.address);
+        check(
+          marks.length === 0,
+          `${a.questionId}: suposição com gênero fora do tratamento ${person.address} (${marks.join(", ")})`,
+        );
+      }
+      if (person.motivations?.length)
+        check(
+          !person.motivations.some((m) => repeatsPhrase(s, m)),
+          `${a.questionId}: a suposição "${s}" já está nas motivações do perfil`,
+        );
+    }
   const all = lower(answers.map((a) => a.answer ?? "").join(" "));
   for (const term of ref.avoid ?? [])
     check(!all.includes(lower(term)), `cita "${term}" (não está nos dados)`);

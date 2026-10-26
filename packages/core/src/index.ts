@@ -82,6 +82,7 @@ export * from "./profile/analyze-input";
 export * from "./profile/card";
 export * from "./profile/cards";
 export * from "./profile/errors";
+export * from "./profile/motivations";
 export * from "./profile/notify";
 export * from "./profile/persona";
 export * from "./profile/relevance";

@@ -166,3 +166,84 @@ export function listShort(items: string[], max = 5): string {
   const shown = items.slice(0, max).map((s) => (s.length > 80 ? `${s.slice(0, 77)}…` : s));
   return items.length > max ? `${shown.join("; ")} (+${items.length - max})` : shown.join("; ");
 }
+
+/**
+ * Palavras com gênero gramatical que contrariam o tratamento do cadastro (F12-23): no neutro, qualquer uma; no feminino,
+ * as masculinas; no masculino, as femininas. Só a lista das que aparecem em frases sobre motivação ("ser dona",
+ * "apaixonado", "realizada"), sem substantivos comuns.
+ */
+const GENDERED_STEMS = [
+  "apaixonad",
+  "interessad",
+  "motivad",
+  "focad",
+  "dedicad",
+  "envolvid",
+  "realizad",
+  "preparad",
+  "acostumad",
+  "comprometid",
+  "animad",
+  "empolgad",
+  "satisfeit",
+  "orgulhos",
+  "fascinad",
+  "encantad",
+  "engajad",
+  "atraíd",
+];
+
+export function genderMarks(text: string, address: string): string[] {
+  const words = text.toLowerCase().match(/[\p{L}]+/gu) ?? [];
+  const found: string[] = [];
+  for (const w of words) {
+    let gender: "f" | "m" | null = null;
+    if (w === "dona" || w === "donas") gender = "f";
+    else if (w === "dono" || w === "donos") gender = "m";
+    else {
+      const stem = GENDERED_STEMS.find(
+        (s) => w.startsWith(s) && /^[oa]s?$/.test(w.slice(s.length)),
+      );
+      if (stem) gender = w.slice(stem.length).startsWith("a") ? "f" : "m";
+    }
+    if (!gender) continue;
+    if (address === "neutro" || (address === "feminino" ? gender === "m" : gender === "f"))
+      found.push(w);
+  }
+  return found;
+}
+
+/** Palavras de conteúdo de uma frase de motivação (sem o verbo de abertura e sem palavras curtas). */
+const MOTIVATION_STOP = new Set([
+  "que",
+  "você",
+  "voce",
+  "quero",
+  "quer",
+  "gosto",
+  "gosta",
+  "prefiro",
+  "prefere",
+  "valorizo",
+  "valoriza",
+  "busco",
+  "busca",
+  "para",
+  "pela",
+  "pelo",
+  "como",
+  "mais",
+]);
+export function contentWords(text: string): string[] {
+  return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(
+    (w) => w.length >= 4 && !MOTIVATION_STOP.has(w),
+  );
+}
+
+/** A frase repete a outra: tem pelo menos 80% das palavras de conteúdo dela. */
+export function repeatsPhrase(text: string, other: string): boolean {
+  const mine = new Set(contentWords(text));
+  const theirs = contentWords(other);
+  if (theirs.length === 0) return false;
+  return theirs.filter((w) => mine.has(w)).length / theirs.length >= 0.8;
+}
