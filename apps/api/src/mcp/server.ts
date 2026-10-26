@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
+  answerableQuestions,
   createApplicationTools,
   createChatTools,
   createCvTools,
@@ -34,6 +35,7 @@ import { Hono } from "hono";
 import { activeToolSpan } from "../chat/turn-trace";
 import { apiError } from "../errors";
 import type { IngestionStartDeps } from "../routes/ingestions";
+import { enqueueAnswers } from "../services/applications";
 import { intakePosting } from "../services/postings";
 import { createChatIngestPort } from "./ingest-port";
 import { inScope, narrowsScope, publishedName } from "./scopes";
@@ -152,8 +154,15 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
       APPLICATION_TOOLS,
       APPLICATION_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
       createApplicationTools(deps.repos, {
+        sessionId,
         ports: {
           changed: (applicationId) => deps.bus.emit({ type: "application.updated", applicationId }),
+          // F12-11: vaga ligada pela conversa → respostas sugeridas, como ao ligar pela janela
+          requestAnswers: async (applicationId) => {
+            const f = deps.repos.applications.get(applicationId);
+            if (f && answerableQuestions(f.questions).length > 0)
+              await enqueueAnswers(deps.repos, deps.queue, applicationId);
+          },
         },
       }),
     ),

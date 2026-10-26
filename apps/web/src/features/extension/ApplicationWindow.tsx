@@ -54,6 +54,9 @@ const savedValue = (q: Question) =>
 /** O que a pessoa responde pela janela: nunca consentimento, autodeclaração nem arquivo (F12-12). */
 const editable = (q: Question) => !["consent", "self_declaration", "file"].includes(q.kind);
 
+/** Autodeclaração que a pessoa já deu no chat e que casou com uma opção da página (F12-12, pelo código). */
+const declared = (q: Question) => q.kind === "self_declaration" && Boolean(q.prefill);
+
 /** Campo de arquivo: carta pelo rótulo; o resto (currículo, CV, resume) recebe o CV. */
 const fileKind = (q: Question): DocumentKind =>
   /carta|cover|motiva/i.test(q.question) ? "cover_letter" : "cv";
@@ -114,10 +117,16 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
   // F12/M5: Perguntas | Conversa; "Ajustar no chat" leva a pergunta para o campo da conversa
   const [view, setView] = useState<"questions" | "chat">("questions");
   const [chatDraft, setChatDraft] = useState("");
-  const askInChat = (x: Question) => {
-    setChatDraft(t("application.askDraft", { question: x.question }));
+  const toChat = (draft: string) => {
+    setChatDraft(draft);
     setView("chat");
   };
+  const askInChat = (x: Question) =>
+    toChat(
+      x.kind === "self_declaration"
+        ? t("application.declareDraft", { question: x.question })
+        : t("application.askDraft", { question: x.question }),
+    );
   const [fillMessage, setFillMessage] = useState<{ tone: "ok" | "warn"; text: string } | null>(
     null,
   );
@@ -240,7 +249,20 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
               ) : null}
             </Alert>
           ) : null}
-          {!a.postingId ? <Alert tone="info">{t("application.needsPosting")}</Alert> : null}
+          {!a.postingId ? (
+            <Alert tone="info" className="flex flex-col gap-2">
+              <span>{t("application.needsPosting")}</span>
+              <span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => toChat(t("application.pasteDraft"))}
+                >
+                  {t("application.pasteDescription")}
+                </Button>
+              </span>
+            </Alert>
+          ) : null}
           {a.questions.some(fillable) ? (
             <div className="flex flex-col gap-1">
               <Button size="sm" onClick={() => void fill(a.questions.filter(fillable))}>
@@ -268,8 +290,13 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
                 value={currentValue(x)}
                 onChange={(text) => setDrafts((d) => ({ ...d, [x.id]: text }))}
                 onCommit={(text) => commit(x, text)}
-                onFill={fillable(x) ? () => void fill([x]) : null}
-                onAsk={editable(x) && !x.profileField ? () => askInChat(x) : null}
+                onFill={fillable(x) || declared(x) ? () => void fill([x]) : null}
+                onAsk={
+                  (editable(x) && !x.profileField) ||
+                  (x.kind === "self_declaration" && !declared(x))
+                    ? () => askInChat(x)
+                    : null
+                }
                 onAttach={
                   x.kind === "file" && docFor(fileKind(x))
                     ? { kind: fileKind(x), run: () => void attach(x) }
@@ -559,7 +586,32 @@ function Answer({
 }) {
   const hint = (text: string) => <span className="text-xs text-muted-fg">{text}</span>;
   if (q.kind === "consent") return hint(t("application.consent"));
-  if (q.kind === "self_declaration") return hint(t("application.selfDeclaration"));
+  // F12-12: com o que a pessoa declarou no chat, a opção da página e Preencher (só por clique, nunca no "todos")
+  if (q.kind === "self_declaration")
+    return q.prefill ? (
+      <div className="flex flex-col gap-1.5">
+        {hint(t("application.declared"))}
+        <span className="flex items-center justify-between gap-2 rounded bg-muted/40 px-2 py-1.5">
+          <span>{q.prefill}</span>
+          {onFill ? (
+            <Button size="sm" variant="outline" onClick={onFill}>
+              {t("application.fill")}
+            </Button>
+          ) : null}
+        </span>
+      </div>
+    ) : (
+      <div className="flex flex-col gap-1.5">
+        {hint(t("application.selfDeclaration"))}
+        {onAsk ? (
+          <span>
+            <Button size="sm" variant="ghost" onClick={onAsk}>
+              {t("application.declareInChat")}
+            </Button>
+          </span>
+        ) : null}
+      </div>
+    );
   if (q.kind === "file")
     return onAttach ? (
       <div>

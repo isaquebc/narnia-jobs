@@ -4,8 +4,13 @@ import { fileURLToPath } from "node:url";
 import {
   type ApprovedCase,
   type ApprovedEvaluation,
+  BASELINE_TOLERANCE,
   type Baselines,
+  depsChanged,
   findRegressions,
+  majorityOutcome,
+  noiseMargin,
+  type PairOutcome,
   type PairwiseCase,
   type PairwiseDecision,
   pairwiseDecision,
@@ -14,6 +19,7 @@ import {
   type Regression,
   serializeApproved,
   serializeBaselines,
+  tallySamples,
 } from "@narnia-jobs/core";
 import type { CompleteInput, CompleteResult } from "@narnia-jobs/providers";
 import { nowUtc } from "@narnia-jobs/shared";
@@ -45,15 +51,32 @@ export interface GateFlags {
    * 2026-10-22). Não grava a linha de base nem regrava aprovada existente; rodada incompleta não grava nada.
    */
   seed?: boolean;
+  /**
+   * `--samples=N` (gate robusto, 2026-10-25): amostras por caso afetado no pairwise (padrão 5 no gate, 3 no `--noise`);
+   * o placar soma as amostras (2026-10-26). Uma amostra só oscilava mais do que o efeito medido.
+   */
+  samples?: number;
+  /**
+   * `--feature=id,…` (não-inferioridade, decisão do dono 2026-10-25): a mudança acrescenta funcionalidade; os casos
+   * novos listados precisam passar, e os antigos afetados só não podem piorar além do ruído.
+   */
+  feature?: string[];
+  /** `--noise`: teste A contra A nos casos sem mudança; grava a fração decidida pelo acaso (`ruido:<chave>`). */
+  noise?: boolean;
 }
 
 export function gateFlags(args: string[]): GateFlags {
   const fixes = args.find((a) => a.startsWith("--fixes="))?.slice("--fixes=".length) ?? "";
+  const feature = args.find((a) => a.startsWith("--feature="))?.slice("--feature=".length);
+  const samples = Number(args.find((a) => a.startsWith("--samples="))?.slice("--samples=".length));
   return {
     gate: args.includes("--gate"),
     update: args.includes("--update-baseline"),
     fixes: fixes.split(",").filter(Boolean),
     ...(args.includes("--seed-approved") ? { seed: true } : {}),
+    ...(Number.isInteger(samples) && samples > 0 ? { samples } : {}),
+    ...(args.includes("--noise") ? { noise: true } : {}),
+    ...(feature ? { feature: feature.split(",").filter(Boolean) } : {}),
   };
 }
 
@@ -74,6 +97,33 @@ export interface PairRun {
   output: unknown;
   evaluations: ApprovedEvaluation[];
   error?: string | undefined;
+  /** Prompts de que o caso dependeu (nome → hash): com elas, só o caso que mudou entra no pairwise. */
+  deps?: Record<string, string> | undefined;
+  /** Saídas das amostras extras do caso (a primeira é `output`). */
+  samples?: unknown[] | undefined;
+  /**
+   * Amostras novas da versão aprovada, pareadas com as da candidata (gate robusto, 2026-10-25): a saída guardada é a
+   * amostra que venceu o gate anterior (acima da média), e no A contra A ela ganhou 7 de 7 casos decididos. Sem elas,
+   * o lado A é a saída guardada.
+   */
+  against?: unknown[] | undefined;
+}
+
+/** Chave do ruído medido pelo A contra A na linha de base. */
+export const noiseKey = (key: string) => `ruido:${key}`;
+
+export interface NoiseReport {
+  key: string;
+  /** Casos sem mudança comparados com a aprovada. */
+  cases: number;
+  samples: number;
+  /** Pares julgados (casos × amostras). */
+  pairs: number;
+  /** Fração dos pares que o acaso decidiu (vitória ou derrota de uma amostra; por amostra desde 2026-10-26). */
+  decisiveRate: number;
+  /** Variação das notas médias entre as amostras (máximo − mínimo), por chave da linha de base. */
+  spreads: Record<string, number>;
+  outcomes: PairwiseCase[];
 }
 
 export interface PairwiseReport {
@@ -82,6 +132,17 @@ export interface PairwiseReport {
   status: "pulado" | "igual" | "primeira" | "comparado";
   decision: PairwiseDecision | null;
   cases: PairwiseCase[];
+  /** Casos sem mudança nas dependências: ficam fora do placar e mantêm a aprovada. */
+  skipped: string[];
+  /** `--feature`: resultado dos casos novos (a maioria das amostras passou em tudo). */
+  features: FeatureResult[];
+}
+
+/** Caso novo de uma mudança `--feature`: passou se a maioria das amostras passou nos avaliadores e no juiz. */
+export interface FeatureResult {
+  exampleId: string;
+  passed: boolean;
+  detail: string;
 }
 
 /** Acumula as rodadas de um comando e, no fim, decide (regressões) e grava (atualização). */
@@ -99,6 +160,7 @@ export class BaselineGate {
   readonly comparisons: PairwiseReport[] = [];
   /** Saídas candidatas a virar a aprovada, gravadas no fim se nada reprovar. */
   private readonly staged = new Map<string, ApprovedCase[]>();
+  readonly noises: NoiseReport[] = [];
 
   constructor(
     readonly flags: GateFlags,
@@ -113,11 +175,95 @@ export class BaselineGate {
     scores: Record<string, number>,
     meta: { versionId?: string; commit?: string; gate?: boolean; errors?: number } = {},
   ): Regression[] {
-    const found = meta.gate === false ? [] : findRegressions(this.baselines, key, scores);
+    const found =
+      meta.gate === false ? [] : findRegressions(this.baselines, key, scores, this.tolerance(key));
     this.regressions.push(...found);
     const incomplete = (meta.errors ?? 0) + (Object.keys(scores).length === 0 ? 1 : 0);
     this.runs.push({ key, scores, versionId: meta.versionId, commit: meta.commit, incomplete });
     return found;
+  }
+
+  /** Tolerância da nota: a padrão ou, se maior, a variação medida pelo A contra A (`ruido:*`). */
+  private tolerance(key: string): number {
+    const measured = Object.entries(this.baselines)
+      .filter(([k]) => k.startsWith("ruido:"))
+      .map(([, e]) => e.scores[key] ?? 0);
+    return Math.max(BASELINE_TOLERANCE, ...measured);
+  }
+
+  /** Julga cada amostra do caso contra a aprovada; o caso mostra a maioria, e o placar soma as amostras. */
+  private async judgeCase(
+    o: {
+      judge: JudgeDef;
+      provider: { complete(input: CompleteInput): Promise<CompleteResult> };
+    },
+    r: PairRun,
+    approved: ApprovedCase,
+  ): Promise<PairwiseCase> {
+    const outputs = [r.output, ...(r.samples ?? [])];
+    const judged = await Promise.all(
+      outputs.map((candidate, i) =>
+        judgePair(o.provider, o.judge, r.ctx, {
+          approved: r.against?.[i] ?? approved.output,
+          candidate,
+        }),
+      ),
+    );
+    const outcomes = judged.map((j) => j.outcome);
+    if (judged.length === 1)
+      return {
+        exampleId: r.exampleId,
+        outcome: outcomes[0] as PairOutcome,
+        explanation: judged[0]?.explanation ?? "",
+      };
+    const n = (x: PairOutcome) => outcomes.filter((y) => y === x).length;
+    const plural = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+    return {
+      exampleId: r.exampleId,
+      outcome: majorityOutcome(outcomes),
+      samples: outcomes,
+      explanation: `${judged.length} amostras: ${plural(n("ganhou"), "vitória", "vitórias")}, ${plural(n("perdeu"), "derrota", "derrotas")}, ${plural(n("empate"), "empate", "empates")} · ${judged.map((j, i) => `[${i + 1}] ${j.explanation}`).join(" · ")}`,
+    };
+  }
+
+  /**
+   * Teste A contra A (gate robusto, 2026-10-25): os casos sem mudança nas dependências, com várias amostras, contra a
+   * aprovada. A fração que o acaso decide vira a margem do pairwise e a variação das médias, a tolerância das notas;
+   * fica na linha de base em `ruido:<chave>` (é uma medição, não uma aprovação: grava sem `--update-baseline`).
+   */
+  async measureNoise(
+    key: string,
+    o: {
+      judge: JudgeDef;
+      provider: { complete(input: CompleteInput): Promise<CompleteResult> };
+      runs: PairRun[];
+      spreads: Record<string, number>;
+      /** Erros nas amostras do lado A: a medição fica incompleta e não é gravada. */
+      errors?: number;
+    },
+  ): Promise<NoiseReport> {
+    if (o.errors) this.runs.push({ key: noiseKey(key), scores: {}, incomplete: o.errors });
+    const byId = new Map(readApproved(key, this.path).map((a) => [a.exampleId, a]));
+    const same = o.runs.filter((r) => {
+      const a = byId.get(r.exampleId);
+      return !r.error && a && !depsChanged(a.deps, r.deps);
+    });
+    const outcomes = await Promise.all(
+      same.map((r) => this.judgeCase(o, r, byId.get(r.exampleId) as ApprovedCase)),
+    );
+    const { wins, losses, ties } = tallySamples(outcomes);
+    const pairs = wins + losses + ties;
+    const report: NoiseReport = {
+      key,
+      cases: same.length,
+      samples: Math.max(1, ...same.map((r) => 1 + (r.samples?.length ?? 0))),
+      pairs,
+      decisiveRate: pairs ? (wins + losses) / pairs : 0,
+      spreads: o.spreads,
+      outcomes,
+    };
+    this.noises.push(report);
+    return report;
   }
 
   /**
@@ -132,50 +278,97 @@ export class BaselineGate {
       judge: JudgeDef;
       provider: { complete(input: CompleteInput): Promise<CompleteResult> };
       runs: PairRun[];
+      features?: FeatureResult[];
     },
   ): Promise<PairwiseReport> {
-    const report: PairwiseReport = { key, status: "pulado", decision: null, cases: [] };
+    const report: PairwiseReport = {
+      key,
+      status: "pulado",
+      decision: null,
+      cases: [],
+      skipped: [],
+      features: [],
+    };
     const approved = readApproved(key, this.path);
     if (this.flags.seed && !this.flags.gate && !this.flags.update && approved.length > 0)
       return report;
     if (!this.flags.gate && !this.flags.update && !this.flags.seed) return report;
     const ok = o.runs.filter((r) => !r.error);
-    const stage = () =>
-      this.staged.set(
-        key,
-        ok.map((r) => ({
-          exampleId: r.exampleId,
-          versionId: o.versionId,
-          commit: o.commit,
-          approvedAt: nowUtc(),
-          output: r.output,
-          evaluations: r.evaluations,
-        })),
-      );
-    if (approved.length > 0 && approved.every((a) => a.versionId === o.versionId)) {
-      report.status = "igual";
-    } else if (approved.length === 0) {
+    const byId = new Map(approved.map((a) => [a.exampleId, a]));
+    const fresh = (r: PairRun): ApprovedCase => ({
+      exampleId: r.exampleId,
+      versionId: o.versionId,
+      commit: o.commit,
+      approvedAt: nowUtc(),
+      output: r.output,
+      evaluations: r.evaluations,
+      ...(r.deps ? { deps: r.deps } : {}),
+    });
+    // com as dependências por caso, só o caso que mudou é comparado; o resto mantém a aprovada (gate robusto)
+    const perCase = ok.some((r) => r.deps);
+    const changed = (r: PairRun) => {
+      const a = byId.get(r.exampleId);
+      return Boolean(a) && (perCase ? depsChanged(a?.deps, r.deps) : a?.versionId !== o.versionId);
+    };
+    const pairs = ok.filter(changed);
+    report.skipped = ok.filter((r) => byId.has(r.exampleId) && !changed(r)).map((r) => r.exampleId);
+    const stage = () => {
+      const next = new Map(approved.map((a) => [a.exampleId, a]));
+      for (const r of ok) if (!byId.has(r.exampleId) || changed(r)) next.set(r.exampleId, fresh(r));
+      this.staged.set(key, [...next.values()]);
+    };
+    const feature = this.flags.feature ?? [];
+    if (approved.length === 0) {
       report.status = "primeira";
       stage();
+    } else if (
+      feature.length === 0 &&
+      (perCase ? pairs.length === 0 : approved.every((a) => a.versionId === o.versionId))
+    ) {
+      report.status = "igual";
+      // caso novo no dataset entra na aprovada sem pairwise (não tem com quem comparar)
+      if (perCase && ok.some((r) => !byId.has(r.exampleId))) stage();
+    } else if (feature.length > 0) {
+      // não-inferioridade: os antigos afetados não pioram além do ruído; os novos passam
+      report.status = "comparado";
+      report.cases = await Promise.all(
+        pairs.map((r) => this.judgeCase(o, r, byId.get(r.exampleId) as ApprovedCase)),
+      );
+      const d = pairwiseDecision(report.cases, [], this.margin(key, report.cases), "nao_inferior");
+      report.features = o.features ?? [];
+      const problems = feature.flatMap((id) => {
+        if (byId.has(id)) return [`já tem aprovada: ${id} (--feature é para caso novo)`];
+        const f = report.features.find((x) => x.exampleId === id);
+        if (!f) return [`não rodou: ${id}`];
+        return f.passed ? [] : [`caso novo reprovado: ${id} (${f.detail})`];
+      });
+      report.decision = problems.length
+        ? { ...d, passed: false, reason: [d.reason, ...problems].join("; ") }
+        : d;
+      if (report.decision.passed) stage();
     } else {
       report.status = "comparado";
-      const byId = new Map(approved.map((a) => [a.exampleId, a]));
-      const pairs = ok.filter((r) => byId.has(r.exampleId));
       report.cases = await Promise.all(
-        pairs.map(async (r) => ({
-          exampleId: r.exampleId,
-          ...(await judgePair(o.provider, o.judge, r.ctx, {
-            approved: byId.get(r.exampleId)?.output,
-            candidate: r.output,
-          })),
-        })),
+        pairs.map((r) => this.judgeCase(o, r, byId.get(r.exampleId) as ApprovedCase)),
       );
       const fixes = this.flags.fixes.filter((id) => pairs.some((r) => r.exampleId === id));
-      report.decision = pairwiseDecision(report.cases, fixes);
+      report.decision = pairwiseDecision(report.cases, fixes, this.margin(key, report.cases));
       if (report.decision.passed) stage();
     }
     this.comparisons.push(report);
     return report;
+  }
+
+  /**
+   * Margem do pairwise pelo ruído por amostra (2026-10-26) e pelo total de pares julgados. A medição antiga (por caso,
+   * `decisivos`) não vale para o placar por amostra: sem a nova, margem 1 até rodar o `--noise` de novo.
+   */
+  private margin(key: string, cases: PairwiseCase[]): number {
+    const t = tallySamples(cases);
+    return noiseMargin(
+      this.baselines[noiseKey(key)]?.scores.decisivos_por_amostra,
+      t.wins + t.losses + t.ties,
+    );
   }
 
   /** Imprime o resumo; grava a linha de base nova se pedida e sem regressão. Devolve true se o gate falhou. */
@@ -203,9 +396,47 @@ export class BaselineGate {
         log(
           `  ${d.passed ? "✔" : "✘"} ${c.key} · pairwise: ${d.wins} vitórias, ${d.losses} derrotas, ${d.ties} empates (${d.reason})`,
         );
-        for (const x of c.cases.filter((x) => x.outcome !== "empate"))
-          log(`      ${x.outcome === "ganhou" ? "+" : "-"} ${x.exampleId}: ${x.explanation}`);
+        // com o placar por amostra, um caso empatado na maioria também pesa: mostra todo caso com amostra decidida
+        for (const x of c.cases.filter((x) =>
+          (x.samples ?? [x.outcome]).some((o) => o !== "empate"),
+        ))
+          log(
+            `      ${x.outcome === "ganhou" ? "+" : x.outcome === "perdeu" ? "-" : "="} ${x.exampleId}: ${x.explanation}`,
+          );
       }
+    }
+    for (const c of this.comparisons)
+      for (const f of c.features)
+        log(`  ${f.passed ? "✔" : "✘"} ${c.key} · caso novo ${f.exampleId}: ${f.detail}`);
+    for (const c of this.comparisons)
+      if (c.skipped.length > 0)
+        log(
+          `  = ${c.key}: sem mudança nas dependências, fora do pairwise: ${c.skipped.join(", ")}.`,
+        );
+    for (const n of this.noises) {
+      const decisive = Math.round(n.decisiveRate * n.pairs);
+      log(
+        `\nRuído de ${n.key} (A contra A, ${n.cases} casos com ${n.samples} amostra(s)): o acaso decidiu ${decisive} de ${n.pairs} pares (${(n.decisiveRate * 100).toFixed(0)}%); margem do pairwise = ⌈√(taxa · pares julgados)⌉ (10 pares: ${noiseMargin(n.decisiveRate, 10)}; 20 pares: ${noiseMargin(n.decisiveRate, 20)}).`,
+      );
+      for (const [k, v] of Object.entries(n.spreads))
+        log(`  ${k}: as médias variaram ${(v * 100).toFixed(0)} pontos entre as amostras.`);
+      for (const x of n.outcomes.filter((x) => x.outcome !== "empate"))
+        log(`  ${x.outcome === "ganhou" ? "+" : "-"} ${x.exampleId}: ${x.explanation}`);
+    }
+    if (this.noises.length > 0 && incomplete.length === 0) {
+      for (const n of this.noises)
+        this.baselines[noiseKey(n.key)] = {
+          scores: {
+            amostras: n.samples,
+            casos: n.cases,
+            pares: n.pairs,
+            decisivos_por_amostra: n.decisiveRate,
+            ...n.spreads,
+          },
+          updatedAt: nowUtc(),
+        };
+      writeFileSync(this.path, serializeBaselines(this.baselines));
+      log(`Ruído gravado em ${this.path}.`);
     }
     const notUpgrade = this.comparisons.filter((c) => c.decision && !c.decision.passed);
     if (this.flags.seed && !this.flags.update) {

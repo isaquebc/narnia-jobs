@@ -354,6 +354,7 @@ const CASES: Record<string, Case> = {
     }),
   },
   // F12/M5: conversa do formulário
+  application_list: { where: "career", args: () => ({}) },
   application_get: { where: "career", args: (c) => ({ applicationId: application(c) }) },
   application_answer_save: {
     where: "career",
@@ -363,6 +364,12 @@ const CASES: Record<string, Case> = {
       answer: "Quero levar a experiência em pagamentos para um produto de saúde.",
     }),
   },
+  application_link_posting: {
+    where: "career",
+    args: (c) => ({ applicationId: application(c), postingId: c.postingId }),
+  },
+  self_declaration_save: { where: "career", args: () => ({ topic: "race", preferNotToSay: true }) },
+  self_declaration_list: { where: "career", args: () => ({}) },
   // mudam o estado global ou da sessão: por último
   session_set_category: { where: "fresh", args: () => ({ category: "ingest" }) },
   profile_switch: { where: "terminal", args: (c) => ({ profileId: c.ids.profileId }) },

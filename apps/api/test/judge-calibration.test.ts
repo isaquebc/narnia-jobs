@@ -2,7 +2,9 @@ import type { CalibrationItem } from "@narnia-jobs/core";
 import type { CompleteInput, CompleteResult } from "@narnia-jobs/providers";
 import { describe, expect, it } from "vitest";
 import { calibrateJudges } from "../src/evals/calibration";
+import { savedPostingsText } from "../src/evals/cli-evals";
 import { judgeContext } from "../src/evals/run";
+import { makeTestApp } from "./helpers";
 
 /** Calibração dos juízes (pedido do dono, 2026-10-24): o runner usa o juiz e o pairwise do gate, com o contexto do sandbox. */
 const result = (structured: Record<string, unknown>) =>
@@ -150,5 +152,36 @@ describe("contexto do juiz do recrutador (calibração, 2026-10-24)", () => {
     expect(judgeContext("cartão", "", "Globex Consultoria · Desenvolvedora Backend Sênior")).toBe(
       "cartão\n\n<vagas_salvas>\nGlobex Consultoria · Desenvolvedora Backend Sênior\n</vagas_salvas>",
     );
+  });
+});
+
+describe("vagas salvas no contexto do juiz (2026-10-26)", () => {
+  it("traz a descrição de cada vaga, que é o que o posting_get devolve: citar o que a vaga pede não é invenção", () => {
+    // gate do M5: o juiz via só empresa e cargo e punia "a vaga pede Node.js, TypeScript, PostgreSQL e Kubernetes"
+    const app = makeTestApp();
+    try {
+      app.repos.postings.create({
+        company: "Globex Consultoria",
+        role: "backend",
+        title: "Desenvolvedora Backend Sênior",
+        jdText: "Requisitos: Node.js e Kubernetes. Diferenciais: Kafka.",
+      });
+      app.repos.postings.create({
+        company: "Initech",
+        role: "data_engineering",
+        title: "Analista",
+        jdText: `Requisitos: SQL. ${"x".repeat(5000)}`,
+      });
+      const text = savedPostingsText(app.repos);
+      expect(text).toContain(
+        "Globex Consultoria · Desenvolvedora Backend Sênior\nDescrição: Requisitos: Node.js e Kubernetes. Diferenciais: Kafka.",
+      );
+      expect(text).toContain("Initech · Analista\nDescrição: Requisitos: SQL.");
+      // descrição longa cortada: o contexto do juiz não cresce sem limite
+      expect(text.length).toBeLessThan(3000);
+      expect(text).toContain("…");
+    } finally {
+      app.cleanup();
+    }
   });
 });

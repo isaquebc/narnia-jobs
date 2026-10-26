@@ -51,6 +51,7 @@ import { type ProposalsRepo, proposalsRepo } from "./proposals";
 import { type ReadingsRepo, readingsRepo } from "./readings";
 import { type RelevanceRepo, relevanceRepo } from "./relevance";
 import { type SalaryReferencesRepo, salaryReferencesRepo } from "./salary-references";
+import { type SelfDeclarationsRepo, selfDeclarationsRepo } from "./self-declarations";
 import { type SettingsRepo, settingsRepo } from "./settings";
 import { type SnapshotsRepo, snapshotsRepo } from "./snapshots";
 import { type SourceFilesRepo, sourceFilesRepo } from "./source-files";
@@ -100,6 +101,8 @@ export interface Repos {
   // F12
   extension: ExtensionRepo;
   applications: ApplicationsRepo;
+  /** F12-12: autodeclaração, fora dos fatos. */
+  selfDeclarations: SelfDeclarationsRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -163,6 +166,7 @@ export function createRepos(db: Db): Repos {
     cvTemplates: cvTemplatesRepo(db),
     extension: extensionRepo(db),
     applications: applicationsRepo(db),
+    selfDeclarations: selfDeclarationsRepo(db),
   };
 }
 

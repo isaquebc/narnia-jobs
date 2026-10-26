@@ -1262,6 +1262,11 @@ export const ptBR = {
     views: "O que mostrar",
     askInChat: "Ajustar no chat",
     askDraft: 'Sobre a pergunta "{question}": ',
+    pasteDescription: "Colar a descrição na conversa",
+    pasteDraft: "Esta é a descrição da vaga deste formulário:\n",
+    declareInChat: "Responder no chat",
+    declareDraft: 'Sobre a autodeclaração "{question}": ',
+    declared: "Você declarou no chat (fica só no narnia, fora do CV).",
     chatHint:
       "Converse com o recrutador sobre este formulário: peça para reescrever uma resposta (ela volta para a lista), mudar o CV ou a carta da vaga, ou conte algo novo para entrar nos seus dados depois da revisão.",
     chatSend: "Enviar",

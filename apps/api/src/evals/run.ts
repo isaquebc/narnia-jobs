@@ -16,7 +16,9 @@ export interface EvalRunOptions {
   /** Todos os fatos do usuário (`knownFactsText`): datas e empresas que o recrutador leu pelas tools não são inventadas. */
   knownFacts?: string;
   /** F12/M5: cria um formulário novo no sandbox para cada caso aberto pela conversa do formulário. */
-  newApplication?: () => string;
+  newApplication?: (o?: { withPosting?: boolean }) => string;
+  /** Antes de cada caso de feedback do documento: o CV da vaga volta à versão pronta (amostras repetidas). */
+  readyPostingCv?: () => void;
   /** Vagas salvas (empresa e cargo, uma por linha): citar a empresa da vaga não é inventar (F12/M5). */
   savedPostings?: string;
 }
@@ -113,18 +115,22 @@ export async function runEvalCases(
     let sessionId = "";
     try {
       let first = 0;
-      if (c.open === "application_chat") {
+      if (c.open === "application_chat" || c.open === "application_chat_no_posting") {
         // F12/M5: conversa do formulário pela janela da extensão, num formulário novo da vaga do sandbox
         if (!o.newApplication) throw new Error("sandbox sem formulário para a conversa");
         sessionId = (
-          await call<{ session: { id: string } }>(`/api/applications/${o.newApplication()}/chat`, {
-            method: "POST",
-            body: JSON.stringify({ message: c.messages[0] }),
-          })
+          await call<{ session: { id: string } }>(
+            `/api/applications/${o.newApplication({ withPosting: c.open === "application_chat" })}/chat`,
+            {
+              method: "POST",
+              body: JSON.stringify({ message: c.messages[0] }),
+            },
+          )
         ).session.id;
         await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000);
         first = 1;
       } else if (c.open === "document_feedback") {
+        o.readyPostingCv?.();
         // "Regerar com mensagem": o CV pronto da vaga do sandbox (um caso anterior pode ter deixado outro CV em
         // geração), com a primeira mensagem como feedback
         const { documents } = await call<{

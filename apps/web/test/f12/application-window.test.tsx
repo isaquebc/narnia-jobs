@@ -333,3 +333,102 @@ describe("F12/M5 · conversa do formulário na janela", () => {
     );
   });
 });
+
+describe("F12/M5 · sem vaga (F12-11) e autodeclaração (F12-12)", () => {
+  const raca = (prefill: string | null) =>
+    q("q5", {
+      question: "Raça/cor",
+      kind: "self_declaration",
+      topic: "race",
+      options: [
+        { value: "b", label: "Branco(a)" },
+        { value: "p", label: "Pardo(a)" },
+      ],
+      prefill,
+      section: "Perguntas",
+    });
+
+  it("sem vaga ligada: colar a descrição na conversa", async () => {
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () =>
+          ({
+            application: application({ postingId: null, posting: null, chatSessionId: null }),
+          }) as never,
+        listPostings: async () => ({ postings: [] }),
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Colar a descrição na conversa" }),
+    );
+    expect(screen.getByRole("textbox", { name: "Mensagem para o recrutador" })).toHaveValue(
+      "Esta é a descrição da vaga deste formulário:\n",
+    );
+  });
+
+  it("autodeclaração não dada: responder no chat; já dada: a opção da página com Preencher, fora do Preencher todos", async () => {
+    let current = application({ chatSessionId: null });
+    current.questions[4] = raca(null) as never;
+    const { unmount } = renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () => ({ application: current }) as never,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    let list = await screen.findByRole("list", { name: "Perguntas do formulário" });
+    let item = within(list).getAllByRole("listitem")[4] as HTMLElement;
+    await userEvent.click(within(item).getByRole("button", { name: "Responder no chat" }));
+    expect(screen.getByRole("textbox", { name: "Mensagem para o recrutador" })).toHaveValue(
+      'Sobre a autodeclaração "Raça/cor": ',
+    );
+    unmount();
+
+    current = application({ chatSessionId: null });
+    current.questions[4] = raca("Pardo(a)") as never;
+    const bridge: unknown[] = [];
+    document.documentElement.dataset.narniaExtension = "1";
+    const onMessage = (e: MessageEvent) => {
+      const d = e.data as { source?: string; id?: string; request?: unknown };
+      if (d?.source !== "narnia-web") return;
+      bridge.push(d.request);
+      window.postMessage(
+        { source: "narnia-ext", id: d.id, response: { ok: true, filled: ["f1"], failed: [] } },
+        "*",
+      );
+    };
+    window.addEventListener("message", onMessage);
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({ capture }) as never,
+        getApplication: async () => ({ application: current }) as never,
+      },
+      initialUrl: "/candidatura?captura=c1&aba=7",
+    });
+    list = await screen.findByRole("list", { name: "Perguntas do formulário" });
+    item = within(list).getAllByRole("listitem")[4] as HTMLElement;
+    expect(item).toHaveTextContent("Pardo(a)");
+    expect(item).toHaveTextContent("Você declarou no chat");
+    await userEvent.click(within(item).getByRole("button", { name: "Preencher" }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(bridge).toContainEqual(
+      expect.objectContaining({ items: [{ ref: "f1", value: "Pardo(a)" }] }),
+    );
+    bridge.length = 0;
+    await userEvent.click(screen.getByRole("button", { name: "Preencher todos" }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    const all = bridge[0] as { items: Array<{ value: string }> };
+    expect(all.items.map((x) => x.value)).not.toContain("Pardo(a)");
+    window.removeEventListener("message", onMessage);
+    delete document.documentElement.dataset.narniaExtension;
+  });
+});

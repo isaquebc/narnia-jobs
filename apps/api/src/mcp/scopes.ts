@@ -29,6 +29,7 @@ const CAREER = [
   // F05: CV e carta (gerar, ler, alterar) e botões sugeridos na mensagem
   "cv.",
   "application.",
+  "self_declaration.",
   "ui.",
   "evidence.",
   "fact.",

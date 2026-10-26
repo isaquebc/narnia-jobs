@@ -2,6 +2,7 @@ import {
   APPLICATION_ANSWER_TASK,
   APPLICATION_TASKS,
   type ApplicationFormRecord,
+  declarationAnswer,
   prefillValue,
   type Repos,
 } from "@narnia-jobs/core";
@@ -48,7 +49,12 @@ export function applicationView(repos: Repos, f: ApplicationFormRecord): Applica
     profileId: f.profileId,
     questions: f.questions.map((q) => ({
       ...q,
-      prefill: q.profileField ? prefillValue(repos, q.profileField) : null,
+      // F12-12: autodeclaração já dada no chat vira a opção da página, pelo código
+      prefill: q.profileField
+        ? prefillValue(repos, q.profileField)
+        : q.kind === "self_declaration"
+          ? declarationAnswer(repos, q)
+          : null,
       answer: answers.get(q.id) ?? null,
     })),
     answersStatus: f.answersStatus,

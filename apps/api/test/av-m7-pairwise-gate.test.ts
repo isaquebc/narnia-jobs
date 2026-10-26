@@ -83,6 +83,12 @@ describe("M7 · gate pairwise", () => {
   }
   const candidate = (ids: string[]) => ids.map((id) => run(id, `candidata ${id}`));
 
+  it("--samples=N e --noise entram nas flags (só quando passados)", () => {
+    expect(gateFlags(["--gate", "--samples=3"])).toMatchObject({ gate: true, samples: 3 });
+    expect(gateFlags(["--noise"])).toMatchObject({ noise: true });
+    expect(gateFlags(["--samples=0"]).samples).toBeUndefined();
+  });
+
   it("--fixes=a,b entra nas flags", () => {
     expect(gateFlags(["--gate", "--fixes=c1,c2"])).toEqual({
       gate: true,
@@ -274,5 +280,329 @@ describe("M7 · gate pairwise", () => {
     });
     expect(r.cases.map((c) => c.exampleId)).toEqual(["a"]);
     expect(j.calls()).toBe(2);
+  });
+});
+
+/** Juiz pelo conteúdo da candidata: "GANHA" vence, "PERDE" perde, o resto empata. */
+function contentJudge() {
+  let calls = 0;
+  const provider = {
+    complete: async (i: CompleteInput): Promise<CompleteResult> => {
+      calls++;
+      const candidateFirst = i.prompt.indexOf("candidata") < i.prompt.indexOf("aprovada");
+      const verdict = i.prompt.includes("GANHA") ? 1 : i.prompt.includes("PERDE") ? -1 : 0;
+      const candidatePos = candidateFirst ? "A" : "B";
+      const other = candidateFirst ? "B" : "A";
+      const vencedor = verdict > 0 ? candidatePos : verdict < 0 ? other : "empate";
+      return {
+        text: "",
+        structured: { vencedor, explicacao: "" },
+        model: "m",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          model: "m",
+        },
+        costUsd: 0,
+      };
+    },
+  };
+  return { provider, calls: () => calls };
+}
+
+describe("gate robusto (2026-10-25) · casos afetados, amostras e ruído", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  const KEY = "narnia-chat";
+  function setup(approved: ApprovedCase[], baselines?: Record<string, unknown>) {
+    const d = mkdtempSync(join(tmpdir(), "narnia-robusto-"));
+    dirs.push(d);
+    const path = join(d, "baselines.json");
+    mkdirSync(join(d, "approved"));
+    const file = join(d, "approved", `${KEY}.jsonl`);
+    writeFileSync(file, serializeApproved(approved));
+    if (baselines) writeFileSync(path, JSON.stringify(baselines));
+    return { path, file };
+  }
+  const approvedWith = (id: string, deps: Record<string, string>) => ({
+    ...approvedCase(id, "v1"),
+    deps,
+  });
+  const candidateRun = (id: string, deps: Record<string, string>, ...texts: string[]) => ({
+    ...run(id, `candidata ${texts[0] ?? ""}`),
+    deps,
+    samples: texts.slice(1).map((t) => out(`candidata ${t}`)),
+  });
+  const BASE = { "narnia-recrutador": "r1" };
+  const FORM = { ...BASE, "narnia-skill-responder-candidatura": "s1" };
+  const FORM2 = { ...BASE, "narnia-skill-responder-candidatura": "s2" };
+
+  it("só compara os casos cujas dependências mudaram; os outros mantêm a aprovada", async () => {
+    const { path, file } = setup([approvedWith("vaga", BASE), approvedWith("form", FORM)]);
+    const j = contentJudge();
+    const g = new BaselineGate({ gate: true, update: true, fixes: [] }, path);
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: j.provider,
+      runs: [candidateRun("vaga", BASE, "PERDE"), candidateRun("form", FORM2, "GANHA")],
+    });
+    expect(r.status).toBe("comparado");
+    expect(r.cases.map((c) => [c.exampleId, c.outcome])).toEqual([["form", "ganhou"]]);
+    expect(r.skipped).toEqual(["vaga"]);
+    expect(j.calls()).toBe(2);
+    expect(g.finish(() => undefined)).toBe(false);
+    const saved = parseApproved(readFileSync(file, "utf8"));
+    expect(saved.find((c) => c.exampleId === "vaga")?.output).toEqual(out("aprovada vaga"));
+    expect(saved.find((c) => c.exampleId === "form")?.deps).toEqual(FORM2);
+  });
+
+  it("nenhum caso afetado: igual, sem juiz; caso novo entra na aprovada com --update-baseline", async () => {
+    const { path, file } = setup([approvedWith("vaga", BASE)]);
+    const j = contentJudge();
+    const g = new BaselineGate({ gate: true, update: true, fixes: [] }, path);
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: j.provider,
+      runs: [candidateRun("vaga", BASE, "x"), candidateRun("novo", FORM, "y")],
+    });
+    expect(r.status).toBe("igual");
+    expect(j.calls()).toBe(0);
+    expect(g.finish(() => undefined)).toBe(false);
+    expect(parseApproved(readFileSync(file, "utf8")).map((c) => [c.exampleId, c.output])).toEqual([
+      ["novo", out("candidata y")],
+      ["vaga", out("aprovada vaga")],
+    ]);
+  });
+
+  it("aprovada sem dependências registradas (arquivo antigo): o caso conta como mudado", async () => {
+    const { path } = setup([approvedCase("vaga", "v1")]);
+    const g = new BaselineGate({ gate: true, update: false, fixes: [] }, path);
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: contentJudge().provider,
+      runs: [candidateRun("vaga", BASE, "GANHA")],
+    });
+    expect(r.cases.map((c) => c.outcome)).toEqual(["ganhou"]);
+  });
+
+  it("várias amostras: o caso vale pela maioria (uma vitória de sorte não decide)", async () => {
+    const { path } = setup([approvedWith("a", FORM), approvedWith("b", FORM)]);
+    const j = contentJudge();
+    const g = new BaselineGate({ gate: true, update: false, fixes: [] }, path);
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: j.provider,
+      runs: [
+        candidateRun("a", FORM2, "GANHA", "x", "PERDE"),
+        candidateRun("b", FORM2, "GANHA", "GANHA", "x"),
+      ],
+    });
+    expect(j.calls()).toBe(12);
+    expect(r.cases.map((c) => [c.exampleId, c.outcome])).toEqual([
+      ["a", "empate"],
+      ["b", "ganhou"],
+    ]);
+    expect(r.cases[0]?.explanation).toMatch(/3 amostras: 1 vitória, 1 derrota, 1 empate/);
+    // o placar soma as amostras (decisão do dono 2026-10-26), não a maioria por caso
+    expect(r.decision).toMatchObject({ wins: 3, losses: 1, ties: 2 });
+  });
+
+  it("amostras novas da versão aprovada (against): cada amostra da candidata contra a sua par, não contra a guardada", async () => {
+    const { path } = setup([approvedWith("a", FORM)]);
+    const prompts: string[] = [];
+    const j = contentJudge();
+    const provider = {
+      complete: (i: CompleteInput) => {
+        prompts.push(i.prompt);
+        return j.provider.complete(i);
+      },
+    };
+    const g = new BaselineGate({ gate: true, update: false, fixes: [] }, path);
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider,
+      runs: [
+        {
+          ...candidateRun("a", FORM2, "GANHA", "GANHA"),
+          against: [out("aprovada nova 1"), out("aprovada nova 2")],
+        },
+      ],
+    });
+    expect(r.cases[0]?.outcome).toBe("ganhou");
+    expect(prompts.some((p) => p.includes("aprovada nova 1"))).toBe(true);
+    expect(prompts.some((p) => p.includes("aprovada nova 2"))).toBe(true);
+    expect(prompts.some((p) => p.includes("aprovada a"))).toBe(false);
+  });
+
+  it("margem pelo ruído medido: 2 vitórias contra 1 derrota não bastam com ruído alto", async () => {
+    const approved = ["a", "b", "c", "d", "e", "f", "g", "h", "i"].map((id) =>
+      approvedWith(id, FORM),
+    );
+    const { path } = setup(approved, {
+      [`ruido:${KEY}`]: { scores: { decisivos_por_amostra: 1 }, updatedAt: "t" },
+    });
+    const g = new BaselineGate({ gate: true, update: false, fixes: [] }, path);
+    const texts = ["GANHA", "GANHA", "PERDE", "x", "x", "x", "x", "x", "x"];
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: contentJudge().provider,
+      runs: approved.map((a, i) => candidateRun(a.exampleId, FORM2, texts[i] as string)),
+    });
+    expect(r.decision).toMatchObject({ passed: false, wins: 2, losses: 1 });
+    expect(r.decision?.reason).toMatch(/margem do ruído: 3/);
+    expect(g.finish(() => undefined)).toBe(true);
+  });
+
+  it("--feature entra nas flags", () => {
+    expect(gateFlags(["--gate", "--feature=n1,n2"]).feature).toEqual(["n1", "n2"]);
+    expect(gateFlags(["--gate"]).feature).toBeUndefined();
+  });
+
+  it("--feature: caso antigo afetado pode perder dentro do ruído; casos novos passam e entram na aprovada", async () => {
+    const { path, file } = setup([approvedWith("a", FORM), approvedWith("b", FORM)], {
+      [`ruido:${KEY}`]: { scores: { decisivos_por_amostra: 0.8 }, updatedAt: "t" },
+    });
+    const g = new BaselineGate({ gate: true, update: true, fixes: [], feature: ["novo"] }, path);
+    const r = await g.pairwise(KEY, {
+      versionId: "v2",
+      commit: "c2",
+      judge,
+      provider: contentJudge().provider,
+      runs: [
+        candidateRun("a", FORM2, "PERDE"),
+        candidateRun("b", FORM2, "x"),
+        candidateRun("novo", FORM2, "y"),
+      ],
+      features: [{ exampleId: "novo", passed: true, detail: "3 de 3 amostras" }],
+    });
+    expect(r.decision).toMatchObject({ passed: true, wins: 0, losses: 1 });
+    expect(r.decision?.reason).toMatch(/não-inferior/);
+    const log: string[] = [];
+    expect(g.finish((l) => log.push(l))).toBe(false);
+    expect(log.join("\n")).toMatch(/novo.*3 de 3 amostras/);
+    expect(parseApproved(readFileSync(file, "utf8")).map((c) => c.exampleId)).toEqual([
+      "a",
+      "b",
+      "novo",
+    ]);
+  });
+
+  it("--feature por amostra: a margem conta os pares (casos × amostras) e o saldo soma as amostras", async () => {
+    const attempt = async (a: string[], b: string[]) => {
+      const { path } = setup([approvedWith("a", FORM), approvedWith("b", FORM)], {
+        [`ruido:${KEY}`]: { scores: { decisivos_por_amostra: 0.5 }, updatedAt: "t" },
+      });
+      const g = new BaselineGate({ gate: true, update: false, fixes: [], feature: ["novo"] }, path);
+      const r = await g.pairwise(KEY, {
+        versionId: "v2",
+        commit: "c2",
+        judge,
+        provider: contentJudge().provider,
+        runs: [
+          candidateRun("a", FORM2, ...a),
+          candidateRun("b", FORM2, ...b),
+          candidateRun("novo", FORM2, "y"),
+        ],
+        features: [{ exampleId: "novo", passed: true, detail: "5 de 5 amostras" }],
+      });
+      return r.decision;
+    };
+    // 10 pares com metade decidida pelo acaso: margem ⌈√5⌉ = 3
+    expect(
+      await attempt(["PERDE", "PERDE", "GANHA", "x", "x"], ["PERDE", "x", "x", "x", "GANHA"]),
+    ).toMatchObject({ passed: true, wins: 2, losses: 3, ties: 5 });
+    const bad = await attempt(
+      ["PERDE", "PERDE", "PERDE", "PERDE", "x"],
+      ["PERDE", "PERDE", "x", "x", "x"],
+    );
+    expect(bad).toMatchObject({ passed: false, wins: 0, losses: 6 });
+    expect(bad?.reason).toMatch(/margem: 3/);
+  });
+
+  it("--feature: caso novo reprovado, ausente ou que já tem aprovada reprova o gate", async () => {
+    const { path } = setup([approvedWith("a", FORM)]);
+    const attempt = async (
+      feature: string[],
+      features: Array<{ exampleId: string; passed: boolean; detail: string }>,
+    ) => {
+      const g = new BaselineGate({ gate: true, update: false, fixes: [], feature }, path);
+      const r = await g.pairwise(KEY, {
+        versionId: "v2",
+        commit: "c2",
+        judge,
+        provider: contentJudge().provider,
+        runs: [candidateRun("a", FORM, "x"), candidateRun("novo", FORM2, "y")],
+        features,
+      });
+      return { r, failed: g.finish(() => undefined) };
+    };
+    const bad = await attempt(["novo"], [{ exampleId: "novo", passed: false, detail: "1 de 3" }]);
+    expect(bad.failed).toBe(true);
+    expect(bad.r.decision?.reason).toMatch(/caso novo reprovado: novo/);
+    expect((await attempt(["sumiu"], [])).r.decision?.reason).toMatch(/não rodou: sumiu/);
+    expect(
+      (await attempt(["a"], [{ exampleId: "a", passed: true, detail: "" }])).r.decision?.reason,
+    ).toMatch(/já tem aprovada: a/);
+  });
+
+  it("A contra A: mede a fração de casos que o acaso decide nos casos sem mudança e grava como ruído", async () => {
+    const { path } = setup([
+      approvedWith("a", BASE),
+      approvedWith("b", BASE),
+      approvedWith("c", FORM),
+    ]);
+    const g = new BaselineGate({ gate: false, update: false, fixes: [] }, path);
+    const noise = await g.measureNoise(KEY, {
+      judge,
+      provider: contentJudge().provider,
+      runs: [
+        candidateRun("a", BASE, "GANHA", "GANHA", "x"),
+        candidateRun("b", BASE, "GANHA", "x", "PERDE"),
+        candidateRun("c", FORM2, "GANHA"),
+      ],
+      spreads: { "chat:juiz": 0.09, "chat:avaliadores": 0.02 },
+    });
+    // por amostra: 3 vitórias e 1 derrota em 6 pares
+    expect(noise).toMatchObject({ cases: 2, samples: 3, pairs: 6 });
+    expect(noise.decisiveRate).toBeCloseTo(4 / 6);
+    const log: string[] = [];
+    expect(g.finish((l) => log.push(l))).toBe(false);
+    expect(log.join("\n")).toMatch(/Ruído de narnia-chat.*4 de 6 pares/);
+    const saved = JSON.parse(readFileSync(path, "utf8"));
+    expect(saved[`ruido:${KEY}`].scores).toMatchObject({
+      amostras: 3,
+      casos: 2,
+      pares: 6,
+      "chat:avaliadores": 0.02,
+      "chat:juiz": 0.09,
+    });
+    expect(saved[`ruido:${KEY}`].scores.decisivos_por_amostra).toBeCloseTo(4 / 6);
+    expect(saved[`ruido:${KEY}`].scores.decisivos).toBeUndefined();
+  });
+
+  it("a tolerância da nota média cresce com o ruído medido", () => {
+    const { path } = setup([], {
+      "chat:juiz": { scores: { media: 0.73 }, updatedAt: "t" },
+      [`ruido:${KEY}`]: { scores: { "chat:juiz": 0.1 }, updatedAt: "t" },
+    });
+    const g = new BaselineGate({ gate: true, update: false, fixes: [] }, path);
+    expect(g.record("chat:juiz", { media: 0.67 })).toEqual([]);
+    expect(g.record("chat:juiz", { media: 0.6 })).toHaveLength(1);
   });
 });

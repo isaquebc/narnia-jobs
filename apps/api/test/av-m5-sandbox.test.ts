@@ -3,7 +3,7 @@ import { parseEvalCases } from "@narnia-jobs/core";
 import { MockProvider } from "@narnia-jobs/providers";
 import { afterEach, describe, expect, it } from "vitest";
 import { runEvalCases } from "../src/evals/run";
-import { type EvalSandbox, openEvalSandbox } from "../src/evals/sandbox";
+import { type EvalSandbox, openEvalSandbox, withEvalSandbox } from "../src/evals/sandbox";
 import { makeTestApp, type TestApp } from "./helpers";
 
 /**
@@ -88,6 +88,36 @@ describe("sandbox de avaliação", () => {
     expect(sb.repos.chatSessions.list({})[0]?.postingId).toBe(seeded?.postingId);
   }, 20_000);
 
+  it("amostra seguinte (gate robusto): o CV da vaga com versão na fila (cv_edit sem worker) volta à versão pronta", async () => {
+    sb = await openEvalSandbox({ provider: new MockProvider() });
+    const [seeded] = sb.repos.documents.list({ kind: "cv" });
+    sb.repos.documents.addVersion(seeded?.id ?? "", {
+      source: "edit",
+      instructions: null,
+      factsVersion: sb.repos.settings.getFactsVersion(),
+      postingUpdatedAt: null,
+      profileHash: "x",
+    });
+    expect(sb.repos.documents.currentVersion(seeded?.id ?? "")?.status).not.toBe("ready");
+    const cases = parseEvalCases(
+      '{"id":"feedback","category":"job","open":"document_feedback","messages":["encurte o resumo"],"graders":[{"type":"within_budget","value":"80000"}]}',
+    );
+    const [r] = await runEvalCases(cases, {
+      baseUrl: sb.baseUrl,
+      token: sb.token,
+      turnTimeoutMs: 10000,
+      readyPostingCv: () => sb?.readyPostingCv(),
+    });
+    expect(r?.error ?? null).toBeNull();
+  }, 20_000);
+
+  it("formulário novo começa sem autodeclaração (a amostra anterior guardou uma e o caso seguinte não perguntava)", async () => {
+    sb = await openEvalSandbox({ provider: new MockProvider() });
+    sb.repos.selfDeclarations.set("race", "Parda");
+    sb.newApplication();
+    expect(sb.repos.selfDeclarations.list()).toEqual([]);
+  });
+
   it("o /mcp do sandbox exige o token dele; fechar apaga a pasta e derruba o servidor", async () => {
     sb = await openEvalSandbox({ provider: new MockProvider() });
     const noToken = await fetch(`${sb.baseUrl}/api/profiles`);
@@ -102,4 +132,28 @@ describe("sandbox de avaliação", () => {
     expect(existsSync(dir)).toBe(false);
     await expect(fetch(`${baseUrl}/api/health`)).rejects.toThrow();
   });
+
+  it("cada rodada de amostras num sandbox novo: o que uma criou não aparece na seguinte, e fecha mesmo com erro", async () => {
+    // noise-4 (2026-10-26): no mesmo sandbox, as vagas e as conversas acumulavam entre as rodadas, e o lado A (que roda
+    // por último) via "9 vagas duplicadas" e o limite de conversas abertas
+    const dirs: string[] = [];
+    const counts: number[] = [];
+    for (let k = 0; k < 2; k++)
+      await withEvalSandbox({ provider: new MockProvider() }, async (s) => {
+        dirs.push(s.dir);
+        counts.push(s.repos.postings.list().length);
+        s.repos.postings.create({ company: "Initech", role: "backend", title: "Dev", jdText: "x" });
+      });
+    expect(counts[0]).toBe(counts[1]);
+    expect(dirs[0]).not.toBe(dirs[1]);
+    expect(dirs.some((d) => existsSync(d))).toBe(false);
+    let dir = "";
+    await expect(
+      withEvalSandbox({ provider: new MockProvider() }, async (s) => {
+        dir = s.dir;
+        throw new Error("falhou");
+      }),
+    ).rejects.toThrow("falhou");
+    expect(existsSync(dir)).toBe(false);
+  }, 20_000);
 });

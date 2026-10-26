@@ -35,8 +35,16 @@ export interface EvalSandbox {
   token: string;
   dir: string;
   repos: Repos;
-  /** F12/M5: formulário de candidatura novo, ligado à vaga do sandbox (um por caso: a conversa é por formulário). */
-  newApplication(): string;
+  /**
+   * F12/M5: formulário de candidatura novo, ligado à vaga do sandbox (um por caso: a conversa é por formulário), sem
+   * autodeclaração guardada.
+   */
+  newApplication(o?: { withPosting?: boolean }): string;
+  /**
+   * Volta o CV da vaga à versão pronta do preparo (gate robusto, 2026-10-25): o `cv_edit` de uma amostra anterior deixa
+   * uma versão na fila sem worker, e o caso de feedback da amostra seguinte não achava CV pronto.
+   */
+  readyPostingCv(): void;
   close(): Promise<void>;
 }
 
@@ -85,7 +93,7 @@ export async function openEvalSandbox(o: {
   migrate(db);
   const repos = createRepos(db);
   const seeded = seedFixture(repos, o.fixture ?? "engineer");
-  await seedPostingCv(repos, seeded.profileId);
+  const postingCv = await seedPostingCv(repos, seeded.profileId);
   const token = randomBytes(24).toString("hex");
   const bus = new EventBus();
   let handler: ((req: Request) => Response | Promise<Response>) | null = null;
@@ -128,7 +136,14 @@ export async function openEvalSandbox(o: {
     token,
     dir,
     repos,
-    newApplication: () => seedApplicationForm(repos, seeded.profileId),
+    newApplication: (opts) => {
+      // a autodeclaração é global: a de uma amostra anterior faria o caso seguinte não perguntar (gate robusto)
+      for (const d of repos.selfDeclarations.list()) repos.selfDeclarations.remove(d.topic);
+      return seedApplicationForm(repos, seeded.profileId, opts?.withPosting ?? true);
+    },
+    readyPostingCv: () => {
+      repos.documents.setCurrent(postingCv.documentId, postingCv.version);
+    },
     async close() {
       if (closed) return;
       closed = true;
@@ -141,6 +156,23 @@ export async function openEvalSandbox(o: {
 }
 
 /**
+ * Uma rodada de casos num sandbox novo, fechado no fim mesmo com erro (gate robusto, 2026-10-26): no mesmo sandbox, as
+ * vagas e as conversas de uma rodada de amostras ficavam para a seguinte, e o lado A, que roda por último, via vagas
+ * duplicadas e o limite de conversas abertas (a candidata ganhava 7 de 8 pares decididos contra ela mesma).
+ */
+export async function withEvalSandbox<T>(
+  o: Parameters<typeof openEvalSandbox>[0],
+  fn: (sandbox: EvalSandbox) => Promise<T>,
+): Promise<T> {
+  const sandbox = await openEvalSandbox(o);
+  try {
+    return await fn(sandbox);
+  } finally {
+    await sandbox.close();
+  }
+}
+
+/**
  * Vaga com um CV pronto (casos `open: document_feedback`): o rascunho é o do mock, determinístico, mesmo quando a
  * rodada usa o modelo real (o preparo não gasta tokens; o que se avalia é a conversa de feedback).
  */
@@ -148,14 +180,18 @@ export async function openEvalSandbox(o: {
  * Formulário fictício da vaga do sandbox (F12/M5), como a extensão deixa depois de organizar e responder: a motivação
  * com limite e a resposta do roleplay, o modelo de trabalho (escolha) e o consentimento (fica com a pessoa).
  */
-function seedApplicationForm(repos: Repos, profileId: string): string {
-  const posting = repos.postings.list().find((p) => p.company === "Globex Consultoria");
+function seedApplicationForm(repos: Repos, profileId: string, withPosting: boolean): string {
+  const posting = withPosting
+    ? repos.postings.list().find((p) => p.company === "Globex Consultoria")
+    : null;
   const f = repos.applications.create({
     captureId: `avaliacao-${randomBytes(4).toString("hex")}`,
     postingId: posting?.id ?? null,
     profileId,
-    url: "https://vagas.example/globex/backend/aplicar",
-    title: "Candidatura · Globex Consultoria",
+    url: posting
+      ? "https://vagas.example/globex/backend/aplicar"
+      : "https://vagas.example/aplicar/8812",
+    title: posting ? "Candidatura · Globex Consultoria" : "Candidatura",
     fields: [],
   });
   const base = {
@@ -187,6 +223,23 @@ function seedApplicationForm(repos: Repos, profileId: string): string {
         { value: "presencial", label: "Presencial" },
       ],
       fieldRefs: ["f2"],
+    },
+    {
+      ...base,
+      id: "raca",
+      question: "Raça/cor (autodeclaração)",
+      kind: "self_declaration",
+      topic: "race",
+      required: false,
+      options: [
+        { value: "branca", label: "Branca" },
+        { value: "preta", label: "Preta" },
+        { value: "parda", label: "Parda" },
+        { value: "amarela", label: "Amarela" },
+        { value: "indigena", label: "Indígena" },
+        { value: "nao", label: "Prefiro não informar" },
+      ],
+      fieldRefs: ["f4"],
     },
     {
       ...base,
@@ -254,4 +307,5 @@ async function seedPostingCv(repos: Repos, profileId: string) {
     header: buildCvHeader(repos, profileId, "pt-BR"),
   });
   repos.documents.updateVersion(version.id, { status: "ready", content });
+  return { documentId: doc.id, version: version.version };
 }

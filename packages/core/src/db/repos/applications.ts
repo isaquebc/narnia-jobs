@@ -33,6 +33,8 @@ export interface ApplicationsRepo {
     now?: Date,
   ): ApplicationFormRecord;
   get(id: string): ApplicationFormRecord | null;
+  /** Os mais recentes primeiro (modo B: achar o formulário pela conversa no terminal). */
+  listRecent(limit: number): ApplicationFormRecord[];
   byCapture(captureId: string): ApplicationFormRecord | null;
   /**
    * Perguntas organizadas: o formulário fica pronto. `warning` (o modelo falhou e as perguntas saíram pelos rótulos)
@@ -137,6 +139,13 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
       db.prepare(
         "update application_form set status = 'error', error = ?, updated_at = ? where id = ?",
       ).run(error, now.toISOString(), id);
+    },
+    listRecent(limit) {
+      return (
+        db
+          .prepare("select * from application_form order by updated_at desc, id desc limit ?")
+          .all(limit) as Row[]
+      ).map(map);
     },
     setChatSession(id, sessionId, now = new Date()) {
       db.prepare(

@@ -30,9 +30,10 @@ const EvalCaseSchema = z.object({
   /**
    * Como a conversa abre: padrão, uma sessão nova; `document_feedback`, pelo "Regerar com mensagem" do CV da vaga do
    * sandbox (a primeira mensagem é o feedback; a nota com o contexto vai junto); `application_chat`, pela conversa de
-   * um formulário novo da vaga do sandbox (F12/M5, janela da extensão).
+   * um formulário novo da vaga do sandbox (F12/M5, janela da extensão); `application_chat_no_posting`, o mesmo
+   * formulário sem vaga ligada (F12-11).
    */
-  open: z.enum(["document_feedback", "application_chat"]).optional(),
+  open: z.enum(["document_feedback", "application_chat", "application_chat_no_posting"]).optional(),
   messages: z.array(z.string().min(1)).min(1),
   graders: z.array(GraderSchema).min(1),
 });

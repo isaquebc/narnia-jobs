@@ -1,6 +1,7 @@
 import { APPLICATION_TOOLS, type ApplicationToolName } from "@narnia-jobs/shared";
 import type { z } from "zod";
 import type { Repos } from "../db";
+import { declarationAnswer, PREFER_NOT } from "./self-declaration";
 
 /**
  * Handlers das tools do formulário (F12/M5). `application.answer_save` vale as mesmas travas da edição na janela
@@ -16,6 +17,8 @@ export type ApplicationToolHandlers = {
 export interface ApplicationToolPorts {
   /** Resposta gravada: a api avisa a janela (`application.updated`). */
   changed?(applicationId: string): void;
+  /** Vaga ligada a um formulário pronto: a api enfileira as respostas sugeridas (F12-11). */
+  requestAnswers?(applicationId: string): Promise<void>;
 }
 
 export class ApplicationToolError extends Error {
@@ -31,7 +34,7 @@ const LOCKED = new Set(["consent", "self_declaration", "file"]);
 
 export function createApplicationTools(
   repos: Repos,
-  ctx: { ports: ApplicationToolPorts },
+  ctx: { ports: ApplicationToolPorts; sessionId?: string | null | undefined },
 ): ApplicationToolHandlers {
   const wrap = <N extends ApplicationToolName>(
     name: N,
@@ -48,6 +51,41 @@ export function createApplicationTools(
   };
 
   return {
+    "application.list": wrap("application.list", (i) => ({
+      items: repos.applications.listRecent(i.limit ?? 5).map((f) => ({
+        applicationId: f.id,
+        url: f.url,
+        title: f.title,
+        postingId: f.postingId,
+        status: f.status,
+        updatedAt: f.updatedAt,
+      })),
+    })),
+    "application.link_posting": wrap("application.link_posting", async (i) => {
+      const f = must(i.applicationId);
+      if (!repos.postings.get(i.postingId))
+        throw new ApplicationToolError("posting_not_found", `Vaga não encontrada: ${i.postingId}`);
+      repos.applications.setPosting(f.id, i.postingId);
+      // a conversa do formulário passa a ser a da vaga também (contexto e menu)
+      const s = ctx.sessionId ? repos.chatSessions.get(ctx.sessionId) : null;
+      if (s && s.category === "job" && !s.postingId)
+        repos.chatSessions.setPosting(s.id, i.postingId);
+      const answersRequested = f.status === "ready" && Boolean(ctx.ports.requestAnswers);
+      if (answersRequested) await ctx.ports.requestAnswers?.(f.id);
+      ctx.ports.changed?.(f.id);
+      return { applicationId: f.id, postingId: i.postingId, answersRequested };
+    }),
+    "self_declaration.list": wrap("self_declaration.list", () => ({
+      items: repos.selfDeclarations.list().map((d) => ({
+        topic: d.topic,
+        value: d.value === PREFER_NOT ? null : d.value,
+        preferNotToSay: d.value === PREFER_NOT,
+      })),
+    })),
+    "self_declaration.save": wrap("self_declaration.save", (i) => {
+      repos.selfDeclarations.set(i.topic, i.preferNotToSay ? PREFER_NOT : (i.value as string));
+      return { topic: i.topic };
+    }),
     "application.get": wrap("application.get", (i) => {
       const f = must(i.applicationId);
       const answers = repos.applications.latestAnswers(f.id);
@@ -58,6 +96,7 @@ export function createApplicationTools(
         postingId: f.postingId,
         questions: f.questions.map((q) => {
           const a = answers.find((x) => x.questionId === q.id);
+          const declared = q.kind === "self_declaration" && q.topic !== null;
           return {
             questionId: q.id,
             question: q.question,
@@ -65,10 +104,11 @@ export function createApplicationTools(
             required: q.required,
             options: q.options.map((o) => o.label),
             maxChars: q.maxChars,
-            answer: a?.answer ?? null,
+            answer: declared ? declarationAnswer(repos, q) : (a?.answer ?? null),
             source: a?.source ?? null,
             gap: a?.gap ?? null,
             editable: !LOCKED.has(q.kind),
+            declared: declared && repos.selfDeclarations.get(q.topic as never) !== null,
           };
         }),
       };
