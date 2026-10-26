@@ -10,9 +10,23 @@ export function usageSummary(repos: Repos) {
       .summarizeByCategory()
       .map((r) => [r.category, r.inputTokens + r.outputTokens]),
   );
+  // redução de custo (2026-10-26): por categoria, com chamadas, cache e custo, da mais cara para a mais barata
+  const categories = repos.usageEvents
+    .summarizeByCategory()
+    .map((r) => ({
+      category: r.category,
+      events: r.events,
+      tokens: r.inputTokens + r.outputTokens,
+      cacheRead: r.cacheRead,
+      cacheWrite: r.cacheWrite,
+      costUsd: r.costUsdEst,
+    }))
+    .sort((a, b) => b.costUsd - a.costUsd || b.tokens - a.tokens);
   return {
     totalTokens: repos.usageEvents.totalTokens(),
+    totalCostUsd: Math.round(categories.reduce((n, c) => n + c.costUsd, 0) * 1e6) / 1e6,
     byCategory,
+    categories,
     byModel: repos.usageEvents.summarizeByModel(),
   };
 }

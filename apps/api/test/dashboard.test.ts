@@ -75,6 +75,19 @@ describe("M4/api dashboard", () => {
     expect(body.profile?.name).toBe(VALID_PROFILE.name);
     expect(body.counts).toEqual({ experiences: 2, skills: 6, education: 1, files: 1, projects: 0 });
     expect(body.usage.totalTokens).toBe(110);
+    // redução de custo (2026-10-26): por categoria, com chamadas, cache e custo
+    const usage = (await (await t.api("/api/usage/summary")).json()) as {
+      categories: Array<Record<string, unknown>>;
+      totalCostUsd: number;
+    };
+    expect(usage.categories).toContainEqual({
+      category: "ingest.facts",
+      events: 1,
+      tokens: 110,
+      cacheRead: 0,
+      cacheWrite: 0,
+      costUsd: 0,
+    });
     expect(body.pendingResearch).toBe(1);
   });
 

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Dashboard } from "../../src/features/dashboard/Dashboard";
 import { renderWithProviders } from "../helpers";
@@ -169,5 +169,61 @@ describe("Dashboard · F02: resumo do cartão, ênfases e banner de sugestão", 
     );
     expect(screen.getByRole("button", { name: "Dispensar" })).toBeInTheDocument();
     expect(api).toBeTruthy();
+  });
+
+  it("uso por categoria, da mais cara para a mais barata, com chamadas, cache e custo (redução de custo, 2026-10-26)", async () => {
+    renderWithProviders(<Dashboard />, {
+      api: {
+        getDashboard: async () => ({
+          profile,
+          counts: { experiences: 0, skills: 0, education: 0, files: 0, projects: 0 },
+          usage: {
+            totalTokens: 52000,
+            byCategory: {},
+            totalCostUsd: 1.25,
+            categories: [
+              {
+                category: "chat.job",
+                events: 4,
+                tokens: 30000,
+                cacheRead: 200000,
+                cacheWrite: 9000,
+                costUsd: 1,
+              },
+              {
+                category: "chat.job.subagente",
+                events: 4,
+                tokens: 20000,
+                cacheRead: 90000,
+                cacheWrite: 0,
+                costUsd: 0,
+              },
+              {
+                category: "cv.generate",
+                events: 2,
+                tokens: 2000,
+                cacheRead: 0,
+                cacheWrite: 0,
+                costUsd: 0.25,
+              },
+            ],
+          },
+          pendingResearch: 0,
+          card: null,
+          emphasis: { highlighted: 0, hidden: 0 },
+          suggestions: 0,
+        }),
+        getUser: async () => ({ user: null }),
+      },
+      timezone: "America/Sao_Paulo",
+    });
+    const table = await screen.findByRole("table", { name: "Uso por categoria" });
+    const rows = within(table).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("chat.job");
+    expect(rows[1]).toHaveTextContent("US$ 1,00");
+    expect(rows[1]).toHaveTextContent("200k");
+    expect(rows[2]).toHaveTextContent("chat.job.subagente");
+    expect(rows[2]).toHaveTextContent("no custo da conversa");
+    expect(screen.getByText(/US\$ 1,25 no total/)).toBeInTheDocument();
   });
 });

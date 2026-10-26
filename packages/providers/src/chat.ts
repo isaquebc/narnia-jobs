@@ -26,7 +26,8 @@ export type ChatEvent =
    * Uma resposta do modelo dentro do turno (mensagem `assistant` do SDK): modelo exato e uso daquela chamada. O CLI
    * repete a mesma mensagem por bloco de conteúdo, com o mesmo `messageId` (o rastro fica com o último uso).
    */
-  | { type: "llm_message"; messageId: string; model: string; usage: Usage }
+  /** `subagent`: resposta de dentro de um subagente (o `usage` do resultado do SDK conta só o agente principal). */
+  | { type: "llm_message"; messageId: string; model: string; usage: Usage; subagent?: true }
   | {
       type: "turn_end";
       text: string;
@@ -86,6 +87,8 @@ export interface ChatAgentDefinition {
   model?: string;
   tools?: string[];
   disallowedTools?: string[];
+  /** Teto de voltas do subagente (redução de custo, 2026-10-26): sem ele, o ciclo de buscas não tem limite. */
+  maxTurns?: number;
 }
 
 export interface ChatHandle {
@@ -295,6 +298,7 @@ export function normalizeSdkChatMessage(m: SdkChatMessageLike, model: string): C
               messageId: m.message.id,
               model: m.message.model ?? model,
               usage: usageOf(m.message.usage, m.message.model ?? model),
+              ...(m.parent_tool_use_id ? { subagent: true as const } : {}),
             },
           ]
         : [];

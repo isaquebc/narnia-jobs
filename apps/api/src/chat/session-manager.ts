@@ -24,6 +24,7 @@ import type {
 } from "@narnia-jobs/providers";
 import {
   annotateSpan,
+  CHAT_TOOLS,
   type ChatCategory,
   type ChatSession,
   type ChatToolCall,
@@ -34,7 +35,7 @@ import {
   type SpanHandle,
 } from "@narnia-jobs/shared";
 import type { EventBus } from "../events";
-import { NATIVE_TOOLS } from "../mcp/scopes";
+import { NATIVE_TOOLS, publishedName } from "../mcp/scopes";
 import {
   pluginDir,
   readPluginFile,
@@ -126,6 +127,11 @@ interface Live {
   /** Execuções criadas pelas tools de ingestão do turno (evento do `/mcp`), na ordem: vão para a tool call. */
   pendingRuns: string[];
   toolStarts: Map<string, { name: string; args: string; t0: number; subagent?: boolean }>;
+  /**
+   * Uso das respostas de dentro dos subagentes no turno, por mensagem (vale a última repetição): o `usage` do resultado
+   * do SDK conta só o agente principal, então esses tokens viram um evento próprio (redução de custo, 2026-10-26).
+   */
+  subagentUsage?: Map<string, Usage> | undefined;
   /** F04/M5: rastro do turno em andamento (no-op sem NARNIA_OTEL_ENDPOINT). */
   trace?: TurnTrace | undefined;
   /** System prompt com que o processo foi aberto (entrada da 1ª chamada ao modelo no rastro). */
@@ -556,6 +562,7 @@ export class SessionManager {
       toolCalls: [],
       pendingRuns: [],
       toolStarts: new Map(),
+      subagentUsage: new Map(),
       trace,
       interrupting: false,
       needsBreak: false,
@@ -658,6 +665,7 @@ export class SessionManager {
     if (entry.busy) entry.trace?.onEvent(e);
     switch (e.type) {
       case "llm_message":
+        if (e.subagent) entry.subagentUsage?.set(e.messageId, e.usage);
         return;
       case "init":
         entry.inited = true;
@@ -810,6 +818,24 @@ export class SessionManager {
         turnIndex: entry.turnIndex,
       },
     );
+    // os tokens dos subagentes (o custo deles já está no total do SDK, no evento acima)
+    const sub = [...(entry.subagentUsage?.values() ?? [])];
+    entry.subagentUsage = new Map();
+    if (sub.length > 0)
+      this.repos.usageEvents.insert({
+        id: newId(),
+        ts: nowUtc(),
+        origin: "narnia",
+        category: `chat.${s.category}.subagente`,
+        jobId: null,
+        sessionId: id,
+        model: sub[0]?.model ?? usage.model,
+        inputTokens: sub.reduce((n, u) => n + u.inputTokens, 0),
+        outputTokens: sub.reduce((n, u) => n + u.outputTokens, 0),
+        cacheRead: sub.reduce((n, u) => n + u.cacheReadTokens, 0),
+        cacheWrite: sub.reduce((n, u) => n + u.cacheWriteTokens, 0),
+        costUsdEst: 0,
+      });
     this.repos.chatSessions.addUsage(id, {
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
@@ -1190,6 +1216,14 @@ export class SessionManager {
  * (`plugin/agents/recrutador-especializado.md`): descrição e modelo do frontmatter, corpo como prompt. O especializado
  * não chama outros subagentes.
  */
+const SPECIALIST_TOOLS = [
+  "profile.get_card",
+  "posting.get",
+  "fact.search",
+  ...Object.keys(CHAT_TOOLS).filter((n) => n.startsWith("evidence.")),
+];
+const SPECIALIST_MAX_TURNS = 15;
+
 export function specialistAgents(dir?: string): Record<string, ChatAgentDefinition> {
   const { frontmatter, body } = splitFrontmatter(
     readPluginFile("agents/recrutador-especializado.md", dir),
@@ -1201,7 +1235,11 @@ export function specialistAgents(dir?: string): Record<string, ChatAgentDefiniti
       description: field("description") ?? "Recrutador especializado em um perfil do usuário.",
       prompt: body.trim(),
       model: field("model") ?? "sonnet",
+      // redução de custo (2026-10-26): só as tools de leitura que o especializado usa (sem elas, ele herdava os
+      // esquemas de todas as tools da conversa e a pesquisa web, que ele não pode usar), e um teto de voltas
+      tools: SPECIALIST_TOOLS.map((t) => `mcp__narnia-jobs__${publishedName(t)}`),
       disallowedTools: ["Agent"],
+      maxTurns: SPECIALIST_MAX_TURNS,
     },
   };
 }

@@ -1,6 +1,14 @@
 import { seedFixture } from "@narnia-jobs/core";
 import { type ChatHandle, type ChatOpenOptions, MockProvider } from "@narnia-jobs/providers";
-import type { AnyWsEvent } from "@narnia-jobs/shared";
+import {
+  type AnyWsEvent,
+  APPLICATION_TOOLS,
+  CHAT_TOOLS,
+  CV_TOOLS,
+  INGEST_TOOLS,
+  POSTING_TOOLS,
+  PROFILE_TOOLS,
+} from "@narnia-jobs/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { specialistAgents } from "../src/chat/session-manager";
 import { makeTestApp, type TestApp } from "./helpers";
@@ -132,5 +140,33 @@ describe("F06/M1 · recrutador global", () => {
     expect(a?.description).toMatch(/profileId/);
     expect(a?.prompt).toMatch(/profile_get_card/);
     expect(a?.prompt).not.toMatch(/^---/);
+  });
+
+  it("redução de custo (2026-10-26): o especializado só recebe as tools de leitura que usa, sem pesquisa web, e tem teto de turnos", () => {
+    const a = specialistAgents()["recrutador-especializado"];
+    const published = new Set(
+      [
+        ...Object.keys(PROFILE_TOOLS),
+        ...Object.keys(POSTING_TOOLS),
+        ...Object.keys(CV_TOOLS),
+        ...Object.keys(APPLICATION_TOOLS),
+        ...Object.keys(INGEST_TOOLS),
+        ...Object.keys(CHAT_TOOLS),
+      ].map((n) => `mcp__narnia-jobs__${n.replaceAll(".", "_")}`),
+    );
+    expect(a?.tools).toEqual(
+      expect.arrayContaining([
+        "mcp__narnia-jobs__profile_get_card",
+        "mcp__narnia-jobs__posting_get",
+        "mcp__narnia-jobs__fact_search",
+        "mcp__narnia-jobs__evidence_experience_get",
+      ]),
+    );
+    // todas existem no /mcp (nome errado = subagente sem dados)
+    expect(a?.tools?.filter((t) => !published.has(t))).toEqual([]);
+    expect(
+      a?.tools?.some((t) => /WebSearch|WebFetch|Agent|_save|_create|_update|ingest_/.test(t)),
+    ).toBe(false);
+    expect(a?.maxTurns).toBeGreaterThan(5);
   });
 });

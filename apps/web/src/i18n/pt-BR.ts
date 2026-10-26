@@ -1037,6 +1037,17 @@ export const ptBR = {
     usage: "Uso do plano",
     usageTokens: "{tokens} tokens até agora",
     usageByCategory: "por categoria",
+    usageTable: "Uso por categoria",
+    usageTotalCost:
+      "{cost} no total (custo estimado pelo Claude Code; na assinatura, conta para o limite do plano)",
+    usageInSession: "no custo da conversa",
+    usageCols: {
+      category: "Categoria",
+      events: "Chamadas",
+      tokens: "Tokens novos",
+      cache: "Cache lido",
+      cost: "Custo",
+    },
     research: "{count} itens para resolver com o recrutador",
     nextSteps: "Próximos passos",
     next: {

@@ -49,7 +49,12 @@ export function dashboardRoutes(deps: { repos: Repos; bus?: EventBus }) {
         files: repos.sourceFiles.list().length,
         projects: counts.projects,
       },
-      usage: { totalTokens: usage.totalTokens, byCategory: usage.byCategory },
+      usage: {
+        totalTokens: usage.totalTokens,
+        byCategory: usage.byCategory,
+        totalCostUsd: usage.totalCostUsd,
+        categories: usage.categories,
+      },
       pendingResearch: profile?.needsResearch.length ?? 0,
       card: profile ? cardSummary(repos, profile.id) : null,
       emphasis: profile ? repos.emphasis.countByMode(profile.id) : { highlighted: 0, hidden: 0 },

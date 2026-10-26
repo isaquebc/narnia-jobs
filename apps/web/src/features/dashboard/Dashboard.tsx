@@ -1,3 +1,4 @@
+import type { DashboardResponse } from "@narnia-jobs/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useApi, useTimezone } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
@@ -110,7 +111,9 @@ export function Dashboard() {
         <p className="text-sm">
           {t("dashboard.usageTokens", { tokens: formatTokens(d.usage.totalTokens) })}
         </p>
-        {Object.keys(d.usage.byCategory).length > 0 ? (
+        {d.usage.categories?.length ? (
+          <UsageTable categories={d.usage.categories} totalCostUsd={d.usage.totalCostUsd ?? 0} />
+        ) : Object.keys(d.usage.byCategory).length > 0 ? (
           <p className="text-xs text-muted-fg">
             {t("dashboard.usageByCategory")}:{" "}
             {Object.entries(d.usage.byCategory)
@@ -142,6 +145,54 @@ export function Dashboard() {
           ))}
         </ul>
       </Card>
+    </div>
+  );
+}
+
+const usd = (n: number) =>
+  `US$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Uso por categoria (redução de custo, 2026-10-26): da mais cara para a mais barata, com as chamadas, os tokens novos
+ * (entrada + saída), o cache lido e o custo estimado. Os subagentes da conversa não têm custo próprio: o do SDK vem
+ * somado na conversa.
+ */
+function UsageTable({
+  categories,
+  totalCostUsd,
+}: {
+  categories: NonNullable<DashboardResponse["usage"]["categories"]>;
+  totalCostUsd: number;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs text-muted-fg">
+        {t("dashboard.usageTotalCost", { cost: usd(totalCostUsd) })}
+      </p>
+      <table aria-label={t("dashboard.usageTable")} className="w-full text-left text-xs">
+        <thead className="text-muted-fg">
+          <tr>
+            <th className="py-1 font-medium">{t("dashboard.usageCols.category")}</th>
+            <th className="py-1 font-medium">{t("dashboard.usageCols.events")}</th>
+            <th className="py-1 font-medium">{t("dashboard.usageCols.tokens")}</th>
+            <th className="py-1 font-medium">{t("dashboard.usageCols.cache")}</th>
+            <th className="py-1 font-medium">{t("dashboard.usageCols.cost")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {categories.map((c) => (
+            <tr key={c.category} className="border-t border-border">
+              <td className="py-1 font-mono">{c.category}</td>
+              <td className="py-1">{c.events}</td>
+              <td className="py-1">{formatTokens(c.tokens)}</td>
+              <td className="py-1">{formatTokens(c.cacheRead)}</td>
+              <td className="py-1">
+                {c.category.endsWith(".subagente") ? t("dashboard.usageInSession") : usd(c.costUsd)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

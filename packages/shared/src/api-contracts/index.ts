@@ -409,6 +409,20 @@ export const DashboardResponseSchema = z.object({
   usage: z.object({
     totalTokens: z.number().int(),
     byCategory: z.record(z.string(), z.number().int()),
+    /** Redução de custo (2026-10-26): custo total e, por categoria, chamadas, tokens, cache e custo. */
+    totalCostUsd: z.number().optional(),
+    categories: z
+      .array(
+        z.object({
+          category: z.string(),
+          events: z.number().int(),
+          tokens: z.number().int(),
+          cacheRead: z.number().int(),
+          cacheWrite: z.number().int(),
+          costUsd: z.number(),
+        }),
+      )
+      .optional(),
   }),
   pendingResearch: z.number().int(),
   // F02 §2.7: cartão resumido do perfil ativo, contadores de ênfase e sugestões novas (obrigatórios desde M4, F02-19).

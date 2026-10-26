@@ -125,6 +125,36 @@ describe("auditoria B · SessionManager com o Claude real", () => {
     expect(costs.map((c) => Number(c.toFixed(6)))).toEqual([0.1, 0.1, 0.1]);
   });
 
+  it("subagentes (redução de custo, 2026-10-26): os tokens deles viram um evento próprio; o custo do turno fica no principal", async () => {
+    const { sid } = setup();
+    const llm = (messageId: string, inputTokens: number, subagent?: true): ChatEvent => ({
+      type: "llm_message",
+      messageId,
+      model: "claude-sonnet-4-5",
+      usage: { ...usage("claude-sonnet-4-5"), inputTokens, outputTokens: 10 },
+      ...(subagent ? { subagent } : {}),
+    });
+    await turn(sid, "a", [
+      { type: "init", providerSessionId: "sdk-1" },
+      llm("m1", 1000),
+      llm("s1", 3000, true),
+      // o CLI repete a mesma mensagem por bloco: vale a última
+      llm("s1", 3500, true),
+      llm("s2", 2000, true),
+      endTurn(0.5),
+    ]);
+    const events = t.repos.usageEvents.list().filter((u) => u.sessionId === sid);
+    const main = events.find((u) => u.category === "chat.career");
+    const sub = events.find((u) => u.category === "chat.career.subagente");
+    expect(main).toMatchObject({ inputTokens: 100, costUsdEst: 0.5 });
+    expect(sub).toMatchObject({ inputTokens: 5500, outputTokens: 20, costUsdEst: 0 });
+    // turno sem subagente não grava o evento extra
+    await turn(sid, "b", [llm("m2", 900), endTurn(0.6)]);
+    expect(
+      t.repos.usageEvents.list().filter((u) => u.category === "chat.career.subagente"),
+    ).toHaveLength(1);
+  });
+
   it("custo após resume: o primeiro total já traz os turnos anteriores; /clear (total menor) recomeça", async () => {
     const { sid } = setup();
     await turn(sid, "a", [{ type: "init", providerSessionId: "sdk-1" }, endTurn(0.3)]);
