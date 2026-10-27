@@ -4,6 +4,8 @@ import type {
   DocumentKind,
   JobApplication,
   JobApplicationSummary,
+  PostingApplicationRef,
+  SavedPostingCard,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 
@@ -187,4 +189,51 @@ export function listJobApplications(
     .list({ archived: filter.archived ?? false })
     .map((a) => summarize(repos, a))
     .filter((row) => matchesSearch(row, filter.q ?? ""));
+}
+
+/** A candidatura mais recente da vaga, para destacar na lista de vagas o que já foi aplicado. */
+export function postingApplicationRef(
+  repos: Repos,
+  postingId: string,
+): PostingApplicationRef | null {
+  const a = repos.jobApplications.latestForPosting(postingId);
+  return a ? { id: a.id, column: a.column, archived: a.archivedAt !== null } : null;
+}
+
+/**
+ * Coluna "Vagas salvas" do quadro (antes de Aplicado): as vagas sem nenhuma candidatura; por padrão as não arquivadas,
+ * com `archived` só as arquivadas. Busca por empresa, cliente, cargo, contato e data em que foi salva.
+ */
+export function listSavedPostings(
+  repos: Repos,
+  filter: { q?: string | undefined; archived?: boolean | undefined },
+): SavedPostingCard[] {
+  const archived = filter.archived ?? false;
+  const needle = norm(filter.q ?? "");
+  return repos.postings
+    .list()
+    .filter((p) => (p.archivedAt !== null) === archived)
+    .filter((p) => repos.jobApplications.countForPosting(p.id) === 0)
+    .filter((p) => {
+      if (!needle) return true;
+      return [
+        p.company,
+        p.client,
+        p.title,
+        ...repos.postingContacts.list(p.id).map((c) => c.name),
+        ...dateForms(p.createdAt.slice(0, 10)),
+      ]
+        .filter((s): s is string => Boolean(s))
+        .some((h) => norm(h).includes(needle));
+    })
+    .map((p) => ({
+      id: p.id,
+      company: p.company,
+      client: p.client,
+      title: p.title,
+      role: p.role,
+      createdAt: p.createdAt,
+      archivedAt: p.archivedAt,
+      archiveReason: p.archiveReason,
+    }));
 }

@@ -311,6 +311,8 @@ describe("F07/M1 · o que foi enviado fica guardado", () => {
   it("0027 entra sobre o banco anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0026_application_steps" });
-    expect(migrate(db).applied).toEqual(["0027_job_application"]);
+    expect(migrate(db, { until: "0027_job_application" }).applied).toEqual([
+      "0027_job_application",
+    ]);
   });
 });

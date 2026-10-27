@@ -3,6 +3,7 @@ import {
   applyToPosting,
   JobApplicationError,
   listJobApplications,
+  listSavedPostings,
   type Repos,
   summarize,
 } from "@narnia-jobs/core";
@@ -54,8 +55,11 @@ export function jobApplicationsRoutes(deps: { repos: Repos; bus?: EventBus | und
 
   app.get("/api/job-applications", (c) => {
     const archived = c.req.query("archived") === "1";
+    const q = c.req.query("q");
     return c.json({
-      applications: listJobApplications(repos, { q: c.req.query("q"), archived }),
+      applications: listJobApplications(repos, { q, archived }),
+      // coluna "Vagas salvas" (antes de Aplicado): vagas sem candidatura
+      saved: listSavedPostings(repos, { q, archived }),
     });
   });
 

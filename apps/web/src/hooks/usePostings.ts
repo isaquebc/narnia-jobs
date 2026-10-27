@@ -5,7 +5,7 @@ import { useApi, useWs } from "../app/context";
 /** Chaves das vagas (F06): a lista, o detalhe, as análises e as notas esperando confirmação. */
 export const postingKeys = {
   all: ["postings"] as const,
-  list: (q = "") => ["postings", "list", q] as const,
+  list: (q = "", archived = false) => ["postings", "list", q, archived] as const,
   detail: (id: string) => ["postings", "detail", id] as const,
   analyses: (id: string) => ["postings", "analyses", id] as const,
   pendingNotes: ["postings", "pending-notes"] as const,
@@ -29,13 +29,14 @@ function usePostingEvents() {
   }, [ws, qc]);
 }
 
-/** Lista das vagas; com `query`, a busca por texto do servidor (a lista anterior fica na tela enquanto carrega). */
-export function usePostings(query = "") {
+/** Lista das vagas (F07: com a candidatura de cada uma; `archived` só as arquivadas); com `query`, a busca por texto do servidor (a lista anterior fica na tela enquanto carrega). */
+export function usePostings(query = "", archived = false) {
   const api = useApi();
   usePostingEvents();
   const q = useQuery({
-    queryKey: postingKeys.list(query),
-    queryFn: () => api.listPostings(query || undefined),
+    queryKey: postingKeys.list(query, archived),
+    queryFn: () =>
+      archived ? api.listPostings(query || undefined, true) : api.listPostings(query || undefined),
     placeholderData: keepPreviousData,
   });
   return { ...q, postings: q.data?.postings ?? [] };

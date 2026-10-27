@@ -59,8 +59,10 @@ import type {
   PlanUsage,
   PluginStatusResponse,
   Posting,
+  PostingArchiveRequest,
   PostingContact,
   PostingContactInput,
+  PostingListItem,
   PostingModels,
   PostingNote,
   PostingPatch,
@@ -80,6 +82,7 @@ import type {
   RunReport,
   RunStatus,
   SalaryReference,
+  SavedPostingCard,
   SnapshotsListResponseSchema,
   SuggestionsListResponse,
   TrustedDomain,
@@ -623,10 +626,18 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     getFileDigest: (id: string) =>
       request<{ digest: FileDigest | null }>(`/api/files/${encodeURIComponent(id)}/digest`),
     // F06 · vagas
-    listPostings: (q?: string) =>
-      request<{ postings: Posting[] }>(
-        q ? `/api/postings?q=${encodeURIComponent(q)}` : "/api/postings",
-      ),
+    /** F07: cada vaga com a candidatura dela; `archived` lista só as arquivadas. */
+    listPostings: (q?: string, archived?: boolean) => {
+      const qs = new URLSearchParams();
+      if (q) qs.set("q", q);
+      if (archived) qs.set("archived", "1");
+      const s = qs.toString();
+      return request<{ postings: PostingListItem[] }>(`/api/postings${s ? `?${s}` : ""}`);
+    },
+    archivePosting: (id: string, body: PostingArchiveRequest) =>
+      request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}/archive`, json(body)),
+    unarchivePosting: (id: string) =>
+      request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}/unarchive`, json({})),
     getPosting: (id: string) => request<PostingDetail>(`/api/postings/${encodeURIComponent(id)}`),
     intakePosting: (body: { text?: string; url?: string; fields?: PostingPatch }) =>
       request<{ posting: Posting; job: Job | null }>("/api/postings/intake", json(body)),
@@ -706,7 +717,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       if (filter.q) qs.set("q", filter.q);
       if (filter.archived) qs.set("archived", "1");
       const s = qs.toString();
-      return request<{ applications: JobApplicationSummary[] }>(
+      return request<{ applications: JobApplicationSummary[]; saved: SavedPostingCard[] }>(
         `/api/job-applications${s ? `?${s}` : ""}`,
       );
     },

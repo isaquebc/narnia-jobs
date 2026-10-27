@@ -72,6 +72,9 @@ export function posting(id: string, partial: Partial<Posting> = {}): Posting {
     createdAt: NOW,
     updatedAt: NOW,
     contentUpdatedAt: NOW,
+    archivedAt: null,
+    archiveReason: null,
+    archiveNote: null,
     ...partial,
   };
 }

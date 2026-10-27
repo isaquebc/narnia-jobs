@@ -9,6 +9,7 @@ import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button, buttonClass } from "../../components/ui/button";
 import { Menu } from "../../components/ui/menu";
+import { useApplyOptions } from "../../hooks/useJobApplications";
 import { postingKeys, usePosting } from "../../hooks/usePostings";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
@@ -16,6 +17,7 @@ import { GenerateDialog } from "../documents/GenerateDialog";
 import { PostingDocuments } from "../documents/PostingDocuments";
 import { ApplyButton } from "../job-applications/ApplyButton";
 import { AnalysisCard, PreAnalysisCard } from "./PostingAnalysis";
+import { ArchivedPostingBanner, ArchivePostingButton } from "./PostingArchive";
 import { PostingAssets } from "./PostingAssets";
 import { PostingContactsSummary } from "./PostingContactsSummary";
 import { PostingForm } from "./PostingForm";
@@ -29,7 +31,8 @@ import { postingWho, statusTone } from "./PostingsPage";
  * na coluna da pré-análise, antes dela, os assets (CV e carta pequenos) e os contatos recentes (2026-10-19);
  * o alerta de vagas parecidas (mesma empresa e role) só aparece quando existe outra vaga assim (correção 2026-10-15;
  * o de candidatura repetida chega com as candidaturas, F06-11/F07). "Aplicar" (F07 §0-1) cria a candidatura com o CV e a
- * carta travados; com uma ativa, vira "Ver candidatura".
+ * carta travados; com uma ativa, vira "Ver candidatura". "Arquivar vaga" (sem candidatura ativa) pede o motivo do fit
+ * ruim; a vaga arquivada mostra o motivo e "Desarquivar".
  */
 /** Só http(s) vira link: o campo é editável e `z.url()` aceita `javascript:`. */
 function isHttpUrl(url: string | null): boolean {
@@ -56,6 +59,8 @@ export function PostingPage({
   const navigate = useNavigate();
   const { detail, analyses } = usePosting(postingId);
   const { profiles, active } = useProfiles();
+  // F07: com candidatura ativa a vaga não é arquivada (encerra ou arquiva a candidatura antes)
+  const applyOptions = useApplyOptions(postingId);
   const [generating, setGenerating] = useState<DocumentKind | null>(generate ?? null);
   const reextract = useMutation({
     mutationFn: () => api.reextractPosting(postingId),
@@ -109,7 +114,9 @@ export function PostingPage({
               {t("postings.reextract")}
             </Button>
           ) : null}
-          <ApplyButton postingId={postingId} onGenerateCv={() => setGenerating("cv")} />
+          {posting.archivedAt ? null : (
+            <ApplyButton postingId={postingId} onGenerateCv={() => setGenerating("cv")} />
+          )}
           <Menu
             label={t("documents.generate")}
             items={(["cv", "cover_letter"] as const).map((k) => ({
@@ -118,6 +125,9 @@ export function PostingPage({
               onSelect: () => setGenerating(k),
             }))}
           />
+          {posting.archivedAt || applyOptions.data?.activeApplicationId !== null ? null : (
+            <ArchivePostingButton postingId={postingId} />
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -128,6 +138,7 @@ export function PostingPage({
           </Button>
         </div>
       </div>
+      <ArchivedPostingBanner posting={posting} />
       {generating ? (
         <GenerateDialog
           key={generating}

@@ -34,6 +34,8 @@ export interface JobApplicationsRepo {
   get(id: string): JobApplication | null;
   /** Mais recentes primeiro (data da candidatura, depois criação). */
   list(filter?: { archived?: boolean | undefined }): JobApplication[];
+  /** A mais recente desta vaga, em qualquer estado. */
+  latestForPosting(postingId: string): JobApplication | null;
   /** A não encerrada e não arquivada desta vaga (F07-9). */
   activeForPosting(postingId: string): JobApplication | null;
   /** Encerrar pede o motivo (F07-6); sair de Encerrado limpa o motivo. */
@@ -147,6 +149,14 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
           )
           .all() as Row[]
       ).map(map);
+    },
+    latestForPosting(postingId) {
+      const r = db
+        .prepare(
+          "select * from job_application where posting_id = ? order by created_at desc, rowid desc limit 1",
+        )
+        .get(postingId) as Row | undefined;
+      return r ? map(r) : null;
     },
     activeForPosting(postingId) {
       const r = db

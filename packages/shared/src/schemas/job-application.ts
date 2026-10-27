@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IdSchema, IsoDateTimeSchema } from "./common";
+import { PostingArchiveReasonSchema, PostingSchema } from "./posting";
 
 /**
  * Candidatura (F07 §0, requisitos do dono 2026-10-27). Nasce só do botão "Aplicar" numa vaga salva, com a versão do CV
@@ -118,3 +119,29 @@ export const JobApplicationPatchSchema = z
     path: ["closedReason"],
   });
 export type JobApplicationPatch = z.infer<typeof JobApplicationPatchSchema>;
+
+/** Candidatura da vaga, para destacar na lista de vagas o que já foi aplicado (a mais recente). */
+export const PostingApplicationRefSchema = z.object({
+  id: IdSchema,
+  column: JobApplicationColumnSchema,
+  archived: z.boolean(),
+});
+export type PostingApplicationRef = z.infer<typeof PostingApplicationRefSchema>;
+
+export const PostingListItemSchema = PostingSchema.extend({
+  application: PostingApplicationRefSchema.nullable(),
+});
+export type PostingListItem = z.infer<typeof PostingListItemSchema>;
+
+/** Cartão da coluna "Vagas salvas" (antes de Aplicado): vaga sem candidatura. */
+export const SavedPostingCardSchema = z.object({
+  id: IdSchema,
+  company: z.string().nullable(),
+  client: z.string().nullable(),
+  title: z.string().nullable(),
+  role: z.string().nullable(),
+  createdAt: IsoDateTimeSchema,
+  archivedAt: IsoDateTimeSchema.nullable(),
+  archiveReason: PostingArchiveReasonSchema.nullable(),
+});
+export type SavedPostingCard = z.infer<typeof SavedPostingCardSchema>;

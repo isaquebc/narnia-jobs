@@ -113,6 +113,28 @@ export const PostingDuplicateCheckSchema = z.object({
 });
 export type PostingDuplicateCheck = z.infer<typeof PostingDuplicateCheckSchema>;
 
+/**
+ * Por que a pessoa arquivou a vaga (F07, pedido do dono 2026-10-27: "não deu um bom fit"). Fica guardado para o
+ * recrutador aprender o que ela descarta e calibrar o fit das próximas vagas.
+ */
+export const PostingArchiveReasonSchema = z.enum([
+  "salary",
+  "seniority",
+  "stack",
+  "work_mode",
+  "location",
+  "contract",
+  "company",
+  "other",
+]);
+export type PostingArchiveReason = z.infer<typeof PostingArchiveReasonSchema>;
+
+export const PostingArchiveRequestSchema = z.object({
+  reason: PostingArchiveReasonSchema,
+  note: z.string().trim().max(2000).nullable().optional(),
+});
+export type PostingArchiveRequest = z.infer<typeof PostingArchiveRequestSchema>;
+
 export const PostingSchema = PostingFieldsSchema.extend({
   id: IdSchema,
   status: PostingStatusSchema,
@@ -131,6 +153,10 @@ export const PostingSchema = PostingFieldsSchema.extend({
    * Status e campos preenchidos pela extração não contam.
    */
   contentUpdatedAt: IsoDateTimeSchema,
+  /** Arquivada pela pessoa (sai da lista e da coluna "Vagas salvas"), com o motivo. */
+  archivedAt: IsoDateTimeSchema.nullable().default(null),
+  archiveReason: PostingArchiveReasonSchema.nullable().default(null),
+  archiveNote: z.string().nullable().default(null),
 });
 export type Posting = z.infer<typeof PostingSchema>;
 

@@ -8,8 +8,15 @@ import { ROLE_LABELS } from "./tools";
  * (slug e rótulo em pt-BR) e nomes dos contatos. Caixa, acentos e pontuação não contam; com várias palavras, todas
  * precisam aparecer em algum campo. Busca vazia devolve todas, mais recentes primeiro.
  */
-export function searchPostings(repos: Repos, query: string): Posting[] {
-  const all = repos.postings.list();
+export function searchPostings(
+  repos: Repos,
+  query: string,
+  opts: { archived?: boolean | undefined } = {},
+): Posting[] {
+  // a lista de vagas separa as arquivadas (F07); o recrutador (sem filtro) vê todas
+  const all = repos.postings
+    .list()
+    .filter((p) => opts.archived === undefined || (p.archivedAt !== null) === opts.archived);
   const words = normalizeIdentityPart(query).split(" ").filter(Boolean);
   if (words.length === 0) return all;
   return all.filter((p) => {

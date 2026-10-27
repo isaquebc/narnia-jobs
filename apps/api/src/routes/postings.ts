@@ -9,6 +9,7 @@ import {
   editPostingNote,
   evidenceLabels,
   type NoteEditResult,
+  postingApplicationRef,
   type Repos,
   rejectPostingNote,
   relatedPostings,
@@ -16,6 +17,7 @@ import {
 } from "@narnia-jobs/core";
 import {
   JobAnalysisSchema,
+  PostingArchiveRequestSchema,
   PostingContactInputSchema,
   PostingCreateSchema,
   PostingFieldsSchema,
@@ -77,9 +79,34 @@ export function postingsRoutes(deps: {
     apiError(c, 404, "posting_not_found", "Vaga não encontrada");
 
   // busca por texto (empresa, cliente, cargo, role, contatos); sem `q`, todas
+  // F07: cada vaga com a candidatura dela (destaque das aplicadas); arquivadas só com `archived=1`
   app.get("/api/postings", (c) =>
-    c.json({ postings: searchPostings(repos, c.req.query("q") ?? "") }),
+    c.json({
+      postings: searchPostings(repos, c.req.query("q") ?? "", {
+        archived: c.req.query("archived") === "1",
+      }).map((p) => ({ ...p, application: postingApplicationRef(repos, p.id) })),
+    }),
   );
+
+  // F07 (pedido do dono 2026-10-27): arquivar a vaga que não deu um bom fit, com o motivo
+  app.post("/api/postings/:id/archive", validate("json", PostingArchiveRequestSchema), (c) => {
+    const id = c.req.param("id");
+    if (!repos.postings.get(id)) return notFound(c);
+    if (repos.jobApplications.activeForPosting(id))
+      return apiError(c, 409, "has_active_application", "Há uma candidatura ativa nesta vaga");
+    const b = c.req.valid("json");
+    repos.postings.setArchived(id, { reason: b.reason, note: b.note?.trim() || null });
+    touched(id);
+    return c.json({ posting: repos.postings.get(id) });
+  });
+
+  app.post("/api/postings/:id/unarchive", (c) => {
+    const id = c.req.param("id");
+    if (!repos.postings.get(id)) return notFound(c);
+    repos.postings.setArchived(id, null);
+    touched(id);
+    return c.json({ posting: repos.postings.get(id) });
+  });
 
   app.post("/api/postings", validate("json", PostingCreateSchema), (c) => {
     const posting = repos.postings.create(c.req.valid("json"), { source: "user" });

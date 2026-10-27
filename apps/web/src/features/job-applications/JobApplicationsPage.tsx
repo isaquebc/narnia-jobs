@@ -4,8 +4,10 @@ import {
   JobApplicationClosedReasonSchema,
   type JobApplicationColumn,
   type JobApplicationSummary,
+  type SavedPostingCard,
 } from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useApi, useTimezone } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
@@ -19,10 +21,13 @@ import { Menu } from "../../components/ui/menu";
 import { jobApplicationKeys, useJobApplications } from "../../hooks/useJobApplications";
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
+import { ApplyButton } from "./ApplyButton";
 
 export const columnLabel = (c: JobApplicationColumn) => t(`jobApplications.column.${c}` as TKey);
 
-export function applicationWho(a: Pick<JobApplicationSummary, "posting">): string {
+export function applicationWho(a: {
+  posting: Pick<JobApplicationSummary["posting"], "company" | "client">;
+}): string {
   return (
     [a.posting.company, a.posting.client].filter(Boolean).join(" / ") ||
     t("jobApplications.noCompany")
@@ -158,8 +163,44 @@ function ApplicationCard({
   );
 }
 
+/** Vaga salva sem candidatura: abre a vaga e aplica dali mesmo (o CV, se faltar, é gerado na vaga). */
+function SavedCard({ p }: { p: SavedPostingCard }) {
+  const tz = useTimezone();
+  const navigate = useNavigate();
+  return (
+    <li aria-label={`${applicationWho({ posting: p })} · ${p.title ?? ""}`}>
+      <Card className="flex flex-col gap-1 p-3">
+        <NavLink to={`/vagas/${p.id}`} className="font-medium hover:underline">
+          {applicationWho({ posting: p })}
+        </NavLink>
+        {p.title ? <p className="text-sm">{p.title}</p> : null}
+        {p.archiveReason ? (
+          <p className="text-xs text-muted-fg">
+            {t("postings.archivedBadge", {
+              reason: t(`postings.archiveReason.${p.archiveReason}` as TKey),
+            })}
+          </p>
+        ) : null}
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-fg">
+            {t("jobApplications.savedOn", { date: formatDate(p.createdAt, tz) })}
+          </span>
+          {p.archivedAt ? null : (
+            <ApplyButton
+              postingId={p.id}
+              onGenerateCv={() =>
+                void navigate({ to: `/vagas/${p.id}` as string, search: { gerar: "cv" } as never })
+              }
+            />
+          )}
+        </div>
+      </Card>
+    </li>
+  );
+}
+
 /**
- * Candidaturas (F07 §0): quadro de 5 colunas (a coluna é o que a pessoa move; o pipeline é de cada candidatura, F07-8),
+ * Candidaturas (F07 §0): "Vagas salvas" (as sem candidatura) e o quadro de 5 colunas (a coluna é o que a pessoa move; o pipeline é de cada candidatura, F07-8),
  * busca por empresa, cliente, cargo, data e contato no servidor e as arquivadas (40 dias sem atividade) à parte.
  */
 export function JobApplicationsPage() {
@@ -173,7 +214,8 @@ export function JobApplicationsPage() {
   const list = useJobApplications(q, archived);
   const { request, dialog } = useMoveApplication();
   if (list.isError) return <ErrorState error={list.error} />;
-  const empty = list.data && list.applications.length === 0;
+  const saved = list.data?.saved ?? [];
+  const empty = list.data && list.applications.length === 0 && saved.length === 0;
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -208,8 +250,22 @@ export function JobApplicationsPage() {
       ) : null}
       <section
         aria-label={t("jobApplications.board")}
-        className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5"
+        className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"
       >
+        {/* "Vagas salvas" (pedido do dono 2026-10-27): antes de Aplicado, as vagas sem candidatura */}
+        <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-dashed border-border p-2">
+          <h2 className="flex items-center justify-between px-1 text-sm font-semibold">
+            {t("jobApplications.savedColumn")}
+            <span aria-hidden className="text-xs font-normal text-muted-fg">
+              {saved.length}
+            </span>
+          </h2>
+          <ul aria-label={t("jobApplications.savedColumn")} className="flex flex-col gap-2">
+            {saved.map((p) => (
+              <SavedCard key={p.id} p={p} />
+            ))}
+          </ul>
+        </div>
         {JOB_APPLICATION_COLUMNS.map((c) => {
           const items = list.applications.filter((a) => a.column === c);
           return (

@@ -6,6 +6,7 @@ import {
   POSTING_FIELD_NAMES,
   POSTING_IDENTITY_FIELDS,
   type Posting,
+  type PostingArchiveReason,
   type PostingContact,
   type PostingContactInput,
   PostingContactSchema,
@@ -93,6 +94,9 @@ function mapPosting(r: Row): Posting {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     contentUpdatedAt: r.content_updated_at ?? r.created_at,
+    archivedAt: r.archived_at ?? null,
+    archiveReason: r.archive_reason ?? null,
+    archiveNote: r.archive_note ?? null,
   });
 }
 
@@ -117,6 +121,12 @@ export interface PostingsRepo {
   setPreAnalysis(id: string, preAnalysis: unknown): void;
   setRawPath(id: string, path: string | null): void;
   setDuplicate(id: string, check: PostingDuplicateCheck | null): void;
+  /** Arquiva com o motivo (F07: "não deu um bom fit") ou desarquiva (`null`). Não conta como mudança de conteúdo. */
+  setArchived(
+    id: string,
+    archive: { reason: PostingArchiveReason; note: string | null } | null,
+    now?: Date,
+  ): void;
   remove(id: string): void;
 }
 
@@ -228,6 +238,11 @@ export function postingsRepo(db: Db): PostingsRepo {
     },
     setRawPath(id, path) {
       q("update posting set raw_path = ? where id = ?").run(path, id);
+    },
+    setArchived(id, archive, now = new Date()) {
+      q(
+        "update posting set archived_at = ?, archive_reason = ?, archive_note = ? where id = ?",
+      ).run(archive ? now.toISOString() : null, archive?.reason ?? null, archive?.note ?? null, id);
     },
     setDuplicate(id, check) {
       q("update posting set duplicate_json = ? where id = ?").run(
