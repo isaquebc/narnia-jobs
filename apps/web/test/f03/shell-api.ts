@@ -2,6 +2,8 @@ import { profile } from "../components/profile-fixture";
 
 /** API mínima do shell (seletor de perfil, provider, bandeja) para testes de rota da F03. */
 export const shellApi = {
+  // janela da extensão (2026-10-27): o andamento das abas
+  getCaptureActivity: async () => ({ items: [] }),
   // menu em grupos: sem onboarding concluído só "Primeiro uso" aparece
   getOnboardingState: async () => ({ step: 5, completed: true }),
   listJobs: async () => ({ jobs: [] }),

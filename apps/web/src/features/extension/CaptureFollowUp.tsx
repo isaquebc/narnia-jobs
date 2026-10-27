@@ -12,6 +12,7 @@ import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import { ApiError, type DocumentView, type PostingAnalysisView } from "../../lib/api";
 import { DuplicateDialog } from "../postings/PostingSections";
+import { bridgeRequest, extensionAvailable } from "./bridge";
 
 /**
  * Janela da extensão depois de "Salvar vaga" (F12/M2, pedido do dono 2026-10-23): na mesma janela, as etapas (lendo os
@@ -22,7 +23,13 @@ import { DuplicateDialog } from "../postings/PostingSections";
 const external = { target: "_blank", rel: "noreferrer" } as const;
 const captureKey = (id: string) => ["extension", "capture", id] as const;
 
-export function CaptureFollowUp({ capture }: { capture: ExtensionCapture }) {
+export function CaptureFollowUp({
+  capture,
+  tabId = null,
+}: {
+  capture: ExtensionCapture;
+  tabId?: number | null;
+}) {
   const postingId = capture.postingId as string;
   const api = useApi();
   const ws = useWs();
@@ -38,7 +45,12 @@ export function CaptureFollowUp({ capture }: { capture: ExtensionCapture }) {
   useEffect(() => {
     ws.connect();
     return ws.subscribe((e) => {
-      if (e.type === "posting.updated" || e.type === "chat.session_updated") {
+      // `application.updated`: o formulário entrou nesta aba (pedido do dono, 2026-10-27)
+      if (
+        e.type === "posting.updated" ||
+        e.type === "chat.session_updated" ||
+        e.type === "application.updated"
+      ) {
         void qc.invalidateQueries({ queryKey: captureKey(capture.id) });
         void qc.invalidateQueries({ queryKey: ["chat", "session"] });
       }
@@ -157,7 +169,46 @@ export function CaptureFollowUp({ capture }: { capture: ExtensionCapture }) {
           recommendedProfileId={latest.recommendedProfileId}
         />
       ) : null}
+      {latest && tabId !== null && extensionAvailable() ? (
+        <FindForm captureId={capture.id} tabId={tabId} />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Candidatar-se sem duplicar a vaga (pedido do dono, 2026-10-27): a extensão lê de novo a mesma aba do Chrome (a
+ * pessoa vai ao formulário nela) e o formulário entra nesta aba da janela, ligado a esta vaga.
+ */
+function FindForm({ captureId, tabId }: { captureId: string; tabId: number }) {
+  const qc = useQueryClient();
+  const titleId = useId();
+  const [message, setMessage] = useState<{ tone: "info" | "warn"; text: string } | null>(null);
+  const read = useMutation({
+    mutationFn: () => bridgeRequest({ type: "narnia.readForm", tabId, captureId }),
+    onMutate: () => setMessage(null),
+    onSuccess: async (r) => {
+      if (!r.ok) setMessage({ tone: "warn", text: r.error });
+      else if (r.permission) setMessage({ tone: "info", text: t("capture.findForm.permission") });
+      else await qc.invalidateQueries({ queryKey: captureKey(captureId) });
+    },
+  });
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="flex flex-col gap-2 rounded-md border border-border p-3"
+    >
+      <h2 id={titleId} className="text-sm font-semibold">
+        {t("capture.findForm.title")}
+      </h2>
+      <p className="text-xs text-muted-fg">{t("capture.findForm.hint")}</p>
+      <div>
+        <Button size="sm" disabled={read.isPending} onClick={() => read.mutate()}>
+          {read.isPending ? t("capture.findForm.reading") : t("capture.findForm.button")}
+        </Button>
+      </div>
+      {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
+    </section>
   );
 }
 

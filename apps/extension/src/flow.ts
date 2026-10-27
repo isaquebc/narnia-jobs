@@ -1,6 +1,6 @@
 import type { FormSnapshot } from "./capture/form";
 import type { PageSnapshot } from "./capture/page";
-import { enterUrl, type Fetch, sendCapture } from "./client";
+import { enterUrl, type Fetch, sendCapture, sendCaptureForm } from "./client";
 import type { Pairing } from "./storage";
 
 /**
@@ -21,8 +21,16 @@ export interface FlowDeps {
   openWindow(url: string): Promise<void>;
   openOptions(): Promise<void>;
   setBadge(text: string, title: string): Promise<void>;
-  /** Formulário num quadro de outro site: a página da extensão pede a permissão (precisa do clique da pessoa). */
-  openPermission(tabId: number, origins: string[]): Promise<void>;
+  /**
+   * Formulário num quadro de outro site: a página da extensão pede a permissão (precisa do clique da pessoa). Com
+   * `captureId`, a releitura depois da permissão entra nessa captura (botão da janela).
+   */
+  openPermission(tabId: number, origins: string[], captureId?: string): Promise<void>;
+  /** A última captura aberta na janela a partir desta aba do Chrome (pedido do dono, 2026-10-27). */
+  recallCapture(tabId: number): Promise<string | null>;
+  rememberCapture(tabId: number, captureId: string): Promise<void>;
+  /** A aba ainda existe (a leitura falhou por falta de acesso, não porque ela foi fechada). */
+  tabExists(tabId: number): Promise<boolean>;
 }
 
 /** Menos que isso não é formulário de candidatura (busca, newsletter, login). */
@@ -100,9 +108,28 @@ export async function onIconClick(
     await deps.openPermission(tab.id, blocked);
     return "permission";
   }
+  // pedido do dono (2026-10-27): o formulário aberto na mesma aba de uma vaga já na janela entra na captura dela, sem
+  // outra aba na janela; recusado (parece outra vaga, já tem formulário, vaga não salva), segue numa captura nova
+  const previous =
+    mode !== "posting" && page.form?.fields.length ? await deps.recallCapture(tab.id) : null;
+  if (previous && page.form) {
+    const a = await sendCaptureForm(
+      deps.fetch,
+      p.instance,
+      p.token,
+      previous,
+      { url: page.url, title: page.title, html: page.html, form: page.form },
+      false,
+    );
+    if (a.ok) {
+      await deps.setBadge("", DEFAULT_TITLE);
+      return open(`/candidatura?captura=${encodeURIComponent(previous)}&aba=${tab.id}`);
+    }
+  }
   const r = await sendCapture(deps.fetch, p.instance, p.token, { ...page, mode });
   if (r.ok) {
     await deps.setBadge("", DEFAULT_TITLE);
+    await deps.rememberCapture(tab.id, r.id);
     // a aba de origem vai junto: a janela volta para ela e preenche nela (F12-14, F12-17)
     return open(`/candidatura?captura=${encodeURIComponent(r.id)}&aba=${tab.id}`);
   }
@@ -110,4 +137,66 @@ export async function onIconClick(
   await deps.setBadge("!", r.message);
   await deps.openOptions();
   return "options";
+}
+
+export type ReadFormResult =
+  | { ok: true; applicationId: string }
+  | { ok: true; permission: true }
+  | { ok: false; code: string; error: string };
+
+/**
+ * Botão "Procurar o formulário nesta aba" (pedido do dono, 2026-10-27): lê de novo a aba do Chrome da vaga (a pessoa
+ * pode ter ido ao formulário nela) e manda o formulário para a captura da vaga. O Chrome só deixa ler a aba enquanto
+ * ela segue no site em que a pessoa clicou no ícone; noutro site, o clique no ícone (Ajudar no formulário) entra nesta
+ * captura.
+ */
+export async function readFormInto(
+  tabId: number,
+  captureId: string,
+  deps: FlowDeps,
+): Promise<ReadFormResult> {
+  const p = await deps.loadPairing();
+  if (!p.token || !p.instance)
+    return { ok: false, code: "unpaired", error: "A extensão não está conectada ao narnia." };
+  let page: TabCapture;
+  try {
+    page = await deps.readTab(tabId);
+  } catch {
+    if (!(await deps.tabExists(tabId)))
+      return {
+        ok: false,
+        code: "tab_closed",
+        error:
+          "A aba da vaga foi fechada. Abra o formulário numa aba e use o ícone do narnia › Ajudar no formulário.",
+      };
+    await deps.rememberCapture(tabId, captureId);
+    return {
+      ok: false,
+      code: "no_access",
+      error:
+        "O Chrome só deixa o narnia ler esta página depois do seu clique: na aba do formulário, clique no ícone do narnia › Ajudar no formulário. Ele entra aqui, nesta vaga.",
+    };
+  }
+  const fields = page.form?.fields.length ?? 0;
+  const blocked = formFrames(page.form?.frames ?? []);
+  if (fields < MIN_FORM_FIELDS && blocked.length > 0) {
+    await deps.openPermission(tabId, blocked, captureId);
+    return { ok: true, permission: true };
+  }
+  if (!page.form || fields < 1)
+    return {
+      ok: false,
+      code: "no_form",
+      error:
+        "Não achei um formulário nesta aba. Se ele está em outra página, abra-a nesta mesma aba e tente de novo.",
+    };
+  const r = await sendCaptureForm(
+    deps.fetch,
+    p.instance,
+    p.token,
+    captureId,
+    { url: page.url, title: page.title, html: page.html, form: page.form },
+    true,
+  );
+  return r.ok ? r : { ok: false, code: r.code, error: r.message };
 }

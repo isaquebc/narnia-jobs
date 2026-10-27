@@ -10,11 +10,19 @@ export type BridgeRequest =
       tabId: number;
       url: string;
       items: Array<{ ref: string; value: string }>;
-    };
+    }
+  | { type: "narnia.readForm"; tabId: number; captureId: string };
 
 export type BridgeResponse =
-  | { ok: true; focused?: boolean; filled?: string[]; failed?: string[] }
-  | { ok: false; error: string };
+  | {
+      ok: true;
+      focused?: boolean;
+      filled?: string[];
+      failed?: string[];
+      applicationId?: string;
+      permission?: boolean;
+    }
+  | { ok: false; error: string; code?: string };
 
 export const extensionAvailable = () => document.documentElement.dataset.narniaExtension === "1";
 

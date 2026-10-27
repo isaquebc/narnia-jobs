@@ -8,12 +8,15 @@ import type { Pairing } from "./storage";
  */
 export type BridgeRequest =
   | { type: "narnia.focus"; tabId: number; url: string }
-  | { type: "narnia.fill"; tabId: number; url: string; items: FillItem[] };
+  | { type: "narnia.fill"; tabId: number; url: string; items: FillItem[] }
+  | { type: "narnia.readForm"; tabId: number; captureId: string };
 
 export type BridgeResponse =
   | { ok: true; focused: boolean }
   | { ok: true; filled: string[]; failed: string[] }
-  | { ok: false; error: string };
+  | { ok: true; applicationId: string }
+  | { ok: true; permission: true }
+  | { ok: false; error: string; code?: string };
 
 export interface BridgeDeps {
   loadPairing(): Promise<Partial<Pairing>>;
@@ -22,6 +25,8 @@ export interface BridgeDeps {
   focusTab(tabId: number): Promise<void>;
   openUrl(url: string): Promise<void>;
   fillTab(tabId: number, items: FillItem[]): Promise<{ filled: string[]; failed: string[] }>;
+  /** Procurar o formulário na aba da vaga (pedido do dono, 2026-10-27): `readFormInto`. */
+  readForm(tabId: number, captureId: string): Promise<BridgeResponse>;
 }
 
 const origin = (u: string | undefined) => {
@@ -41,6 +46,7 @@ export async function handleBridge(
   const p = await deps.loadPairing();
   if (!p.instance || origin(senderUrl) !== origin(p.instance))
     return { ok: false, error: "origem não é o narnia pareado" };
+  if (msg.type === "narnia.readForm") return deps.readForm(msg.tabId, msg.captureId);
   const current = await deps.tabUrl(msg.tabId);
   if (msg.type === "narnia.focus") {
     if (samePage(current, msg.url)) {

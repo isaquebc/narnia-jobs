@@ -17,6 +17,7 @@ function deps(
     focusTab: vi.fn(async () => {}),
     openUrl: vi.fn(async () => {}),
     fillTab: vi.fn(async () => ({ filled: ["f1"], failed: [] })),
+    readForm: vi.fn(async () => ({ ok: true as const, applicationId: "a1" })),
     ...over,
   } as BridgeDeps & Record<string, ReturnType<typeof vi.fn>>;
 }
@@ -85,5 +86,23 @@ describe("F12 · ponte da janela", () => {
       error: expect.stringMatching(/não está mais no formulário/),
     });
     expect(moved.fillTab).not.toHaveBeenCalled();
+  });
+
+  it("procurar o formulário na aba da vaga (pedido do dono, 2026-10-27): lê a aba e liga à captura", async () => {
+    const d = deps();
+    const r = await handleBridge(
+      { type: "narnia.readForm", tabId: 7, captureId: "c1" },
+      "http://127.0.0.1:5173/candidatura?captura=c1",
+      d,
+    );
+    expect(r).toEqual({ ok: true, applicationId: "a1" });
+    expect(d.readForm).toHaveBeenCalledWith(7, "c1");
+    const other = deps();
+    await handleBridge(
+      { type: "narnia.readForm", tabId: 7, captureId: "c1" },
+      "http://evil.example/",
+      other,
+    );
+    expect(other.readForm).not.toHaveBeenCalled();
   });
 });

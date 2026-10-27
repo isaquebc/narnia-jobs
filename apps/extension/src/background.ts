@@ -2,7 +2,14 @@ import { type BridgeDeps, type BridgeRequest, handleBridge } from "./bridge";
 import type { FillItem } from "./capture/fill";
 import { type FrameForm, mergeFrames } from "./capture/frames";
 import type { PageSnapshot } from "./capture/page";
-import { type CaptureMode, DEFAULT_TITLE, onIconClick, type TabCapture } from "./flow";
+import {
+  type CaptureMode,
+  DEFAULT_TITLE,
+  type FlowDeps,
+  onIconClick,
+  readFormInto,
+  type TabCapture,
+} from "./flow";
 import { loadPairing } from "./storage";
 
 /**
@@ -31,8 +38,12 @@ async function readTab(tabId: number): Promise<TabCapture> {
 }
 
 /** Página da extensão que pede a permissão do quadro (a permissão só sai com o clique da pessoa). */
-async function openPermission(tabId: number, origins: string[]) {
-  const q = new URLSearchParams({ tab: String(tabId), origins: origins.join(",") });
+async function openPermission(tabId: number, origins: string[], captureId?: string) {
+  const q = new URLSearchParams({
+    tab: String(tabId),
+    origins: origins.join(","),
+    ...(captureId ? { capture: captureId } : {}),
+  });
   await chrome.windows.create({
     url: chrome.runtime.getURL(`permission.html?${q}`),
     type: "popup",
@@ -81,20 +92,32 @@ async function setBadge(text: string, title: string) {
   await chrome.action.setTitle({ title: title || DEFAULT_TITLE });
 }
 
+/** Aba do Chrome → a última captura aberta na janela a partir dela (pedido do dono, 2026-10-27). */
+async function tabCaptures(): Promise<Record<string, string>> {
+  const { narniaTabCaptures } = await chrome.storage.session.get(["narniaTabCaptures"]);
+  return (narniaTabCaptures as Record<string, string> | undefined) ?? {};
+}
+
+const flowDeps: FlowDeps = {
+  loadPairing,
+  readTab,
+  fetch: (url, init) => fetch(url, init),
+  openWindow,
+  openOptions: () => chrome.runtime.openOptionsPage(),
+  setBadge,
+  openPermission,
+  recallCapture: async (tabId) => (await tabCaptures())[String(tabId)] ?? null,
+  rememberCapture: async (tabId, captureId) => {
+    const map = await tabCaptures();
+    await chrome.storage.session.set({
+      narniaTabCaptures: { ...map, [String(tabId)]: captureId },
+    });
+  },
+  tabExists: async (tabId) => !!(await chrome.tabs.get(tabId).catch(() => null)),
+};
+
 const click = (tab: { id?: number }, mode: CaptureMode = "auto") =>
-  onIconClick(
-    tab,
-    {
-      loadPairing,
-      readTab,
-      fetch: (url, init) => fetch(url, init),
-      openWindow,
-      openOptions: () => chrome.runtime.openOptionsPage(),
-      setBadge,
-      openPermission,
-    },
-    mode,
-  );
+  onIconClick(tab, flowDeps, mode);
 
 /** Preenche na aba (F12-14): cada quadro recebe as suas referências, na mesma ordem em que foram lidas e juntadas. */
 async function fillTab(tabId: number, items: FillItem[]) {
@@ -145,18 +168,28 @@ const bridgeDeps: BridgeDeps = {
     await chrome.windows.create({ url, type: "normal" });
   },
   fillTab,
+  readForm: (tabId, captureId) => readFormInto(tabId, captureId, flowDeps),
 };
 
 chrome.action.onClicked.addListener((tab) => void click(tab));
 chrome.runtime.onMessage.addListener(
   (
-    msg: { type?: string; tabId?: number; mode?: CaptureMode; request?: BridgeRequest },
+    msg: {
+      type?: string;
+      tabId?: number;
+      captureId?: string;
+      mode?: CaptureMode;
+      request?: BridgeRequest;
+    },
     sender: { url?: string; tab?: { url?: string } },
     sendResponse: (r: unknown) => void,
   ) => {
     // permissão do quadro concedida na página da extensão: lê a aba de novo, agora com o quadro
+    // (pedida pelo botão da janela, com a captura da vaga: o formulário entra nela)
     if (msg?.type === "narnia.recapture" && typeof msg.tabId === "number")
-      void click({ id: msg.tabId });
+      void (msg.captureId
+        ? readFormInto(msg.tabId, msg.captureId, flowDeps)
+        : click({ id: msg.tabId }));
     // menu do ícone (F12-15)
     if (msg?.type === "narnia.capture" && typeof msg.tabId === "number")
       void click({ id: msg.tabId }, msg.mode ?? "auto");

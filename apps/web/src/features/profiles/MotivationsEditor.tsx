@@ -22,6 +22,8 @@ export function useMotivations(profileId: string) {
   const q = useQuery({
     queryKey: motivationsKey(profileId),
     queryFn: () => api.listMotivations(profileId),
+    // o worker avisa das frases antes de a tarefa terminar: enquanto sugere, relê até parar
+    refetchInterval: (query) => (query.state.data?.suggesting ? 2_000 : false),
   });
   useEffect(() => {
     ws.connect();

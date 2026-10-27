@@ -200,6 +200,10 @@ export function createApp(deps: AppDeps) {
       bus: deps.bus,
       // o SessionManager é montado mais abaixo
       openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
+      sessionBusy: (id) => {
+        const s = deps.repos.chatSessions.get(id);
+        return !!s && sessions.withBusy(s).busy === true;
+      },
     }),
   );
   app.route("/", applicationsRoutes({ repos: deps.repos, queue: deps.queue, bus: deps.bus }));

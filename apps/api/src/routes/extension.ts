@@ -2,14 +2,17 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   analyzePostingText,
+  type ExtensionCaptureRecord,
   findLikelyPosting,
   isDeviceToken,
+  isVersionActive,
   MIN_APPLICATION_FIELDS,
   type Repos,
 } from "@narnia-jobs/core";
 import {
   type ExtensionCapture,
   ExtensionCaptureCreateRequestSchema,
+  ExtensionCaptureFormRequestSchema,
   type ExtensionCaptureReading,
   ExtensionPairRequestSchema,
 } from "@narnia-jobs/shared";
@@ -21,7 +24,7 @@ import { apiError } from "../errors";
 import type { EventBus } from "../events";
 import { extractPosting } from "../postings/fetch";
 import type { QueueAdapter } from "../queue";
-import { enqueueLocate } from "../services/applications";
+import { enqueueLocate, suggestingMotivations } from "../services/applications";
 import { intakePosting } from "../services/postings";
 import { validate } from "./validate";
 
@@ -42,6 +45,8 @@ export function extensionRoutes(deps: {
   bus?: EventBus | undefined;
   /** Abre a conversa da análise da vaga (F06 §1.1, `SessionManager.openPostingAnalysis`). */
   openAnalysis?: ((postingId: string) => { id: string }) | undefined;
+  /** Turno em andamento na conversa (`SessionManager.withBusy`): o andamento das abas da janela. */
+  sessionBusy?: ((sessionId: string) => boolean) | undefined;
 }) {
   const app = new Hono();
   const startAnalysis = captureAnalysisStarter(deps);
@@ -134,11 +139,22 @@ export function extensionRoutes(deps: {
     },
   );
 
+  // andamento das abas da janela (pedido do dono, 2026-10-27): antes de `/captures/:id`
+  app.get("/api/extension/captures/activity", (c) => {
+    const ids = (c.req.query("ids") ?? "").split(",").filter(Boolean).slice(0, 50);
+    const items = ids.flatMap((id) => {
+      const capture = deps.repos.extension.getCapture(id);
+      return capture ? [{ id, busy: captureBusy(deps, capture) }] : [];
+    });
+    return c.json({ items });
+  });
+
   app.get("/api/extension/captures/:id", (c) => {
     const capture = deps.repos.extension.getCapture(c.req.param("id"));
     if (!capture) return apiError(c, 404, "not_found", "Captura não encontrada");
     const p = capture.payload as CapturePayload;
     const reading = readingOf(p);
+    const form = deps.repos.applications.byCapture(capture.id);
     const likely = capture.postingId
       ? null
       : findLikelyPosting(deps.repos.postings.list(), {
@@ -160,7 +176,8 @@ export function extensionRoutes(deps: {
         sessionId: capture.analysisSessionId,
         error: capture.analysisError,
       },
-      applicationId: deps.repos.applications.byCapture(capture.id)?.id ?? null,
+      applicationId: form?.id ?? null,
+      applicationUrl: form?.url ?? null,
       mode: (capture.payload as { mode?: "auto" | "posting" | "form" }).mode ?? "auto",
     };
     return c.json({ capture: body });
@@ -198,6 +215,50 @@ export function extensionRoutes(deps: {
     if (r.posting.status !== "extracting") startAnalysis(capture.id, r.posting.id);
     return c.json({ posting: r.posting, job: r.job }, 201);
   });
+
+  // o formulário na mesma aba da vaga (pedido do dono, 2026-10-27): entra nesta captura, sem outra aba na janela
+  app.post(
+    "/api/extension/captures/:id/form",
+    validate("json", ExtensionCaptureFormRequestSchema),
+    async (c) => {
+      const capture = deps.repos.extension.getCapture(c.req.param("id"));
+      if (!capture) return apiError(c, 404, "not_found", "Captura não encontrada");
+      if (!capture.postingId)
+        return apiError(c, 422, "not_saved", "Salve a vaga antes de ler o formulário.");
+      if (deps.repos.applications.byCapture(capture.id))
+        return apiError(c, 409, "has_form", "Esta aba já tem um formulário.");
+      const b = c.req.valid("json");
+      if (b.form.fields.length < 1)
+        return apiError(
+          c,
+          422,
+          "no_form",
+          "Não achei um formulário nesta aba. Se ele está em outra página, abra-a nesta mesma aba e tente de novo.",
+        );
+      if (!b.force) {
+        const read = extractPosting(b.html, b.url, "extension");
+        const likely = findLikelyPosting(deps.repos.postings.list(), {
+          url: b.url,
+          title: read.ok ? read.title : null,
+          company: read.ok ? read.company : null,
+          pageTitle: b.title ?? null,
+        });
+        if (likely && likely.id !== capture.postingId)
+          return apiError(c, 409, "different_posting", "A página parece ser de outra vaga.");
+      }
+      const form = deps.repos.applications.create({
+        captureId: capture.id,
+        postingId: capture.postingId,
+        profileId: deps.repos.profiles.active()?.id ?? null,
+        url: b.url,
+        title: b.title ?? null,
+        fields: b.form.fields,
+      });
+      if (deps.queue) await enqueueLocate(deps.queue, form.id);
+      deps.bus?.emit({ type: "application.updated", applicationId: form.id });
+      return c.json({ applicationId: form.id }, 201);
+    },
+  );
 
   // "Analisar de novo" na janela: abre a conversa da análise agora
   app.post("/api/extension/captures/:id/analyze", (c) => {
@@ -284,6 +345,46 @@ function readingOf(p: CapturePayload): ExtensionCaptureReading {
 /** Destino do `/enter`: só caminho do próprio narnia (`/…`, nunca `//host` nem esquema). */
 function safeNext(next: string | undefined): string {
   return next && /^\/(?![/\\])/.test(next) ? next : "/candidatura";
+}
+
+/**
+ * A aba da janela está processando (pedido do dono, 2026-10-27): o formulário organizando as perguntas, sugerindo as
+ * motivações ou escrevendo as respostas; a vaga lendo os detalhes; a análise pedida sem resultado (ou com o turno em
+ * andamento); um CV ou carta da vaga gerando; a conversa do formulário respondendo. O que espera a pessoa (vaga
+ * repetida, motivações para revisar) não conta.
+ */
+function captureBusy(
+  deps: { repos: Repos; sessionBusy?: ((id: string) => boolean) | undefined },
+  capture: ExtensionCaptureRecord,
+): boolean {
+  const { repos } = deps;
+  const talking = (id: string | null) => !!id && (deps.sessionBusy?.(id) ?? false);
+  const form = repos.applications.byCapture(capture.id);
+  const postingId = form?.postingId ?? capture.postingId;
+  if (form) {
+    if (form.status === "locating" || form.answersStatus === "answering") return true;
+    if (
+      form.answersStatus === "motivations" &&
+      form.profileId &&
+      suggestingMotivations(repos, form.profileId)
+    )
+      return true;
+    if (talking(form.chatSessionId)) return true;
+  } else if (capture.postingId) {
+    const posting = repos.postings.get(capture.postingId);
+    if (posting?.status === "extracting") return true;
+    const waiting =
+      capture.analysisRequestedAt !== null &&
+      capture.analysisError === null &&
+      !repos.jobAnalyses.latest(capture.postingId) &&
+      !(posting?.duplicate && posting.duplicate.decision === null);
+    if (waiting || talking(capture.analysisSessionId)) return true;
+  }
+  if (!postingId) return false;
+  return repos.documents.list({ postingId }).some((d) => {
+    const v = repos.documents.currentVersion(d.id);
+    return !!v && isVersionActive(v);
+  });
 }
 
 type AnalysisStart =

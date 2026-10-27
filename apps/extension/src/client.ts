@@ -166,3 +166,41 @@ export async function sendCapture(
   if (res.ok && body.id) return { ok: true, id: body.id };
   return { ok: false, reason: "unexpected", message: `O narnia respondeu ${res.status}.` };
 }
+
+export type FormAttachResult =
+  | { ok: true; applicationId: string }
+  | { ok: false; code: string; message: string };
+
+/**
+ * O formulário lido na mesma aba da vaga (pedido do dono, 2026-10-27): entra na captura da vaga já aberta na janela.
+ * `force` é o botão da janela (a pessoa diz que é desta vaga); o clique no ícone manda sem ele.
+ */
+export async function sendCaptureForm(
+  fetch: Fetch,
+  instance: string,
+  token: string,
+  captureId: string,
+  page: { url: string; title: string; html: string; form: unknown },
+  force: boolean,
+): Promise<FormAttachResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${instance}/api/extension/captures/${encodeURIComponent(captureId)}/form`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ ...page, force }),
+    });
+  } catch {
+    return { ok: false, code: "offline", message: offlineMessage(instance) };
+  }
+  const body = (await res.json().catch(() => ({}))) as {
+    applicationId?: string;
+    error?: { code?: string; message?: string };
+  };
+  if (res.ok && body.applicationId) return { ok: true, applicationId: body.applicationId };
+  return {
+    ok: false,
+    code: body.error?.code ?? (res.status === 401 ? "unauthorized" : "unexpected"),
+    message: body.error?.message ?? `O narnia respondeu ${res.status}.`,
+  };
+}

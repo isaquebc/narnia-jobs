@@ -26,6 +26,7 @@ import type {
   EvalsSettingsResponse,
   EvidenceFile,
   ExtensionCapture,
+  ExtensionCaptureActivityResponse,
   ExtensionDevicesResponse,
   ExtensionPairingResponse,
   FileDigest,
@@ -278,6 +279,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     revokeExtensionDevice: (id: string) =>
       request<void>(`/api/extension/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
     // janela da extensão (F12/M2): página lida e "Salvar vaga"
+    getCaptureActivity: (ids: string[]) =>
+      request<ExtensionCaptureActivityResponse>(
+        `/api/extension/captures/activity?ids=${ids.map(encodeURIComponent).join(",")}`,
+      ),
     getExtensionCapture: (id: string) =>
       request<{ capture: ExtensionCapture }>(`/api/extension/captures/${encodeURIComponent(id)}`),
     saveCapturePosting: (id: string) =>

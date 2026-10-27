@@ -27,6 +27,7 @@ const capture = (id: string, over: Record<string, unknown> = {}) => ({
   postingId: null,
   duplicate: null,
   applicationId: null,
+  applicationUrl: null,
   mode: "posting",
   analysis: { requested: false, sessionId: null, error: null },
   reading: reading(id === "c1" ? "Backend Sr" : "Frontend Pleno"),
@@ -69,16 +70,22 @@ describe("janela da extensão: abas, voltar à página e preencher", () => {
       router.navigate({ to: "/candidatura", search: { captura: "c2", aba: 8, erro: undefined } }),
     );
     expect(await screen.findByRole("heading", { name: "Frontend Pleno" })).toBeInTheDocument();
-    const tabs = screen.getByRole("tablist", { name: "Páginas abertas" });
+    // em menu (pedido do dono, 2026-10-27): a aberta no botão, todas na lista
+    const menu = async () => {
+      await userEvent.click(screen.getByRole("button", { name: /^Páginas abertas/ }));
+      return screen.getByRole("list", { name: "Páginas abertas" });
+    };
+    let tabs = await menu();
     expect(
       within(tabs)
-        .getAllByRole("tab")
-        .map((t) => t.textContent),
+        .getAllByRole("listitem")
+        .map((li) => within(li).getAllByRole("button")[0]?.textContent),
     ).toEqual(["Backend Sr", "Frontend Pleno"]);
-    await userEvent.click(within(tabs).getByRole("tab", { name: "Backend Sr" }));
+    await userEvent.click(within(tabs).getByRole("button", { name: "Backend Sr" }));
     expect(await screen.findByRole("heading", { name: "Backend Sr" })).toBeInTheDocument();
+    tabs = await menu();
     await userEvent.click(within(tabs).getByRole("button", { name: "Fechar Frontend Pleno" }));
-    await waitFor(() => expect(within(tabs).getAllByRole("tab")).toHaveLength(1));
+    await waitFor(() => expect(within(tabs).getAllByRole("listitem")).toHaveLength(1));
   });
 
   it("bandeja: o botão no topo abre a bandeja em overlay e os links abrem na janela normal", async () => {

@@ -171,6 +171,29 @@ describe("F12-23 · motivações antes das respostas", () => {
     });
     expect(await screen.findByText("Sugerindo frases pelo seu histórico…")).toBeInTheDocument();
   });
+
+  it("a sugestão termina sem outro evento (o worker avisa antes de a tarefa acabar): o andamento some sozinho", async () => {
+    let suggesting = true;
+    renderApp({
+      api: {
+        ...base,
+        getApplication: async () =>
+          ({ application: form({ answersStatus: "motivations" }) }) as never,
+        listMotivations: async () => ({
+          items: [motivation("m1", "Quero continuar trabalhando com pagamentos.", "suggested")],
+          reviewed: false,
+          suggesting,
+        }),
+      } as never,
+      initialUrl: "/candidatura?captura=c1",
+    });
+    expect(await screen.findByText("Sugerindo frases pelo seu histórico…")).toBeInTheDocument();
+    suggesting = false;
+    await waitFor(
+      () => expect(screen.queryByText("Sugerindo frases pelo seu histórico…")).toBeNull(),
+      { timeout: 4_000 },
+    );
+  });
 });
 
 describe("F12-23 · suposições do roleplay na resposta", () => {

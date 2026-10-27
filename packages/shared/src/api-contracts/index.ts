@@ -848,6 +848,24 @@ export const ExtensionCaptureCreateRequestSchema = z.object({
   mode: z.enum(["auto", "posting", "form"]).default("auto"),
 });
 export type ExtensionCaptureCreateRequest = z.infer<typeof ExtensionCaptureCreateRequestSchema>;
+/**
+ * O formulário lido na mesma aba da vaga (pedido do dono, 2026-10-27): entra na captura já salva, sem outra aba na
+ * janela. `force` é o botão da janela (a pessoa diz que é desta vaga); sem ele (clique no ícone), página que parece de
+ * outra vaga salva é recusada.
+ */
+export const ExtensionCaptureFormRequestSchema = ExtensionCaptureCreateRequestSchema.pick({
+  url: true,
+  title: true,
+  html: true,
+}).extend({ form: FormSnapshotSchema, force: z.boolean().default(false) });
+export type ExtensionCaptureFormRequest = z.input<typeof ExtensionCaptureFormRequestSchema>;
+/** Andamento das abas da janela (pedido do dono, 2026-10-27): o seletor mostra quem está processando. */
+export const ExtensionCaptureActivityResponseSchema = z.object({
+  items: z.array(z.object({ id: z.string(), busy: z.boolean() })),
+});
+export type ExtensionCaptureActivityResponse = z.infer<
+  typeof ExtensionCaptureActivityResponseSchema
+>;
 /** O que a janela mostra da página lida: o extrator da F06 sobre o HTML, sem tokens. */
 export const ExtensionCaptureReadingSchema = z.object({
   ok: z.boolean(),
@@ -882,6 +900,8 @@ export const ExtensionCaptureSchema = z.object({
   }),
   /** Formulário de candidatura lido na página (F12/M3): a janela abre no modo formulário. */
   applicationId: z.string().nullable(),
+  /** Endereço da página do formulário (pode ser outra página da mesma aba, depois da vaga): voltar e preencher. */
+  applicationUrl: z.string().nullable(),
   /** O que a pessoa escolheu no menu (F12-15): `form` sem formulário achado mostra o aviso. */
   mode: z.enum(["auto", "posting", "form"]),
 });

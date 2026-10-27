@@ -17,6 +17,7 @@ const capture = (over: Record<string, unknown> = {}) => ({
   postingId: null,
   duplicate: null,
   applicationId: null,
+  applicationUrl: null,
   mode: "auto" as const,
   analysis: { requested: false, sessionId: null, error: null },
   reading: {

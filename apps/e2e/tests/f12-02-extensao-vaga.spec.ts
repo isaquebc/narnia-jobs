@@ -27,6 +27,11 @@ const JOB_PAGE = `<!doctype html><html><head><title>Vagas</title>
   hiringOrganization: { "@type": "Organization", name: "Acme Pagamentos" },
 })}</script></head><body><nav>Início · Entrar</nav>
 <main><h1>Engenheira Backend Sênior</h1>${DESCRIPTION}</main></body></html>`;
+/** O formulário da mesma vaga, em outra página do mesmo site (o "Candidatar-se" da página). */
+const FORM_PAGE = `<!doctype html><html><head><title>Candidatura · Acme</title></head><body>
+<form><label for="nome">Nome completo *</label><input id="nome" name="nome" required>
+<label for="email">E-mail</label><input id="email" type="email" name="email">
+<button type="submit">Enviar</button></form></body></html>`;
 
 let dir: string;
 let context: BrowserContext;
@@ -76,7 +81,10 @@ test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → anál
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
   });
   await context.route(`http://${FIXTURE_HOST}/**`, (route) =>
-    route.fulfill({ contentType: "text/html; charset=utf-8", body: JOB_PAGE }),
+    route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: route.request().url().includes("/aplicar") ? FORM_PAGE : JOB_PAGE,
+    }),
   );
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
   const extensionId = new URL(worker.url()).host;
@@ -157,4 +165,21 @@ test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → anál
   await expect(popup.getByRole("region", { name: "Análise da vaga" })).toBeVisible();
   await page.goto("/vagas");
   await expect(page.getByText("Engenheira Backend Sênior")).toHaveCount(1);
+
+  // candidatar-se sem duplicar (pedido do dono, 2026-10-27): na mesma aba do Chrome, a pessoa vai ao formulário e a
+  // janela procura por ele; o formulário entra nesta aba da janela, ligado à vaga
+  await job.goto(`http://${FIXTURE_HOST}/vagas/123/aplicar`);
+  await popup.getByRole("button", { name: "Procurar o formulário nesta aba" }).click();
+  await expect(popup.getByRole("heading", { name: "Formulário de candidatura" })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(popup.getByRole("list", { name: "Perguntas do formulário" })).toBeVisible({
+    timeout: 60_000,
+  });
+  // as mesmas duas páginas no menu (a primeira captura e esta), nenhuma nova
+  await popup.getByRole("button", { name: /^Páginas abertas/ }).click();
+  await expect(
+    popup.getByRole("list", { name: "Páginas abertas" }).getByRole("listitem"),
+  ).toHaveCount(2);
+  expect(context.pages().length).toBe(pagesBefore);
 });

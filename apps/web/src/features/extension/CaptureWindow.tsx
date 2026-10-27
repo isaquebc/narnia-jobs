@@ -1,8 +1,8 @@
 import type { ExtensionCapture } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { useApi } from "../../app/context";
+import { useEffect, useId, useState } from "react";
+import { useApi, useWs } from "../../app/context";
 import { ActivityTray } from "../../components/shell/ActivityTray";
 import { ExternalLinksContext } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
@@ -11,14 +11,15 @@ import { t } from "../../i18n";
 import { ApplicationWindow } from "./ApplicationWindow";
 import { bridgeRequest, extensionAvailable } from "./bridge";
 import { CaptureFollowUp } from "./CaptureFollowUp";
-import { useWindowTabs, type WindowTab } from "./windowTabs";
+import { menuState, type TabState, tabState, useWindowTabs, type WindowTab } from "./windowTabs";
 
 /**
  * Janela da extensão (F12-2, F12/M2): aberta numa janela popup do Chrome sobre a página lida, sem o menu do narnia.
  * Modo vaga: o que o extrator da F06 tirou da página, o aviso de vaga já salva e "Salvar vaga", que também analisa
  * (`CaptureFollowUp`). Modo formulário (F12/M3): as perguntas do formulário (`ApplicationWindow`). Cada página aberta
  * pela extensão vira uma aba (F12-16) e "Ir para a página" volta à aba analisada (F12-17). Links abrem fora da janela
- * (`target="_blank"` cai na janela normal do Chrome).
+ * (`target="_blank"` cai na janela normal do Chrome). As abas ficam num menu com o andamento de cada uma (pedido do
+ * dono, 2026-10-27).
  */
 export function CaptureWindow({
   captureId,
@@ -30,10 +31,11 @@ export function CaptureWindow({
   tabId?: number | undefined;
 }) {
   const navigate = useNavigate();
-  const { tabs, setLabel, close } = useWindowTabs({
+  const { tabs, setLabel, close, setActivity } = useWindowTabs({
     captureId: error ? undefined : captureId,
     tabId,
   });
+  useTabsActivity(tabs, captureId, setActivity);
   const current = tabs.find((x) => x.captureId === captureId);
   const go = (tab: WindowTab) =>
     void navigate({
@@ -57,40 +59,7 @@ export function CaptureWindow({
           <ActivityTray overlay />
         </div>
         {tabs.length > 0 ? (
-          <div
-            role="tablist"
-            aria-label={t("capture.tabs")}
-            className="-mx-1 flex gap-1 overflow-x-auto pb-1"
-          >
-            {tabs.map((x) => {
-              const label = x.label ?? t("capture.loading");
-              const selected = x.captureId === captureId;
-              return (
-                <span
-                  key={x.captureId}
-                  className={`flex shrink-0 items-center rounded-md border text-xs ${selected ? "border-primary bg-primary/10" : "border-border"}`}
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    className="max-w-40 truncate px-2 py-1"
-                    onClick={() => go(x)}
-                  >
-                    {label}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t("capture.closeTab", { name: label })}
-                    className="px-1.5 py-1 text-muted-fg hover:text-fg"
-                    onClick={() => closeTab(x)}
-                  >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
-          </div>
+          <TabsMenu tabs={tabs} current={captureId} onSelect={go} onClose={closeTab} />
         ) : null}
         {captureId && !error ? (
           <CaptureView
@@ -105,6 +74,161 @@ export function CaptureWindow({
         )}
       </div>
     </ExternalLinksContext.Provider>
+  );
+}
+
+/** Eventos que mudam o andamento de uma aba: a janela relê o api (e a cada 5 s enquanto alguma processa). */
+const ACTIVITY_EVENTS = new Set([
+  "posting.updated",
+  "chat.session_updated",
+  "application.updated",
+  "document.updated",
+  "profile.motivations.updated",
+]);
+
+function useTabsActivity(
+  tabs: WindowTab[],
+  current: string | undefined,
+  setActivity: (items: Array<{ id: string; busy: boolean }>, selected: string | undefined) => void,
+) {
+  const api = useApi();
+  const ws = useWs();
+  const qc = useQueryClient();
+  const ids = tabs.map((x) => x.captureId);
+  const anyBusy = tabs.some((x) => x.busy);
+  const q = useQuery({
+    queryKey: ["extension", "activity", ids],
+    queryFn: () => api.getCaptureActivity(ids),
+    enabled: ids.length > 0,
+    refetchInterval: anyBusy ? 5_000 : false,
+  });
+  useEffect(() => {
+    ws.connect();
+    return ws.subscribe((e) => {
+      if (ACTIVITY_EVENTS.has(e.type))
+        void qc.invalidateQueries({ queryKey: ["extension", "activity"] });
+    });
+  }, [ws, qc]);
+  // a aba aberta conta como vista; o andamento novo marca as que pararam sem ser vistas
+  useEffect(() => {
+    setActivity(q.data?.items ?? [], current);
+  }, [q.data, current, setActivity]);
+}
+
+const STATE_KEYS: Record<
+  TabState,
+  "capture.tabState.busy" | "capture.tabState.unseen" | "capture.tabState.seen"
+> = {
+  busy: "capture.tabState.busy",
+  unseen: "capture.tabState.unseen",
+  seen: "capture.tabState.seen",
+};
+
+/** Processando (carregando), terminou sem você ver (bolinha verde) ou vista (check verde). */
+function StateIcon({ state }: { state: TabState }) {
+  const label = t(STATE_KEYS[state]);
+  if (state === "busy")
+    return (
+      <span
+        role="img"
+        aria-label={label}
+        title={label}
+        className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+      />
+    );
+  if (state === "unseen")
+    return (
+      <span
+        role="img"
+        aria-label={label}
+        title={label}
+        className="h-2.5 w-2.5 shrink-0 rounded-full bg-ok"
+      />
+    );
+  return (
+    <span role="img" aria-label={label} title={label} className="shrink-0 text-ok">
+      ✓
+    </span>
+  );
+}
+
+/** As abas da janela num menu (pedido do dono, 2026-10-27): a aberta no botão, as outras na lista. */
+function TabsMenu({
+  tabs,
+  current,
+  onSelect,
+  onClose,
+}: {
+  tabs: WindowTab[];
+  current: string | undefined;
+  onSelect: (tab: WindowTab) => void;
+  onClose: (tab: WindowTab) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const selected = tabs.find((x) => x.captureId === current);
+  const name = selected?.label ?? t("capture.loading");
+  const summary = menuState(tabs);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label={t("capture.tabsTrigger", { name })}
+        aria-expanded={open}
+        aria-controls={listId}
+        className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-1.5 text-left text-sm"
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
+      >
+        <span className="min-w-0 flex-1 truncate">{name}</span>
+        <span className="text-xs text-muted-fg">{tabs.length}</span>
+        {summary ? <StateIcon state={summary} /> : null}
+        <span aria-hidden className="text-muted-fg">
+          ▾
+        </span>
+      </button>
+      {open ? (
+        <ul
+          id={listId}
+          aria-label={t("capture.tabs")}
+          className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-80 flex-col overflow-y-auto rounded-md border border-border bg-bg py-1 shadow-lg"
+        >
+          {tabs.map((x) => {
+            const label = x.label ?? t("capture.loading");
+            const isCurrent = x.captureId === current;
+            return (
+              <li
+                key={x.captureId}
+                className={`flex items-center gap-2 px-2 text-sm ${isCurrent ? "bg-primary/10" : ""}`}
+              >
+                <StateIcon state={tabState(x)} />
+                <button
+                  type="button"
+                  aria-current={isCurrent ? "page" : undefined}
+                  className="min-w-0 flex-1 truncate py-1.5 text-left"
+                  onClick={() => {
+                    setOpen(false);
+                    onSelect(x);
+                  }}
+                >
+                  {label}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("capture.closeTab", { name: label })}
+                  className="px-1.5 py-1 text-muted-fg hover:text-fg"
+                  onClick={() => onClose(x)}
+                >
+                  ×
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
@@ -134,7 +258,8 @@ function CaptureView({
   }, [label, onLabel]);
   if (q.isPending) return <p className="text-sm text-muted-fg">{t("capture.loading")}</p>;
   if (q.isError || !capture) return <Alert tone="warn">{t("capture.notFound")}</Alert>;
-  const page = { url: capture.url, tabId };
+  // o formulário pode estar em outra página da mesma aba (pedido do dono, 2026-10-27): voltar e preencher vão nela
+  const page = { url: capture.applicationUrl ?? capture.url, tabId };
   return (
     <>
       <PageLink page={page} />
@@ -144,7 +269,7 @@ function CaptureView({
       ) : (
         <>
           {capture.mode === "form" ? <Alert tone="info">{t("capture.noForm")}</Alert> : null}
-          <PostingCapture capture={capture} />
+          <PostingCapture capture={capture} tabId={tabId} />
         </>
       )}
     </>
@@ -183,7 +308,7 @@ function host(url: string) {
   }
 }
 
-function PostingCapture({ capture }: { capture: ExtensionCapture }) {
+function PostingCapture({ capture, tabId }: { capture: ExtensionCapture; tabId: number | null }) {
   const api = useApi();
   const qc = useQueryClient();
   // salvar liga a captura à vaga e pede a análise: a captura recarregada passa a mostrar o acompanhamento
@@ -222,7 +347,7 @@ function PostingCapture({ capture }: { capture: ExtensionCapture }) {
       </header>
       {saved ? (
         <>
-          <CaptureFollowUp capture={capture} />
+          <CaptureFollowUp capture={capture} tabId={tabId} />
           {/* salva, a descrição fica recolhida: o que importa agora é a análise e os documentos */}
           {description ? (
             <details className="text-sm">

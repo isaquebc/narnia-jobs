@@ -160,9 +160,14 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar,
     const tab = tabs.find((t) => t.url?.endsWith("/vagas/123"));
     return g.narniaIconClick(tab ?? {}, "posting");
   }, FIXTURE_HOST);
-  const tabs = popup.getByRole("tablist", { name: "Páginas abertas" });
-  await expect(tabs.getByRole("tab")).toHaveCount(2, { timeout: 30_000 });
-  await tabs.getByRole("tab").first().click();
+  // em menu (pedido do dono, 2026-10-27)
+  await expect(popup.getByRole("button", { name: /^Páginas abertas/ })).toContainText("2", {
+    timeout: 30_000,
+  });
+  await popup.getByRole("button", { name: /^Páginas abertas/ }).click();
+  const tabs = popup.getByRole("list", { name: "Páginas abertas" }).getByRole("listitem");
+  await expect(tabs).toHaveCount(2);
+  await tabs.first().getByRole("button").first().click();
   await expect(popup.getByRole("list", { name: "Perguntas do formulário" })).toBeVisible();
 
   // F12/M4: ligada a uma vaga salva, as respostas sugeridas chegam (mock do Sonnet) e entram no Preencher todos
@@ -175,6 +180,10 @@ test("F12/E2E-03 extensão: formulário de candidatura → perguntas → copiar,
   const step = popup.getByRole("region", { name: "Antes das respostas: o que te move" });
   const phrases = step.getByRole("list", { name: "Motivações" }).getByRole("listitem");
   await expect(phrases.first()).toBeVisible({ timeout: 60_000 });
+  // conta só depois que a sugestão termina (as frases podem chegar em mais de uma leva)
+  await expect(step.getByText("Sugerindo frases pelo seu histórico…")).toBeHidden({
+    timeout: 60_000,
+  });
   const before = await phrases.count();
   await phrases.first().getByRole("button", { name: "Aceitar" }).click();
   await expect(phrases.first()).toContainText("Aceita");

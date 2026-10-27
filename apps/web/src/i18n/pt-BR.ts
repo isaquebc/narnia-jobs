@@ -1353,7 +1353,20 @@ export const ptBR = {
     title: "narnia · vaga",
     loading: "Lendo a página…",
     tabs: "Páginas abertas",
+    tabsTrigger: "Páginas abertas: {name}",
     closeTab: "Fechar {name}",
+    tabState: {
+      busy: "Processando",
+      unseen: "Atualização não vista",
+      seen: "Vista",
+    },
+    findForm: {
+      title: "Candidatar-se",
+      hint: "Vá ao formulário de candidatura nesta mesma aba do navegador (pelo botão Candidatar-se da página, por exemplo) e procure por ele aqui. Ele entra nesta vaga, sem abrir outra aba.",
+      button: "Procurar o formulário nesta aba",
+      reading: "Lendo a aba…",
+      permission: "Autorize a leitura do formulário na janela que abriu.",
+    },
     formTab: "Formulário · {host}",
     goToPage: "Ir para a página",
     noForm:

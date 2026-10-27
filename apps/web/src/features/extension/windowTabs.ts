@@ -9,6 +9,42 @@ export interface WindowTab {
   captureId: string;
   tabId: number | null;
   label: string | null;
+  /** Andamento (pedido do dono, 2026-10-27): processando agora, e terminou sem a pessoa ver. */
+  busy?: boolean;
+  unseen?: boolean;
+}
+
+export type TabState = "busy" | "unseen" | "seen";
+
+export const tabState = (t: WindowTab): TabState =>
+  t.busy ? "busy" : t.unseen ? "unseen" : "seen";
+
+/** O botão do menu: novidade não vista vence; senão, alguma processando; senão, nada. */
+export function menuState(tabs: WindowTab[]): Exclude<TabState, "seen"> | null {
+  if (tabs.some((t) => tabState(t) === "unseen")) return "unseen";
+  if (tabs.some((t) => t.busy)) return "busy";
+  return null;
+}
+
+/**
+ * Aplica o andamento lido no api: a aba que estava processando e parou fica "não vista", a menos que seja a aberta;
+ * a aberta é sempre vista.
+ */
+export function applyActivity(
+  tabs: WindowTab[],
+  items: Array<{ id: string; busy: boolean }>,
+  selected: string | undefined,
+): WindowTab[] {
+  const busy = new Map(items.map((i) => [i.id, i.busy]));
+  let changed = false;
+  const next = tabs.map((t) => {
+    const now = busy.get(t.captureId) ?? t.busy ?? false;
+    const unseen = t.captureId === selected ? false : (t.unseen ?? false) || (!!t.busy && !now);
+    if (now === (t.busy ?? false) && unseen === (t.unseen ?? false)) return t;
+    changed = true;
+    return { ...t, busy: now, unseen };
+  });
+  return changed ? next : tabs;
 }
 
 const KEY = "narnia.window.tabs";
@@ -65,5 +101,10 @@ export function useWindowTabs(current: {
     (captureId: string) => update((prev) => prev.filter((t) => t.captureId !== captureId)),
     [update],
   );
-  return { tabs, setLabel, close };
+  const setActivity = useCallback(
+    (items: Array<{ id: string; busy: boolean }>, selected: string | undefined) =>
+      update((prev) => applyActivity(prev, items, selected)),
+    [update],
+  );
+  return { tabs, setLabel, close, setActivity };
 }
