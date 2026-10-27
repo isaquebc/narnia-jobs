@@ -859,6 +859,13 @@ export const ExtensionCaptureFormRequestSchema = ExtensionCaptureCreateRequestSc
   html: true,
 }).extend({ form: FormSnapshotSchema, force: z.boolean().default(false) });
 export type ExtensionCaptureFormRequest = z.input<typeof ExtensionCaptureFormRequestSchema>;
+/** O formulário da aba (F12/M6): a etapa em que a página entrou e se ela é nova (organizando) ou já lida. */
+export const ExtensionCaptureFormResponseSchema = z.object({
+  applicationId: z.string(),
+  step: z.number().int().positive(),
+  added: z.boolean(),
+});
+export type ExtensionCaptureFormResponse = z.infer<typeof ExtensionCaptureFormResponseSchema>;
 /** Andamento das abas da janela (pedido do dono, 2026-10-27): o seletor mostra quem está processando. */
 export const ExtensionCaptureActivityResponseSchema = z.object({
   items: z.array(z.object({ id: z.string(), busy: z.boolean() })),
@@ -920,6 +927,18 @@ export const ApplicationFormViewSchema = z.object({
   postingId: z.string().nullable(),
   posting: z.object({ title: z.string().nullable(), company: z.string().nullable() }).nullable(),
   profileId: z.string().nullable(),
+  /**
+   * Etapas lidas (F12/M6), em ordem; `url` e `title` acima são os da atual (a da aba), a única que dá para preencher.
+   */
+  steps: z.array(
+    z.object({
+      n: z.number().int().positive(),
+      url: z.string(),
+      title: z.string().nullable(),
+      status: ApplicationStatusSchema,
+    }),
+  ),
+  currentStep: z.number().int().positive(),
   questions: z.array(
     ApplicationQuestionSchema.extend({
       /** Valor tirado dos dados da pessoa (campos óbvios), pronto para copiar. */

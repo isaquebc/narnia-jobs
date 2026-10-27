@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   analyzePostingText,
@@ -7,6 +7,7 @@ import {
   isDeviceToken,
   isVersionActive,
   MIN_APPLICATION_FIELDS,
+  matchStep,
   type Repos,
 } from "@narnia-jobs/core";
 import {
@@ -216,17 +217,17 @@ export function extensionRoutes(deps: {
     return c.json({ posting: r.posting, job: r.job }, 201);
   });
 
-  // o formulário na mesma aba da vaga (pedido do dono, 2026-10-27): entra nesta captura, sem outra aba na janela
+  // o formulário na mesma aba da vaga (pedido do dono, 2026-10-27): entra nesta captura, sem outra aba na janela; com
+  // o formulário já lido, a página é uma etapa dele (F12/M6): a já lida vira a atual, a nova é organizada sozinha
   app.post(
     "/api/extension/captures/:id/form",
     validate("json", ExtensionCaptureFormRequestSchema),
     async (c) => {
       const capture = deps.repos.extension.getCapture(c.req.param("id"));
       if (!capture) return apiError(c, 404, "not_found", "Captura não encontrada");
-      if (!capture.postingId)
+      const existing = deps.repos.applications.byCapture(capture.id);
+      if (!existing && !capture.postingId)
         return apiError(c, 422, "not_saved", "Salve a vaga antes de ler o formulário.");
-      if (deps.repos.applications.byCapture(capture.id))
-        return apiError(c, 409, "has_form", "Esta aba já tem um formulário.");
       const b = c.req.valid("json");
       if (b.form.fields.length < 1)
         return apiError(
@@ -235,7 +236,9 @@ export function extensionRoutes(deps: {
           "no_form",
           "Não achei um formulário nesta aba. Se ele está em outra página, abra-a nesta mesma aba e tente de novo.",
         );
+      // pelo ícone (sem force), só o que parece continuar a mesma candidatura; o botão da janela é a pessoa dizendo que é
       if (!b.force) {
+        const postingId = existing ? existing.postingId : capture.postingId;
         const read = extractPosting(b.html, b.url, "extension");
         const likely = findLikelyPosting(deps.repos.postings.list(), {
           url: b.url,
@@ -243,8 +246,26 @@ export function extensionRoutes(deps: {
           company: read.ok ? read.company : null,
           pageTitle: b.title ?? null,
         });
-        if (likely && likely.id !== capture.postingId)
+        if (postingId && likely && likely.id !== postingId)
           return apiError(c, 409, "different_posting", "A página parece ser de outra vaga.");
+        if (existing && !existing.steps.some((s) => originOf(s.url) === originOf(b.url)))
+          return apiError(c, 409, "different_form", "A página é de outro site.");
+      }
+      if (existing) {
+        const seen = matchStep(existing.steps, { url: b.url, fields: b.form.fields });
+        if (seen) {
+          deps.repos.applications.setCurrentStep(existing.id, seen.n);
+          deps.bus?.emit({ type: "application.updated", applicationId: existing.id });
+          return c.json({ applicationId: existing.id, step: seen.n, added: false }, 200);
+        }
+        const step = deps.repos.applications.addStep(existing.id, {
+          url: b.url,
+          title: b.title ?? null,
+          fields: b.form.fields,
+        });
+        if (deps.queue) await enqueueLocate(deps.queue, existing.id, step);
+        deps.bus?.emit({ type: "application.updated", applicationId: existing.id });
+        return c.json({ applicationId: existing.id, step, added: true }, 201);
       }
       const form = deps.repos.applications.create({
         captureId: capture.id,
@@ -256,7 +277,7 @@ export function extensionRoutes(deps: {
       });
       if (deps.queue) await enqueueLocate(deps.queue, form.id);
       deps.bus?.emit({ type: "application.updated", applicationId: form.id });
-      return c.json({ applicationId: form.id }, 201);
+      return c.json({ applicationId: form.id, step: 1, added: true }, 201);
     },
   );
 
@@ -303,6 +324,24 @@ type CapturePayload =
       siteName: string | null;
     }
   | { ok: false; code: string; message: string };
+
+const originOf = (u: string) => {
+  try {
+    return new URL(u).origin;
+  } catch {
+    return null;
+  }
+};
+
+/** Poda das capturas (F12 §5) com o HTML de cada uma; no boot do api e uma vez por dia. Devolve quantas saíram. */
+export function pruneCapturesNow(
+  deps: { repos: Repos; dataDir: string },
+  now = new Date(),
+): number {
+  const ids = deps.repos.extension.pruneCaptures(now);
+  for (const id of ids) rmSync(capturePath(deps.dataDir, id), { force: true });
+  return ids.length;
+}
 
 const capturePath = (dataDir: string, id: string) => join(dataDir, "captures", `${id}.html`);
 

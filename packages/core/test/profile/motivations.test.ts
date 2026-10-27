@@ -26,7 +26,9 @@ describe("F12-23 · motivações do perfil", () => {
   it("0025 entra sobre o banco anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0024_self_declaration" });
-    expect(migrate(db).applied).toEqual(["0025_profile_motivation"]);
+    expect(migrate(db, { until: "0025_profile_motivation" }).applied).toEqual([
+      "0025_profile_motivation",
+    ]);
   });
 
   it("guarda por perfil, com estado e origem; editar muda o texto e aceita; recusada continua guardada", () => {

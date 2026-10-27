@@ -138,3 +138,88 @@ describe("F12/M3 worker · application.locate", () => {
     expect(h.published).toHaveLength(1);
   });
 });
+
+describe("F12/M6 worker · formulário em várias etapas", () => {
+  let h: ReturnType<typeof harness>;
+  afterEach(() => h?.cleanup());
+
+  it("etapa nova: organiza só ela, mantém as perguntas e respostas da anterior e pede respostas só para ela", async () => {
+    h = harness();
+    const tasks: Array<Record<string, unknown>> = [];
+    h.deps.enqueueTask = async (t) => {
+      tasks.push(t.payload as Record<string, unknown>);
+    };
+    const postingId = h.repos.postings.create({ title: "Backend Sr", company: "Acme" }).id;
+    const f = h.repos.applications.create({
+      captureId: "c1",
+      postingId,
+      profileId: null,
+      url: "https://acme.example/aplicar",
+      title: "Etapa 1",
+      fields: [
+        field("f1", { label: "Nome completo" }),
+        field("f2", { control: "textarea", label: "Conte" }),
+      ],
+    });
+    await run(h, f.id);
+    expect(tasks).toEqual([{ applicationId: f.id }]);
+    h.repos.applications.addAnswers(f.id, [
+      {
+        questionId: "q2",
+        answer: "Minha história.",
+        origins: [],
+        gap: null,
+        assumptions: [],
+        source: "edited",
+      },
+    ]);
+    const n = h.repos.applications.addStep(f.id, {
+      url: "https://acme.example/aplicar/2",
+      title: "Etapa 2",
+      fields: [
+        field("f1", { control: "textarea", label: "Por que a Acme?" }),
+        field("f2", { label: "Cidade" }),
+      ],
+    });
+    tasks.length = 0;
+    await processTask(
+      {
+        kind: "task",
+        type: "application.locate",
+        key: f.id,
+        payload: { applicationId: f.id, step: n },
+      },
+      h.ctx,
+      h.deps,
+    );
+    const done = h.repos.applications.get(f.id);
+    expect(done?.status).toBe("ready");
+    expect(done?.questions.map((q) => [q.id, q.step, q.question])).toEqual([
+      ["q1", 1, "Nome completo"],
+      ["q2", 1, "Conte"],
+      ["s2q1", 2, "Por que a Acme?"],
+      ["s2q2", 2, "Cidade"],
+    ]);
+    expect(h.repos.applications.latestAnswers(f.id).map((a) => a.questionId)).toEqual(["q2"]);
+    // "Cidade" sai dos dados (campo óbvio): só a aberta da etapa 2 vai para o modelo
+    expect(tasks).toEqual([{ applicationId: f.id, questionIds: ["s2q1"] }]);
+  });
+
+  it("Ler de novo (sem etapa): organiza todas, cada uma com os ids dela", async () => {
+    h = harness();
+    const f = form(h, [field("f1", { label: "Nome completo" })]);
+    await run(h, f.id);
+    h.repos.applications.addStep(f.id, {
+      url: "https://acme.example/aplicar/2",
+      title: null,
+      fields: [field("f1", { label: "Cargo atual" })],
+    });
+    h.repos.applications.setLocating(f.id);
+    await run(h, f.id);
+    expect(h.repos.applications.get(f.id)?.questions.map((q) => [q.id, q.step])).toEqual([
+      ["q1", 1],
+      ["s2q1", 2],
+    ]);
+    expect(h.repos.applications.get(f.id)?.status).toBe("ready");
+  });
+});

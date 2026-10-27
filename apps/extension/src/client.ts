@@ -168,7 +168,7 @@ export async function sendCapture(
 }
 
 export type FormAttachResult =
-  | { ok: true; applicationId: string }
+  | { ok: true; applicationId: string; step?: number; added?: boolean }
   | { ok: false; code: string; message: string };
 
 /**
@@ -195,9 +195,17 @@ export async function sendCaptureForm(
   }
   const body = (await res.json().catch(() => ({}))) as {
     applicationId?: string;
+    step?: number;
+    added?: boolean;
     error?: { code?: string; message?: string };
   };
-  if (res.ok && body.applicationId) return { ok: true, applicationId: body.applicationId };
+  // F12/M6: a etapa do formulário em que a página entrou (o narnia antigo não manda)
+  if (res.ok && body.applicationId)
+    return {
+      ok: true,
+      applicationId: body.applicationId,
+      ...(typeof body.step === "number" ? { step: body.step, added: body.added === true } : {}),
+    };
   return {
     ok: false,
     code: body.error?.code ?? (res.status === 401 ? "unauthorized" : "unexpected"),

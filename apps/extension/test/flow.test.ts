@@ -271,6 +271,19 @@ describe("formulário na aba da vaga", () => {
     expect(JSON.parse(String(init.body)).force).toBe(true);
   });
 
+  it("formulário em várias etapas (F12/M6): repassa à janela a etapa em que a página entrou", async () => {
+    const d = deps({
+      readTab: vi.fn(async () => formPage),
+      fetch: vi.fn(() => json(201, { applicationId: "a1", step: 2, added: true })),
+    });
+    expect(await readFormInto(7, "c-vaga", d)).toEqual({
+      ok: true,
+      applicationId: "a1",
+      step: 2,
+      added: true,
+    });
+  });
+
   it("botão: página sem acesso (outro site) pede o clique no ícone, e o clique entra nesta captura", async () => {
     const d = deps({ readTab: vi.fn(async () => Promise.reject(new Error("Cannot access"))) });
     const r = await readFormInto(7, "c-vaga", d);

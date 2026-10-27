@@ -53,9 +53,12 @@ describe("F12 · tutorial de instalação da extensão", () => {
     expect(screen.getByRole("heading", { name: "Se algo der errado" })).toBeInTheDocument();
   });
 
-  it("avisa que a extensão já lê vagas e que os formulários vêm depois (M2)", async () => {
+  it("F12/M6: sem o aviso de em construção; mostra os limites (Chrome, outro site, várias etapas, nada enviado)", async () => {
     renderApp({ api, initialUrl: "/extensao" });
-    expect(await screen.findByText(/a extensão já lê páginas de vaga/)).toBeInTheDocument();
+    const limits = await screen.findByRole("region", { name: "Limites" });
+    expect(screen.queryByText(/próximas atualizações/)).toBeNull();
+    for (const text of [/Só no Chrome/, /abriu em outro site/, /várias páginas/, /nunca envia/])
+      expect(within(limits).getByText(text)).toBeInTheDocument();
   });
 });
 

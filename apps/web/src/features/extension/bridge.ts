@@ -20,6 +20,9 @@ export type BridgeResponse =
       filled?: string[];
       failed?: string[];
       applicationId?: string;
+      /** Etapa do formulário em que a página entrou (F12/M6) e se ela é nova. */
+      step?: number;
+      added?: boolean;
       permission?: boolean;
     }
   | { ok: false; error: string; code?: string };

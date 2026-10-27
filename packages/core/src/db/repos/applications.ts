@@ -4,8 +4,9 @@ import type {
   ApplicationQuestion,
   FormField,
 } from "@narnia-jobs/shared";
+import { type FormStep, mergeStepQuestions } from "../../applications/steps";
 import { newId } from "../../ids";
-import type { Db } from "../open";
+import { type Db, withTransaction } from "../open";
 import { json, type Row, str } from "../sql";
 
 /** Formulário de candidatura lido pela extensão (F12/M3): campos da página e perguntas organizadas. */
@@ -16,8 +17,13 @@ export interface ApplicationFormRecord {
   profileId: string | null;
   url: string;
   title: string | null;
+  /** Campos da etapa 1 (os de antes das etapas); os de cada etapa ficam em `steps`. */
   fields: FormField[];
   questions: ApplicationQuestion[];
+  /** Etapas lidas (F12/M6), em ordem; o formulário antigo é a etapa 1. */
+  steps: FormStep[];
+  /** A etapa da aba: `url` e `title` são os dela, e preencher só vale nela. */
+  currentStep: number;
   status: "locating" | "ready" | "error";
   error: string | null;
   /** Geração das respostas (F12/M4). */
@@ -53,6 +59,24 @@ export interface ApplicationsRepo {
     warning?: string | null,
     now?: Date,
   ): void;
+  /**
+   * Perguntas de uma etapa (F12/M6): troca só as dela; o formulário fica pronto quando nenhuma etapa está organizando.
+   */
+  setStepQuestions(
+    id: string,
+    step: number,
+    questions: ApplicationQuestion[],
+    warning?: string | null,
+    now?: Date,
+  ): void;
+  /** Etapa nova lida na aba: vira a atual e fica organizando; devolve o número dela. */
+  addStep(
+    id: string,
+    step: { url: string; title: string | null; fields: FormField[] },
+    now?: Date,
+  ): number;
+  /** A pessoa voltou a uma etapa já lida: ela vira a atual. */
+  setCurrentStep(id: string, step: number, now?: Date): void;
   setError(id: string, error: string, now?: Date): void;
   /** Liga (ou desliga) o formulário a uma vaga salva, escolhida na janela. */
   setPosting(id: string, postingId: string | null, now?: Date): void;
@@ -84,6 +108,20 @@ export interface ApplicationsRepo {
 const MIN_SAMPLE_CHARS = 60;
 
 function map(r: Row): ApplicationFormRecord {
+  const status = String(r.status) as ApplicationFormRecord["status"];
+  const saved = json<FormStep[]>(r.steps_json, []);
+  const steps: FormStep[] = saved.length
+    ? saved
+    : [
+        {
+          n: 1,
+          url: String(r.url),
+          title: str(r.title),
+          fields: json<FormField[]>(r.fields_json, []),
+          status,
+          createdAt: String(r.created_at),
+        },
+      ];
   return {
     id: String(r.id),
     captureId: String(r.capture_id),
@@ -93,7 +131,9 @@ function map(r: Row): ApplicationFormRecord {
     title: str(r.title),
     fields: json<FormField[]>(r.fields_json, []),
     questions: json<ApplicationQuestion[]>(r.questions_json, []),
-    status: String(r.status) as ApplicationFormRecord["status"],
+    steps,
+    currentStep: Number(r.current_step ?? 1),
+    status,
     error: str(r.error),
     answersStatus: (str(r.answers_status) ?? "idle") as ApplicationFormRecord["answersStatus"],
     answersError: str(r.answers_error),
@@ -108,13 +148,58 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
     const r = db.prepare("select * from application_form where id = ?").get(id) as Row | undefined;
     return r ? map(r) : null;
   };
+  /** Grava as etapas e o estado do formulário que sai delas (organizando se alguma está; senão, o pedido). */
+  const writeSteps = (
+    id: string,
+    steps: FormStep[],
+    set: {
+      status?: ApplicationFormRecord["status"];
+      error?: string | null;
+      questions?: ApplicationQuestion[];
+    },
+    now: Date,
+  ) => {
+    const status = steps.some((s) => s.status === "locating")
+      ? "locating"
+      : (set.status ?? "ready");
+    const cols = ["steps_json = ?", "status = ?", "updated_at = ?"];
+    const args: Array<string | null> = [JSON.stringify(steps), status, now.toISOString()];
+    if (set.error !== undefined) {
+      cols.push("error = ?");
+      args.push(set.error);
+    }
+    if (set.questions) {
+      cols.push("questions_json = ?");
+      args.push(JSON.stringify(set.questions));
+    }
+    db.prepare(`update application_form set ${cols.join(", ")} where id = ?`).run(...args, id);
+  };
+  const markAll = (id: string, status: FormStep["status"], error: string | null, now: Date) =>
+    withTransaction(db, () => {
+      const f = get(id);
+      if (!f) return;
+      writeSteps(
+        id,
+        f.steps.map((s) => ({ ...s, status })),
+        { status, error },
+        now,
+      );
+    });
   return {
     create(i, now = new Date()) {
       const id = newId();
       const at = now.toISOString();
+      const step: FormStep = {
+        n: 1,
+        url: i.url,
+        title: i.title,
+        fields: i.fields,
+        status: "locating",
+        createdAt: at,
+      };
       db.prepare(
-        `insert into application_form (id, capture_id, posting_id, profile_id, url, title, fields_json, status,
-           created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, 'locating', ?, ?)`,
+        `insert into application_form (id, capture_id, posting_id, profile_id, url, title, fields_json, steps_json,
+           status, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 'locating', ?, ?)`,
       ).run(
         id,
         i.captureId,
@@ -123,6 +208,7 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
         i.url,
         i.title,
         JSON.stringify(i.fields),
+        JSON.stringify([step]),
         at,
         at,
       );
@@ -138,14 +224,47 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
       return r ? map(r) : null;
     },
     setQuestions(id, questions, warning = null, now = new Date()) {
+      withTransaction(db, () => {
+        const f = get(id);
+        if (!f) return;
+        const steps = f.steps.map((s) => ({ ...s, status: "ready" as const }));
+        writeSteps(id, steps, { error: warning, questions }, now);
+      });
+    },
+    setStepQuestions(id, step, questions, warning = null, now = new Date()) {
+      withTransaction(db, () => {
+        const f = get(id);
+        if (!f) return;
+        const steps = f.steps.map((s) => (s.n === step ? { ...s, status: "ready" as const } : s));
+        const merged = mergeStepQuestions(f.questions, step, questions);
+        writeSteps(id, steps, { error: warning, questions: merged }, now);
+      });
+    },
+    addStep(id, step, now = new Date()) {
+      return withTransaction(db, () => {
+        const f = get(id);
+        if (!f) throw new Error(`formulário ${id} não encontrado`);
+        const n = Math.max(...f.steps.map((s) => s.n)) + 1;
+        const steps: FormStep[] = [
+          ...f.steps,
+          { n, ...step, status: "locating", createdAt: now.toISOString() },
+        ];
+        writeSteps(id, steps, { error: null }, now);
+        db.prepare(
+          "update application_form set current_step = ?, url = ?, title = ? where id = ?",
+        ).run(n, step.url, step.title, id);
+        return n;
+      });
+    },
+    setCurrentStep(id, step, now = new Date()) {
+      const s = get(id)?.steps.find((x) => x.n === step);
+      if (!s) return;
       db.prepare(
-        "update application_form set questions_json = ?, status = 'ready', error = ?, updated_at = ? where id = ?",
-      ).run(JSON.stringify(questions), warning, now.toISOString(), id);
+        "update application_form set current_step = ?, url = ?, title = ?, updated_at = ? where id = ?",
+      ).run(step, s.url, s.title, now.toISOString(), id);
     },
     setError(id, error, now = new Date()) {
-      db.prepare(
-        "update application_form set status = 'error', error = ?, updated_at = ? where id = ?",
-      ).run(error, now.toISOString(), id);
+      markAll(id, "error", error, now);
     },
     withAnswersStatus(status) {
       return (
@@ -234,9 +353,7 @@ export function applicationsRepo(db: Db): ApplicationsRepo {
       return rows.map((r) => String(r.answer));
     },
     setLocating(id, now = new Date()) {
-      db.prepare(
-        "update application_form set status = 'locating', error = null, updated_at = ? where id = ?",
-      ).run(now.toISOString(), id);
+      markAll(id, "locating", null, now);
     },
   };
 }

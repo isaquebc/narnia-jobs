@@ -105,6 +105,8 @@ export const ApplicationQuestionSchema = z.object({
   topic: SelfDeclarationTopicSchema.nullable(),
   /** Quem organizou: a heurística (campos óbvios, consentimento, autodeclaração) ou o modelo. */
   source: z.enum(["heuristic", "model"]),
+  /** Etapa do formulário (F12/M6); sem o número, a 1 (perguntas gravadas antes das etapas). */
+  step: z.number().int().positive().optional(),
 });
 export type ApplicationQuestion = z.infer<typeof ApplicationQuestionSchema>;
 

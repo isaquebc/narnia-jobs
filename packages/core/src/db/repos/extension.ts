@@ -55,7 +55,15 @@ export interface ExtensionRepo {
   setCaptureAnalysis(id: string, result: { sessionId: string } | { error: string }): void;
   /** Capturas daquela vaga com análise pedida e ainda sem conversa. */
   capturesAwaitingAnalysis(postingId: string): ExtensionCaptureRecord[];
+  /**
+   * Poda (F12 §5): apaga as capturas sem vaga nem formulário com mais de `CAPTURE_TTL_DAYS`; devolve os ids (o api
+   * apaga o HTML guardado de cada uma).
+   */
+  pruneCaptures(now?: Date): string[];
 }
+
+/** Captura que não virou vaga nem formulário some depois disso (F12 §5). */
+export const CAPTURE_TTL_DAYS = 30;
 
 const TOUCH_EVERY_MS = 60 * 1000;
 
@@ -217,6 +225,17 @@ export function extensionRepo(db: Db): ExtensionRepo {
            and analysis_session_id is null and analysis_error is null order by created_at, id`,
         ).all(postingId) as Row[]
       ).map(mapCapture);
+    },
+    pruneCaptures(now = new Date()) {
+      const cutoff = new Date(now.getTime() - CAPTURE_TTL_DAYS * 86_400_000).toISOString();
+      const rows = q(
+        `select id from extension_capture c where posting_id is null and created_at < ?
+         and not exists (select 1 from application_form f where f.capture_id = c.id)`,
+      ).all(cutoff) as Row[];
+      const ids = rows.map((r) => String(r.id));
+      const del = q("delete from extension_capture where id = ?");
+      for (const id of ids) del.run(id);
+      return ids;
     },
   };
 }

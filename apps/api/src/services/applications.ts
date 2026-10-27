@@ -7,11 +7,11 @@ import {
   PROFILE_MOTIVATIONS_TASK,
   prefillValue,
   type Repos,
+  stepOf,
 } from "@narnia-jobs/core";
 import type { ApplicationFormView } from "@narnia-jobs/shared";
 import type { QueueAdapter } from "../queue";
 
-/** Pede ao worker as perguntas do formulário (F12/M3); a chave muda a cada pedido (ler de novo). */
 /** Pede as respostas sugeridas (F12/M4); só faz sentido com a vaga ligada (F12-11). */
 export async function enqueueAnswers(
   repos: Repos,
@@ -55,12 +55,13 @@ export function suggestingMotivations(repos: Repos, profileId: string): boolean 
   );
 }
 
-export async function enqueueLocate(queue: QueueAdapter, applicationId: string) {
+/** Pede as perguntas do formulário (F12/M3); `step` organiza só aquela etapa (F12/M6). */
+export async function enqueueLocate(queue: QueueAdapter, applicationId: string, step?: number) {
   const { job } = await queue.enqueueTask({
     queue: "extract",
     type: APPLICATION_TASKS.locate,
     key: `${applicationId}-${Date.now()}`,
-    payload: { applicationId },
+    payload: step ? { applicationId, step } : { applicationId },
   });
   return job;
 }
@@ -87,8 +88,11 @@ export function applicationView(repos: Repos, f: ApplicationFormRecord): Applica
     postingId: posting ? posting.id : null,
     posting: posting ? { title: posting.title, company: posting.company } : null,
     profileId: f.profileId,
+    steps: f.steps.map((s) => ({ n: s.n, url: s.url, title: s.title, status: s.status })),
+    currentStep: f.currentStep,
     questions: f.questions.map((q) => ({
       ...q,
+      step: stepOf(q),
       // F12-12: autodeclaração já dada no chat vira a opção da página, pelo código
       prefill: q.profileField
         ? prefillValue(repos, q.profileField)

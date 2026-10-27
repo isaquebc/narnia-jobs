@@ -1,5 +1,4 @@
 import { useId } from "react";
-import { Alert } from "../../components/ui/alert";
 import { Card } from "../../components/ui/card";
 import { CommandLine } from "../../components/ui/code";
 import { t } from "../../i18n";
@@ -33,11 +32,11 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export function ExtensionInstallPage() {
   const origin = window.location.origin;
+  const limitsId = useId();
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <h1 className="text-xl font-semibold">{t("extension.title")}</h1>
       <p className="text-sm text-muted-fg">{t("extension.intro")}</p>
-      <Alert tone="warn">{t("extension.wip")}</Alert>
       <Card className="flex flex-col gap-4">
         <ol aria-label={t("extension.stepsLabel")} className="flex flex-col gap-5">
           <Step n={1} title={t("extension.step.build.title")}>
@@ -72,6 +71,18 @@ export function ExtensionInstallPage() {
       <Card className="flex flex-col gap-2">
         <h2 className="text-base font-semibold">{t("extension.use.title")}</h2>
         <p className="text-sm">{t("extension.use.body")}</p>
+      </Card>
+      <Card className="flex flex-col gap-2">
+        <section aria-labelledby={limitsId} className="flex flex-col gap-2">
+          <h2 id={limitsId} className="text-base font-semibold">
+            {t("extension.limits.title")}
+          </h2>
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+            {(["chrome", "click", "frames", "steps", "never", "prune"] as const).map((k) => (
+              <li key={k}>{t(`extension.limits.${k}`)}</li>
+            ))}
+          </ul>
+        </section>
       </Card>
       <Card className="flex flex-col gap-2">
         <h2 className="text-base font-semibold">{t("extension.update.title")}</h2>

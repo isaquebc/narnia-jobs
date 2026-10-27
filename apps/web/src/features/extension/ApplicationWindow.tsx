@@ -111,7 +111,10 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const dropDraft = (questionId: string) => setDrafts(({ [questionId]: _, ...rest }) => rest);
   const currentValue = (x: Question) => drafts[x.id] ?? savedValue(x);
-  const fillable = (x: Question) => editable(x) && currentValue(x).trim() !== "";
+  // F12/M6: preencher só vale na etapa aberta na aba; as outras ficam para copiar
+  const currentStep = q.data?.application.currentStep ?? 1;
+  const onPage = (x: Question) => (x.step ?? 1) === currentStep;
+  const fillable = (x: Question) => onPage(x) && editable(x) && currentValue(x).trim() !== "";
   const save = useMutation({
     mutationFn: (v: { questionId: string; answer: string }) =>
       api.editApplicationAnswer(id, v.questionId, v.answer),
@@ -149,7 +152,9 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
       setFillMessage({ tone: "warn", text: t("application.fillUnavailable") });
       return;
     }
-    const r = await bridgeRequest({ type: "narnia.fill", tabId: page.tabId, url: page.url, items });
+    // o endereço da etapa atual (a captura pode ainda ter o da etapa anterior)
+    const url = q.data?.application.url ?? page.url;
+    const r = await bridgeRequest({ type: "narnia.fill", tabId: page.tabId, url, items });
     if (!r.ok) setFillMessage({ tone: "warn", text: r.error });
     else if (r.failed?.length)
       setFillMessage({ tone: "warn", text: t("application.fillFailed", { n: r.failed.length }) });
@@ -188,6 +193,11 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
   if (q.isPending) return <p className="text-sm text-muted-fg">{t("capture.loading")}</p>;
   if (q.isError) return <Alert tone="warn">{t("capture.notFound")}</Alert>;
   const a = q.data.application;
+  const steps = a.steps ?? [];
+  const multiStep = steps.length > 1;
+  const locatingStep = steps.find((s) => s.status === "locating" && s.n > 1);
+  // a etapa nova organizando não esconde as perguntas das que já estão prontas
+  const showQuestions = a.status === "ready" || (a.status === "locating" && a.questions.length > 0);
   const again = (
     <div>
       <Button
@@ -228,7 +238,13 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
         />
       ) : null}
       {view === "questions" && a.status === "locating" ? (
-        <Progress text={t("application.locating")} />
+        <Progress
+          text={
+            locatingStep && a.questions.length
+              ? t("application.locatingStep", { n: locatingStep.n })
+              : t("application.locating")
+          }
+        />
       ) : null}
       {view === "questions" && a.status === "error" ? (
         <Alert tone="warn" className="flex flex-col gap-2">
@@ -241,7 +257,7 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
           {again}
         </Alert>
       ) : null}
-      {view === "questions" && a.status === "ready" ? (
+      {view === "questions" && showQuestions ? (
         <>
           {a.warning ? (
             <Alert tone="warn" className="flex flex-col gap-1">
@@ -303,13 +319,29 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
                 key={x.id}
                 n={i + 1}
                 q={x}
-                section={x.section && x.section !== a.questions[i - 1]?.section ? x.section : null}
+                stepTitle={
+                  multiStep && (x.step ?? 1) !== (a.questions[i - 1]?.step ?? (i ? 1 : 0))
+                    ? t(
+                        (x.step ?? 1) === currentStep
+                          ? "application.stepCurrent"
+                          : "application.step",
+                        { n: x.step ?? 1 },
+                      )
+                    : null
+                }
+                section={
+                  x.section &&
+                  (x.section !== a.questions[i - 1]?.section ||
+                    (x.step ?? 1) !== (a.questions[i - 1]?.step ?? 1))
+                    ? x.section
+                    : null
+                }
                 answering={a.answersStatus === "answering"}
                 hasPosting={a.postingId !== null}
                 value={currentValue(x)}
                 onChange={(text) => setDrafts((d) => ({ ...d, [x.id]: text }))}
                 onCommit={(text) => commit(x, text)}
-                onFill={fillable(x) || declared(x) ? () => void fill([x]) : null}
+                onFill={fillable(x) || (onPage(x) && declared(x)) ? () => void fill([x]) : null}
                 onAsk={
                   (editable(x) && !x.profileField) ||
                   (x.kind === "self_declaration" && !declared(x))
@@ -317,7 +349,7 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
                     : null
                 }
                 onAttach={
-                  x.kind === "file" && docFor(fileKind(x))
+                  x.kind === "file" && onPage(x) && docFor(fileKind(x))
                     ? { kind: fileKind(x), run: () => void attach(x) }
                     : null
                 }
@@ -343,6 +375,9 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
             ) : null}
             {again}
           </div>
+          {extensionAvailable() && page.tabId !== null ? (
+            <NextStep applicationId={a.id} captureId={a.captureId} tabId={page.tabId} />
+          ) : null}
         </>
       ) : null}
       {relocate.isError ? <Alert tone="danger">{(relocate.error as Error).message}</Alert> : null}
@@ -364,6 +399,56 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
         <PostingDocuments postingId={a.postingId} profileId={a.profileId} />
       ) : null}
     </article>
+  );
+}
+
+/**
+ * Formulário em várias etapas (F12/M6): a extensão lê de novo a mesma aba (a pessoa avançou nela) e a página entra
+ * neste formulário como etapa nova, ou vira a atual se já foi lida.
+ */
+function NextStep({
+  applicationId,
+  captureId,
+  tabId,
+}: {
+  applicationId: string;
+  captureId: string;
+  tabId: number;
+}) {
+  const qc = useQueryClient();
+  const titleId = useId();
+  const [message, setMessage] = useState<{ tone: "info" | "warn"; text: string } | null>(null);
+  const read = useMutation({
+    mutationFn: () => bridgeRequest({ type: "narnia.readForm", tabId, captureId }),
+    onMutate: () => setMessage(null),
+    onSuccess: async (r) => {
+      if (!r.ok) setMessage({ tone: "warn", text: r.error });
+      else if (r.permission)
+        setMessage({ tone: "info", text: t("application.nextStep.permission") });
+      else {
+        const n = r.step ?? 1;
+        setMessage({
+          tone: "info",
+          text: r.added
+            ? t("application.nextStep.added", { n })
+            : t("application.nextStep.seen", { n }),
+        });
+        await qc.invalidateQueries({ queryKey: applicationKey(applicationId) });
+      }
+    },
+  });
+  return (
+    <section aria-labelledby={titleId} className="flex flex-col gap-2 border-t border-border pt-3">
+      <p id={titleId} className="text-xs text-muted-fg">
+        {t("application.nextStep.hint")}
+      </p>
+      <div>
+        <Button size="sm" variant="outline" disabled={read.isPending} onClick={() => read.mutate()}>
+          {read.isPending ? t("application.nextStep.reading") : t("application.nextStep.button")}
+        </Button>
+      </div>
+      {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
+    </section>
   );
 }
 
@@ -464,6 +549,7 @@ function Progress({ text }: { text: string }) {
 function QuestionItem({
   n,
   q,
+  stepTitle,
   section,
   answering,
   hasPosting,
@@ -477,6 +563,8 @@ function QuestionItem({
 }: {
   n: number;
   q: Question;
+  /** Primeira pergunta de uma etapa num formulário de várias (F12/M6). */
+  stepTitle: string | null;
   section: string | null;
   answering: boolean;
   hasPosting: boolean;
@@ -494,6 +582,7 @@ function QuestionItem({
   ].filter(Boolean);
   return (
     <li className="flex flex-col gap-1">
+      {stepTitle ? <h2 className="mt-2 text-sm font-semibold">{stepTitle}</h2> : null}
       {section ? (
         <h2 className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-fg">
           {section}

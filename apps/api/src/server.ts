@@ -27,6 +27,7 @@ import { syncPrompts } from "./evals/prompt-sync";
 import { EventBus } from "./events";
 import { BullQueueAdapter } from "./queue";
 import { startRedisRelay } from "./relay";
+import { pruneCapturesNow } from "./routes/extension";
 import { attachWebSocket } from "./ws";
 
 const port = Number(process.env.PORT ?? 3100);
@@ -43,6 +44,17 @@ migrate(db, { backupDir });
 const repos = createRepos(db);
 // F03-fix L1: backup do dia fora da pasta de dados e aviso de banco recriado; nunca impede o boot
 bootData({ db, repos, dataDir, backupDir });
+// F12 §5: capturas que não viraram vaga nem formulário saem depois de 30 dias (no boot e uma vez por dia)
+const pruneCaptures = () => {
+  try {
+    const n = pruneCapturesNow({ repos, dataDir });
+    if (n) console.warn(`[api] ${n} captura(s) da extensão antiga(s) apagada(s)`);
+  } catch (e) {
+    console.warn(`[api] aviso: poda das capturas falhou (${(e as Error).message})`);
+  }
+};
+pruneCaptures();
+setInterval(pruneCaptures, 24 * 60 * 60 * 1000).unref();
 const provider = createProviderFromEnv();
 const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const queueOpts = { connection, prefix, defaultJobOptions: { ...DEFAULT_JOB_OPTIONS } };

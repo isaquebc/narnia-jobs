@@ -58,7 +58,7 @@ cmd_env_reset() {
   else
     "${DEV_COMPOSE[@]}" --profile app stop api worker >/dev/null
     rm -f "$(claude_data_dir)"/narnia.sqlite "$(claude_data_dir)"/narnia.sqlite-shm "$(claude_data_dir)"/narnia.sqlite-wal
-    rm -rf "$(claude_data_dir)"/{uploads,readings,digests,documents,templates}
+    rm -rf "$(claude_data_dir)"/{uploads,readings,digests,documents,templates,captures}
     "${DEV_COMPOSE[@]}" exec -T redis redis-cli FLUSHALL >/dev/null
     "${DEV_COMPOSE[@]}" --profile app start api worker >/dev/null
     wait_api

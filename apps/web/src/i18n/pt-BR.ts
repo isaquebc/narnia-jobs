@@ -1276,6 +1276,17 @@ export const ptBR = {
     savedPosting: "Vaga salva",
     noneOption: "Nenhuma",
     locating: "Organizando as perguntas do formulário…",
+    locatingStep: "Organizando as perguntas da etapa {n}…",
+    step: "Etapa {n}",
+    stepCurrent: "Etapa {n} · esta página",
+    nextStep: {
+      button: "Ler a próxima etapa nesta aba",
+      hint: "Formulário em várias páginas: avance nele nesta mesma aba e leia a etapa seguinte aqui. Preencher vale na etapa aberta na aba.",
+      reading: "Lendo a aba…",
+      added: "Etapa {n} lida. Organizando as perguntas…",
+      seen: "Esta página é a etapa {n}, já lida. Avance no formulário e tente de novo.",
+      permission: "Autorize a leitura do formulário na janela que abriu.",
+    },
     error: "Não deu para organizar as perguntas deste formulário.",
     fallback:
       "O modelo não respondeu, então montei as perguntas pelos rótulos da página. Podem faltar junções de perguntas; tente Ler de novo.",
@@ -1444,7 +1455,6 @@ export const ptBR = {
     title: "Instalar a extensão no Chrome",
     intro:
       "A extensão lê a página só quando você clica no ícone do narnia e manda o conteúdo para esta instância, no seu computador. Ela nunca preenche nem envia formulários.",
-    wip: "Nesta versão, a extensão já lê páginas de vaga e salva no narnia. A ajuda nos formulários de candidatura chega nas próximas atualizações.",
     stepsLabel: "Passos da instalação",
     step: {
       build: {
@@ -1478,7 +1488,20 @@ export const ptBR = {
     },
     use: {
       title: "Como usar",
-      body: "Numa página de vaga ou de candidatura, clique no ícone do narnia e escolha: Analisar a vaga (salvar, ver o fit, gerar CV e carta) ou Ajudar no formulário (as perguntas, copiar ou preencher as respostas). Abre uma janela ao lado; cada página vira uma aba nela.",
+      body: "Numa página de vaga ou de candidatura, clique no ícone do narnia e escolha: Analisar a vaga (salvar, ver o fit, gerar CV e carta) ou Ajudar no formulário (as perguntas, copiar ou preencher as respostas). Abre uma janela ao lado; cada página vira uma aba nela. O formulário aberto na mesma aba da vaga, e cada etapa seguinte dele, entram na mesma aba da janela.",
+    },
+    limits: {
+      title: "Limites",
+      chrome: "Só no Chrome (e navegadores baseados nele), instalada sem compactação.",
+      click:
+        "O Chrome só deixa a extensão ler a página depois do seu clique no ícone, e só no site em que você clicou. Se o formulário abriu em outro site, clique no ícone de novo nele (Ajudar no formulário).",
+      frames:
+        "Formulário embutido de outro site (Greenhouse, Lever, Workday): o Chrome pede a sua permissão para aquele site na primeira vez.",
+      steps:
+        "Formulário em várias páginas: avance nele na mesma aba e clique no ícone (ou em Ler a próxima etapa na janela) a cada etapa; Preencher vale na etapa aberta.",
+      never:
+        "A extensão nunca envia o formulário e nunca lê o que você digitou na página; preenche só quando você clica em Preencher.",
+      prune: "Páginas lidas que não viraram vaga nem formulário são apagadas depois de 30 dias.",
     },
     update: {
       title: "Depois de atualizar o narnia",

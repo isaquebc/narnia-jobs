@@ -14,7 +14,7 @@ export type BridgeRequest =
 export type BridgeResponse =
   | { ok: true; focused: boolean }
   | { ok: true; filled: string[]; failed: string[] }
-  | { ok: true; applicationId: string }
+  | { ok: true; applicationId: string; step?: number; added?: boolean }
   | { ok: true; permission: true }
   | { ok: false; error: string; code?: string };
 

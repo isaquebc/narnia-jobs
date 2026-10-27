@@ -2,7 +2,7 @@
 
 Entregável 6 do plan-v0. Cobre a feature **#2** de `../02-fluxos-do-usuario.md §F5`: a pessoa cola a descrição de uma vaga (ou a URL) e recebe uma análise honesta de aderência ao perfil ativo, com lacunas sem evidência, riscos, palavras-chave ausentes e perguntas prováveis, pronta para virar candidatura, CV direcionado (F05) ou simulação de entrevista (F08).
 
-Status: **em escopo, replanejada pelo dono em 2026-10-14** (a F06 vem antes da F05). Decisões F06-1 a F06-17 fechadas (§5); F06-16 e F06-17 fechadas depois da revisão do código; requisitos novos em §1.1 a §1.4; marcos em §6.0. **Fechada pelo dono em 2026-10-15** (M1 a M7 e as correções dos testes do dono, §8). O roteiro formal do §6.4 (10 vagas) foi substituído pelos testes do dono com vagas reais. Nada pendente nesta task.
+Status: **fechada pelo dono em 2026-10-15** (M1 a M7 e as correções dos testes do dono, §8; replanejada em 2026-10-14: a F06 vem antes da F05). Decisões F06-1 a F06-17 fechadas (§5); F06-16 e F06-17 fechadas depois da revisão do código; requisitos novos em §1.1 a §1.4; marcos em §6.0. **Fechada pelo dono em 2026-10-15** (M1 a M7 e as correções dos testes do dono, §8). O roteiro formal do §6.4 (10 vagas) foi substituído pelos testes do dono com vagas reais. Nada pendente nesta task.
 
 ---
 

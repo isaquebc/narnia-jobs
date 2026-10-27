@@ -140,7 +140,7 @@ export async function onIconClick(
 }
 
 export type ReadFormResult =
-  | { ok: true; applicationId: string }
+  | { ok: true; applicationId: string; step?: number; added?: boolean }
   | { ok: true; permission: true }
   | { ok: false; code: string; error: string };
 

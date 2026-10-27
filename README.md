@@ -93,6 +93,28 @@ Cada perfil tem o seu currículo (**Perfis › Currículo**) e cada vaga pode te
 - **Desatualizado**: se os seus dados, o perfil ou a vaga mudarem depois, o documento avisa; nada é refeito sozinho.
 - **Processos** (menu › Geral) lista tudo o que roda em segundo plano, com cancelar e tentar de novo; **Configurações › Processos simultâneos** define quantos jobs de cada fila rodam juntos.
 
+### Extensão do Chrome (vagas e formulários de candidatura)
+
+A extensão leva vagas de qualquer site para o narnia e ajuda nos formulários de candidatura, numa janela ao lado. Ela lê a página só quando você clica no ícone e manda o conteúdo para a sua instância, no seu computador.
+
+**Instalar** (o passo a passo com os endereços desta instância está em **Configurações › Extensão do navegador › Como instalar no Chrome**):
+
+1. Gere a extensão: `./start.sh extension` (Windows: `.\start.ps1 extension`). O `promote` já gera junto.
+2. Em `chrome://extensions`, ligue o **Modo do desenvolvedor**, clique em **Carregar sem compactação** e escolha `apps/extension/dist` (na instância atualizada pelo `promote`, `.owner-src/apps/extension/dist`).
+3. Fixe o ícone do narnia na barra.
+4. **Parear:** em Configurações › Extensão do navegador, gere um código (vale 10 minutos e uma vez só). Nas opções da extensão (botão direito no ícone › Opções), informe o endereço da instância e o código. Os navegadores conectados aparecem em Configurações, com **Desconectar**.
+
+Depois de cada atualização do narnia, clique em recarregar no cartão do narnia em `chrome://extensions`: o Chrome não recarrega sozinho extensões sem compactação.
+
+**Usar:** numa página, clique no ícone e escolha **Analisar a vaga** (salva a vaga, mostra o fit por perfil e gera CV e carta) ou **Ajudar no formulário** (organiza as perguntas, sugere as respostas com os seus dados e a vaga, deixa copiar, editar, ajustar no chat e preencher na página, e anexa o CV da vaga). Cada página vira uma aba na janela, num menu que mostra o que está processando e o que terminou sem você ver. O formulário aberto na mesma aba da vaga entra na aba dela (ou pelo botão **Procurar o formulário nesta aba**), sem duplicar a vaga. Formulário em várias páginas: avance nele na mesma aba e clique no ícone a cada etapa (ou em **Ler a próxima etapa nesta aba**); as perguntas aparecem por etapa, e **Preencher** vale na etapa aberta.
+
+**Limites:**
+- Só no Chrome (e navegadores baseados nele).
+- O Chrome só deixa a extensão ler a página depois do seu clique, e só no site em que você clicou. Se o formulário abriu em outro site, clique no ícone de novo nele.
+- Formulário embutido de outro site (Greenhouse, Lever, Workday): o Chrome pede a sua permissão para aquele site na primeira vez.
+- A extensão nunca envia o formulário e nunca lê o que você digitou; preenche só quando você clica. Consentimentos ficam com você, e autodeclaração (raça, gênero, deficiência…) só é respondida com o que você mesmo declarou no chat.
+- As páginas lidas e os formulários ficam no banco (entram no backup diário); páginas que não viraram vaga nem formulário são apagadas depois de 30 dias.
+
 ### Recrutador no terminal (Claude Code, modo B)
 
 O mesmo recrutador do chat roda no Claude Code do seu computador, com o mesmo cartão do perfil e as mesmas tools:

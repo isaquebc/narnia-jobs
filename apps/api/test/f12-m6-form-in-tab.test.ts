@@ -103,9 +103,11 @@ describe("formulário na aba da vaga", () => {
       postingId: posting.id,
     });
     expect(t.events).toContainEqual({ type: "application.updated", applicationId });
-    // de novo: a aba já tem formulário
+    // de novo, a mesma página: é a etapa já lida, sem outra leitura
     const again = await attach(t, await device(t), capture.id, { force: true });
-    expect(again.status).toBe(409);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ applicationId, step: 1, added: false });
+    expect(t.queue.tasks.filter((x) => x.type === "application.locate")).toHaveLength(1);
   });
 
   it("pelo ícone (sem force): só liga se a página não parece ser de outra vaga já salva", async () => {
@@ -150,6 +152,139 @@ describe("formulário na aba da vaga", () => {
     expect(empty.status).toBe(422);
     expect(((await empty.json()) as { error: { code: string } }).error.code).toBe("no_form");
     expect((await attach(t, token, "nao-existe", { force: true })).status).toBe(404);
+  });
+});
+
+describe("F12/M6 · formulário em várias etapas", () => {
+  let t: TestApp | undefined;
+  afterEach(() => t?.cleanup());
+
+  async function device(app: TestApp) {
+    const { code } = (await (
+      await app.api("/api/extension/pairing", { method: "POST" })
+    ).json()) as { code: string };
+    const r = await app.app.request("/api/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, name: "Chrome" }),
+    });
+    return ((await r.json()) as { token: string }).token;
+  }
+
+  const STEP2 = {
+    fields: [
+      field("f1", { control: "textarea", label: "Por que a Acme?" }),
+      field("f2", { control: "number", label: "Pretensão salarial" }),
+    ],
+    frames: [],
+  };
+
+  /** Captura de "Ajudar no formulário" (sem vaga salva), com a etapa 1 lida. */
+  function formCapture(app: TestApp, postingId: string | null = null) {
+    const capture = app.repos.extension.createCapture({
+      kind: "page",
+      url: "https://jobs.acme.example/apply",
+      title: "Apply",
+      payload: { ok: false, code: "no_text", message: "", mode: "form" },
+      deviceId: null,
+    });
+    const form = app.repos.applications.create({
+      captureId: capture.id,
+      postingId,
+      profileId: null,
+      url: "https://jobs.acme.example/apply",
+      title: "Apply",
+      fields: FORM.fields,
+    });
+    app.repos.applications.setQuestions(form.id, []);
+    return { capture, form };
+  }
+
+  const send = async (
+    app: TestApp,
+    token: string,
+    captureId: string,
+    body: Record<string, unknown>,
+  ) =>
+    app.app.request(`/api/extension/captures/${captureId}/form`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ title: "Apply", html: HTML, form: STEP2, ...body }),
+    });
+
+  it("o clique na etapa seguinte entra no mesmo formulário: etapa nova, organizada sozinha, vira a atual", async () => {
+    t = makeTestApp();
+    const token = await device(t);
+    const { capture, form } = formCapture(t);
+    const r = await send(t, token, capture.id, { url: "https://jobs.acme.example/apply/step-2" });
+    expect(r.status).toBe(201);
+    expect(await r.json()).toEqual({ applicationId: form.id, step: 2, added: true });
+    expect(t.queue.tasks.filter((x) => x.type === "application.locate").at(-1)?.payload).toEqual({
+      applicationId: form.id,
+      step: 2,
+    });
+    expect(t.events).toContainEqual({ type: "application.updated", applicationId: form.id });
+    const view = (
+      (await (await t.api(`/api/applications/${form.id}`)).json()) as {
+        application: { steps: unknown[]; currentStep: number; url: string };
+      }
+    ).application;
+    expect(view).toMatchObject({
+      currentStep: 2,
+      url: "https://jobs.acme.example/apply/step-2",
+      steps: [
+        { n: 1, url: "https://jobs.acme.example/apply", status: "ready" },
+        { n: 2, url: "https://jobs.acme.example/apply/step-2", status: "locating" },
+      ],
+    });
+
+    // de novo na mesma etapa: nada novo; voltar à etapa 1 na aba: ela vira a atual
+    const same = await send(t, token, capture.id, {
+      url: "https://jobs.acme.example/apply/step-2",
+    });
+    expect(await same.json()).toEqual({ applicationId: form.id, step: 2, added: false });
+    const back = await send(t, token, capture.id, {
+      url: "https://jobs.acme.example/apply",
+      form: FORM,
+    });
+    expect(await back.json()).toEqual({ applicationId: form.id, step: 1, added: false });
+    expect(t.repos.applications.get(form.id)).toMatchObject({
+      currentStep: 1,
+      url: "https://jobs.acme.example/apply",
+    });
+    expect(t.queue.tasks.filter((x) => x.type === "application.locate")).toHaveLength(1);
+  });
+
+  it("página de outro site pelo ícone: recusa (vira outra aba na janela); pelo botão da janela (force), entra", async () => {
+    t = makeTestApp();
+    const token = await device(t);
+    const { capture } = formCapture(t);
+    const other = await send(t, token, capture.id, { url: "https://forms.globex.example/apply" });
+    expect(other.status).toBe(409);
+    expect(((await other.json()) as { error: { code: string } }).error.code).toBe("different_form");
+    const forced = await send(t, token, capture.id, {
+      url: "https://forms.globex.example/apply",
+      force: true,
+    });
+    expect(forced.status).toBe(201);
+  });
+
+  it("pelo ícone, a página de outra vaga salva também recusa", async () => {
+    t = makeTestApp();
+    const token = await device(t);
+    const mine = t.repos.postings.create({ title: "Backend Sr", company: "Acme" });
+    t.repos.postings.create({
+      title: "Designer de Produto",
+      company: "Acme",
+      postingUrl: "https://jobs.acme.example/design",
+    });
+    const { capture } = formCapture(t, mine.id);
+    const r = await send(t, token, capture.id, {
+      url: "https://jobs.acme.example/design",
+      title: "Designer de Produto · Acme",
+    });
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe("different_posting");
   });
 });
 
