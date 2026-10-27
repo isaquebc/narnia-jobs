@@ -2,6 +2,7 @@ import {
   Activity,
   Bell,
   Briefcase,
+  ClipboardList,
   Download,
   FolderGit2,
   LayoutDashboard,
@@ -92,6 +93,11 @@ export function SideNav({ className }: { className?: string }) {
             <li>
               <NavLink to="/vagas" className={item}>
                 <Briefcase size={16} /> {t("nav.postings")}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/candidaturas" className={item}>
+                <ClipboardList size={16} /> {t("nav.jobApplications")}
               </NavLink>
             </li>
             <li>

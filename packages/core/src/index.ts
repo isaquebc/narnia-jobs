@@ -65,6 +65,7 @@ export * from "./ingest/sources/github/snapshot";
 export * from "./ingest/sources-store";
 export * from "./ingest/timeline";
 export * from "./ingest/tools";
+export * from "./job-applications";
 export * from "./jobs/concurrency";
 export * from "./jobs/tasks";
 export * from "./models";

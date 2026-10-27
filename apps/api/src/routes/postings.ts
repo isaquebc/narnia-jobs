@@ -196,6 +196,9 @@ export function postingsRoutes(deps: {
   app.delete("/api/postings/:id", (c) => {
     const id = c.req.param("id");
     if (!repos.postings.get(id)) return notFound(c);
+    // F07: a vaga de uma candidatura é o que foi enviado; apagar a candidatura antes
+    if (repos.jobApplications.countForPosting(id))
+      return apiError(c, 409, "has_application", "Há uma candidatura nesta vaga");
     for (const n of repos.postingNotes.list(id))
       repos.notifications.resolveSubject("posting_note", n.id, ["posting.note_pending"]);
     // CVs e cartas da vaga (F05): as linhas caem em cascata; os arquivos e os avisos saem aqui

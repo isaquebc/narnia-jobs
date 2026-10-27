@@ -34,6 +34,7 @@ import {
   reposRepo,
 } from "./github";
 import { type IngestionRunsRepo, ingestionRunsRepo } from "./ingestion-runs";
+import { type JobApplicationsRepo, jobApplicationsRepo } from "./job-applications";
 import { type JobsRepo, jobsRepo } from "./jobs";
 import { type NotificationsRepo, notificationsRepo } from "./notifications";
 import {
@@ -105,6 +106,8 @@ export interface Repos {
   /** F12-12: autodeclaração, fora dos fatos. */
   selfDeclarations: SelfDeclarationsRepo;
   profileMotivations: ProfileMotivationsRepo;
+  // F07
+  jobApplications: JobApplicationsRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -170,6 +173,7 @@ export function createRepos(db: Db): Repos {
     applications: applicationsRepo(db),
     selfDeclarations: selfDeclarationsRepo(db),
     profileMotivations: profileMotivationsRepo(db),
+    jobApplications: jobApplicationsRepo(db),
   };
 }
 
@@ -183,6 +187,7 @@ export * from "./fact-sources";
 export * from "./facts";
 export * from "./github";
 export * from "./ingestion-runs";
+export * from "./job-applications";
 export * from "./jobs";
 export * from "./notifications";
 export * from "./postings";

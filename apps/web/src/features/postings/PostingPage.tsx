@@ -14,6 +14,7 @@ import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import { GenerateDialog } from "../documents/GenerateDialog";
 import { PostingDocuments } from "../documents/PostingDocuments";
+import { ApplyButton } from "../job-applications/ApplyButton";
 import { AnalysisCard, PreAnalysisCard } from "./PostingAnalysis";
 import { PostingAssets } from "./PostingAssets";
 import { PostingContactsSummary } from "./PostingContactsSummary";
@@ -27,7 +28,8 @@ import { postingWho, statusTone } from "./PostingsPage";
  * junto das ações (2026-10-15). "Gerar" (F05) abre CV ou cover letter, e os documentos da vaga ficam na página;
  * na coluna da pré-análise, antes dela, os assets (CV e carta pequenos) e os contatos recentes (2026-10-19);
  * o alerta de vagas parecidas (mesma empresa e role) só aparece quando existe outra vaga assim (correção 2026-10-15;
- * o de candidatura repetida chega com as candidaturas, F06-11/F07).
+ * o de candidatura repetida chega com as candidaturas, F06-11/F07). "Aplicar" (F07 §0-1) cria a candidatura com o CV e a
+ * carta travados; com uma ativa, vira "Ver candidatura".
  */
 /** Só http(s) vira link: o campo é editável e `z.url()` aceita `javascript:`. */
 function isHttpUrl(url: string | null): boolean {
@@ -107,6 +109,7 @@ export function PostingPage({
               {t("postings.reextract")}
             </Button>
           ) : null}
+          <ApplyButton postingId={postingId} onGenerateCv={() => setGenerating("cv")} />
           <Menu
             label={t("documents.generate")}
             items={(["cv", "cover_letter"] as const).map((k) => ({

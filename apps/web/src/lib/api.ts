@@ -3,6 +3,7 @@ import type {
   AnalyzeEstimateResponse,
   AnalyzeRequest,
   ApplicationFormView,
+  ApplyOptions,
   BackupSettingsResponse,
   BridgeSettingsDto,
   Budget,
@@ -46,6 +47,9 @@ import type {
   IngestSettingsSchema,
   Job,
   JobAnalysis,
+  JobApplicationCreate,
+  JobApplicationPatch,
+  JobApplicationSummary,
   MotivationStatus,
   NotificationsListResponse,
   OnboardingState,
@@ -692,6 +696,31 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     listPendingNotes: () => request<{ notes: PendingNote[] }>("/api/postings-pending-notes"),
     getModelSettings: () =>
       request<{ models: PostingModels; defaults: PostingModels }>("/api/settings/models"),
+    // F07 · candidaturas
+    getApplyOptions: (postingId: string) =>
+      request<ApplyOptions>(`/api/postings/${encodeURIComponent(postingId)}/apply-options`),
+    createJobApplication: (body: JobApplicationCreate) =>
+      request<{ application: JobApplicationSummary }>("/api/job-applications", json(body)),
+    listJobApplications: (filter: { q?: string; archived?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (filter.q) qs.set("q", filter.q);
+      if (filter.archived) qs.set("archived", "1");
+      const s = qs.toString();
+      return request<{ applications: JobApplicationSummary[] }>(
+        `/api/job-applications${s ? `?${s}` : ""}`,
+      );
+    },
+    getJobApplication: (id: string) =>
+      request<{ application: JobApplicationSummary }>(
+        `/api/job-applications/${encodeURIComponent(id)}`,
+      ),
+    patchJobApplication: (id: string, patch: JobApplicationPatch) =>
+      request<{ application: JobApplicationSummary }>(
+        `/api/job-applications/${encodeURIComponent(id)}`,
+        { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    deleteJobApplication: (id: string) =>
+      request<null>(`/api/job-applications/${encodeURIComponent(id)}`, { method: "DELETE" }),
     // F05 · CV e carta
     listDocuments: (filter: { profileId?: string; postingId?: string }) => {
       const qs = new URLSearchParams(

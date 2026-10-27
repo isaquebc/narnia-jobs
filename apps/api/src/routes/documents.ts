@@ -374,6 +374,9 @@ export function documentsRoutes(deps: {
   app.delete("/api/documents/:id", (c) => {
     const doc = repos.documents.get(c.req.param("id"));
     if (!doc) return notFound(c);
+    // F07: a versão enviada numa candidatura fica travada
+    if (repos.jobApplications.countForDocument(doc.id))
+      return apiError(c, 409, "has_application", "Este documento foi enviado numa candidatura");
     repos.notifications.resolveSubject("document", doc.id);
     repos.documents.remove(doc.id);
     rmSync(join(deps.dataDir, "documents", doc.id), { recursive: true, force: true });

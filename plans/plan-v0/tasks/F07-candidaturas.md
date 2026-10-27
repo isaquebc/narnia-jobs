@@ -2,7 +2,37 @@
 
 Entregável 7 do plan-v0. Cobre a feature **#3** de `../02-fluxos-do-usuario.md §F5` e o fluxo `§F5.1`: o rastreador de candidaturas em kanban, com etapas datadas, documentos, análise, contatos, notas e agenda. No MVP, a agenda exporta para o Google Calendar **sem autenticação** (link + `.ics`); a integração com o MCP oficial do Google (`../08-docker-calendar-voz.md §2`) entra como opção, prevista para a fase 7 do plano.
 
-Status: **em escopo** (2026-10-07). Nada implementado. Decisão global 12 fechada em 2026-10-07: integração autenticada com o Google Calendar **mantida como opcional**, com guia passo a passo; a feature funciona completa sem Google (link + `.ics`).
+Status: **em andamento** (2026-10-27): M1 entregue. Requisitos novos do dono em §0, que valem sobre o resto do arquivo onde houver conflito. Decisão global 12 fechada em 2026-10-07: integração autenticada com o Google Calendar **mantida como opcional**, com guia passo a passo; a feature funciona completa sem Google (link + `.ics`).
+
+---
+
+## 0 · Requisitos do dono (2026-10-27) · valem sobre §1 a §6
+
+1. **Só o botão "Aplicar" cria a candidatura.** Ele fica na página da vaga salva e, na extensão, na janela da análise e na do formulário. Cria a candidatura com a vaga, a versão do CV (**obrigatória**, F07-10) e a da carta, se houver, **travadas** (a candidatura guarda a `document_version`, não o documento; regerar o CV depois não muda o que foi enviado) e a **data da candidatura**, que a pessoa pode trocar antes de confirmar (ex.: aplicou ontem). Substitui o requisito de 2026-10-11 de "gerar CV para uma vaga cria a candidatura" e o "+ nova" à mão: vaga salva é o "interesse".
+2. **Colunas:** Aplicado → 1ª Entrevista → Em processo → Oferta → Encerrado (sai "Interesse").
+3. **Etapas do processo (pipeline) ajustáveis por candidatura.** Padrão: Análise de currículo · Bate-papo com Talent · Entrevista com liderança · Entrevista técnica · Oferta · Contratação. A pessoa adiciona (ex.: "Design system", "Pair programming"), remove e reordena com arrastar e soltar. Se a descrição da vaga traz as etapas, elas vêm da leitura da vaga (§0.1) e viram o pipeline da candidatura ao aplicar.
+4. **Cartão em "Em processo" mostra a etapa atual como "x/N"** do pipeline daquela candidatura; a coluna não depende do pipeline (F07-8).
+5. **Notas e anexos datados:** texto e/ou arquivos (e-mails, imagens, textos, PDFs, vídeo etc.), com data que a pessoa pode trocar antes de salvar (ex.: registrar um e-mail de ontem).
+6. **Arquivamento:** candidatura sem atividade por 40 dias fica arquivada por padrão; há um caminho para ver as arquivadas.
+7. **Busca** na página de candidaturas por empresa, cliente, cargo, data e contato.
+
+### 0.1 Como encaixa no que existe
+- **Nomes no código:** `applications`/`application_form` já são o formulário da extensão (F12). As tabelas da F07 viram `job_application`, `job_application_stage` e `job_application_entry`; o repositório, `jobApplications`. A rota da janela da extensão (`/candidatura`) continua; a página nova é `/candidaturas`.
+- **Contatos:** os da vaga (`posting_contact`, F06) são os da candidatura; a cadeia de contatos (§1) entra na M6.
+- **Etapas na vaga:** a extração da vaga (`posting.extract`) ganha `hiring_steps` (lista de nomes, vazia quando a descrição não diz). Muda prompt estruturado → gate F06-14 antes do commit.
+- **Anexos:** em `<dados>/job-applications/<id>/`, com o nome original guardado no banco; entram no backup como os uploads (cópia dos que faltam).
+- **Arquivamento:** atividade = aplicar, mudar de etapa ou coluna, nota, anexo, editar a candidatura. A conta roda no boot e a cada 24 h, como a poda das capturas; arquivar é marcar (`archived_at`), nunca apagar. Desarquivar à mão; atividade nova numa arquivada a desarquiva.
+
+### 0.2 Marcos
+| Marco | Conteúdo |
+|---|---|
+| M1 | Dados (migração 0027), regras no core, API; botão Aplicar na página da vaga (data editável, versões travadas, aviso de candidatura já existente); página `/candidaturas` com quadro de 5 colunas, lista, busca e arquivadas; arquivamento por inatividade. |
+| M2 | Pipeline editável na candidatura (adicionar, remover, arrastar), "x/N" no cartão; `hiring_steps` na extração da vaga (gate). |
+| M3 | Notas e anexos datados (upload, prévia de imagem, PDF e vídeo, baixar), backup dos anexos. |
+| M4 | Extensão: Aplicar na janela da análise e na do formulário. |
+| M5 | Agenda das etapas (link Google, `.ics`), lembretes, funil. |
+| M6 | Skill `candidaturas` + tools MCP, conversar sobre a candidatura, cadeia de contatos, modo B. |
+| M7 | Google Calendar autenticado (opcional, F07-4). |
 
 ---
 
@@ -142,7 +172,11 @@ Referência: `../05-layouts.md` L7. Componentes a construir:
 | F07-4 | Quando entra o OAuth do Google | fase 7 do plano (após F07 base) · junto com F07 · nunca | **fase 7**: F07 entrega link + `.ics` e a estrutura de `google_status`; a conexão real é a última etapa |
 | F07-5 | Lembretes | só UI (badge/bandeja) · + notificação do navegador (Notification API) | **só UI** em F07; Notification API como opção simples depois |
 | F07-6 | Encerramento | motivo obrigatório · opcional | **obrigatório** (alimenta o funil e o recrutador) |
-| F07-7 | Múltiplos perfis | candidatura pertence a um perfil · pode ser compartilhada | **um perfil** (coerente com F02) |
+| F07-7 | Múltiplos perfis | candidatura pertence a um perfil · pode ser compartilhada | **um perfil** (coerente com F02): o do CV travado; sem CV, o perfil ativo |
+| F07-8 | Coluna × etapa do pipeline | coluna derivada da etapa atual · coluna independente | **Fechada (dono, 2026-10-27): independentes.** A coluna é o que a pessoa move; o pipeline é de cada candidatura (uma pode ter 3 etapas, outra 6) e o "x/N" só aparece no cartão em "Em processo". Uma candidatura nunca interfere na outra. |
+| F07-9 | Aplicar de novo na mesma vaga | uma candidatura ativa por vaga (o botão abre a existente) · várias | **uma ativa por vaga**; encerrada ou arquivada permite outra |
+| F07-10 | Sem CV para a vaga | **Fechada (dono, 2026-10-27): toda candidatura tem um currículo.** O diálogo de Aplicar escolhe a versão pronta do CV da vaga ou do CV geral do perfil; sem nenhum pronto, o botão leva a gerar o CV e não cria nada. A carta é opcional (trava a versão se houver). |
+| F07-11 | Tamanho dos anexos | limite por arquivo | **100 MB por arquivo** (vídeo de entrevista cabe; acima disso, guardar o link) |
 
 ---
 
@@ -228,4 +262,6 @@ Usar o kanban por 1 semana com candidaturas reais: pedir ao recrutador (modo A e
 |------|-------|-----------------|
 | 2026-10-11 | — | **Plano incrementado (dono):** candidatura criada pelo CV com vaga, lista, abrir, conversar no chat, status pelo chat, pessoas e cadeia de contatos (`contact.*`); testes e2e correspondentes. |
 | 2026-10-11 | — | **Requisitos do dono (registro antecipado):** gerar CV para uma vaga salva **a vaga e o CV** como uma candidatura; **lista de candidaturas**, abrir uma candidatura, **conversar com o chat sobre ela** e **atualizar o status**; quando o assunto é uma vaga, salvar **o nome de quem está do outro lado e a cadeia de pessoas contactadas** (recrutador, indicação, gestor, com data e canal de cada contato). |
+| 2026-10-27 | — | **Requisitos do dono (§0):** candidatura só pelo botão Aplicar (vaga, CV e carta com versão travada, data editável), colunas Aplicado → 1ª Entrevista → Em processo → Oferta → Encerrado, pipeline ajustável por candidatura e lido da vaga, "x/N" no cartão, notas e anexos datados, arquivamento após 40 dias sem atividade, busca. Marcos M1–M7 em §0.2. |
+| 2026-10-27 | M1 | **Entregue:** migração 0027 (`job_application`, `job_application_stage`); core `job-applications/` (opções do Aplicar só com versões prontas, CV obrigatório da vaga ou geral, carta da vaga, data até hoje, uma ativa por vaga, vaga com duplicata pendente não aplica, pipeline padrão de 6 etapas na etapa 1, busca por empresa/cliente/cargo/data/contato, arquivamento por 40 dias); API `/api/postings/:id/apply-options` e `/api/job-applications` (CRUD, evento `job_application.updated`); arquivamento no boot e a cada 24 h; apagar vaga ou documento enviado numa candidatura dá `409 has_application` (o banco também recusa). Web: botão Aplicar na vaga (diálogo com CV e carta, "Mudar a data"; sem CV leva a gerar; com candidatura ativa vira "Ver candidatura"), página `/candidaturas` (quadro de 5 colunas, "x/N" só em Em processo, mover pelo menu do cartão, Encerrado pede o motivo, busca, "Ver arquivadas"), página da candidatura (versões travadas com download, etapas com a atual, arquivar, apagar), item "Candidaturas" no menu. Testes: core 10, api 4, web 8, e2e F07/E2E-01. Arrastar e soltar no quadro fica para a M2, junto do pipeline. |
 (Preencher durante a implementação: datas, resultados do teste manual, decisões tomadas.)

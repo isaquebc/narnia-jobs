@@ -996,6 +996,12 @@ export const ApplicationUpdatedEventSchema = z.object({
   applicationId: IdSchema,
 });
 
+/** Candidatura criada, movida, arquivada ou apagada (F07): a web recarrega o quadro, a vaga e a candidatura. */
+export const JobApplicationUpdatedEventSchema = z.object({
+  type: z.literal("job_application.updated"),
+  applicationId: IdSchema,
+});
+
 /** Motivações do perfil sugeridas ou decididas (F12-23): a janela do formulário e a página do perfil recarregam. */
 export const ProfileMotivationsUpdatedEventSchema = z.object({
   type: z.literal("profile.motivations.updated"),
@@ -1039,6 +1045,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   DocumentUpdatedEventSchema,
   ApplicationUpdatedEventSchema,
   ProfileMotivationsUpdatedEventSchema,
+  JobApplicationUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

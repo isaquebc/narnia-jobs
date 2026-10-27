@@ -28,6 +28,7 @@ import { EventBus } from "./events";
 import { BullQueueAdapter } from "./queue";
 import { startRedisRelay } from "./relay";
 import { pruneCapturesNow } from "./routes/extension";
+import { archiveJobApplicationsNow } from "./routes/job-applications";
 import { attachWebSocket } from "./ws";
 
 const port = Number(process.env.PORT ?? 3100);
@@ -53,8 +54,21 @@ const pruneCaptures = () => {
     console.warn(`[api] aviso: poda das capturas falhou (${(e as Error).message})`);
   }
 };
-pruneCaptures();
-setInterval(pruneCaptures, 24 * 60 * 60 * 1000).unref();
+// F07 §0-6: candidaturas sem atividade há 40 dias ficam arquivadas (no boot e uma vez por dia; nunca apaga)
+const archiveApplications = () => {
+  try {
+    const n = archiveJobApplicationsNow({ repos });
+    if (n) console.warn(`[api] ${n} candidatura(s) arquivada(s) por inatividade`);
+  } catch (e) {
+    console.warn(`[api] aviso: arquivamento das candidaturas falhou (${(e as Error).message})`);
+  }
+};
+const daily = () => {
+  pruneCaptures();
+  archiveApplications();
+};
+daily();
+setInterval(daily, 24 * 60 * 60 * 1000).unref();
 const provider = createProviderFromEnv();
 const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const queueOpts = { connection, prefix, defaultJobOptions: { ...DEFAULT_JOB_OPTIONS } };

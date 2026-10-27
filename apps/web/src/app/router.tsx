@@ -316,6 +316,28 @@ const postingRoute = createRoute({
     );
   },
 });
+// F07 · candidaturas
+const JobApplicationsPage = lazyRouteComponent(
+  () => import("../features/job-applications/JobApplicationsPage"),
+  "JobApplicationsPage",
+);
+const JobApplicationPage = lazyRouteComponent(
+  () => import("../features/job-applications/JobApplicationPage"),
+  "JobApplicationPage",
+);
+const jobApplicationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/candidaturas",
+  component: JobApplicationsPage,
+});
+const jobApplicationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/candidaturas/$id",
+  component: function JobApplicationRoute() {
+    const { id } = jobApplicationRoute.useParams();
+    return <JobApplicationPage key={id} id={id} />;
+  },
+});
 // F05 · processos em segundo plano (sob demanda)
 const ProcessesPage = lazyRouteComponent(
   () => import("../features/processes/ProcessesPage"),
@@ -381,6 +403,8 @@ const routeTree = rootRoute.addChildren([
   processesRoute,
   postingsRoute,
   postingRoute,
+  jobApplicationsRoute,
+  jobApplicationRoute,
   chatRoute,
   chatSessionRoute,
 ]);

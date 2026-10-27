@@ -12,6 +12,7 @@ export * from "./github";
 export * from "./ingest";
 export * from "./ingest-output";
 export * from "./job";
+export * from "./job-application";
 export * from "./notification";
 export * from "./persona";
 export * from "./posting";
