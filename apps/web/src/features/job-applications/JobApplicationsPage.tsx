@@ -1,4 +1,15 @@
 import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import {
   JOB_APPLICATION_COLUMNS,
   type JobApplicationClosedReason,
   JobApplicationClosedReasonSchema,
@@ -8,7 +19,8 @@ import {
 } from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { GripVertical } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useApi, useTimezone } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
@@ -22,6 +34,7 @@ import { jobApplicationKeys, useJobApplications } from "../../hooks/useJobApplic
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
 import { ApplyButton } from "./ApplyButton";
+import { FunnelStats } from "./FunnelStats";
 
 export const columnLabel = (c: JobApplicationColumn) => t(`jobApplications.column.${c}` as TKey);
 
@@ -119,13 +132,31 @@ function ApplicationCard({
 }) {
   const tz = useTimezone();
   const stage = a.stages.find((s) => s.id === a.currentStageId);
+  // F07/M2: arrastar o cartão para outra coluna (o "Mover" continua como alternativa)
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: a.id });
   return (
-    <li aria-label={`${applicationWho(a)} · ${a.posting.title ?? ""}`}>
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform) }}
+      className={isDragging ? "relative z-10 opacity-80" : undefined}
+      aria-label={`${applicationWho(a)} · ${a.posting.title ?? ""}`}
+    >
       <Card className="flex flex-col gap-1 p-3">
         <div className="flex items-start justify-between gap-2">
-          <NavLink to={`/candidaturas/${a.id}`} className="font-medium hover:underline">
-            {applicationWho(a)}
-          </NavLink>
+          <span className="flex min-w-0 items-start gap-1">
+            <button
+              type="button"
+              aria-label={t("jobApplications.drag", { name: applicationWho(a) })}
+              className="mt-0.5 cursor-grab text-muted-fg"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical size={14} />
+            </button>
+            <NavLink to={`/candidaturas/${a.id}`} className="font-medium hover:underline">
+              {applicationWho(a)}
+            </NavLink>
+          </span>
           {/* x/N: só em "Em processo" e só do pipeline desta candidatura (F07-8) */}
           {a.column === "in_process" && a.progress.total > 0 ? (
             <span className="shrink-0 rounded bg-muted px-1.5 text-xs font-medium tabular-nums">
@@ -160,6 +191,20 @@ function ApplicationCard({
         </div>
       </Card>
     </li>
+  );
+}
+
+/** Coluna que recebe o cartão arrastado (F07/M2). */
+function BoardColumn({ column, children }: { column: JobApplicationColumn; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: column });
+  return (
+    <div
+      ref={setNodeRef}
+      data-column={column}
+      className={`flex min-w-0 flex-col gap-2 rounded-lg p-2 ${isOver ? "bg-primary/10 ring-2 ring-primary" : "bg-muted/40"}`}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -213,6 +258,15 @@ export function JobApplicationsPage() {
   }, [text]);
   const list = useJobApplications(q, archived);
   const { request, dialog } = useMoveApplication();
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+  const onDragEnd = (e: DragEndEvent) => {
+    const to = e.over?.id as JobApplicationColumn | undefined;
+    const from = list.applications.find((a) => a.id === e.active.id)?.column;
+    if (to && from && to !== from) request(String(e.active.id), to);
+  };
   if (list.isError) return <ErrorState error={list.error} />;
   const saved = list.data?.saved ?? [];
   const empty = list.data && list.applications.length === 0 && saved.length === 0;
@@ -248,6 +302,7 @@ export function JobApplicationsPage() {
           {q ? t("jobApplications.emptySearch") : t("jobApplications.empty")}
         </p>
       ) : null}
+      <FunnelStats />
       <section
         aria-label={t("jobApplications.board")}
         className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6"
@@ -266,24 +321,26 @@ export function JobApplicationsPage() {
             ))}
           </ul>
         </div>
-        {JOB_APPLICATION_COLUMNS.map((c) => {
-          const items = list.applications.filter((a) => a.column === c);
-          return (
-            <div key={c} className="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/40 p-2">
-              <h2 className="flex items-center justify-between px-1 text-sm font-semibold">
-                {columnLabel(c)}
-                <span aria-hidden className="text-xs font-normal text-muted-fg">
-                  {items.length}
-                </span>
-              </h2>
-              <ul aria-label={columnLabel(c)} className="flex flex-col gap-2">
-                {items.map((a) => (
-                  <ApplicationCard key={a.id} a={a} onMove={request} />
-                ))}
-              </ul>
-            </div>
-          );
-        })}
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          {JOB_APPLICATION_COLUMNS.map((c) => {
+            const items = list.applications.filter((a) => a.column === c);
+            return (
+              <BoardColumn key={c} column={c}>
+                <h2 className="flex items-center justify-between px-1 text-sm font-semibold">
+                  {columnLabel(c)}
+                  <span aria-hidden className="text-xs font-normal text-muted-fg">
+                    {items.length}
+                  </span>
+                </h2>
+                <ul aria-label={columnLabel(c)} className="flex flex-col gap-2">
+                  {items.map((a) => (
+                    <ApplicationCard key={a.id} a={a} onMove={request} />
+                  ))}
+                </ul>
+              </BoardColumn>
+            );
+          })}
+        </DndContext>
       </section>
       {dialog}
     </div>

@@ -51,3 +51,29 @@ export function useApplyOptions(postingId: string) {
     queryFn: () => api.getApplyOptions(postingId),
   });
 }
+
+/**
+ * Lembretes da agenda (F07/M5, F07-5: só na interface): eventos nas próximas 24 h e atrasados, recarregados a cada
+ * 5 min e quando uma candidatura muda.
+ */
+export function useJobApplicationReminders() {
+  const api = useApi();
+  useJobApplicationEvents();
+  const q = useQuery({
+    queryKey: [...jobApplicationKeys.all, "upcoming"],
+    queryFn: () => api.getJobApplicationUpcoming(24),
+    refetchInterval: 5 * 60_000,
+  });
+  const upcoming = q.data?.upcoming ?? [];
+  const overdue = q.data?.overdue ?? [];
+  return { upcoming, overdue, count: upcoming.length + overdue.length };
+}
+
+export function useJobApplicationFunnel() {
+  const api = useApi();
+  useJobApplicationEvents();
+  return useQuery({
+    queryKey: [...jobApplicationKeys.all, "funnel"],
+    queryFn: () => api.getJobApplicationFunnel(),
+  });
+}

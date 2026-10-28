@@ -7,6 +7,7 @@ import {
   createChatTools,
   createCvTools,
   createIngestTools,
+  createJobApplicationTools,
   createPostingTools,
   createProfileTools,
   friendlyError,
@@ -25,6 +26,8 @@ import {
   contentTracingEnabled,
   INGEST_TOOL_JSON_SCHEMAS,
   INGEST_TOOLS,
+  JOB_APPLICATION_TOOL_JSON_SCHEMAS,
+  JOB_APPLICATION_TOOLS,
   POSTING_TOOL_JSON_SCHEMAS,
   POSTING_TOOLS,
   PROFILE_TOOL_JSON_SCHEMAS,
@@ -164,6 +167,16 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
               await enqueueAnswers(deps.repos, deps.queue, applicationId);
           },
         },
+      }),
+    ),
+    // F07/M6: candidaturas (skill `candidaturas`); o link do `.ics` sai pelo endereço público
+    ...entries(
+      JOB_APPLICATION_TOOLS,
+      JOB_APPLICATION_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
+      createJobApplicationTools(deps.repos, {
+        publicUrl: process.env.NARNIA_PUBLIC_URL ?? "http://127.0.0.1:3100",
+        changed: (applicationId) =>
+          deps.bus.emit({ type: "job_application.updated", applicationId }),
       }),
     ),
   ];

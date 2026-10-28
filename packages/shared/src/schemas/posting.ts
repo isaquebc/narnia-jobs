@@ -88,6 +88,8 @@ export const PostingFieldsSchema = z.object({
   responsibilities: TextList,
   skillsRequired: TextList,
   skillsNice: TextList,
+  /** Etapas do processo seletivo como a vaga descreve (F07/M2); viram o pipeline da candidatura ao aplicar. */
+  hiringSteps: TextList,
   companySummary: Text.nullable(),
   postingUrl: UrlSchema.nullable(),
   companyUrl: UrlSchema.nullable(),
@@ -205,9 +207,27 @@ const LinkedinUrl = z.string().transform((v, ctx) => {
   return url;
 });
 
+/** Papel de quem está do outro lado (F07/M6, cadeia de contatos). */
+export const ContactRoleSchema = z.enum([
+  "recruiter",
+  "hiring_manager",
+  "referral",
+  "interviewer",
+  "other",
+]);
+export type ContactRole = z.infer<typeof ContactRoleSchema>;
+
+const ContactDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+
 export const PostingContactInputSchema = z.object({
   name: Text,
   origin: ContactOriginSchema,
+  role: ContactRoleSchema.nullable().optional(),
+  /** Quando falou com a pessoa (ordem da cadeia). */
+  contactedOn: ContactDate.nullable().optional(),
+  summary: z.string().trim().max(2000).nullable().optional(),
+  /** Quem indicou esta pessoa (outro contato da mesma vaga). */
+  referredById: IdSchema.nullable().optional(),
   linkedinUrl: LinkedinUrl.nullable().optional(),
   email: z.email().nullable().optional(),
   phone: z
@@ -229,6 +249,10 @@ export const PostingContactSchema = z.object({
   linkedinUrl: z.string().nullable(),
   /** Fixado no topo da página da vaga (um por vaga; fora do limite dos dois últimos). */
   pinned: z.boolean(),
+  role: ContactRoleSchema.nullable().default(null),
+  contactedOn: z.string().nullable().default(null),
+  summary: z.string().nullable().default(null),
+  referredById: IdSchema.nullable().default(null),
   createdAt: IsoDateTimeSchema,
 });
 export type PostingContact = z.infer<typeof PostingContactSchema>;
@@ -329,9 +353,16 @@ export const ModelKeywordSchema = z.object({
   section: KeywordSectionSchema,
 });
 
+/**
+ * Campos que o modelo extrai e junta (F06-5, F06-6). As etapas do processo (F07/M2) ficam de fora: vêm só da heurística
+ * local e da edição na vaga, sem mudar os prompts estruturados nem o formato de saída deles.
+ */
+export const ModelPostingFieldsSchema = PostingFieldsSchema.omit({ hiringSteps: true });
+const MODEL_FIELD_NAMES = POSTING_FIELD_NAMES.filter((f) => f !== "hiringSteps");
+
 /** Extração da vaga pelo modelo barato (F06-5: Haiku), independente da heurística (F06-6). */
 export const PostingExtractOutputSchema = z.object({
-  fields: PostingFieldsSchema,
+  fields: ModelPostingFieldsSchema,
   keywords: z.array(ModelKeywordSchema),
 });
 export type PostingExtractOutput = z.infer<typeof PostingExtractOutputSchema>;
@@ -341,10 +372,10 @@ export type PostingExtractOutput = z.infer<typeof PostingExtractOutputSchema>;
  * as palavras-chave com quem as achou. Origem em lista (schema de saída estruturada não tem chave dinâmica).
  */
 export const PostingMergeOutputSchema = z.object({
-  fields: PostingFieldsSchema,
+  fields: ModelPostingFieldsSchema,
   fieldSources: z.array(
     z.object({
-      field: z.enum(POSTING_FIELD_NAMES as [PostingFieldName, ...PostingFieldName[]]),
+      field: z.enum(MODEL_FIELD_NAMES as [PostingFieldName, ...PostingFieldName[]]),
       source: z.enum(["heuristic", "model", "both"]),
     }),
   ),

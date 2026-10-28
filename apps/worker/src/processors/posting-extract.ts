@@ -50,7 +50,8 @@ export const postingExtract: TaskHandler = async (data, ctx, deps) => {
       model: mergeModel,
       extracted: extracted.output,
       heuristic: {
-        fields: analyzePostingText(text).fields,
+        // as etapas do processo (F07/M2) não passam pelo modelo: a heurística já as gravou na vaga
+        fields: (({ hiringSteps: _steps, ...f }) => f)(analyzePostingText(text).fields),
         keywords: (pre?.keywords ?? []).map((k) => ({ term: k.term, section: k.section })),
       },
     });

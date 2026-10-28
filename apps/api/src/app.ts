@@ -37,6 +37,7 @@ import { extensionRoutes, watchCaptureAnalyses } from "./routes/extension";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
 import { ingestionsRoutes } from "./routes/ingestions";
+import { integrationsRoutes } from "./routes/integrations";
 import { jobApplicationsRoutes } from "./routes/job-applications";
 import { jobsRoutes } from "./routes/jobs";
 import { modelSettingsRoutes } from "./routes/model-settings";
@@ -159,6 +160,14 @@ export function createApp(deps: AppDeps) {
   app.route("/", personaCardRoutes({ repos: deps.repos }));
   // avaliações no Phoenix (AV-2): ponte da assinatura, com chave própria (fora do /api)
   app.route("/", bridgeRoutes({ repos: deps.repos, provider: deps.provider }));
+  // F07/M7: Google Calendar opcional; com o mock (testes, e2e) o CLI real não roda: "não conectado"
+  app.route(
+    "/",
+    integrationsRoutes({
+      ...(fake ? { runMcpList: async () => ({ stdout: "" }) } : {}),
+      oauthPort: Number(process.env.NARNIA_OAUTH_PORT ?? 8089) || 8089,
+    }),
+  );
   {
     const phoenixUrl =
       deps.phoenixUrl === undefined ? phoenixBaseUrl(process.env) : deps.phoenixUrl;
@@ -209,7 +218,15 @@ export function createApp(deps: AppDeps) {
   );
   app.route("/", applicationsRoutes({ repos: deps.repos, queue: deps.queue, bus: deps.bus }));
   app.route("/", motivationsRoutes({ repos: deps.repos, queue: deps.queue, bus: deps.bus }));
-  app.route("/", jobApplicationsRoutes({ repos: deps.repos, bus: deps.bus }));
+  app.route(
+    "/",
+    jobApplicationsRoutes({
+      repos: deps.repos,
+      dataDir: deps.dataDir,
+      bus: deps.bus,
+      publicUrl: process.env.NARNIA_PUBLIC_URL,
+    }),
+  );
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route(
     "/",

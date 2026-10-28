@@ -16,9 +16,10 @@ import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { ChatView } from "../chat/ChatPage";
 import { type SessionLimit, SessionLimitDialog, sessionLimitOf } from "../chat/SessionLimitDialog";
+import { ApplyButton } from "../job-applications/ApplyButton";
 import { AddressSelect, MotivationsEditor, PhraseEditor } from "../profiles/MotivationsEditor";
 import { bridgeRequest, extensionAvailable } from "./bridge";
-import { CaptureDocuments } from "./CaptureFollowUp";
+import { CaptureDocuments, openGenerateCv } from "./CaptureFollowUp";
 
 /**
  * Janela da extensão no modo formulário (F12/M3, §4.7): as perguntas do formulário de candidatura na ordem da página,
@@ -214,7 +215,16 @@ export function ApplicationWindow({ id, page }: { id: string; page: FormPage }) 
     <article className="flex flex-col gap-3">
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold leading-tight">{t("application.title")}</h1>
-        <PostingLink application={a} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <PostingLink application={a} />
+          {/* F07/M4: com a vaga ligada, aplicar daqui (o formulário enviado vira a candidatura) */}
+          {a.postingId ? (
+            <ApplyButton
+              postingId={a.postingId}
+              onGenerateCv={() => openGenerateCv(a.postingId as string)}
+            />
+          ) : null}
+        </div>
       </header>
       <fieldset aria-label={t("application.views")} className="flex gap-1">
         {(["questions", "chat"] as const).map((v) => (

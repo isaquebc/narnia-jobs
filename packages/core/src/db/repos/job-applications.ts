@@ -40,6 +40,28 @@ export interface JobApplicationsRepo {
   activeForPosting(postingId: string): JobApplication | null;
   /** Encerrar pede o motivo (F07-6); sair de Encerrado limpa o motivo. */
   update(id: string, patch: JobApplicationUpdate, now?: Date): JobApplication;
+  /**
+   * Troca o pipeline pela lista em ordem (F07/M2): as que trazem `id` ficam com ele, as sem id nascem, as que faltam
+   * saem. A etapa atual continua se ficou; se saiu, passa para a que ficou na mesma posição (ou a última).
+   */
+  setStages(
+    id: string,
+    stages: Array<{ id?: string | undefined; name: string }>,
+    now?: Date,
+  ): JobApplication;
+  setCurrentStage(id: string, stageId: string | null, now?: Date): JobApplication;
+  /** Mudanças de coluna em ordem (a primeira é a criação, sem origem): o funil sai daqui. */
+  moves(): Array<{
+    applicationId: string;
+    from: JobApplicationColumn | null;
+    to: JobApplicationColumn;
+    at: string;
+  }>;
+  /** Conversa sobre a candidatura (F07/M6). */
+  chatSessionId(id: string): string | null;
+  setChatSession(id: string, sessionId: string | null): void;
+  /** Atividade sem mudar nada (nota, anexo): conta para o arquivamento e desarquiva. */
+  touch(id: string, now?: Date): void;
   /** Arquiva as sem atividade há `ARCHIVE_AFTER_DAYS`; devolve os ids. Nunca apaga. */
   archiveInactive(now?: Date): string[];
   remove(id: string): void;
@@ -92,6 +114,18 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
     updatedAt: String(r.updated_at),
   });
 
+  const move = (
+    id: string,
+    from: JobApplicationColumn | null,
+    to: JobApplicationColumn,
+    at: string,
+  ) =>
+    db
+      .prepare(
+        "insert into job_application_move (id, job_application_id, from_column, to_column, at) values (?, ?, ?, ?, ?)",
+      )
+      .run(newId(), id, from, to, at);
+
   const get = (id: string) => {
     const r = db.prepare("select * from job_application where id = ?").get(id) as Row | undefined;
     return r ? map(r) : null;
@@ -131,6 +165,7 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
           ins.run(sid, id, name, i + 1, at);
         });
         db.prepare("update job_application set current_stage_id = ? where id = ?").run(first, id);
+        move(id, null, "applied", at);
       });
       return must(id);
     },
@@ -181,11 +216,86 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
       if (column === "closed" && !reason) throw new Error("encerrar pede o motivo");
       const at = now.toISOString();
       const archivedAt = patch.archived === true ? (cur.archivedAt ?? at) : null;
+      if (column !== cur.column) move(id, cur.column, column, at);
       db.prepare(
         `update job_application set board_column = ?, closed_reason = ?, applied_on = ?, archived_at = ?,
            last_activity_at = ?, updated_at = ? where id = ?`,
       ).run(column, reason, patch.appliedOn ?? cur.appliedOn, archivedAt, at, at, id);
       return must(id);
+    },
+    setStages(id, stages, now = new Date()) {
+      const cur = must(id);
+      const at = now.toISOString();
+      withTransaction(db, () => {
+        const keep = new Set(stages.flatMap((s) => (s.id ? [s.id] : [])));
+        const del = db.prepare("delete from job_application_stage where id = ?");
+        for (const s of cur.stages) if (!keep.has(s.id)) del.run(s.id);
+        const upd = db.prepare(
+          "update job_application_stage set name = ?, position = ? where id = ?",
+        );
+        const ins = db.prepare(
+          "insert into job_application_stage (id, job_application_id, name, position, created_at) values (?, ?, ?, ?, ?)",
+        );
+        const ids = stages.map((s, i) => {
+          if (s.id) {
+            upd.run(s.name, i + 1, s.id);
+            return s.id;
+          }
+          const sid = newId();
+          ins.run(sid, id, s.name, i + 1, at);
+          return sid;
+        });
+        const old = cur.stages.find((s) => s.id === cur.currentStageId);
+        const current =
+          cur.currentStageId && keep.has(cur.currentStageId)
+            ? cur.currentStageId
+            : old
+              ? (ids[Math.min(old.position, ids.length) - 1] ?? null)
+              : (ids[0] ?? null);
+        db.prepare(
+          `update job_application set current_stage_id = ?, archived_at = null, last_activity_at = ?, updated_at = ?
+             where id = ?`,
+        ).run(current, at, at, id);
+      });
+      return must(id);
+    },
+    setCurrentStage(id, stageId, now = new Date()) {
+      must(id);
+      const at = now.toISOString();
+      db.prepare(
+        `update job_application set current_stage_id = ?, archived_at = null, last_activity_at = ?, updated_at = ?
+           where id = ?`,
+      ).run(stageId, at, at, id);
+      return must(id);
+    },
+    moves() {
+      return (
+        db
+          .prepare(
+            "select job_application_id, from_column, to_column, at from job_application_move order by at, rowid",
+          )
+          .all() as Row[]
+      ).map((r) => ({
+        applicationId: String(r.job_application_id),
+        from: (r.from_column as JobApplicationColumn | null) ?? null,
+        to: String(r.to_column) as JobApplicationColumn,
+        at: String(r.at),
+      }));
+    },
+    chatSessionId(id) {
+      const r = db.prepare("select chat_session_id from job_application where id = ?").get(id) as
+        | Row
+        | undefined;
+      return r?.chat_session_id ? String(r.chat_session_id) : null;
+    },
+    setChatSession(id, sessionId) {
+      db.prepare("update job_application set chat_session_id = ? where id = ?").run(sessionId, id);
+    },
+    touch(id, now = new Date()) {
+      const at = now.toISOString();
+      db.prepare(
+        "update job_application set archived_at = null, last_activity_at = ?, updated_at = ? where id = ?",
+      ).run(at, at, id);
     },
     archiveInactive(now = new Date()) {
       const limit = new Date(now.getTime() - ARCHIVE_AFTER_DAYS * 86_400_000).toISOString();

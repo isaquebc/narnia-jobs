@@ -55,3 +55,19 @@ export function formatDateOnly(value: string, locale: "pt-BR" | "en-US" = "pt-BR
   if (!day) return `${month}/${year}`;
   return monthFirst ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
 }
+
+const LOCAL_INPUT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** Data e hora digitadas no fuso da pessoa (`YYYY-MM-DDTHH:mm`, como o `datetime-local`) → instante UTC (F07/M5). */
+export function localToUtc(local: string, timeZone: string): string {
+  if (!isValidTimeZone(timeZone)) throw new TypeError(`Fuso horário inválido: ${timeZone}`);
+  if (!LOCAL_INPUT.test(local)) throw new TypeError(`Data e hora inválidas: ${local}`);
+  const m = moment.tz(local, "YYYY-MM-DDTHH:mm", true, timeZone);
+  if (!m.isValid()) throw new TypeError(`Data e hora inválidas: ${local}`);
+  return m.toISOString();
+}
+
+/** Instante UTC → `YYYY-MM-DDTHH:mm` no fuso da pessoa (valor do `datetime-local`). */
+export function localInputFromUtc(iso: string, timeZone: string): string {
+  return formatInUserTz(iso, timeZone, "YYYY-MM-DDTHH:mm");
+}

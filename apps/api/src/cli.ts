@@ -1,7 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveBackupDir } from "@narnia-jobs/core";
+import {
+  googleCalendarConnectSteps,
+  parseGoogleCalendarStatus,
+  resolveBackupDir,
+} from "@narnia-jobs/core";
 import { createProviderFromEnv, resolveClaudeBinary } from "@narnia-jobs/providers";
 import IORedis from "ioredis";
 import { runDoctor } from "./doctor";
@@ -59,11 +63,44 @@ function login(): number {
   return r.status ?? 1;
 }
 
+/**
+ * Google Calendar opcional (F07/M7, F07-4): `google status` lê o `claude mcp list`; `google connect <client-id>`
+ * registra o MCP oficial com o cliente OAuth da pessoa (o CLI pede o segredo) e abre o login (callback na 8089).
+ */
+function google(sub: string, clientId: string | undefined): number {
+  const bin = resolveClaudeBinary({ explicit: process.env.NARNIA_CLAUDE_BIN });
+  if (!bin) {
+    console.error("CLI do Claude Code não encontrado na imagem.");
+    return 1;
+  }
+  if (sub === "status") {
+    const r = spawnSync(bin, ["mcp", "list"], { encoding: "utf8", timeout: 20_000 });
+    console.log(
+      JSON.stringify(parseGoogleCalendarStatus(r.stdout ?? null, r.error?.message), null, 2),
+    );
+    return 0;
+  }
+  // o client ID vai para o shell: só o formato do Google (dígitos, letras, ponto e hífen)
+  if (sub === "connect" && clientId && /^[\w.-]+$/.test(clientId)) {
+    const steps = googleCalendarConnectSteps({ clientId, callbackPort: 8089 });
+    console.log(`URI de redirecionamento do cliente OAuth: ${steps.redirectUri}`);
+    const add = spawnSync("sh", ["-c", steps.add.replace(/^claude /, `"${bin}" `)], {
+      stdio: "inherit",
+    });
+    if (add.status !== 0) return add.status ?? 1;
+    return spawnSync(bin, ["mcp", "login", "google-calendar"], { stdio: "inherit" }).status ?? 1;
+  }
+  console.log("narnia-jobs google status | google connect <client-id>");
+  return 2;
+}
+
 function usage(): void {
   console.log(`narnia-jobs <comando>
   doctor          verifica login (volume/token), Redis, pasta de dados e worker
   login           login interativo da assinatura dentro do container
   install-plugin  roda no host: ./start.sh install-plugin (ou .\\start.ps1 install-plugin)
+  google status   Google Calendar (opcional, F07): conectado, precisa de login ou não configurado
+  google connect <client-id>  registra o MCP do Google com o seu cliente OAuth e abre o login
   evals prompts [nome…] [--strict]  prompts estruturados sobre os datasets no Phoenix (pela ponte)
   evals chat [id…] [--strict]       conversas de referência com o recrutador, num banco temporário isolado
   evals pdf [--strict]              leitura do PDF fictício (tool Read), num banco temporário isolado
@@ -79,6 +116,11 @@ switch (cmd) {
   case "login":
     code = login();
     break;
+  case "google": {
+    const [, sub = "", clientId] = process.argv.slice(2);
+    code = google(sub, clientId);
+    break;
+  }
   case "install-plugin":
     // o plugin vai para o Claude Code do computador (host), não para o container: quem instala é o lançador
     console.log(

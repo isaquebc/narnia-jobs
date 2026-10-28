@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import {
+  applyToPosting,
   assembleCv,
   buildCvBrief,
   buildCvHeader,
@@ -45,6 +46,12 @@ export interface EvalSandbox {
    * uma versão na fila sem worker, e o caso de feedback da amostra seguinte não achava CV pronto.
    */
   readyPostingCv(): void;
+  /**
+   * F07/M6: a candidatura da vaga da Globex, sem conversa ligada (cada caso abre a conversa da candidatura do zero).
+   */
+  jobApplication(): string;
+  /** Erro do último turno da conversa (`chat.error`), para o runner não esperar o tempo do turno (2026-10-28). */
+  turnError(sessionId: string): string | undefined;
   close(): Promise<void>;
 }
 
@@ -94,8 +101,13 @@ export async function openEvalSandbox(o: {
   const repos = createRepos(db);
   const seeded = seedFixture(repos, o.fixture ?? "engineer");
   const postingCv = await seedPostingCv(repos, seeded.profileId);
+  seedDiscardedPosting(repos);
   const token = randomBytes(24).toString("hex");
   const bus = new EventBus();
+  const turnErrors = new Map<string, string>();
+  bus.on((e) => {
+    if (e.type === "chat.error") turnErrors.set(e.sessionId, e.error);
+  });
   let handler: ((req: Request) => Response | Promise<Response>) | null = null;
   const server = serve({
     fetch: (req) => (handler ? handler(req) : new Response("iniciando", { status: 503 })),
@@ -144,6 +156,11 @@ export async function openEvalSandbox(o: {
     readyPostingCv: () => {
       repos.documents.setCurrent(postingCv.documentId, postingCv.version);
     },
+    jobApplication: () => {
+      repos.jobApplications.setChatSession(postingCv.applicationId, null);
+      return postingCv.applicationId;
+    },
+    turnError: (sessionId) => turnErrors.get(sessionId),
     async close() {
       if (closed) return;
       closed = true;
@@ -170,6 +187,28 @@ export async function withEvalSandbox<T>(
   } finally {
     await sandbox.close();
   }
+}
+
+/**
+ * Vaga que o usuário descartou por falta de fit (F07/M1.6): o `posting_get` a traz em `discarded`, e o caso
+ * `analise-com-vaga-descartada` confere que o especializado pesa o motivo. O motivo (contrato: só PJ) não se repete nas
+ * vagas dos outros casos, todas CLT.
+ */
+function seedDiscardedPosting(repos: Repos): void {
+  const p = repos.postings.create(
+    {
+      company: "Hooli Sistemas",
+      title: "Desenvolvedora Backend Sênior",
+      role: "backend",
+      seniority: "senior",
+      contractType: "pj",
+    },
+    { source: "user" },
+  );
+  repos.postings.setArchived(p.id, {
+    reason: "contract",
+    note: "Só PJ não me interessa: quero CLT.",
+  });
 }
 
 /**
@@ -307,5 +346,11 @@ async function seedPostingCv(repos: Repos, profileId: string) {
     header: buildCvHeader(repos, profileId, "pt-BR"),
   });
   repos.documents.updateVersion(version.id, { status: "ready", content });
-  return { documentId: doc.id, version: version.version };
+  // F07/M6: a candidatura na vaga da Globex, como o botão Aplicar deixa (casos `open: job_application_chat`)
+  const application = applyToPosting(repos, {
+    postingId: posting.id,
+    cvVersionId: version.id,
+    appliedOn: new Date().toISOString().slice(0, 10),
+  });
+  return { documentId: doc.id, version: version.version, applicationId: application.id };
 }

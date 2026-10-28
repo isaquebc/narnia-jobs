@@ -10,7 +10,8 @@ import type { Db } from "./open";
  *   para fora); antes de migration também (`migrate` usa `writeBackup`).
  * - Poda única: no máximo `backups.max` arquivos `narnia-boot-*`/`narnia-pre-*` no total (padrão 5, FX-2), sai o
  *   mais antigo. Nunca apaga arquivo que não criou (`narnia-before-restore-*` do lançador fica de fora).
- * - Uploads copiados por nome (sha) para `<backups>/uploads`, só os que faltam.
+ * - Uploads copiados por nome (sha) para `<backups>/uploads`, só os que faltam; o mesmo com os templates de CV e os
+ *   anexos das candidaturas (F07/M3).
  * - Tudo à prova de falha: erro vira `error` no resultado, nunca exceção no boot.
  */
 export const DEFAULT_BACKUPS_MAX = 5;
@@ -114,6 +115,11 @@ export function backupTemplates(dataDir: string, dir: string): number {
   return copyMissing(dataDir, dir, "templates", (f) => f.endsWith(".zip"));
 }
 
+/** Anexos das candidaturas (F07/M3): pasta plana, nome = id do anexo. */
+export function backupJobApplicationFiles(dataDir: string, dir: string): number {
+  return copyMissing(dataDir, dir, "job-applications");
+}
+
 function copyMissing(
   dataDir: string,
   dir: string,
@@ -153,7 +159,10 @@ export function backupOnBoot(input: {
   try {
     if (!hasUserData(db)) return { created: null, skipped: "empty" };
     const now = input.now ?? new Date();
-    const uploadsCopied = backupUploads(dataDir, backupDir) + backupTemplates(dataDir, backupDir);
+    const uploadsCopied =
+      backupUploads(dataDir, backupDir) +
+      backupTemplates(dataDir, backupDir) +
+      backupJobApplicationFiles(dataDir, backupDir);
     const today = `narnia-boot-${now.toISOString().slice(0, 10)}`;
     if (listBackups(backupDir).some((b) => b.file.startsWith(today)))
       return { created: null, skipped: "already_today", uploadsCopied };

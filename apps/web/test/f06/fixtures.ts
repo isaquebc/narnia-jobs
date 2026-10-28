@@ -25,6 +25,7 @@ export function posting(id: string, partial: Partial<Posting> = {}): Posting {
     responsibilities: [],
     skillsRequired: ["Java"],
     skillsNice: ["AWS"],
+    hiringSteps: [],
     companySummary: null,
     postingUrl: null,
     companyUrl: null,

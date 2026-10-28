@@ -2,13 +2,15 @@ import type { Job, RunStatus } from "@narnia-jobs/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useApi, useWs } from "../../app/context";
+import { useApi, useTimezone, useWs } from "../../app/context";
 import { runHeadline } from "../../features/ingestion/runHeadline";
 import { useChatSessions } from "../../hooks/useChat";
+import { useJobApplicationReminders } from "../../hooks/useJobApplications";
 import { useJobs } from "../../hooks/useJobs";
 import { useNotifications } from "../../hooks/useNotifications";
 import { usePendingNotes } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
+import { formatDate } from "../../lib/format";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
@@ -177,6 +179,8 @@ export function ActivityTray({
   const waiting = usePendingNotes();
   const analyses = usePostingAnalyses();
   const documents = useDocumentNotices();
+  const reminders = useJobApplicationReminders();
+  const tz = useTimezone();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="relative">
@@ -189,7 +193,7 @@ export function ActivityTray({
       >
         <Activity size={16} />
         <span data-testid="activity-count" className="text-xs">
-          {activeCount + waiting.length + analyses.count + documents.count}
+          {activeCount + waiting.length + analyses.count + documents.count + reminders.count}
         </span>
       </Button>
       {open ? (
@@ -220,6 +224,34 @@ export function ActivityTray({
               ) : null}
             </span>
           </div>
+          {reminders.count > 0 ? (
+            <ul aria-label={t("tray.agenda")} className="mb-2 flex flex-col gap-2">
+              {[...reminders.overdue, ...reminders.upcoming].map(({ event, application }) => {
+                const late = reminders.overdue.some((o) => o.event.id === event.id);
+                const what = `${event.title} · ${application.company ?? "—"}`;
+                return (
+                  <li
+                    key={event.id}
+                    className={`flex items-center justify-between gap-2 rounded-md border p-2 text-sm ${late ? "border-warn/40" : "border-border"}`}
+                  >
+                    <span>
+                      {late ? t("tray.agendaLate", { what }) : what}
+                      <span className="block text-xs text-muted-fg">
+                        {formatDate(event.startsAt, tz)}
+                      </span>
+                    </span>
+                    <NavLink
+                      to={`/candidaturas/${application.id}`}
+                      className="inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                      onClick={() => setOpen(false)}
+                    >
+                      {t("tray.openApplication")}
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
           {waiting.length > 0 ? (
             <ul aria-label={t("tray.waiting")} className="mb-2 flex flex-col gap-2">
               {waiting.map(({ note, posting }) => (

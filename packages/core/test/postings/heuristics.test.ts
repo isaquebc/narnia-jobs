@@ -136,4 +136,15 @@ describe("F06/M3 core · analyzePostingText", () => {
     expect(analyzePostingText("Desenvolvedor Pleno/Sênior Java").fields.seniority).toBe("senior");
     expect(analyzePostingText("Vaga de desenvolvimento Java").fields.seniority).toBeUndefined();
   });
+  it("F07/M2 · etapas do processo: seção com itens ou linha com setas; sem seção, nenhuma", () => {
+    const h = analyzePostingText(
+      `${JD_PT}\n\nEtapas do processo seletivo:\n1. Triagem com RH\n2. Case técnico\n3. Conversa com o CTO`,
+    );
+    expect(h.fields.hiringSteps).toEqual(["Triagem com RH", "Case técnico", "Conversa com o CTO"]);
+    expect(
+      analyzePostingText("Vaga Backend\nProcesso seletivo: Triagem → Entrevista técnica → Proposta")
+        .fields.hiringSteps,
+    ).toEqual(["Triagem", "Entrevista técnica", "Proposta"]);
+    expect(analyzePostingText(JD_PT).fields.hiringSteps).toBeUndefined();
+  });
 });

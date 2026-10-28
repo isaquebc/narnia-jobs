@@ -28,6 +28,13 @@ import { type CvContent, contentTracingEnabled } from "@narnia-jobs/shared";
 import { approvedPlugins } from "./approved-plugin";
 import { BaselineGate, gateFlags, type PairRun, readApproved } from "./baseline-file";
 import { chatCaseDeps } from "./chat-deps";
+import {
+  type Checkpoint,
+  checkpointKey,
+  isUsageLimit,
+  limitConcurrency,
+  openCheckpoint,
+} from "./checkpoint";
 import { syncChatJudge, syncEvaluators } from "./eval-sync";
 import { chatJudge, judgeFor } from "./judges";
 import { judgeLocally, type LocalEvaluation, recordLocalExperiment } from "./local-eval";
@@ -38,7 +45,7 @@ import { gitCommit } from "./phoenix-setup";
 import { promptCatalog } from "./prompt-catalog";
 import { datasetRows, PROMPT_DATASETS } from "./prompt-datasets";
 import { promptEvaluators } from "./prompt-evaluators";
-import { type EvalCaseReport, runEvalCases } from "./run";
+import { type EvalCaseReport, EvalRunAborted, runEvalCases } from "./run";
 import { openEvalSandbox, withEvalSandbox } from "./sandbox";
 
 /**
@@ -71,7 +78,11 @@ export const savedPostingsText = (repos: Repos) =>
   repos.postings
     .list()
     .map((p) => {
-      const head = [p.company, p.client, p.title].filter(Boolean).join(" · ");
+      const base = [p.company, p.client, p.title].filter(Boolean).join(" · ");
+      // F07/M1.6: a vaga descartada por falta de fit entra com o motivo (o especializado o recebe no `posting_get`)
+      const head = p.archivedAt
+        ? `${base} (arquivada pelo usuário por falta de fit · motivo: ${p.archiveReason}${p.archiveNote ? ` · "${p.archiveNote}"` : ""})`
+        : base;
       const jd = (p.jdText ?? "").trim();
       if (!jd) return head;
       return `${head}\nDescrição: ${jd.length > JD_LIMIT ? `${jd.slice(0, JD_LIMIT)}…` : jd}`;
@@ -104,7 +115,43 @@ const chatVersion = () =>
 
 const mark = (score: number) => (score >= 1 ? "✔" : score >= 0.5 ? "~" : "✘");
 
-async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<number> {
+/** Chamadas simultâneas ao juiz (limite de taxa da assinatura, 2026-10-28). */
+const JUDGE_CONCURRENCY = 4;
+
+/** Retomada do gate do chat (2026-10-28): fora do git, apagada quando a rodada grava a linha de base. */
+const checkpointPath = () => join(repoRoot(), "evals/.checkpoint/narnia-chat.json");
+
+/**
+ * A chave da retomada: tudo o que muda o resultado de uma conversa ou de um julgamento (prompts da candidata, casos,
+ * aprovadas, juízes e as opções que mudam as amostras). Mudou um deles, a rodada começa do zero.
+ */
+function chatCheckpoint(only: string[], args: string[]): Checkpoint {
+  const read = (sub: string) => {
+    const dir = join(repoRoot(), sub);
+    return readdirSync(dir)
+      .sort()
+      .map((f) => `${f}\n${readFileSync(join(dir, f), "utf8")}`);
+  };
+  const flags = gateFlags(args);
+  const key = checkpointKey([
+    chatVersion(),
+    read("evals/chat"),
+    read("evals/judges"),
+    readApproved(CHAT_KEY),
+    [...only].sort(),
+    flags.noise ?? false,
+    flags.samples ?? null,
+    flags.feature ?? [],
+  ]);
+  return openCheckpoint(checkpointPath(), key, { fresh: args.includes("--fresh") });
+}
+
+async function chat(
+  ctx: Ctx,
+  only: string[],
+  gate?: BaselineGate,
+  cp?: Checkpoint,
+): Promise<number> {
   const dir = join(repoRoot(), "evals/chat");
   const cases = readdirSync(dir)
     .filter((f) => f.endsWith(".jsonl"))
@@ -112,41 +159,74 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
     .filter((c) => only.length === 0 || only.includes(c.id));
   let failed = 0;
   {
+    const flags = gate?.flags;
+    // gate: o primeiro erro para a rodada (rodada com erro não grava nada); o que terminou fica na retomada
+    const stopOnError = Boolean(flags && (flags.gate || flags.update || flags.noise));
+    if (cp && (cp.resumed.runs > 0 || cp.resumed.completions > 0))
+      console.log(
+        `Retomando a rodada anterior (${checkpointPath()}): ${cp.resumed.runs} conversa(s) e ${cp.resumed.completions} julgamento(s) já feitos.`,
+      );
     // cada rodada (a principal e cada amostra extra, dos dois lados) num sandbox novo: o estado de uma não vaza para a
-    // seguinte (2026-10-26)
-    const runCases = (list: typeof cases) =>
-      withEvalSandbox({ provider: ctx.provider }, (sandbox) => {
-        console.log(
-          `Sandbox isolado em ${sandbox.baseUrl} (banco descartável com a fixture fictícia).`,
-        );
-        return runEvalCases(list, {
-          baseUrl: sandbox.baseUrl,
-          token: sandbox.token,
-          knownFacts: knownFactsText(sandbox.repos),
-          newApplication: (opts) => sandbox.newApplication(opts),
-          readyPostingCv: () => sandbox.readyPostingCv(),
-          savedPostings: savedPostingsText(sandbox.repos),
-        });
+    // seguinte (2026-10-26); os casos da amostra que já terminaram vêm da retomada
+    const runCases = async (list: typeof cases, slot: string) => {
+      const done = new Map<string, EvalCaseReport>();
+      for (const c of list) {
+        const r = cp?.getRun(`${slot}:${c.id}`);
+        if (r) done.set(c.id, r);
+      }
+      const todo = list.filter((c) => !done.has(c.id));
+      if (done.size > 0) console.log(`  (${done.size} caso(s) desta amostra vêm da retomada)`);
+      const fresh =
+        todo.length === 0
+          ? []
+          : await withEvalSandbox({ provider: ctx.provider }, (sandbox) => {
+              console.log(
+                `Sandbox isolado em ${sandbox.baseUrl} (banco descartável com a fixture fictícia).`,
+              );
+              return runEvalCases(todo, {
+                baseUrl: sandbox.baseUrl,
+                token: sandbox.token,
+                knownFacts: knownFactsText(sandbox.repos),
+                newApplication: (opts) => sandbox.newApplication(opts),
+                readyPostingCv: () => sandbox.readyPostingCv(),
+                jobApplication: () => sandbox.jobApplication(),
+                savedPostings: savedPostingsText(sandbox.repos),
+                turnError: (id) => sandbox.turnError(id),
+                stopOnError,
+                onCase: (r) => cp?.putRun(`${slot}:${r.id}`, r),
+              });
+            });
+      return list.flatMap((c) => {
+        const r = done.get(c.id) ?? fresh.find((x) => x.id === c.id);
+        return r ? [r] : [];
       });
+    };
     const judge = chatJudge();
-    const judgeAll = async (list: EvalCaseReport[]) => {
+    // o juiz absoluto e o pairwise com memória (julgamento já feito vem da retomada) e no máximo 4 chamadas ao mesmo
+    // tempo (o pairwise dispara todas de uma vez e estourava o limite de taxa da assinatura)
+    const limited = limitConcurrency(ctx.provider, JUDGE_CONCURRENCY);
+    const judgeProvider = cp ? cp.memo(limited) : limited;
+    const judgeAll = async (list: EvalCaseReport[], slot: string) => {
       for (const r of list) {
         const c = cases.find((x) => x.id === r.id);
-        if (r.error || !c) continue;
+        if (r.error || !c || r.judges) continue;
         try {
           r.judges = [
-            await judgeLocally(ctx.provider, judge, {
+            await judgeLocally(judgeProvider, judge, {
               input: { messages: c.messages, context: r.context ?? "" },
               output: { replies: r.replies, tools: r.tools },
             }),
           ];
+          cp?.putRun(`${slot}:${r.id}`, r);
         } catch (e) {
+          // limite de uso: para a rodada (o que terminou fica na retomada)
+          if (isUsageLimit((e as Error).message)) throw e;
           console.log(`  ! juiz de ${r.id}: ${(e as Error).message}`);
         }
       }
     };
-    const report = await runCases(cases);
-    await judgeAll(report);
+    const report = await runCases(cases, "1");
+    await judgeAll(report, "1");
     for (const r of report) {
       console.log(`${r.passed ? "✔" : "✘"} ${r.id}${r.error ? ` · erro: ${r.error}` : ""}`);
       for (const g of r.results) console.log(`    ${g.passed ? "✔" : "✘"} ${g.type}: ${g.detail}`);
@@ -156,7 +236,6 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
     }
 
     // gate robusto (2026-10-25): dependências por caso (o pairwise só compara o caso que mudou) e amostras extras
-    const flags = gate?.flags;
     const full = only.length === 0;
     const catalog = promptCatalog().filter((p) => p.kind !== "structured");
     const approved = new Map(readApproved(CHAT_KEY).map((a) => [a.exampleId, a]));
@@ -188,10 +267,14 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
       ids: string[],
       into: Map<string, EvalCaseReport[]>,
       judgeThem: boolean,
+      slot: string,
     ) => {
       console.log(`\n${label}: ${ids.join(", ")}`);
-      const more = await runCases(cases.filter((c) => ids.includes(c.id)));
-      if (judgeThem) await judgeAll(more);
+      const more = await runCases(
+        cases.filter((c) => ids.includes(c.id)),
+        slot,
+      );
+      if (judgeThem) await judgeAll(more, slot);
       for (const r of more) {
         into.set(r.id, [...(into.get(r.id) ?? []), r]);
         const j = r.judges?.[0];
@@ -205,9 +288,15 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
     };
     const extras = new Map<string, EvalCaseReport[]>();
     for (let k = 2; k <= sampleCount && extraIds.length > 0; k++)
-      await sample(`Amostra ${k} de ${sampleCount}`, extraIds, extras, true);
+      await sample(`Amostra ${k} de ${sampleCount}`, extraIds, extras, true, `amostra-${k}`);
     for (let k = 2; k <= sampleCount && featureRuns.length > 0; k++)
-      await sample(`Caso novo, amostra ${k} de ${sampleCount}`, featureRuns, extras, true);
+      await sample(
+        `Caso novo, amostra ${k} de ${sampleCount}`,
+        featureRuns,
+        extras,
+        true,
+        `novo-${k}`,
+      );
     // lado A com amostras novas (a saída guardada venceu o gate anterior: está acima da média e ganhava 7 de 7 casos
     // decididos no A contra A). No A contra A, a mesma versão de novo; no gate, os prompts do commit da aprovada
     const against = new Map<string, EvalCaseReport[]>();
@@ -215,7 +304,13 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
     try {
       if (flags?.noise && extraIds.length > 0)
         for (let k = 1; k <= sampleCount; k++)
-          await sample(`Lado A, amostra ${k} de ${sampleCount}`, extraIds, against, false);
+          await sample(
+            `Lado A, amostra ${k} de ${sampleCount}`,
+            extraIds,
+            against,
+            false,
+            `lado-a-${k}`,
+          );
       if (comparing && !flags?.noise && extraIds.length > 0) {
         plugins.push(...approvedPlugins(repoRoot(), CHAT_KEY));
         const byPlugin = new Map<string, string[]>();
@@ -251,6 +346,7 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
                 ids,
                 against,
                 false,
+                `aprovada-${commit}-${k}`,
               ),
             );
         }
@@ -355,7 +451,7 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
         };
         await gate.measureNoise(CHAT_KEY, {
           judge,
-          provider: ctx.provider,
+          provider: judgeProvider,
           runs: report.filter((r) => sameIds.has(r.id)).flatMap(pairRun),
           errors: [...against.values()].flat().filter((x) => x.error).length,
           spreads: { "chat:avaliadores": spread("avaliadores"), "chat:juiz": spread("juiz") },
@@ -369,7 +465,7 @@ async function chat(ctx: Ctx, only: string[], gate?: BaselineGate): Promise<numb
         versionId: chatVersion(),
         commit: gitCommit(),
         judge,
-        provider: ctx.provider,
+        provider: judgeProvider,
         runs: report.flatMap(pairRun),
         // caso novo passa se a maioria das amostras passou em todos os avaliadores e o juiz não reprovou (≥ parcial)
         features: featureIds
@@ -651,15 +747,32 @@ export async function runSandboxEvals(
   const gate = new BaselineGate(gateFlags(args));
   const only = args.filter((a) => !a.startsWith("--"));
   await initTelemetry({ ...process.env, NARNIA_OTEL_PROJECT: "narnia-evals" }, "narnia-evals");
+  // retomada só no gate (as amostras e o pairwise são o que custa horas)
+  const flags = gateFlags(args);
+  const cp =
+    kind === "chat" && (flags.gate || flags.update || flags.noise)
+      ? chatCheckpoint(only, args)
+      : undefined;
   try {
     const ctx = await context();
-    const failed =
-      kind === "chat"
-        ? await chat(ctx, only, gate)
-        : kind === "pdf"
-          ? await pdf(ctx)
-          : await cvReview(ctx, gate);
+    let failed: number;
+    try {
+      failed =
+        kind === "chat"
+          ? await chat(ctx, only, gate, cp)
+          : kind === "pdf"
+            ? await pdf(ctx)
+            : await cvReview(ctx, gate);
+    } catch (e) {
+      const message = (e as Error).message;
+      if (!cp || !(e instanceof EvalRunAborted || isUsageLimit(message))) throw e;
+      console.log(
+        `\nRodada parada: ${message}\nO que terminou está em ${checkpointPath()}: rode o mesmo comando para retomar${isUsageLimit(message) ? " depois que o limite de uso renovar" : ""} (--fresh começa do zero).`,
+      );
+      return 1;
+    }
     const regressed = gate.finish();
+    if (gate.wroteBaseline) cp?.clear();
     return (strict && failed > 0) || regressed ? 1 : 0;
   } finally {
     await shutdownTelemetry();

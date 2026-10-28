@@ -29,6 +29,7 @@ const LIST_FIELDS: PostingFieldName[] = [
   "responsibilities",
   "skillsRequired",
   "skillsNice",
+  "hiringSteps",
 ];
 const NUMBER_FIELDS: PostingFieldName[] = ["salaryMin", "salaryMax"];
 
@@ -220,6 +221,8 @@ export function PostingForm({ posting }: { posting: Posting }) {
           {area("skillsNice", "postings.fields.skillsNice", 5, listHint)}
           {area("responsibilities", "postings.fields.responsibilities", 5, listHint)}
           {area("benefits", "postings.fields.benefits", 5, listHint)}
+          {/* F07/M2: viram o pipeline da candidatura ao aplicar */}
+          {area("hiringSteps", "postings.fields.hiringSteps", 5, listHint)}
         </div>
         {area("jdText", "postings.fields.jdText", 12)}
         {save.isError ? <Alert tone="danger">{describeError(save.error).title}</Alert> : null}

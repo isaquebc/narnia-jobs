@@ -48,8 +48,16 @@ import type {
   Job,
   JobAnalysis,
   JobApplicationCreate,
+  JobApplicationEntry,
+  JobApplicationEntryPatch,
+  JobApplicationEvent,
+  JobApplicationEventInput,
+  JobApplicationEventPatch,
+  JobApplicationFunnel,
   JobApplicationPatch,
+  JobApplicationStagesPut,
   JobApplicationSummary,
+  JobApplicationUpcoming,
   MotivationStatus,
   NotificationsListResponse,
   OnboardingState,
@@ -729,6 +737,78 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ application: JobApplicationSummary }>(
         `/api/job-applications/${encodeURIComponent(id)}`,
         { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    putJobApplicationStages: (id: string, stages: JobApplicationStagesPut["stages"]) =>
+      request<{ application: JobApplicationSummary }>(
+        `/api/job-applications/${encodeURIComponent(id)}/stages`,
+        { method: "PUT", body: JSON.stringify({ stages }) },
+      ),
+    listJobApplicationEntries: (id: string) =>
+      request<{ entries: JobApplicationEntry[] }>(
+        `/api/job-applications/${encodeURIComponent(id)}/entries`,
+      ),
+    createJobApplicationEntry: (
+      id: string,
+      input: { occurredOn: string; body: string | null; files: File[] },
+    ) => {
+      const form = new FormData();
+      form.set("occurredOn", input.occurredOn);
+      if (input.body) form.set("body", input.body);
+      for (const f of input.files) form.append("files", f);
+      return request<{ entry: JobApplicationEntry }>(
+        `/api/job-applications/${encodeURIComponent(id)}/entries`,
+        { method: "POST", body: form },
+      );
+    },
+    patchJobApplicationEntry: (id: string, entryId: string, patch: JobApplicationEntryPatch) =>
+      request<{ entry: JobApplicationEntry }>(
+        `/api/job-applications/${encodeURIComponent(id)}/entries/${encodeURIComponent(entryId)}`,
+        { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    deleteJobApplicationEntry: (id: string, entryId: string) =>
+      request<null>(
+        `/api/job-applications/${encodeURIComponent(id)}/entries/${encodeURIComponent(entryId)}`,
+        { method: "DELETE" },
+      ),
+    jobApplicationAttachmentUrl: (id: string, attachmentId: string) =>
+      `${base}/api/job-applications/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`,
+    listJobApplicationEvents: (id: string) =>
+      request<{ events: JobApplicationEvent[] }>(
+        `/api/job-applications/${encodeURIComponent(id)}/events`,
+      ),
+    createJobApplicationEvent: (id: string, input: JobApplicationEventInput) =>
+      request<{ event: JobApplicationEvent }>(
+        `/api/job-applications/${encodeURIComponent(id)}/events`,
+        json(input),
+      ),
+    patchJobApplicationEvent: (id: string, eventId: string, patch: JobApplicationEventPatch) =>
+      request<{ event: JobApplicationEvent }>(
+        `/api/job-applications/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
+        { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    deleteJobApplicationEvent: (id: string, eventId: string) =>
+      request<null>(
+        `/api/job-applications/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
+        { method: "DELETE" },
+      ),
+    jobApplicationEventIcsUrl: (id: string, eventId: string) =>
+      `${base}/api/job-applications/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}/calendar.ics`,
+    getJobApplicationUpcoming: (hours = 24) =>
+      request<JobApplicationUpcoming>(`/api/job-applications/upcoming?hours=${hours}`),
+    getJobApplicationFunnel: () => request<JobApplicationFunnel>("/api/job-applications/funnel"),
+    getGoogleCalendarStatus: (refresh = false) =>
+      request<{
+        status: "connected" | "needs_auth" | "not_configured" | "error" | "unavailable";
+        detail: string | null;
+        mcpUrl: string;
+        callbackPort: number;
+        redirectUri: string;
+        steps: { add: string; login: string };
+      }>(`/api/integrations/google-calendar/status${refresh ? "?refresh=1" : ""}`),
+    openJobApplicationChat: (id: string, message: string) =>
+      request<{ session: ChatSession }>(
+        `/api/job-applications/${encodeURIComponent(id)}/chat`,
+        json({ message }),
       ),
     deleteJobApplication: (id: string) =>
       request<null>(`/api/job-applications/${encodeURIComponent(id)}`, { method: "DELETE" }),

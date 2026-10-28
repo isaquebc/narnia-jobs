@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useJobApplicationReminders } from "../../hooks/useJobApplications";
 import { useOnboardingState } from "../../hooks/useOnboarding";
 import { useProfiles } from "../../hooks/useProfiles";
 import { t } from "../../i18n";
@@ -98,6 +99,7 @@ export function SideNav({ className }: { className?: string }) {
             <li>
               <NavLink to="/candidaturas" className={item}>
                 <ClipboardList size={16} /> {t("nav.jobApplications")}
+                <RemindersBadge />
               </NavLink>
             </li>
             <li>
@@ -134,5 +136,20 @@ export function SideNav({ className }: { className?: string }) {
         </>
       )}
     </nav>
+  );
+}
+
+/** F07/M5: eventos das candidaturas nas próximas 24 h e atrasados. */
+function RemindersBadge() {
+  const { count, overdue } = useJobApplicationReminders();
+  if (count === 0) return null;
+  return (
+    <Badge
+      tone={overdue.length > 0 ? "warn" : "ok"}
+      className="ml-auto"
+      aria-label={t("nav.jobApplicationsReminders", { count })}
+    >
+      {count}
+    </Badge>
   );
 }

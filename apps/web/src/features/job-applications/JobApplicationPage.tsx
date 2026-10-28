@@ -6,12 +6,17 @@ import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
 import { Badge } from "../../components/ui/badge";
 import { Button, buttonClass } from "../../components/ui/button";
-import { Card, CardTitle } from "../../components/ui/card";
+import { Card } from "../../components/ui/card";
 import { Menu } from "../../components/ui/menu";
 import { jobApplicationKeys, useJobApplication } from "../../hooks/useJobApplications";
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
+import { AgendaCard } from "./AgendaCard";
+import { ChatAboutCard } from "./ChatAboutCard";
+import { ContactChainCard } from "./ContactChainCard";
+import { EntriesCard } from "./EntriesCard";
 import { applicationWho, columnLabel, useMoveApplication } from "./JobApplicationsPage";
+import { StagesEditor } from "./StagesEditor";
 
 function LockedDoc({
   label,
@@ -49,8 +54,8 @@ function LockedDoc({
 
 /**
  * Uma candidatura (F07 §0): a vaga, o currículo e a carta enviados (versões travadas), a data, a coluna (mover;
- * Encerrado pede o motivo), as etapas do processo dela e arquivar, desarquivar ou apagar. Notas, anexos e editar as
- * etapas chegam na M2 e na M3.
+ * Encerrado pede o motivo), as etapas do processo dela (editáveis, F07/M2), as notas e os anexos datados (M3) e arquivar,
+ * desarquivar ou apagar.
  */
 export function JobApplicationPage({ id }: { id: string }) {
   const api = useApi();
@@ -145,19 +150,11 @@ export function JobApplicationPage({ id }: { id: string }) {
           <p className="text-sm text-muted-fg">{t("jobApplications.detail.noLetter")}</p>
         )}
       </Card>
-      <Card className="flex flex-col gap-2">
-        <CardTitle>{t("jobApplications.detail.stages")}</CardTitle>
-        <ol aria-label={t("jobApplications.detail.stages")} className="flex flex-col gap-1 text-sm">
-          {a.stages.map((s) => (
-            <li key={s.id} aria-current={s.id === a.currentStageId ? "step" : undefined}>
-              {s.position}. {s.name}
-              {s.id === a.currentStageId ? (
-                <span className="text-muted-fg"> · {t("jobApplications.detail.current")}</span>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      </Card>
+      <ChatAboutCard appId={a.id} />
+      <StagesEditor application={a} />
+      <AgendaCard application={a} />
+      <ContactChainCard postingId={a.postingId} />
+      <EntriesCard appId={a.id} />
       {dialog}
     </div>
   );

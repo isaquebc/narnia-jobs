@@ -19,8 +19,30 @@ export interface EvalRunOptions {
   newApplication?: (o?: { withPosting?: boolean }) => string;
   /** Antes de cada caso de feedback do documento: o CV da vaga volta à versão pronta (amostras repetidas). */
   readyPostingCv?: () => void;
+  /** F07/M6: a candidatura do sandbox, para os casos abertos pela conversa da candidatura. */
+  jobApplication?: () => string;
   /** Vagas salvas (empresa e cargo, uma por linha): citar a empresa da vaga não é inventar (F12/M5). */
   savedPostings?: string;
+  /**
+   * Erro do turno que a sessão registrou (o `chat.error` do sandbox): o limite de uso vira erro na hora, sem esperar o
+   * tempo do turno (retomada do gate, 2026-10-28).
+   */
+  turnError?: (sessionId: string) => string | undefined;
+  /** Gate: o primeiro erro para a rodada (`EvalRunAborted`); rodada com erro não grava nada mesmo. */
+  stopOnError?: boolean;
+  /** Cada caso, assim que termina (com ou sem erro): o gate guarda as conversas terminadas para retomar. */
+  onCase?: (report: EvalCaseReport) => void;
+}
+
+/** A rodada parou no primeiro erro (`stopOnError`). */
+export class EvalRunAborted extends Error {
+  constructor(
+    readonly caseId: string,
+    readonly reason: string,
+  ) {
+    super(`${caseId}: ${reason}`);
+    this.name = "EvalRunAborted";
+  }
 }
 
 export interface EvalCaseReport {
@@ -127,7 +149,18 @@ export async function runEvalCases(
             },
           )
         ).session.id;
-        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000);
+        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        first = 1;
+      } else if (c.open === "job_application_chat") {
+        // F07/M6: "Conversar sobre esta candidatura" na página da candidatura
+        if (!o.jobApplication) throw new Error("sandbox sem candidatura para a conversa");
+        sessionId = (
+          await call<{ session: { id: string } }>(
+            `/api/job-applications/${o.jobApplication()}/chat`,
+            { method: "POST", body: JSON.stringify({ message: c.messages[0] }) },
+          )
+        ).session.id;
+        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
         first = 1;
       } else if (c.open === "document_feedback") {
         o.readyPostingCv?.();
@@ -147,7 +180,7 @@ export async function runEvalCases(
             body: JSON.stringify({ message: c.messages[0] }),
           })
         ).session.id;
-        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000);
+        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
         first = 1;
       } else
         sessionId = (
@@ -162,7 +195,7 @@ export async function runEvalCases(
           method: "POST",
           body: JSON.stringify({ text }),
         });
-        await waitReplies(call, sessionId, i + 1, o.turnTimeoutMs ?? 180_000);
+        await waitReplies(call, sessionId, i + 1, o.turnTimeoutMs ?? 180_000, o.turnError);
       }
       const { messages } = await call<{ messages: Message[] }>(
         `/api/sessions/${sessionId}/messages?limit=200`,
@@ -261,6 +294,9 @@ export async function runEvalCases(
           () => undefined,
         );
     }
+    const last = out[out.length - 1];
+    if (last) o.onCase?.(last);
+    if (o.stopOnError && last?.error) throw new EvalRunAborted(last.id, last.error);
   }
   return out;
 }
@@ -270,9 +306,12 @@ async function waitReplies(
   sessionId: string,
   count: number,
   timeoutMs: number,
+  turnError?: (sessionId: string) => string | undefined,
 ): Promise<void> {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
+    const failed = turnError?.(sessionId);
+    if (failed) throw new Error(`o turno da conversa ${sessionId} falhou: ${failed}`);
     const { messages } = await call<{ messages: Message[] }>(
       `/api/sessions/${sessionId}/messages?limit=200`,
     );

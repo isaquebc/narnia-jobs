@@ -4,6 +4,7 @@ import {
   type ChatCategory,
   CV_TOOLS,
   INGEST_TOOLS,
+  JOB_APPLICATION_TOOLS,
   POSTING_TOOLS,
   PROFILE_TOOLS,
 } from "@narnia-jobs/shared";
@@ -26,6 +27,8 @@ const CAREER = [
   // F06: vagas e análises (salvar, completar aos poucos, analisar)
   "posting.",
   "analysis.",
+  // F07/M6: candidaturas (listar, mover, etapa, nota, agenda); criar só pelo botão Aplicar
+  "job_application.",
   // F05: CV e carta (gerar, ler, alterar) e botões sugeridos na mensagem
   "cv.",
   "application.",
@@ -95,6 +98,7 @@ export const NATIVE_TOOLS: Record<ChatCategory, string[]> = {
 
 const ALL_TOOLS = [
   ...Object.keys(APPLICATION_TOOLS),
+  ...Object.keys(JOB_APPLICATION_TOOLS),
   ...Object.keys(CV_TOOLS),
   ...Object.keys(POSTING_TOOLS),
   ...Object.keys(PROFILE_TOOLS),

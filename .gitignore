@@ -27,3 +27,5 @@ backups/
 plugin/.mcp.json
 plugin/.narnia-env
 .plugin-build/
+# retomada do gate do chat (apps/api/src/evals/checkpoint.ts)
+evals/.checkpoint/

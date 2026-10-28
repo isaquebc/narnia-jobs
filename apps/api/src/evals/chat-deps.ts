@@ -23,6 +23,11 @@ export function chatCaseDeps(
   if (c.open === "application_chat" || c.open === "application_chat_no_posting")
     names.push("narnia-nota-candidatura-contexto", "narnia-skill-responder-candidatura");
   if (c.open === "document_feedback") names.push("narnia-nota-documento-feedback-contexto");
+  if (c.open === "job_application_chat")
+    names.push("narnia-nota-acompanhamento-contexto", "narnia-skill-candidaturas");
+  // F07/M6: a conversa que mexe numa candidatura segue a skill `candidaturas`
+  else if (tools.some((t) => t.startsWith("job_application_")))
+    names.push("narnia-skill-candidaturas");
   if (tools.includes("posting_open_analysis"))
     names.push("narnia-nota-analise-vaga-contexto", "narnia-skill-analisar-vaga");
   // a ingestão pronta volta à conversa que a pediu com a nota `ingestao-pronta`

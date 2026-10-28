@@ -5,6 +5,7 @@ import {
   CHAT_TOOLS,
   CV_TOOLS,
   INGEST_TOOLS,
+  JOB_APPLICATION_TOOLS,
   POSTING_TOOLS,
   PROFILE_TOOLS,
 } from "@narnia-jobs/shared";
@@ -26,6 +27,7 @@ const PUBLISHED = new Set(
     ...Object.keys(POSTING_TOOLS),
     ...Object.keys(CV_TOOLS),
     ...Object.keys(APPLICATION_TOOLS),
+    ...Object.keys(JOB_APPLICATION_TOOLS),
   ].map(publishedName),
 );
 const TOOL_REF = /`([a-z]+_[a-z_]+)`/g;

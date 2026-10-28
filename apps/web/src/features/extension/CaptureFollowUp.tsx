@@ -11,6 +11,7 @@ import { usePosting } from "../../hooks/usePostings";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
 import { ApiError, type DocumentView, type PostingAnalysisView } from "../../lib/api";
+import { ApplyButton } from "../job-applications/ApplyButton";
 import { DuplicateDialog } from "../postings/PostingSections";
 import { bridgeRequest, extensionAvailable } from "./bridge";
 
@@ -21,6 +22,10 @@ import { bridgeRequest, extensionAvailable } from "./bridge";
  * repetida mostra a comparação aqui mesmo, e a análise espera a decisão.
  */
 const external = { target: "_blank", rel: "noreferrer" } as const;
+
+/** Sem CV pronto, o Aplicar leva a gerar o CV na página da vaga (outra aba; a janela continua). */
+export const openGenerateCv = (postingId: string) =>
+  window.open(`/vagas/${postingId}?gerar=cv`, "_blank", "noreferrer");
 const captureKey = (id: string) => ["extension", "capture", id] as const;
 
 export function CaptureFollowUp({
@@ -97,13 +102,17 @@ export function CaptureFollowUp({
         className="flex flex-col gap-2 rounded-md border border-ok/40 bg-ok/10 p-3 text-sm"
       >
         <span>{t("capture.saved")}</span>
-        <a
-          href={`/vagas/${postingId}`}
-          {...external}
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          {t("capture.open")}
-        </a>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <a
+            href={`/vagas/${postingId}`}
+            {...external}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {t("capture.open")}
+          </a>
+          {/* F07/M4: a candidatura nasce daqui também (sem CV, a vaga abre em outra aba no "Gerar CV") */}
+          <ApplyButton postingId={postingId} onGenerateCv={() => openGenerateCv(postingId)} />
+        </div>
       </div>
       {step === "duplicate" && posting ? (
         <div className="flex flex-col gap-2">

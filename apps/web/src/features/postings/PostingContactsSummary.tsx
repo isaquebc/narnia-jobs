@@ -96,7 +96,12 @@ export function PostingContactsSummary({
         ) : null}
       </Card>
       <Dialog open={adding} onOpenChange={setAdding} title={t("postings.contacts.add")}>
-        <ContactForm postingId={postingId} layout="stack" onSaved={() => setAdding(false)} />
+        <ContactForm
+          postingId={postingId}
+          layout="stack"
+          contacts={contacts}
+          onSaved={() => setAdding(false)}
+        />
       </Dialog>
     </section>
   );

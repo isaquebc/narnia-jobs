@@ -2,7 +2,13 @@ import { z } from "zod";
 import { toJsonSchema } from "../json-schema";
 import { JobAnalysisSchema } from "../schemas/analysis";
 import { IdSchema } from "../schemas/common";
-import { ContactOriginSchema, PostingFieldsSchema, PostingStatusSchema } from "../schemas/posting";
+import {
+  ContactOriginSchema,
+  ContactRoleSchema,
+  PostingArchiveReasonSchema,
+  PostingFieldsSchema,
+  PostingStatusSchema,
+} from "../schemas/posting";
 import type { ToolDefinition } from "./profile";
 
 /**
@@ -47,7 +53,7 @@ export const POSTING_TOOLS = {
     }),
   ),
   "posting.get": tool(
-    "Detalhe de uma vaga salva: campos (com a origem de cada um), pré-análise local, contatos, notas e a análise mais recente (com aviso se envelheceu).",
+    "Detalhe de uma vaga salva: campos (com a origem de cada um), pré-análise local, contatos, notas, a análise mais recente (com aviso se envelheceu) e as vagas que o usuário descartou por falta de fit, com o motivo (`discarded`, as 10 mais recentes).",
     z.object({ id: IdSchema }),
     z.object({
       id: IdSchema,
@@ -62,6 +68,14 @@ export const POSTING_TOOLS = {
       analysis: z
         .object({ id: IdSchema, createdAt: z.string(), stale: z.boolean(), summary: z.string() })
         .nullable(),
+      /** F07/M1.6: vagas arquivadas pelo usuário ("não deu um bom fit"), com o motivo; alimentam o fit. */
+      discarded: z.array(
+        Line.extend({
+          reason: PostingArchiveReasonSchema,
+          note: z.string().nullable(),
+          archivedOn: z.string(),
+        }),
+      ),
       url: z.string(),
     }),
   ),
@@ -79,11 +93,18 @@ export const POSTING_TOOLS = {
     z.object({ id: IdSchema, updated: z.array(z.string()) }),
   ),
   "posting.contact_add": tool(
-    "Registra uma pessoa com quem o usuário falou sobre a vaga (nome, origem e, se houver, e-mail, telefone e o link do perfil no LinkedIn). Se o mesmo LinkedIn ou e-mail já estiver na vaga, devolve esse contato com duplicate: true, sem criar outro.",
+    "Registra uma pessoa com quem o usuário falou sobre a vaga (nome, origem e, se houver, e-mail, telefone e o link do perfil no LinkedIn) e, para a cadeia de contatos, o papel dela, a data da conversa, um resumo e quem a indicou (nome de outro contato da vaga, já registrado antes). Registre na ordem em que as pessoas apareceram. Se o mesmo LinkedIn ou e-mail já estiver na vaga, devolve esse contato com duplicate: true, sem criar outro.",
     z.object({
       postingId: IdSchema,
       name: z.string().min(1),
       origin: ContactOriginSchema,
+      role: ContactRoleSchema.optional(),
+      contactedOn: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      summary: z.string().max(2000).optional(),
+      referredBy: z.string().min(1).optional(),
       email: z.email().optional(),
       phone: z.string().min(7).optional(),
       linkedinUrl: z.string().min(1).optional(),

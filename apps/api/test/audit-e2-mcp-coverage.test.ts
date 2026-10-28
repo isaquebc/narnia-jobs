@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { type SeededIds, saveDigest, seedFixture } from "@narnia-jobs/core";
+import { applyToPosting, type SeededIds, saveDigest, seedFixture } from "@narnia-jobs/core";
 import { MOCK_DIGEST } from "@narnia-jobs/providers";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeTestApp, simulateWorker, type TestApp, TOKEN, uploadFixture } from "./helpers";
@@ -34,6 +34,37 @@ interface Ctx {
   draft?: unknown;
   /** F12/M5: formulário lido pela extensão, com uma pergunta aberta. */
   applicationId?: string;
+  /** F07/M6: candidatura criada pelo Aplicar (CV pronto travado). */
+  jobApplicationId?: string;
+}
+
+/** Candidatura como o botão Aplicar deixa: CV da vaga pronto, travado. */
+function jobApplication(c: Ctx): string {
+  if (c.jobApplicationId) return c.jobApplicationId;
+  const postingId = c.postingId as string;
+  const doc = c.t.repos.documents.create({
+    kind: "cv",
+    profileId: c.ids.profileId,
+    postingId,
+    templateId: "classico",
+    paper: "A4",
+    locale: "pt-BR",
+    format: "pdf",
+  });
+  const v = c.t.repos.documents.addVersion(doc.id, {
+    source: "agent",
+    instructions: null,
+    factsVersion: 1,
+    postingUpdatedAt: null,
+    profileHash: "h",
+  });
+  c.t.repos.documents.updateVersion(v.id, { status: "ready" });
+  c.jobApplicationId = applyToPosting(c.t.repos, {
+    postingId,
+    cvVersionId: v.id,
+    appliedOn: "2026-10-20",
+  }).id;
+  return c.jobApplicationId;
 }
 
 /** Formulário como a extensão deixa (a captura e o leitor rodam fora daqui). */
@@ -370,6 +401,38 @@ const CASES: Record<string, Case> = {
   },
   self_declaration_save: { where: "career", args: () => ({ topic: "race", preferNotToSay: true }) },
   self_declaration_list: { where: "career", args: () => ({}) },
+  // F07/M6: candidaturas
+  job_application_list: { where: "career", args: () => ({}) },
+  job_application_get: { where: "career", args: (c) => ({ id: jobApplication(c) }) },
+  job_application_move: {
+    where: "career",
+    args: (c) => ({ id: jobApplication(c), column: "in_process" }),
+  },
+  job_application_set_stage: {
+    where: "career",
+    args: (c) => ({ id: jobApplication(c), stage: "Entrevista técnica" }),
+  },
+  job_application_add_note: {
+    where: "career",
+    args: (c) => ({ id: jobApplication(c), body: "Recrutadora pediu o portfólio." }),
+  },
+  job_application_schedule: {
+    where: "career",
+    args: (c) => ({
+      id: jobApplication(c),
+      kind: "interview",
+      title: "Entrevista técnica",
+      startsLocal: "2030-10-29T14:00",
+    }),
+  },
+  job_application_set_google_event: {
+    where: "career",
+    args: (c) => ({
+      eventId: c.t.repos.jobApplicationEvents.list(jobApplication(c))[0]?.id,
+      googleEventId: "g-123",
+    }),
+  },
+  job_application_upcoming: { where: "career", args: () => ({}) },
   // mudam o estado global ou da sessão: por último
   session_set_category: { where: "fresh", args: () => ({ category: "ingest" }) },
   profile_switch: { where: "terminal", args: (c) => ({ profileId: c.ids.profileId }) },

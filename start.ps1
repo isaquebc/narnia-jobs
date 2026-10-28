@@ -94,7 +94,8 @@ function Resolve-BackupFile([string] $Dir, [string] $Arg) {
 }
 
 # Guarda o banco atual (e o WAL) como narnia-before-restore-STAMP, põe o backup no lugar, apaga WAL/SHM do banco
-# antigo (seriam reaplicados sobre o restaurado) e devolve os uploads e os templates de CV enviados (F05) que faltam.
+# antigo (seriam reaplicados sobre o restaurado) e devolve os uploads, os templates de CV enviados (F05) e os anexos das
+# candidaturas (F07) que faltam.
 function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [string] $Stamp) {
   New-Item -ItemType Directory -Force -Path $DataDir, $BackupDir | Out-Null
   $db = Join-Path $DataDir "narnia.sqlite"
@@ -105,7 +106,7 @@ function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [
   Copy-Item $File "$db.restoring" -Force
   Move-Item "$db.restoring" $db -Force
   Remove-Item "$db-wal", "$db-shm" -Force -ErrorAction SilentlyContinue
-  foreach ($sub in @("uploads", "templates")) {
+  foreach ($sub in @("uploads", "templates", "job-applications")) {
     $src = Join-Path $BackupDir $sub
     if (-not (Test-Path $src)) { continue }
     $dst = Join-Path $DataDir $sub; New-Item -ItemType Directory -Force -Path $dst | Out-Null
@@ -393,6 +394,16 @@ function Invoke-Down {
   }
 }
 
+# Google Calendar opcional (F07/M7): no api de produção (volume claude-auth, callback na 8089) ou num container avulso
+function Invoke-Google([string[]] $Rest) {
+  Assert-Docker
+  if (Test-StackRunning) { Invoke-Prod (@("exec", "api", "narnia-jobs", "google") + $Rest) }
+  else {
+    $port = Get-EnvValue $script:EnvFile "NARNIA_OAUTH_PORT"; if (-not $port) { $port = "8089" }
+    Invoke-Prod (@("run", "--rm", "--no-deps", "-p", "127.0.0.1:${port}:8089", "api", "narnia-jobs", "google") + $Rest)
+  }
+}
+
 function Invoke-Login {
   Assert-Docker
   if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "atenção: CLAUDE_CODE_OAUTH_TOKEN está definido em $($script:EnvFile) e prevalece sobre o login no volume." }
@@ -425,6 +436,7 @@ Desenvolvimento (tudo em containers):
   typecheck     tsc em todos os pacotes
   build         build de todos os pacotes
   shell         abre um shell no container de desenvolvimento
+  google status | google connect <client-id>   Google Calendar opcional das candidaturas (docs/google-calendar.md)
   cli <cmd>     roda a CLI narnia-jobs (doctor | login | install-plugin) no container de dev
   test:sh       testa start.sh (bats) e start.ps1 (Pester) em containers
   e2e [args]    testes de ponta a ponta (Playwright em container, provider mock); --ui-only pula down/up e worker
@@ -446,6 +458,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "up"        { Invoke-Up }
     "down"      { Invoke-Down }
     "login"     { Invoke-Login }
+    "google"    { Invoke-Google $Rest }
     "evals"     { Assert-Docker; try { Invoke-Evals $Rest } catch { Fail $_.Exception.Message } }
     "doctor"    {
       Assert-Docker

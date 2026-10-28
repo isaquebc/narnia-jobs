@@ -222,3 +222,25 @@ describe("F05/M7 · backup dos templates de CV enviados", async () => {
     }
   });
 });
+
+describe("F07/M3 · backup dos anexos das candidaturas", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { backupJobApplicationFiles } = await import("../../src/db/backup");
+
+  it("copia os anexos que faltam, sem sobrescrever", () => {
+    const data = mkdtempSync(join(tmpdir(), "narnia-att-data-"));
+    const bk = mkdtempSync(join(tmpdir(), "narnia-att-bk-"));
+    try {
+      mkdirSync(join(data, "job-applications"));
+      writeFileSync(join(data, "job-applications/a1"), "email");
+      expect(backupJobApplicationFiles(data, bk)).toBe(1);
+      expect(existsSync(join(bk, "job-applications/a1"))).toBe(true);
+      expect(backupJobApplicationFiles(data, bk)).toBe(0);
+    } finally {
+      rmSync(data, { recursive: true, force: true });
+      rmSync(bk, { recursive: true, force: true });
+    }
+  });
+});

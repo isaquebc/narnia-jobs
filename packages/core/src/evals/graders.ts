@@ -33,7 +33,15 @@ const EvalCaseSchema = z.object({
    * um formulário novo da vaga do sandbox (F12/M5, janela da extensão); `application_chat_no_posting`, o mesmo
    * formulário sem vaga ligada (F12-11).
    */
-  open: z.enum(["document_feedback", "application_chat", "application_chat_no_posting"]).optional(),
+  open: z
+    .enum([
+      "document_feedback",
+      "application_chat",
+      "application_chat_no_posting",
+      // F07/M6: "Conversar sobre esta candidatura" (a candidatura da vaga do sandbox)
+      "job_application_chat",
+    ])
+    .optional(),
   messages: z.array(z.string().min(1)).min(1),
   graders: z.array(GraderSchema).min(1),
 });
@@ -94,6 +102,8 @@ const NOT_COMPANIES = new Set([
   "latam",
   "clt",
   "pj",
+  // F07/M6: destino do link da agenda que a skill `candidaturas` entrega
+  "google calendar",
 ]);
 /** Percentis ("do P75") também não são empresa. */
 const NOT_COMPANY_PATTERN = /^p\d{1,2}$/;

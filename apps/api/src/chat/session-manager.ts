@@ -73,6 +73,7 @@ export class SessionStateError extends Error {
       | "posting_not_found"
       | "document_not_found"
       | "application_not_found"
+      | "job_application_not_found"
       | "busy",
     message: string,
   ) {
@@ -403,6 +404,41 @@ export class SessionManager {
         ? `, ligado à vaga ${posting.id} ("${postingSessionTitle(posting)}")`
         : ", sem vaga ligada",
       instrucoes: stripFrontmatter(readPluginFile("skills/responder-candidatura/SKILL.md")).trim(),
+      mensagem: message.trim(),
+    });
+    this.send(session.id, note, { display: message.trim(), asUser: true });
+    this.emitState(session.id, session.state, session.category);
+    return this.get(session.id);
+  }
+
+  /**
+   * Conversa sobre a candidatura (F07/M6): uma por candidatura, categoria `job`, ligada à vaga. Nasce na primeira
+   * mensagem da pessoa, com a nota da candidatura e o procedimento da skill `candidaturas` (fonte única dos modos A e
+   * B); as próximas mensagens vão para a mesma conversa.
+   */
+  openJobApplicationChat(applicationId: string, message: string): ChatSession {
+    const a = this.repos.jobApplications.get(applicationId);
+    if (!a) throw new SessionStateError("job_application_not_found", "Candidatura não encontrada.");
+    const currentId = this.repos.jobApplications.chatSessionId(a.id);
+    const current = currentId ? this.repos.chatSessions.get(currentId) : null;
+    if (current && current.state !== "archived") {
+      this.send(current.id, message.trim());
+      return this.get(current.id);
+    }
+    const posting = this.repos.postings.get(a.postingId);
+    const title = posting ? `${postingSessionTitle(posting)} · Candidatura` : "Candidatura";
+    const session = this.create({
+      category: "job",
+      title,
+      ...(a.profileId ? { profileId: a.profileId } : {}),
+    });
+    this.repos.chatSessions.setPosting(session.id, a.postingId);
+    this.repos.jobApplications.setChatSession(a.id, session.id);
+    const note = renderNote(readPluginFile("prompts/acompanhamento-contexto.md"), {
+      job_application_id: a.id,
+      posting_id: a.postingId,
+      vaga: posting ? postingSessionTitle(posting) : "vaga",
+      instrucoes: stripFrontmatter(readPluginFile("skills/candidaturas/SKILL.md")).trim(),
       mensagem: message.trim(),
     });
     this.send(session.id, note, { display: message.trim(), asUser: true });

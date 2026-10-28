@@ -227,6 +227,22 @@ export function missingEvidence(repos: Repos, analysis: JobAnalysis): EvidenceId
   return all.filter((e) => !exists[e.kind](e.id));
 }
 
+/** Vagas que o usuário arquivou por falta de fit (F07/M1.6), mais recentes primeiro: o especializado pesa o motivo no fit. */
+export function discardedPostings(repos: Repos, exceptId: string, limit = 10) {
+  return repos.postings
+    .list()
+    .filter((o) => o.id !== exceptId && o.archivedAt !== null && o.archiveReason !== null)
+    .sort((a, b) => (b.archivedAt ?? "").localeCompare(a.archivedAt ?? ""))
+    .slice(0, limit)
+    .map((o) => ({
+      id: o.id,
+      line: postingLine(o),
+      reason: o.archiveReason as NonNullable<Posting["archiveReason"]>,
+      note: o.archiveNote,
+      archivedOn: (o.archivedAt ?? "").slice(0, 10),
+    }));
+}
+
 export function createPostingTools(
   repos: Repos,
   ctx: { ports: PostingToolPorts; sessionId?: string | null },
@@ -307,6 +323,7 @@ export function createPostingTools(
               summary: (latest.analysis as JobAnalysis).summary ?? "",
             }
           : null,
+        discarded: discardedPostings(repos, p.id),
         url: postingUrl(p.id),
       };
     }),
@@ -330,12 +347,27 @@ export function createPostingTools(
       const linkedinUrl = i.linkedinUrl ? normalizeLinkedinUrl(i.linkedinUrl) : null;
       if (i.linkedinUrl && !linkedinUrl)
         throw new Error("Link do LinkedIn inválido: use o endereço do perfil (linkedin.com/in/…).");
+      // quem indicou: outro contato da vaga, pelo nome (sem acento e caixa) ou pelo id
+      const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
+      const referrer = i.referredBy
+        ? repos.postingContacts
+            .list(i.postingId)
+            .find((c) => c.id === i.referredBy || norm(c.name) === norm(i.referredBy as string))
+        : undefined;
+      if (i.referredBy && !referrer)
+        throw new Error(
+          `Quem indicou (${i.referredBy}) não está nos contatos da vaga: registre essa pessoa antes.`,
+        );
       const input = {
         name: i.name,
         origin: i.origin,
         email: i.email ?? null,
         phone: i.phone ?? null,
         linkedinUrl,
+        role: i.role ?? null,
+        contactedOn: i.contactedOn ?? null,
+        summary: i.summary ?? null,
+        referredById: referrer?.id ?? null,
       };
       const dup = repos.postingContacts.findDuplicate(i.postingId, input);
       if (dup) return { id: dup.id, duplicate: true };

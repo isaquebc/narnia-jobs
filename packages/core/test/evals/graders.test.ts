@@ -115,6 +115,15 @@ describe("F04/M5 · avaliadores do chat", () => {
       });
     });
 
+    it("no_unknown_companies: o Google Calendar do link da agenda não é empresa (F07/M6)", () => {
+      const t = {
+        ...base,
+        card: "Acme Pagamentos · Engenheira",
+        replies: ["Agendei a entrevista. Para pôr no Google Calendar, use o link abaixo."],
+      };
+      expect(gradeTranscript(t, [{ type: "no_unknown_companies" }])[0]?.passed).toBe(true);
+    });
+
     it("no_unknown_companies: fonte citada (domínio confiável ou registrado) não conta como empresa inventada", () => {
       const t = {
         ...base,

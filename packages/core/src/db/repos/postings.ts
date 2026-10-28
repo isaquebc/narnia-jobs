@@ -60,6 +60,7 @@ const COLUMN: Record<PostingFieldName, string> = {
   responsibilities: "responsibilities_json",
   skillsRequired: "skills_required_json",
   skillsNice: "skills_nice_json",
+  hiringSteps: "hiring_steps_json",
   companySummary: "company_summary",
   postingUrl: "posting_url",
   companyUrl: "company_url",
@@ -71,6 +72,7 @@ const LIST_FIELDS = new Set<PostingFieldName>([
   "responsibilities",
   "skillsRequired",
   "skillsNice",
+  "hiringSteps",
 ]);
 
 const toDb = (field: PostingFieldName, value: unknown) =>
@@ -292,12 +294,24 @@ function mapContact(r: Row): PostingContact {
     phone: r.phone ?? null,
     linkedinUrl: r.linkedin_url ?? null,
     pinned: Number(r.pinned ?? 0) === 1,
+    role: r.role ?? null,
+    contactedOn: r.contacted_on ?? null,
+    summary: r.summary ?? null,
+    referredById: r.referred_by_id ?? null,
     createdAt: r.created_at,
   });
 }
 
 export function postingContactsRepo(db: Db): PostingContactsRepo {
   const q = lazy(db);
+  // quem indicou precisa ser outro contato da mesma vaga; fora disso, a indicação some
+  const referrer = (postingId: string, refId: string | null | undefined, self: string | null) => {
+    if (!refId || refId === self) return null;
+    const r = q("select posting_id from posting_contact where id = ?").get(refId) as
+      | Row
+      | undefined;
+    return r && r.posting_id === postingId ? refId : null;
+  };
   const repo: PostingContactsRepo = {
     list: (postingId) =>
       (
@@ -312,8 +326,8 @@ export function postingContactsRepo(db: Db): PostingContactsRepo {
     add(postingId, i) {
       const id = newId();
       q(
-        `insert into posting_contact (id, posting_id, name, origin, email, phone, linkedin_url, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `insert into posting_contact (id, posting_id, name, origin, email, phone, linkedin_url, role, contacted_on,
+           summary, referred_by_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         postingId,
@@ -322,6 +336,10 @@ export function postingContactsRepo(db: Db): PostingContactsRepo {
         i.email ?? null,
         i.phone ?? null,
         i.linkedinUrl ? (normalizeLinkedinUrl(i.linkedinUrl) ?? null) : null,
+        i.role ?? null,
+        i.contactedOn ?? null,
+        i.summary?.trim() || null,
+        referrer(postingId, i.referredById, null),
         nowUtc(),
       );
       return repo.get(id) as PostingContact;
@@ -330,7 +348,8 @@ export function postingContactsRepo(db: Db): PostingContactsRepo {
       const cur = repo.get(id);
       if (!cur) throw new Error(`Contato não encontrado: ${id}`);
       q(
-        "update posting_contact set name = ?, origin = ?, email = ?, phone = ?, linkedin_url = ? where id = ?",
+        `update posting_contact set name = ?, origin = ?, email = ?, phone = ?, linkedin_url = ?, role = ?,
+           contacted_on = ?, summary = ?, referred_by_id = ? where id = ?`,
       ).run(
         p.name ?? cur.name,
         p.origin ?? cur.origin,
@@ -341,6 +360,12 @@ export function postingContactsRepo(db: Db): PostingContactsRepo {
           : p.linkedinUrl
             ? (normalizeLinkedinUrl(p.linkedinUrl) ?? null)
             : null,
+        p.role === undefined ? cur.role : p.role,
+        p.contactedOn === undefined ? cur.contactedOn : p.contactedOn,
+        p.summary === undefined ? cur.summary : p.summary?.trim() || null,
+        p.referredById === undefined
+          ? cur.referredById
+          : referrer(cur.postingId, p.referredById, id),
         id,
       );
       return repo.get(id) as PostingContact;

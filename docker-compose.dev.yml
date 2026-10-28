@@ -28,6 +28,7 @@ x-dev: &dev
     - NARNIA_BACKUP_DIR=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
     - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
     - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+    - CLAUDE_CONFIG_DIR=/home/node/.claude   # F07/M7: o .claude.json (MCP do Google) fica no volume claude-auth
 
 services:
   dev:
@@ -48,6 +49,7 @@ services:
       - NARNIA_BACKUP_DIR=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - CLAUDE_CONFIG_DIR=/home/node/.claude   # F07/M7: o .claude.json (MCP do Google) fica no volume claude-auth
       - NARNIA_TOKEN=${NARNIA_TOKEN:-dev-token}         # token de boot previsível em dev; em produção é aleatório
       - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_DEV_API_PORT:-3100}
       - PORT=3100
@@ -68,6 +70,7 @@ services:
       - NARNIA_BACKUP_DIR=${NARNIA_DEV_BACKUP_DIR:-/app/backups}
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - CLAUDE_CONFIG_DIR=/home/node/.claude   # F07/M7: o .claude.json (MCP do Google) fica no volume claude-auth
       - TESSDATA_PATH=/usr/share/tessdata
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros

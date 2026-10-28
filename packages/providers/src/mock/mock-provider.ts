@@ -1336,6 +1336,7 @@ const EMPTY_POSTING_FIELDS: PostingFields = {
   responsibilities: [],
   skillsRequired: [],
   skillsNice: [],
+  hiringSteps: [],
   companySummary: null,
   postingUrl: null,
   companyUrl: null,

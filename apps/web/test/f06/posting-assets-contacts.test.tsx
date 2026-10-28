@@ -63,6 +63,10 @@ const contact = (id: string, over: Partial<PostingContact> = {}): PostingContact
   phone: null,
   linkedinUrl: null,
   pinned: false,
+  role: null,
+  contactedOn: null,
+  summary: null,
+  referredById: null,
   createdAt: "2026-10-10T12:00:00.000Z",
   ...over,
 });
@@ -193,6 +197,11 @@ describe("Página da vaga · assets e contatos", () => {
       email: null,
       phone: null,
       linkedinUrl: "linkedin.com/in/joana",
+      // F07/M6: cadeia de contatos (opcionais)
+      role: null,
+      contactedOn: null,
+      referredById: null,
+      summary: null,
     });
     expect(await within(dialog).findByText(/já está na vaga/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar contato" }));

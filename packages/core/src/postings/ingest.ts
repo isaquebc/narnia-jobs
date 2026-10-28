@@ -78,7 +78,7 @@ export function applyPostingMerge(
   const sources: Partial<Record<PostingFieldName, FieldSource>> = {};
   for (const f of POSTING_FIELD_NAMES) {
     if (f === "jdText" || current.fieldSources[f] === "user") continue;
-    const v = merge.fields[f];
+    const v = (merge.fields as Partial<PostingFields>)[f];
     if (!filled(v)) continue;
     (patch as Record<string, unknown>)[f] = v;
     sources[f] = sourceOf.get(f) ?? "model";

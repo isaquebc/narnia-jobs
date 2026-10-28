@@ -148,8 +148,8 @@ resolve_backup_file() {
 
 # restore_files DATA_DIR BACKUP_DIR FILE STAMP -> guarda o banco atual (e o WAL) como narnia-before-restore-STAMP,
 # põe o backup no lugar, apaga WAL/SHM do banco antigo (seriam reaplicados sobre o restaurado) e devolve os uploads e
-# os templates de CV enviados (F05) que faltam. Só mexe em DATA_DIR/narnia.sqlite*, DATA_DIR/uploads,
-# DATA_DIR/templates e no próprio arquivo de "antes".
+# os templates de CV enviados (F05) e os anexos das candidaturas (F07) que faltam. Só mexe em DATA_DIR/narnia.sqlite*,
+# DATA_DIR/uploads, DATA_DIR/templates, DATA_DIR/job-applications e no próprio arquivo de "antes".
 restore_files() {
   local data=$1 bdir=$2 file=$3 stamp=$4 db=$1/narnia.sqlite
   mkdir -p "$data" "$bdir"
@@ -160,7 +160,7 @@ restore_files() {
   cp "$file" "$db.restoring" && mv -f "$db.restoring" "$db"
   rm -f "$db-wal" "$db-shm"
   local sub f
-  for sub in uploads templates; do
+  for sub in uploads templates job-applications; do
     [[ -d "$bdir/$sub" ]] || continue
     mkdir -p "$data/$sub"
     for f in "$bdir/$sub"/*; do
@@ -393,6 +393,17 @@ MSG
   "${PROD_COMPOSE[@]}" run --rm --no-deps api narnia-jobs login
 }
 
+# cmd_google status|connect <client-id> -> Google Calendar opcional (F07/M7): roda no api de produção (volume claude-auth
+# e callback do OAuth na 8089); com a stack parada, num container avulso com a porta do callback publicada só no localhost
+cmd_google() {
+  require_docker
+  if stack_running; then "${PROD_COMPOSE[@]}" exec api narnia-jobs google "$@"
+  else
+    local port; port=$(env_value "$ENV_FILE" NARNIA_OAUTH_PORT || true)
+    "${PROD_COMPOSE[@]}" run --rm --no-deps -p "127.0.0.1:${port:-8089}:8089" api narnia-jobs google "$@"
+  fi
+}
+
 # --- e2e (M7): Playwright em container contra a stack de produção com provider mock -------------------
 
 # dev_project_name -> nome do projeto do compose de dev (dono do volume node_modules)
@@ -613,6 +624,7 @@ Desenvolvimento (tudo em containers):
   typecheck     tsc em todos os pacotes
   build         build de todos os pacotes
   shell         abre um shell no container de desenvolvimento
+  google status | google connect <client-id>   Google Calendar opcional das candidaturas (docs/google-calendar.md)
   cli <cmd>     roda a CLI narnia-jobs (doctor | login | install-plugin) no container de dev
   test:sh       testa start.sh (bats) e start.ps1 (Pester) em containers
   e2e [args]    testes de ponta a ponta (Playwright em container, provider mock); --ui-only pula down/up, worker e porta
@@ -637,6 +649,7 @@ main() {
       local ep; ep=$(plugin_endpoint dev)
       plugin_doctor "$(mcp_server_name)" "${ep%%|*}" "$(plugin_marketplace_name)" || true ;;
     restore) cmd_restore "$@" ;;
+    google) cmd_google "$@" ;;
     install-plugin) cmd_install_plugin "$@" ;;
     evals) cmd_evals "$@" ;;
     promote) cmd_promote "$@" ;;

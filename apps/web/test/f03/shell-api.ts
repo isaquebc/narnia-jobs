@@ -4,6 +4,8 @@ import { profile } from "../components/profile-fixture";
 export const shellApi = {
   // janela da extensão (2026-10-27): o andamento das abas
   getCaptureActivity: async () => ({ items: [] }),
+  // F07/M5: lembretes da agenda das candidaturas (badge e bandeja)
+  getJobApplicationUpcoming: async () => ({ upcoming: [], overdue: [] }),
   // menu em grupos: sem onboarding concluído só "Primeiro uso" aparece
   getOnboardingState: async () => ({ step: 5, completed: true }),
   listJobs: async () => ({ jobs: [] }),

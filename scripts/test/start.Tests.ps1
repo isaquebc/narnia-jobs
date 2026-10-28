@@ -149,6 +149,18 @@ Describe "Backups e restore (F03-fix L1)" {
     Get-Content -Raw (Join-Path $d "templates/t1.zip") | Should -Be "zip1"
     Get-Content -Raw (Join-Path $d "templates/t2.zip") | Should -Be "zip2-atual"
   }
+
+  It "Restore-Files devolve os anexos das candidaturas (F07) que faltam, sem sobrescrever" {
+    $d = Join-Path $script:Tmp "jdata"; $b = Join-Path $script:Tmp "jbk"
+    New-Item -ItemType Directory -Force -Path (Join-Path $d "job-applications"), (Join-Path $b "job-applications") | Out-Null
+    Set-Content -NoNewline -Path (Join-Path $b "narnia-boot-x.sqlite") -Value "backup"
+    Set-Content -NoNewline -Path (Join-Path $b "job-applications/a1") -Value "email"
+    Set-Content -NoNewline -Path (Join-Path $b "job-applications/a2") -Value "video-backup"
+    Set-Content -NoNewline -Path (Join-Path $d "job-applications/a2") -Value "video-atual"
+    Restore-Files $d $b (Join-Path $b "narnia-boot-x.sqlite") "STAMP"
+    Get-Content -Raw (Join-Path $d "job-applications/a1") | Should -Be "email"
+    Get-Content -Raw (Join-Path $d "job-applications/a2") | Should -Be "video-atual"
+  }
 }
 
 Describe "Regressão 2026-10-10: imagem antiga e volume do gh com dono root" {

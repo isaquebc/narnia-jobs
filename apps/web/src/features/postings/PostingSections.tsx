@@ -1,4 +1,11 @@
-import type { ContactOrigin, Posting, PostingContact, PostingNote } from "@narnia-jobs/shared";
+import {
+  type ContactOrigin,
+  type ContactRole,
+  ContactRoleSchema,
+  type Posting,
+  type PostingContact,
+  type PostingNote,
+} from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useApi, useTimezone } from "../../app/context";
@@ -24,10 +31,13 @@ export function ContactForm({
   postingId,
   onSaved,
   layout = "inline",
+  contacts = [],
 }: {
   postingId: string;
   onSaved?: () => void;
   layout?: "inline" | "stack";
+  /** F07/M6: os contatos da vaga, para "indicado(a) por" (cadeia de contatos). */
+  contacts?: PostingContact[];
 }) {
   const api = useApi();
   const qc = useQueryClient();
@@ -36,6 +46,10 @@ export function ContactForm({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [linkedin, setLinkedin] = useState("");
+  const [role, setRole] = useState<ContactRole | "">("");
+  const [contactedOn, setContactedOn] = useState("");
+  const [referredById, setReferredById] = useState("");
+  const [summary, setSummary] = useState("");
   const add = useMutation({
     mutationFn: () =>
       api.addPostingContact(postingId, {
@@ -44,12 +58,20 @@ export function ContactForm({
         email: email.trim() || null,
         phone: phone.trim() || null,
         linkedinUrl: linkedin.trim() || null,
+        role: role || null,
+        contactedOn: contactedOn || null,
+        referredById: referredById || null,
+        summary: summary.trim() || null,
       }),
     onSuccess: async () => {
       setName("");
       setEmail("");
       setPhone("");
       setLinkedin("");
+      setRole("");
+      setContactedOn("");
+      setReferredById("");
+      setSummary("");
       await qc.invalidateQueries({ queryKey: postingKeys.all });
       onSaved?.();
     },
@@ -138,6 +160,66 @@ export function ContactForm({
           onChange={(e) => setPhone(e.target.value)}
         />,
       )}
+      {field(
+        t("postings.contacts.role"),
+        "role",
+        <Select
+          id={`${ids}-role`}
+          aria-label={t("postings.contacts.role")}
+          value={role}
+          onChange={(e) => setRole(e.target.value as ContactRole | "")}
+        >
+          <option value="">{t("postings.contacts.noRole")}</option>
+          {ContactRoleSchema.options.map((r) => (
+            <option key={r} value={r}>
+              {t(`postings.contacts.roles.${r}` as TKey)}
+            </option>
+          ))}
+        </Select>,
+      )}
+      {field(
+        t("postings.contacts.contactedOn"),
+        "contacted-on",
+        <Input
+          id={`${ids}-contacted-on`}
+          aria-label={t("postings.contacts.contactedOn")}
+          type="date"
+          value={contactedOn}
+          onChange={(e) => setContactedOn(e.target.value)}
+        />,
+      )}
+      {contacts.length > 0
+        ? field(
+            t("postings.contacts.referredBy"),
+            "referred-by",
+            <Select
+              id={`${ids}-referred-by`}
+              aria-label={t("postings.contacts.referredBy")}
+              value={referredById}
+              onChange={(e) => setReferredById(e.target.value)}
+            >
+              <option value="">{t("postings.contacts.noReferrer")}</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>,
+          )
+        : null}
+      {field(
+        t("postings.contacts.summary"),
+        "summary",
+        <Textarea
+          id={`${ids}-summary`}
+          aria-label={t("postings.contacts.summary")}
+          placeholder={stack ? undefined : t("postings.contacts.summary")}
+          rows={2}
+          value={summary}
+          maxLength={2000}
+          onChange={(e) => setSummary(e.target.value)}
+        />,
+      )}
       {add.isError ? (
         <Alert tone="danger" className={stack ? undefined : "sm:col-span-3"}>
           {add.error instanceof ApiError && add.error.status === 409
@@ -212,7 +294,7 @@ export function ContactsCard({
           ))}
         </ul>
       )}
-      <ContactForm postingId={postingId} />
+      <ContactForm postingId={postingId} contacts={contacts} />
     </Card>
   );
 }

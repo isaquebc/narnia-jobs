@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IdSchema, IsoDateTimeSchema } from "./common";
+import { IdSchema, IsoDateTimeSchema, TimeZoneSchema } from "./common";
 import { PostingArchiveReasonSchema, PostingSchema } from "./posting";
 
 /**
@@ -113,12 +113,22 @@ export const JobApplicationPatchSchema = z
     closedReason: JobApplicationClosedReasonSchema.nullable().optional(),
     appliedOn: CalendarDateSchema.optional(),
     archived: z.boolean().optional(),
+    /** Etapa atual do pipeline (F07/M2); null antes de começar. */
+    currentStageId: IdSchema.nullable().optional(),
   })
   .refine((p) => p.column !== "closed" || Boolean(p.closedReason), {
     message: "Encerrar pede o motivo",
     path: ["closedReason"],
   });
 export type JobApplicationPatch = z.infer<typeof JobApplicationPatchSchema>;
+
+/** Pipeline editado (F07/M2): a lista em ordem; com `id`, a etapa existente; sem, uma nova. */
+export const JobApplicationStagesPutSchema = z.object({
+  stages: z
+    .array(z.object({ id: IdSchema.optional(), name: z.string().trim().min(1).max(80) }))
+    .max(20),
+});
+export type JobApplicationStagesPut = z.infer<typeof JobApplicationStagesPutSchema>;
 
 /** Candidatura da vaga, para destacar na lista de vagas o que já foi aplicado (a mais recente). */
 export const PostingApplicationRefSchema = z.object({
@@ -145,3 +155,140 @@ export const SavedPostingCardSchema = z.object({
   archiveReason: PostingArchiveReasonSchema.nullable(),
 });
 export type SavedPostingCard = z.infer<typeof SavedPostingCardSchema>;
+
+/** Anexos de até 100 MB por arquivo (F07-11; acima disso, guardar o link na nota). */
+export const ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
+
+export const JobApplicationAttachmentSchema = z.object({
+  id: IdSchema,
+  fileName: z.string(),
+  mime: z.string(),
+  size: z.number().int().min(0),
+  createdAt: IsoDateTimeSchema,
+});
+export type JobApplicationAttachment = z.infer<typeof JobApplicationAttachmentSchema>;
+
+/** Nota ou registro datado da candidatura (F07/M3, §0-5): texto e/ou anexos, com a data que a pessoa escolhe. */
+export const JobApplicationEntrySchema = z.object({
+  id: IdSchema,
+  applicationId: IdSchema,
+  occurredOn: CalendarDateSchema,
+  body: z.string().nullable(),
+  attachments: z.array(JobApplicationAttachmentSchema),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
+});
+export type JobApplicationEntry = z.infer<typeof JobApplicationEntrySchema>;
+
+export const JobApplicationEntryPatchSchema = z.object({
+  occurredOn: CalendarDateSchema.optional(),
+  body: z.string().max(20_000).nullable().optional(),
+});
+export type JobApplicationEntryPatch = z.infer<typeof JobApplicationEntryPatchSchema>;
+
+/** Tipos de evento da agenda (F07/M5). */
+export const JOB_APPLICATION_EVENT_KINDS = [
+  "interview",
+  "test",
+  "deadline",
+  "followup",
+  "other",
+] as const;
+export const JobApplicationEventKindSchema = z.enum(JOB_APPLICATION_EVENT_KINDS);
+export type JobApplicationEventKind = z.infer<typeof JobApplicationEventKindSchema>;
+
+/** Evento da agenda de uma candidatura: início em UTC com o fuso de quem registrou (F07-3). */
+export const JobApplicationEventSchema = z.object({
+  id: IdSchema,
+  applicationId: IdSchema,
+  stageId: IdSchema.nullable(),
+  kind: JobApplicationEventKindSchema,
+  title: z.string(),
+  startsAt: IsoDateTimeSchema,
+  durationMin: z.number().int(),
+  timezone: z.string(),
+  location: z.string().nullable(),
+  link: z.string().nullable(),
+  notes: z.string().nullable(),
+  doneAt: IsoDateTimeSchema.nullable(),
+  icsSequence: z.number().int().min(0),
+  googleEventId: z.string().nullable(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
+});
+export type JobApplicationEvent = z.infer<typeof JobApplicationEventSchema>;
+
+const HttpUrl = z
+  .string()
+  .trim()
+  .url()
+  .regex(/^https?:\/\//i, "Use um link http(s)");
+/** Data e hora como a pessoa digita no fuso dela (`datetime-local`). */
+export const LocalDateTimeSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Use YYYY-MM-DDTHH:mm");
+
+export const JobApplicationEventInputSchema = z.object({
+  kind: JobApplicationEventKindSchema,
+  title: z.string().trim().min(1).max(120),
+  startsLocal: LocalDateTimeSchema,
+  timezone: TimeZoneSchema,
+  durationMin: z
+    .number()
+    .int()
+    .min(5)
+    .max(24 * 60)
+    .default(60),
+  stageId: IdSchema.nullable().optional(),
+  location: z.string().trim().max(300).nullable().optional(),
+  link: HttpUrl.nullable().optional(),
+  notes: z.string().max(4000).nullable().optional(),
+});
+export type JobApplicationEventInput = z.input<typeof JobApplicationEventInputSchema>;
+
+export const JobApplicationEventPatchSchema = JobApplicationEventInputSchema.partial()
+  .extend({ done: z.boolean().optional() })
+  .refine((p) => (p.startsLocal === undefined) === (p.timezone === undefined), {
+    message: "Data e hora vêm com o fuso",
+    path: ["timezone"],
+  });
+export type JobApplicationEventPatch = z.infer<typeof JobApplicationEventPatchSchema>;
+
+/** Lembrete: o evento com a candidatura (empresa e cargo) para a bandeja e o badge. */
+export const JobApplicationReminderSchema = z.object({
+  event: JobApplicationEventSchema,
+  application: z.object({
+    id: IdSchema,
+    company: z.string().nullable(),
+    title: z.string().nullable(),
+  }),
+});
+export type JobApplicationReminder = z.infer<typeof JobApplicationReminderSchema>;
+
+export const JobApplicationUpcomingSchema = z.object({
+  upcoming: z.array(JobApplicationReminderSchema),
+  overdue: z.array(JobApplicationReminderSchema),
+});
+export type JobApplicationUpcoming = z.infer<typeof JobApplicationUpcomingSchema>;
+
+/** Funil (F07/M5): agora em cada coluna, quantas chegaram a ela, dias médios e a taxa de avanço. */
+export const JobApplicationFunnelSchema = z.object({
+  total: z.number().int(),
+  columns: z.array(
+    z.object({
+      column: JobApplicationColumnSchema,
+      now: z.number().int(),
+      reached: z.number().int(),
+      avgDays: z.number().nullable(),
+    }),
+  ),
+  rates: z.array(
+    z.object({
+      from: JobApplicationColumnSchema,
+      to: JobApplicationColumnSchema,
+      rate: z.number().nullable(),
+    }),
+  ),
+  closedReasons: z.partialRecord(JobApplicationClosedReasonSchema, z.number().int()),
+});
+export type JobApplicationFunnel = z.infer<typeof JobApplicationFunnelSchema>;

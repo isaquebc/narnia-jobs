@@ -104,6 +104,6 @@ describe("F07 · vagas salvas e o destaque das aplicadas", () => {
   it("0028 entra sobre o banco anterior", () => {
     const db = openDatabase(":memory:");
     migrate(db, { until: "0027_job_application" });
-    expect(migrate(db).applied).toEqual(["0028_posting_archive"]);
+    expect(migrate(db).applied[0]).toBe("0028_posting_archive");
   });
 });

@@ -32,7 +32,7 @@ export interface PostingHeuristics {
   fields: Partial<PostingFields>;
 }
 
-type Section = "required" | "nice" | "responsibilities" | "benefits" | "about" | "none";
+type Section = "required" | "nice" | "responsibilities" | "benefits" | "steps" | "about" | "none";
 
 const HEADERS: Array<[Exclude<Section, "none">, RegExp]> = [
   [
@@ -50,6 +50,10 @@ const HEADERS: Array<[Exclude<Section, "none">, RegExp]> = [
   [
     "benefits",
     /^(beneficios|benefits|o que oferecemos|what we offer|we offer|perks|perks and benefits|perks & benefits|vantagens)$/,
+  ],
+  [
+    "steps",
+    /^(etapas( do processo( seletivo)?)?|processo seletivo|nosso processo( seletivo)?|(hiring|interview|recruitment|selection) process|our process)$/,
   ],
   ["about", /^(sobre (a empresa|nos|a [\p{L}]+)|about (us|the company)|quem somos)$/u],
 ];
@@ -371,6 +375,14 @@ export function analyzePostingText(text: string): PostingHeuristics {
   const resp = items("responsibilities");
   const benefits = items("benefits");
   const about = items("about");
+  // F07/M2: "Etapas: Triagem → Case → CTO" numa linha só vira uma etapa por seta
+  const steps = items("steps").flatMap((l) =>
+    l
+      .split(/\s*(?:→|->|>|»)\s*/)
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
+  if (steps.length) fields.hiringSteps = steps;
   if (required.length) fields.skillsRequired = required;
   if (nice.length) fields.skillsNice = nice;
   if (resp.length) fields.responsibilities = resp;

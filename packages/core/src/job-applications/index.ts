@@ -32,7 +32,12 @@ export type JobApplicationErrorCode =
   | "wrong_posting"
   | "future_date"
   | "duplicate_pending"
-  | "already_applied";
+  | "already_applied"
+  | "stage_not_found"
+  | "not_found"
+  | "entry_empty"
+  | "file_too_large"
+  | "invalid_datetime";
 
 export class JobApplicationError extends Error {
   constructor(
@@ -95,6 +100,12 @@ function checkVersion(repos: Repos, versionId: string, kind: DocumentKind, posti
 
 const today = (now: Date) => now.toISOString().slice(0, 10);
 
+/** Data (YYYY-MM-DD) até hoje, com um dia de folga para o fuso de quem está à frente do UTC. */
+export function notAfterToday(date: string, now = new Date()): void {
+  if (date > today(new Date(now.getTime() + 86_400_000)))
+    throw new JobApplicationError("future_date", "A data está no futuro");
+}
+
 export function applyToPosting(
   repos: Repos,
   input: {
@@ -116,10 +127,7 @@ export function applyToPosting(
   const cv = checkVersion(repos, input.cvVersionId, "cv", input.postingId);
   if (input.coverLetterVersionId)
     checkVersion(repos, input.coverLetterVersionId, "cover_letter", input.postingId);
-  // um dia de folga para o fuso de quem está à frente do UTC
-  const limit = today(new Date(now.getTime() + 86_400_000));
-  if (input.appliedOn > limit)
-    throw new JobApplicationError("future_date", "A data da candidatura está no futuro");
+  notAfterToday(input.appliedOn, now);
   const active = repos.jobApplications.activeForPosting(input.postingId);
   if (active)
     throw new JobApplicationError(
@@ -134,10 +142,48 @@ export function applyToPosting(
       cvVersionId: input.cvVersionId,
       coverLetterVersionId: input.coverLetterVersionId ?? null,
       appliedOn: input.appliedOn,
-      stages: [...DEFAULT_STAGES],
+      // as etapas que a descrição da vaga traz (F07/M2) ou o padrão
+      stages: posting.hiringSteps.length > 0 ? [...posting.hiringSteps] : [...DEFAULT_STAGES],
     },
     now,
   );
+}
+
+const mustApplication = (repos: Repos, id: string) => {
+  const app = repos.jobApplications.get(id);
+  if (!app) throw new JobApplicationError("stage_not_found", "Candidatura não encontrada");
+  return app;
+};
+
+/** Pipeline editado pela pessoa (F07/M2): só ids de etapas desta candidatura. */
+export function setJobApplicationStages(
+  repos: Repos,
+  id: string,
+  stages: Array<{ id?: string | undefined; name: string }>,
+  now = new Date(),
+): JobApplication {
+  const app = mustApplication(repos, id);
+  const mine = new Set(app.stages.map((s) => s.id));
+  if (stages.some((s) => s.id && !mine.has(s.id)))
+    throw new JobApplicationError("stage_not_found", "Etapa não é desta candidatura");
+  return repos.jobApplications.setStages(
+    id,
+    stages.map((s) => ({ id: s.id, name: s.name.trim() })),
+    now,
+  );
+}
+
+/** Etapa atual (o "x" do "x/N"); null antes de começar. */
+export function setCurrentStage(
+  repos: Repos,
+  id: string,
+  stageId: string | null,
+  now = new Date(),
+): JobApplication {
+  const app = mustApplication(repos, id);
+  if (stageId && !app.stages.some((s) => s.id === stageId))
+    throw new JobApplicationError("stage_not_found", "Etapa não é desta candidatura");
+  return repos.jobApplications.setCurrentStage(id, stageId, now);
 }
 
 const norm = (s: string) =>
@@ -237,3 +283,8 @@ export function listSavedPostings(
       archiveReason: p.archiveReason,
     }));
 }
+
+export * from "./agenda";
+export * from "./entries";
+export * from "./google-calendar";
+export * from "./tools";

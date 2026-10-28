@@ -1,5 +1,6 @@
 export const SHARED_PACKAGE = "@narnia-jobs/shared" as const;
 export * from "./api-contracts";
+export * from "./calendar";
 export * from "./errors/friendly";
 export * from "./i18n";
 export * from "./json-schema";
@@ -7,6 +8,7 @@ export * from "./mcp/application";
 export * from "./mcp/chat";
 export * from "./mcp/cv";
 export * from "./mcp/ingest";
+export * from "./mcp/job-application";
 export * from "./mcp/posting";
 export * from "./mcp/profile";
 export * from "./motivations";

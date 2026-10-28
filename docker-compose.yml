@@ -22,6 +22,7 @@ x-app: &app
     - NARNIA_QUEUE_PREFIX=narnia
     - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
     - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+    - CLAUDE_CONFIG_DIR=/home/node/.claude   # F07/M7: o .claude.json (MCP do Google) fica no volume claude-auth
     - TESSDATA_PATH=/usr/share/tessdata
     - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}   # F04-15: vazio = sem rastros; com o perfil observability use http://phoenix:6006/v1/traces
     - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 deixa só metadados nos rastros
@@ -51,6 +52,7 @@ services:
       - NARNIA_QUEUE_PREFIX=narnia
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - CLAUDE_CONFIG_DIR=/home/node/.claude   # F07/M7: o .claude.json (MCP do Google) fica no volume claude-auth
       - TESSDATA_PATH=/usr/share/tessdata
       - NARNIA_TOKEN=${NARNIA_TOKEN:-}
       - NARNIA_PUBLIC_URL=http://127.0.0.1:${NARNIA_PORT:-3100}
@@ -83,6 +85,7 @@ services:
       - NARNIA_QUEUE_PREFIX=narnia
       - NARNIA_PROVIDER=${NARNIA_PROVIDER:-claude-code}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - CLAUDE_CONFIG_DIR=/home/node/.claude   # F07/M7: o .claude.json (MCP do Google) fica no volume claude-auth
       - TESSDATA_PATH=/usr/share/tessdata
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}

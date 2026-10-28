@@ -379,6 +379,9 @@ export class BaselineGate {
   }
 
   /** Imprime o resumo; grava a linha de base nova se pedida e sem regressão. Devolve true se o gate falhou. */
+  /** A rodada gravou a linha de base e as aprovadas (`--update-baseline` aprovado): a retomada do gate é apagada. */
+  wroteBaseline = false;
+
   finish(log: (line: string) => void = console.log): boolean {
     // rodada com erro do modelo ou sem notas não mede nada: reprova o gate e nunca vira linha de base (2026-10-16:
     // a ponte respondeu 401 e a linha de base saiu vazia)
@@ -468,6 +471,7 @@ export class BaselineGate {
           "Linha de base não atualizada: corrija as regressões, as rodadas incompletas e os prompts que não são upgrade antes.",
         );
       } else {
+        this.wroteBaseline = true;
         const next: Baselines = { ...this.baselines };
         for (const r of this.runs)
           next[r.key] = {
