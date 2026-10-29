@@ -247,13 +247,16 @@ export class BaselineGate {
       spreads: Record<string, number>;
       /** Erros nas amostras do lado A: a medição fica incompleta e não é gravada. */
       errors?: number;
+      /** Sem dependências por caso (prompts estruturados): o caso sem mudança é o da mesma versão do prompt. */
+      versionId?: string;
     },
   ): Promise<NoiseReport> {
     if (o.errors) this.runs.push({ key: noiseKey(key), scores: {}, incomplete: o.errors });
     const byId = new Map(readApproved(key, this.path).map((a) => [a.exampleId, a]));
     const same = o.runs.filter((r) => {
       const a = byId.get(r.exampleId);
-      return !r.error && a && !depsChanged(a.deps, r.deps);
+      if (r.error || !a) return false;
+      return r.deps || !o.versionId ? !depsChanged(a.deps, r.deps) : a.versionId === o.versionId;
     });
     const outcomes = await Promise.all(
       same.map((r) => this.judgeCase(o, r, byId.get(r.exampleId) as ApprovedCase)),
@@ -286,6 +289,8 @@ export class BaselineGate {
       provider: { complete(input: CompleteInput): Promise<CompleteResult> };
       runs: PairRun[];
       features?: FeatureResult[];
+      /** Casos novos deste prompt (o `--feature` do comando pode listar casos de vários prompts). */
+      feature?: string[];
     },
   ): Promise<PairwiseReport> {
     const report: PairwiseReport = {
@@ -324,7 +329,7 @@ export class BaselineGate {
       for (const r of ok) if (!byId.has(r.exampleId) || changed(r)) next.set(r.exampleId, fresh(r));
       this.staged.set(key, [...next.values()]);
     };
-    const feature = this.flags.feature ?? [];
+    const feature = o.feature ?? this.flags.feature ?? [];
     if (approved.length === 0) {
       report.status = "primeira";
       stage();
@@ -381,6 +386,8 @@ export class BaselineGate {
   /** Imprime o resumo; grava a linha de base nova se pedida e sem regressão. Devolve true se o gate falhou. */
   /** A rodada gravou a linha de base e as aprovadas (`--update-baseline` aprovado): a retomada do gate é apagada. */
   wroteBaseline = false;
+  /** A rodada gravou o ruído medido (`--noise` completo). */
+  wroteNoise = false;
 
   finish(log: (line: string) => void = console.log): boolean {
     // rodada com erro do modelo ou sem notas não mede nada: reprova o gate e nunca vira linha de base (2026-10-16:
@@ -446,6 +453,7 @@ export class BaselineGate {
           updatedAt: nowUtc(),
         };
       writeFileSync(this.path, serializeBaselines(this.baselines));
+      this.wroteNoise = true;
       log(`Ruído gravado em ${this.path}.`);
     }
     const notUpgrade = this.comparisons.filter((c) => c.decision && !c.decision.passed);

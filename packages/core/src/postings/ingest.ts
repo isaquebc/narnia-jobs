@@ -70,6 +70,8 @@ export function applyPostingMerge(
   repos: Repos,
   postingId: string,
   merge: PostingMergeOutput,
+  /** Etapas do processo que a extração do modelo achou (F07/M2, 2026-10-29): vencem a heurística, não o usuário. */
+  extracted: { hiringSteps?: string[] } = {},
 ): Posting {
   const current = repos.postings.get(postingId);
   if (!current) throw new Error(`Vaga não encontrada: ${postingId}`);
@@ -82,6 +84,12 @@ export function applyPostingMerge(
     if (!filled(v)) continue;
     (patch as Record<string, unknown>)[f] = v;
     sources[f] = sourceOf.get(f) ?? "model";
+  }
+  const steps = extracted.hiringSteps ?? [];
+  if (steps.length > 0 && current.fieldSources.hiringSteps !== "user") {
+    patch.hiringSteps = steps;
+    sources.hiringSteps =
+      JSON.stringify(current.hiringSteps) === JSON.stringify(steps) ? "both" : "model";
   }
   const updated = repos.postings.update(postingId, patch, { sources, source: "model" });
   const pre = updated.preAnalysis as PreAnalysis | null;

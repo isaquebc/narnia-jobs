@@ -7,6 +7,7 @@ Regras dos campos:
 - `city` e `state` (UF, ex.: "SP") e `country` (ISO de 2 letras) só quando escritos. `workMode`: remote, hybrid ou onsite. `contractType`: clt, pj, freelance, internship ou temporary.
 - Salário: `currency` em ISO-4217 (R$ → BRL, US$ → USD), `salaryMin`/`salaryMax` como números (R$ 15.000 → 15000; 8k → 8000) e `salaryPeriod` (monthly, yearly, hourly) só quando escrito.
 - `benefits`, `responsibilities`, `skillsRequired` e `skillsNice`: um item por linha da vaga, com as palavras dela, sem resumir nem traduzir. `skillsNice` são os diferenciais ("desejável", "nice to have", "plus").
+- `hiringSteps`: as etapas do processo seletivo que a vaga descreve (em lista, numa linha com setas ou em prosa: "começamos com uma conversa com o RH, depois um case"), uma por item, na ordem da vaga e com as palavras dela, sem traduzir. Vaga que não descreve o processo tem a lista vazia: não acrescente etapas genéricas ("entrevista", "teste técnico").
 - `companySummary`: até duas frases sobre a empresa contratante, com o que a vaga diz dela. `postingUrl` e `companyUrl`: só URLs escritas no texto. `publishedAt`: AAAA-MM-DD (ou AAAA-MM) só se a data de publicação estiver escrita. `jdText`: `null` (o sistema guarda o texto original).
 
 Regras das palavras-chave:

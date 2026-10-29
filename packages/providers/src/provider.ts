@@ -152,7 +152,10 @@ export interface PostingExtractInput {
 export interface PostingMergeInput {
   text: string;
   heuristic: { fields: Partial<PostingFields>; keywords: Array<{ term: string; section: string }> };
-  extracted: PostingExtractOutput;
+  /** A extração sem as etapas do processo (F07/M2): o merge não as junta. */
+  extracted: Omit<PostingExtractOutput, "fields"> & {
+    fields: Omit<PostingExtractOutput["fields"], "hiringSteps">;
+  };
   model: string;
 }
 /** F06-9: as duas vagas com o mesmo hash de identidade, resumidas (campos preenchidos e a JD). */

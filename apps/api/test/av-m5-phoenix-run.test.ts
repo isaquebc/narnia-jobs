@@ -119,6 +119,21 @@ describe("experimento de prompt no Phoenix", () => {
         { id: "DE1", name: "json_schema", inputMapping: { pathMapping: { output: "output" } } },
       ],
     });
+    const completo = {
+      runId: "R1",
+      output: { messages: [{ role: "assistant", content: "{}" }] },
+      evaluations: [
+        { name: "json_schema", kind: "CODE", label: "passou", score: 1, explanation: "ok" },
+        {
+          name: "padrao_de_entrega",
+          kind: "LLM",
+          label: "parcial",
+          score: 0.5,
+          explanation: "faltou a formação",
+        },
+      ],
+    };
+    const ingles = { runId: null, output: null, evaluations: [], error: "Limite da assinatura" };
     expect(r).toEqual({
       name: "narnia-extract-facts",
       experimentId: "X1",
@@ -129,29 +144,17 @@ describe("experimento de prompt no Phoenix", () => {
         padrao_de_entrega: { mean: 0.5, n: 1, failed: ["cv-completo: faltou a formação"] },
       },
       evaluatorErrors: ["json_schema (cv-ingles): sem saída"],
-      // M7: saída e notas por exemplo, para o pairwise e a versão aprovada
+      // M7: saída e notas por exemplo, para o pairwise e a versão aprovada; todas as repetições em samples
       examples: [
         {
           exampleId: "cv-completo",
-          runId: "R1",
-          output: { messages: [{ role: "assistant", content: "{}" }] },
-          evaluations: [
-            { name: "json_schema", kind: "CODE", label: "passou", score: 1, explanation: "ok" },
-            {
-              name: "padrao_de_entrega",
-              kind: "LLM",
-              label: "parcial",
-              score: 0.5,
-              explanation: "faltou a formação",
-            },
-          ],
+          ...completo,
+          samples: [{ repetition: 1, ...completo }],
         },
         {
           exampleId: "cv-ingles",
-          runId: null,
-          output: null,
-          evaluations: [],
-          error: "Limite da assinatura",
+          ...ingles,
+          samples: [{ repetition: 1, ...ingles }],
         },
       ],
     });

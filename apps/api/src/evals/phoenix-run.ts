@@ -20,14 +20,29 @@ export interface PromptExperimentResult {
   /** Média por avaliador e os exemplos abaixo de 1 (com a explicação). */
   scores: Record<string, { mean: number; n: number; failed: string[] }>;
   evaluatorErrors: string[];
-  /** Por exemplo (id do narnia-jobs): execução, saída e notas, para o pairwise (M7) e a versão aprovada (AV-6). */
-  examples: Array<{
-    exampleId: string;
-    runId: string | null;
-    output: unknown;
-    evaluations: ApprovedEvaluation[];
-    error?: string;
-  }>;
+  /**
+   * Por exemplo (id do narnia-jobs): execução, saída e notas da primeira repetição, para o pairwise (M7) e a versão
+   * aprovada (AV-6); `samples` traz todas as repetições, em ordem (gate com amostras, 2026-10-29).
+   */
+  examples: PromptExample[];
+}
+
+/** Uma repetição de um exemplo no experimento. */
+export interface PromptSample {
+  repetition: number;
+  runId: string | null;
+  output: unknown;
+  evaluations: ApprovedEvaluation[];
+  error?: string;
+}
+
+export interface PromptExample {
+  exampleId: string;
+  runId: string | null;
+  output: unknown;
+  evaluations: ApprovedEvaluation[];
+  error?: string;
+  samples: PromptSample[];
 }
 
 const SUBSCRIPTION = `subscription($i: ChatCompletionOverDatasetInput!) {
@@ -70,6 +85,7 @@ export function parseMultipart(raw: string): unknown[] {
 type Chunk = {
   __typename: string;
   datasetExampleId?: string;
+  repetitionNumber?: number | null;
   experiment?: { id: string };
   experimentRun?: { id: string; output: unknown } | null;
   message?: string;
@@ -90,6 +106,10 @@ export async function runPromptExperiment(
     fetch?: FetchLike;
     customProviderId: string | null;
     commit?: string | null;
+    /** Repetições de cada exemplo (amostras do gate); padrão 1. */
+    repetitions?: number;
+    /** Outra versão no lugar da `production` (lado A do gate: a versão aprovada, achada no histórico). */
+    version?: { id: string; def: PromptDef };
   },
 ): Promise<PromptExperimentResult> {
   const f: FetchLike = o.fetch ?? ((url, init) => fetch(url, init));
@@ -103,9 +123,13 @@ export async function runPromptExperiment(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),
   });
-  const production = await json<{ data: { id: string } }>(
-    `${o.baseUrl}/v1/prompts/${encodeURIComponent(def.name)}/tags/production`,
-  );
+  const versionId =
+    o.version?.id ??
+    (
+      await json<{ data: { id: string } }>(
+        `${o.baseUrl}/v1/prompts/${encodeURIComponent(def.name)}/tags/production`,
+      )
+    ).data.id;
   const dataset = (
     await json<{ data: Array<{ id: string; name: string }> }>(
       `${o.baseUrl}/v1/datasets?name=${encodeURIComponent(def.name)}`,
@@ -152,17 +176,17 @@ export async function runPromptExperiment(
       },
     })) ?? [];
   const input = {
-    promptVersionId: production.data.id,
-    promptVersion: promptVersionInput(def, {
+    promptVersionId: versionId,
+    promptVersion: promptVersionInput(o.version?.def ?? def, {
       customProviderId: o.customProviderId,
       commit: o.commit ?? null,
     }),
     datasetId: dataset.id,
-    repetitions: 1,
+    repetitions: o.repetitions ?? 1,
     streamModelOutput: false,
     tracingEnabled: true,
     templateVariablesPath: "input",
-    experimentName: `${def.name} · ${new Date().toISOString().slice(0, 16).replace("T", " ")}`,
+    experimentName: `${def.name}${o.version ? " · aprovada" : ""} · ${new Date().toISOString().slice(0, 16).replace("T", " ")}`,
     experimentDescription: "narnia-jobs: rodada de regressão do prompt (comando de avaliações)",
     evaluators,
   };
@@ -185,39 +209,45 @@ export async function runPromptExperiment(
     evaluatorErrors: [],
     examples: [],
   };
-  const byExample = new Map<string, PromptExperimentResult["examples"][number]>();
-  const exampleOf = (id: string | undefined) => {
-    const key = ex(id);
-    let e = byExample.get(key);
+  const byExample = new Map<string, Map<number, PromptSample>>();
+  const sampleOf = (c: Chunk) => {
+    const key = ex(c.datasetExampleId);
+    const rep = c.repetitionNumber ?? 1;
+    let reps = byExample.get(key);
+    if (!reps) {
+      reps = new Map();
+      byExample.set(key, reps);
+    }
+    let e = reps.get(rep);
     if (!e) {
-      e = { exampleId: key, runId: null, output: null, evaluations: [] };
-      byExample.set(key, e);
+      e = { repetition: rep, runId: null, output: null, evaluations: [] };
+      reps.set(rep, e);
     }
     return e;
   };
+  const where = (c: Chunk) =>
+    `${ex(c.datasetExampleId)}${(c.repetitionNumber ?? 1) > 1 ? ` (repetição ${c.repetitionNumber})` : ""}`;
   const acc: Record<string, { sum: number; n: number; failed: string[] }> = {};
   for (const c of chunks) {
     if (c.__typename === "ChatCompletionSubscriptionExperiment")
       out.experimentId = c.experiment?.id ?? null;
     else if (c.__typename === "ChatCompletionSubscriptionResult") {
       out.runs++;
-      const e = exampleOf(c.datasetExampleId);
+      const e = sampleOf(c);
       e.runId = c.experimentRun?.id ?? null;
       e.output = c.experimentRun?.output ?? null;
     } else if (c.__typename === "ChatCompletionSubscriptionError") {
-      out.errors.push(`${ex(c.datasetExampleId)}: ${c.message}`);
-      exampleOf(c.datasetExampleId).error = c.message ?? "erro do modelo";
+      out.errors.push(`${where(c)}: ${c.message}`);
+      sampleOf(c).error = c.message ?? "erro do modelo";
     } else if (c.__typename === "EvaluationChunk") {
       const ev = c.experimentRunEvaluation;
       if (c.error || !ev || ev.score === null) {
-        out.evaluatorErrors.push(
-          `${c.evaluatorName} (${ex(c.datasetExampleId)}): ${c.error ?? "sem nota"}`,
-        );
+        out.evaluatorErrors.push(`${c.evaluatorName} (${where(c)}): ${c.error ?? "sem nota"}`);
         continue;
       }
       const a = acc[ev.name] ?? { sum: 0, n: 0, failed: [] };
       acc[ev.name] = a;
-      exampleOf(c.datasetExampleId).evaluations.push({
+      sampleOf(c).evaluations.push({
         name: ev.name,
         kind: ev.name === JUDGE_NAME ? "LLM" : "CODE",
         label: ev.label ?? "",
@@ -226,11 +256,92 @@ export async function runPromptExperiment(
       });
       a.sum += ev.score;
       a.n++;
-      if (ev.score < 1) a.failed.push(`${ex(c.datasetExampleId)}: ${ev.explanation ?? ""}`);
+      if (ev.score < 1) a.failed.push(`${where(c)}: ${ev.explanation ?? ""}`);
     }
   }
   for (const [name, a] of Object.entries(acc))
     out.scores[name] = { mean: a.sum / a.n, n: a.n, failed: a.failed };
-  out.examples = [...byExample.values()];
+  out.examples = [...byExample.entries()].map(([exampleId, reps]) => {
+    const samples = [...reps.values()].sort((a, b) => a.repetition - b.repetition);
+    const { repetition: _r, ...first } = samples[0] as PromptSample;
+    return { exampleId, ...first, samples };
+  });
   return out;
+}
+
+/**
+ * Junta experimentos de uma repetição cada (gate com amostras, 2026-10-29): a ponte da assinatura atende 2 chamadas e
+ * enfileira 8, e as N repetições num experimento só saíam todas de uma vez ("rate limit"). A k-ésima vira a repetição k.
+ */
+export function mergeRepetitions(results: PromptExperimentResult[]): PromptExperimentResult {
+  const tag = (k: number, text: string) => (k > 1 ? `${text} (repetição ${k})` : text);
+  const scores: PromptExperimentResult["scores"] = {};
+  const examples = new Map<string, PromptExample>();
+  results.forEach((r, i) => {
+    const k = i + 1;
+    for (const [name, s] of Object.entries(r.scores)) {
+      const a = scores[name] ?? { mean: 0, n: 0, failed: [] };
+      const n = a.n + s.n;
+      scores[name] = {
+        mean: n ? (a.mean * a.n + s.mean * s.n) / n : 0,
+        n,
+        failed: [...a.failed, ...s.failed.map((f) => tag(k, f))],
+      };
+    }
+    for (const e of r.examples) {
+      const cur = examples.get(e.exampleId) ?? { ...e, samples: [] };
+      const samples = e.samples.map((x) => ({ ...x, repetition: k }));
+      examples.set(e.exampleId, { ...cur, samples: [...cur.samples, ...samples] });
+    }
+  });
+  const first = results[0];
+  return {
+    name: first?.name ?? "",
+    experimentId: first?.experimentId ?? null,
+    runs: results.reduce((n, r) => n + r.runs, 0),
+    errors: results.flatMap((r, i) => r.errors.map((e) => tag(i + 1, e))),
+    scores,
+    evaluatorErrors: results.flatMap((r, i) => r.evaluatorErrors.map((e) => tag(i + 1, e))),
+    examples: [...examples.values()],
+  };
+}
+
+/**
+ * A versão aprovada no histórico do Phoenix (lado A do gate dos estruturados, 2026-10-29): a sincronização grava o
+ * hash do repositório na metadata de cada versão, e a aprovada guarda esse hash (`versionId`). Null se o histórico não
+ * tem a versão (Phoenix zerado): o lado A volta a ser a saída guardada.
+ */
+export async function approvedPromptVersion(
+  def: PromptDef,
+  hash: string,
+  o: { baseUrl: string; fetch?: FetchLike },
+): Promise<{ id: string; def: PromptDef } | null> {
+  const f: FetchLike = o.fetch ?? ((url, init) => fetch(url, init));
+  const r = await f(`${o.baseUrl}/v1/prompts/${encodeURIComponent(def.name)}/versions`);
+  if (!r.ok) return null;
+  type Version = {
+    id: string;
+    metadata?: { hash?: string };
+    model_name?: string;
+    template?: { messages?: Array<{ role: string; content: Array<{ text?: string }> | string }> };
+    response_format?: { json_schema?: { name?: string; schema?: Record<string, unknown> } };
+  };
+  const v = ((await r.json()) as { data?: Version[] }).data?.find((x) => x.metadata?.hash === hash);
+  if (!v) return null;
+  const text = (c: Array<{ text?: string }> | string) =>
+    typeof c === "string" ? c : c.map((p) => p.text ?? "").join("");
+  return {
+    id: v.id,
+    def: {
+      ...def,
+      hash,
+      modelName: v.model_name ?? def.modelName,
+      messages: (v.template?.messages ?? []).map((m) => ({
+        role: m.role.toUpperCase() === "SYSTEM" ? "SYSTEM" : "USER",
+        content: text(m.content),
+      })),
+      jsonSchema: v.response_format?.json_schema?.schema ?? null,
+      schemaName: v.response_format?.json_schema?.name ?? null,
+    },
+  };
 }

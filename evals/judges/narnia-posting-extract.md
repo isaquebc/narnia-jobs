@@ -13,5 +13,6 @@ Padrão de entrega:
 2. A role e a senioridade batem com o cargo publicado; `client` só existe quando a vaga diz onde a pessoa vai trabalhar.
 3. Requisitos, diferenciais, responsabilidades e benefícios estão nas listas certas, com as palavras da vaga.
 4. As palavras-chave são as tecnologias e competências pedidas, com nome canônico e a seção certa (obrigatório × diferencial × outro), sem termos genéricos.
+5. As etapas do processo seletivo (`hiringSteps`), quando a extração as traz, são as que a vaga descreve, na ordem dela e com as palavras dela; vaga sem processo descrito fica sem etapas (nada de "entrevista" ou "teste técnico" genéricos).
 
-Rótulos: `atende` quando os 4 pontos valem; `parcial` quando erra detalhe (um item na lista errada, uma keyword faltando); `nao_atende` quando inventa um campo ou erra empresa, cargo, contrato ou faixa. Explique citando o campo.
+Rótulos: `atende` quando os 5 pontos valem; `parcial` quando erra detalhe (um item na lista errada, uma keyword faltando); `nao_atende` quando inventa um campo ou erra empresa, cargo, contrato ou faixa. Explique citando o campo.

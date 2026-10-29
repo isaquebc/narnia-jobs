@@ -45,18 +45,19 @@ export const postingExtract: TaskHandler = async (data, ctx, deps) => {
     await ctx.progress(50, "merging");
     const pre = posting.preAnalysis as PreAnalysis | null;
     const mergeModel = model("posting_merge");
+    // as etapas do processo (F07/M2) não passam pelo merge (o prompt dele não as tem): vão direto para a vaga
+    const { hiringSteps, ...extractedFields } = extracted.output.fields;
     const merged = await deps.provider.postingMerge({
       text,
       model: mergeModel,
-      extracted: extracted.output,
+      extracted: { ...extracted.output, fields: extractedFields },
       heuristic: {
-        // as etapas do processo (F07/M2) não passam pelo modelo: a heurística já as gravou na vaga
         fields: (({ hiringSteps: _steps, ...f }) => f)(analyzePostingText(text).fields),
         keywords: (pre?.keywords ?? []).map((k) => ({ term: k.term, section: k.section })),
       },
     });
     usage("posting.merge", mergeModel, merged.sdk);
-    const updated = applyPostingMerge(repos, id, merged.output);
+    const updated = applyPostingMerge(repos, id, merged.output, { hiringSteps });
 
     await ctx.progress(80, "dedupe");
     const candidate = duplicateCandidate(repos, id);

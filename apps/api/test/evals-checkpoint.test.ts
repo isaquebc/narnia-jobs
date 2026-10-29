@@ -58,7 +58,7 @@ describe("gate do chat · retomada depois do limite de uso", () => {
     expect(again.getRun("amostra-2:pontos-fracos")?.replies).toEqual(["resposta de pontos-fracos"]);
     // conversa com erro não vale: roda de novo na retomada
     expect(again.getRun("amostra-2:salario")).toBeUndefined();
-    expect(again.resumed).toEqual({ runs: 1, completions: 0 });
+    expect(again.resumed).toEqual({ runs: 1, completions: 0, values: 0 });
   });
 
   it("chave diferente (prompt, caso ou opção mudou) ou --fresh começa do zero", () => {

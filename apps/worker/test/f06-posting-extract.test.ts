@@ -104,6 +104,35 @@ describe("F06/M4 worker · posting.extract", () => {
     expect(h.published).toContainEqual({ type: "posting.updated", postingId: p.id });
   });
 
+  it("etapas do processo pelo modelo (F07/M2, 2026-10-29): vão para a vaga sem passar pelo merge", async () => {
+    const mock = new MockProvider();
+    const mergeInputs: unknown[] = [];
+    const provider = Object.assign(Object.create(mock) as MockProvider, {
+      postingExtract: async (input: Parameters<MockProvider["postingExtract"]>[0]) => {
+        const r = await mock.postingExtract(input);
+        return {
+          ...r,
+          output: {
+            ...r.output,
+            fields: { ...r.output.fields, hiringSteps: ["Conversa com o RH", "Case técnico"] },
+          },
+        };
+      },
+      postingMerge: async (input: Parameters<MockProvider["postingMerge"]>[0]) => {
+        mergeInputs.push(input);
+        return mock.postingMerge(input);
+      },
+    });
+    h = harness(provider);
+    const p = createPostingFromIntake(h.repos, { text: JD });
+    await run(h, p.id);
+    const done = h.repos.postings.get(p.id);
+    expect(done?.hiringSteps).toEqual(["Conversa com o RH", "Case técnico"]);
+    expect(done?.fieldSources.hiringSteps).toBe("model");
+    // o merge (prompt sem etapas) recebe a extração sem elas
+    expect(JSON.stringify(mergeInputs)).not.toContain("hiringSteps");
+  });
+
   it("vaga salva com o mesmo hash: compara e grava a duplicata pendente de decisão", async () => {
     h = harness();
     const first = createPostingFromIntake(h.repos, { text: JD });

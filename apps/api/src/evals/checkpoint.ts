@@ -14,15 +14,20 @@ interface CheckpointFile {
   key: string;
   runs: Record<string, EvalCaseReport>;
   completions: Record<string, CompleteResult>;
+  /** Outros resultados terminados (experimento de um prompt estruturado no Phoenix, por lado). */
+  values?: Record<string, unknown>;
 }
 
 type Completer = { complete(input: CompleteInput): Promise<CompleteResult> };
 
 export interface Checkpoint {
   /** O que veio do arquivo ao abrir (para avisar que retomou). */
-  readonly resumed: { runs: number; completions: number };
+  readonly resumed: { runs: number; completions: number; values: number };
   getRun(slot: string): EvalCaseReport | undefined;
   putRun(slot: string, report: EvalCaseReport): void;
+  getValue<T>(slot: string): T | undefined;
+  /** Quem chama só guarda o que terminou sem erro. */
+  putValue(slot: string, value: unknown): void;
   /** O provider do juiz com memória: a mesma entrada devolve o julgamento guardado. */
   memo<P extends Completer>(provider: P): P;
   clear(): void;
@@ -48,6 +53,7 @@ export function openCheckpoint(path: string, key: string, o: { fresh?: boolean }
   const resumed = {
     runs: Object.keys(data.runs).length,
     completions: Object.keys(data.completions).length,
+    values: Object.keys(data.values ?? {}).length,
   };
   const save = () => {
     mkdirSync(dirname(path), { recursive: true });
@@ -62,6 +68,11 @@ export function openCheckpoint(path: string, key: string, o: { fresh?: boolean }
     putRun(slot, report) {
       if (report.error) return;
       data.runs[slot] = report;
+      save();
+    },
+    getValue: <T>(slot: string) => data.values?.[slot] as T | undefined,
+    putValue(slot, value) {
+      data.values = { ...data.values, [slot]: value };
       save();
     },
     memo<P extends Completer>(provider: P): P {
@@ -84,6 +95,9 @@ export function openCheckpoint(path: string, key: string, o: { fresh?: boolean }
     },
   };
 }
+
+/** Chamadas simultâneas ao juiz (limite de taxa da assinatura, 2026-10-28). */
+export const JUDGE_CONCURRENCY = 4;
 
 /**
  * No máximo `n` chamadas ao juiz ao mesmo tempo (2026-10-28): o pairwise julga casos × amostras × 2 ordens de uma vez

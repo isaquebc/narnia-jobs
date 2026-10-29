@@ -32,6 +32,7 @@ import {
   type Checkpoint,
   checkpointKey,
   isUsageLimit,
+  JUDGE_CONCURRENCY,
   limitConcurrency,
   openCheckpoint,
 } from "./checkpoint";
@@ -114,9 +115,6 @@ const chatVersion = () =>
     .digest("hex");
 
 const mark = (score: number) => (score >= 1 ? "✔" : score >= 0.5 ? "~" : "✘");
-
-/** Chamadas simultâneas ao juiz (limite de taxa da assinatura, 2026-10-28). */
-const JUDGE_CONCURRENCY = 4;
 
 /** Retomada do gate do chat (2026-10-28): fora do git, apagada quando a rodada grava a linha de base. */
 const checkpointPath = () => join(repoRoot(), "evals/.checkpoint/narnia-chat.json");

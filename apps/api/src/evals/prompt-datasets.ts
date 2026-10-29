@@ -243,6 +243,38 @@ Compensation: USD 6,000 - 8,000 / month, contractor`;
 
 const JD_MINIMA = `Vaga para pessoa desenvolvedora frontend com React e TypeScript. Envie o currículo.`;
 
+/** F07/M2: o processo seletivo em prosa, sem título nem setas (a heurística não acha; o modelo precisa achar). */
+const JD_ETAPAS_PROSA = `Pessoa Desenvolvedora Python Pleno
+Empresa: Vandelay Dados · Remoto · PJ
+
+Você vai construir pipelines de dados em Python e Airflow.
+
+Requisitos:
+- Python e SQL
+- Airflow
+
+Como é o nosso processo: começamos com uma conversa com o RH, depois você recebe um case técnico para fazer em casa e, por fim, faz um bate-papo com o time de dados. Respondemos em até 5 dias úteis.`;
+
+/** F07/M2: o processo seletivo em lista numerada, em inglês. */
+const JD_ETAPAS_LISTA = `Frontend Engineer
+Initrode · Remote (Europe) · Full-time
+
+What you'll do
+* Build our design system in React
+
+Requirements
+* 4+ years with React and TypeScript
+
+Our hiring process
+1. Intro call with a recruiter
+2. Pair programming session
+3. Final interview with the CTO`;
+
+/** F07/M2: vaga sem processo descrito; nada de etapas inventadas ("entrevista", "teste técnico"). */
+const JD_SEM_ETAPAS = `Analista de QA Júnior na Contoso, presencial em Curitiba - PR.
+Requisitos: testes manuais e Cypress.
+Benefícios: vale transporte.`;
+
 const HEURISTIC_CONSULTORIA = {
   fields: {
     title: "Desenvolvedor(a) Backend Sênior",
@@ -1551,6 +1583,48 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
       reference: {
         expected: ["React", "TypeScript", '"frontend"'],
         forbidden: ["São Paulo", '"BRL"', '"USD"', '"remote"'],
+      },
+    },
+    {
+      id: "etapas-em-prosa",
+      description:
+        "F07/M2: o processo seletivo vem em prosa; as etapas saem na ordem da vaga e com as palavras dela.",
+      input: { text: JD_ETAPAS_PROSA },
+      reference: {
+        expected: [
+          "Vandelay Dados",
+          '"remote"',
+          '"pj"',
+          "Airflow",
+          "RH",
+          "case técnico",
+          "bate-papo",
+        ],
+      },
+    },
+    {
+      id: "etapas-em-lista",
+      description: "F07/M2: o processo seletivo numa lista numerada em inglês, sem traduzir.",
+      input: { text: JD_ETAPAS_LISTA },
+      reference: {
+        expected: [
+          "Initrode",
+          '"remote"',
+          "React",
+          "Intro call",
+          "Pair programming session",
+          "Final interview with the CTO",
+        ],
+      },
+    },
+    {
+      id: "sem-etapas",
+      description:
+        "F07/M2: vaga sem processo descrito: a lista de etapas fica vazia, sem etapas genéricas.",
+      input: { text: JD_SEM_ETAPAS },
+      reference: {
+        expected: ["Contoso", "Curitiba", '"onsite"', "Cypress"],
+        forbidden: ["entrevista", "interview", "teste técnico"],
       },
     },
   ],

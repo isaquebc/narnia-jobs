@@ -354,15 +354,15 @@ export const ModelKeywordSchema = z.object({
 });
 
 /**
- * Campos que o modelo extrai e junta (F06-5, F06-6). As etapas do processo (F07/M2) ficam de fora: vêm só da heurística
- * local e da edição na vaga, sem mudar os prompts estruturados nem o formato de saída deles.
+ * Campos que o merge junta (F06-6). As etapas do processo (F07/M2) ficam fora do merge: a extração do modelo as traz
+ * (2026-10-29) e o código as aplica direto na vaga (`applyPostingMerge`), sem mudar o prompt do merge.
  */
 export const ModelPostingFieldsSchema = PostingFieldsSchema.omit({ hiringSteps: true });
 const MODEL_FIELD_NAMES = POSTING_FIELD_NAMES.filter((f) => f !== "hiringSteps");
 
-/** Extração da vaga pelo modelo barato (F06-5: Haiku), independente da heurística (F06-6). */
+/** Extração da vaga pelo modelo barato (F06-5: Haiku), independente da heurística (F06-6); inclui as etapas (F07/M2). */
 export const PostingExtractOutputSchema = z.object({
-  fields: ModelPostingFieldsSchema,
+  fields: PostingFieldsSchema,
   keywords: z.array(ModelKeywordSchema),
 });
 export type PostingExtractOutput = z.infer<typeof PostingExtractOutputSchema>;

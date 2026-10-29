@@ -212,14 +212,14 @@
   },
   "narnia-posting-extract": {
     "scores": {
-      "cobertura_da_referencia": 0.963,
+      "cobertura_da_referencia": 1,
       "json_schema": 1,
-      "padrao_de_entrega": 0.833,
+      "padrao_de_entrega": 0.933,
       "sem_anos_inventados": 1
     },
-    "versionId": "6311e7e66acc61a42af9df02ad0d6555e2e92059d32e0f20e76715f5aa05774a",
-    "commit": "c609a8e",
-    "updatedAt": "2026-10-15T00:48:21.702Z"
+    "versionId": "20c55fa3f367a2df070891f950b35d778c284034f821b3579c22639c99080613",
+    "commit": "c1da356",
+    "updatedAt": "2026-10-29T17:12:23.677Z"
   },
   "narnia-posting-merge": {
     "scores": {
@@ -243,6 +243,66 @@
     "commit": "ceaedec",
     "updatedAt": "2026-10-26T20:17:05.074Z"
   },
+  "ruido:narnia-analyze-profiles": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0.667,
+      "narnia-analyze-profiles": 0.5,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-analyze-repo": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0.833,
+      "narnia-analyze-repo": 0.5,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-application-answer": {
+    "scores": {
+      "amostras": 3,
+      "casos": 5,
+      "decisivos_por_amostra": 0.133,
+      "narnia-application-answer": 0,
+      "pares": 15
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-application-locate": {
+    "scores": {
+      "amostras": 3,
+      "casos": 6,
+      "decisivos_por_amostra": 0.333,
+      "narnia-application-locate": 0.167,
+      "pares": 18
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-application-roleplay": {
+    "scores": {
+      "amostras": 3,
+      "casos": 7,
+      "decisivos_por_amostra": 0.333,
+      "narnia-application-roleplay": 0.143,
+      "pares": 21
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-build-digest": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0.667,
+      "narnia-build-digest": 0.5,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
   "ruido:narnia-chat": {
     "scores": {
       "amostras": 3,
@@ -253,5 +313,115 @@
       "pares": 33
     },
     "updatedAt": "2026-10-26T17:51:36.955Z"
+  },
+  "ruido:narnia-chat-title": {
+    "scores": {
+      "amostras": 3,
+      "casos": 3,
+      "decisivos_por_amostra": 0,
+      "narnia-chat-title": 0.167,
+      "pares": 9
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-check-proposals": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0.333,
+      "narnia-check-proposals": 0.5,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-cover-letter-generate": {
+    "scores": {
+      "amostras": 3,
+      "casos": 4,
+      "decisivos_por_amostra": 0.333,
+      "narnia-cover-letter-generate": 0,
+      "pares": 12
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-cv-generate": {
+    "scores": {
+      "amostras": 3,
+      "casos": 5,
+      "decisivos_por_amostra": 0.067,
+      "narnia-cv-generate": 0,
+      "pares": 15
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-extract-facts": {
+    "scores": {
+      "amostras": 3,
+      "casos": 6,
+      "decisivos_por_amostra": 0.444,
+      "narnia-extract-facts": 0.167,
+      "pares": 18
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-pick-files": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0.333,
+      "narnia-pick-files": 0.25,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-posting-duplicate": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0,
+      "narnia-posting-duplicate": 0.25,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-posting-extract": {
+    "scores": {
+      "amostras": 3,
+      "casos": 3,
+      "decisivos_por_amostra": 0.556,
+      "narnia-posting-extract": 0.25,
+      "pares": 9
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-posting-merge": {
+    "scores": {
+      "amostras": 3,
+      "casos": 2,
+      "decisivos_por_amostra": 0.667,
+      "narnia-posting-merge": 0.25,
+      "pares": 6
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-profile-motivations": {
+    "scores": {
+      "amostras": 3,
+      "casos": 3,
+      "decisivos_por_amostra": 0.222,
+      "narnia-profile-motivations": 0,
+      "pares": 9
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
+  },
+  "ruido:narnia-synthesize-run": {
+    "scores": {
+      "amostras": 3,
+      "casos": 1,
+      "decisivos_por_amostra": 0.333,
+      "narnia-synthesize-run": 0.5,
+      "pares": 3
+    },
+    "updatedAt": "2026-10-29T16:49:49.266Z"
   }
 }

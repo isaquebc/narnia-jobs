@@ -108,6 +108,28 @@ describe("F06/M4 core · pipeline da vaga", () => {
     expect(pre.ngrams.length).toBeGreaterThanOrEqual(0);
   });
 
+  it("etapas do modelo (F07/M2, 2026-10-29): entram e vencem a heurística; as do usuário ficam; lista vazia não apaga", () => {
+    const repos = setup();
+    const steps = ["Conversa com o RH", "Case técnico", "Bate-papo com o time"];
+    const p = createPostingFromIntake(repos, { text: JD_PT });
+    const u = applyPostingMerge(repos, p.id, merge(), { hiringSteps: steps });
+    expect(u.hiringSteps).toEqual(steps);
+    expect(u.fieldSources.hiringSteps).toBe("model");
+    // o modelo devolveu as mesmas etapas que já estavam: origem both
+    expect(
+      applyPostingMerge(repos, p.id, merge(), { hiringSteps: [...steps] }).fieldSources.hiringSteps,
+    ).toBe("both");
+    // lista vazia do modelo não apaga o que a heurística achou
+    expect(applyPostingMerge(repos, p.id, merge(), { hiringSteps: [] }).hiringSteps).toEqual(steps);
+    const edited = createPostingFromIntake(repos, {
+      text: JD_PT,
+      fields: { hiringSteps: ["Triagem"] },
+    });
+    expect(
+      applyPostingMerge(repos, edited.id, merge(), { hiringSteps: steps }).hiringSteps,
+    ).toEqual(["Triagem"]);
+  });
+
   it("duplicata: candidata pelo hash; update leva campos, contatos e notas para a salva e apaga a nova", () => {
     const repos = setup();
     const saved = createPostingFromIntake(repos, {
