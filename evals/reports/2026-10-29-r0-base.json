@@ -1,0 +1,414 @@
+{
+ "label": "r0-base",
+ "commit": "c18337a",
+ "at": "2026-10-29T20:32:48.997Z",
+ "provider": "claude-code",
+ "samples": 3,
+ "summary": {
+  "conversations": 54,
+  "errors": 0,
+  "turns": 63,
+  "turnMsP50": 17346,
+  "turnMsP95": 95245.49999999999,
+  "toolsPerTurn": 2.8412698412698414,
+  "searchesPerTurn": 2.3333333333333335,
+  "replyCharsAvg": 1136.7619047619048,
+  "tokensPerConversation": 2094.814814814815,
+  "costPerConversation": 0.16211650370370373,
+  "graders": 0.9512195121951219,
+  "judge": 0.6666666666666666,
+  "recall": 0.19444444444444445
+ },
+ "recall": {
+  "cases": [
+   {
+    "id": "kubernetes",
+    "category": "exato",
+    "recall": 1,
+    "found": 3,
+    "missing": []
+   },
+   {
+    "id": "mentoria",
+    "category": "exato",
+    "recall": 1,
+    "found": 1,
+    "missing": []
+   },
+   {
+    "id": "latencia",
+    "category": "exato",
+    "recall": 1,
+    "found": 1,
+    "missing": []
+   },
+   {
+    "id": "ingles",
+    "category": "exato",
+    "recall": 1,
+    "found": 1,
+    "missing": []
+   },
+   {
+    "id": "mensageria-agrupada",
+    "category": "agrupado",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Redis",
+     "project: fila-leve",
+     "experience: Beta Logística"
+    ]
+   },
+   {
+    "id": "lideranca-agrupada",
+    "category": "agrupado",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Mentoria",
+     "achievement: Liderou a migração"
+    ]
+   },
+   {
+    "id": "testes-agrupado",
+    "category": "agrupado",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Testes automatizados",
+     "achievement: suíte de testes"
+    ]
+   },
+   {
+    "id": "cloud-agrupado",
+    "category": "agrupado",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: AWS",
+     "experience: Beta Logística"
+    ]
+   },
+   {
+    "id": "mentoring",
+    "category": "traducao",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Mentoria"
+    ]
+   },
+   {
+    "id": "leadership",
+    "category": "traducao",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "achievement: Liderou a migração"
+    ]
+   },
+   {
+    "id": "automated-tests",
+    "category": "traducao",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Testes automatizados",
+     "achievement: suíte de testes"
+    ]
+   },
+   {
+    "id": "payments",
+    "category": "traducao",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "experience: Acme Pagamentos"
+    ]
+   },
+   {
+    "id": "k8s",
+    "category": "sinonimo",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Kubernetes",
+     "achievement: migração para Kubernetes"
+    ]
+   },
+   {
+    "id": "postgres",
+    "category": "sinonimo",
+    "recall": 1,
+    "found": 1,
+    "missing": []
+   },
+   {
+    "id": "iac",
+    "category": "sinonimo",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Terraform"
+    ]
+   },
+   {
+    "id": "lideranca",
+    "category": "sinonimo",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "achievement: Liderou a migração"
+    ]
+   },
+   {
+    "id": "frontend",
+    "category": "sinonimo",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: React",
+     "experience: Full Stack"
+    ]
+   },
+   {
+    "id": "banco-de-dados",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: PostgreSQL",
+     "skill: SQLite"
+    ]
+   },
+   {
+    "id": "monitoramento",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: Observabilidade"
+    ]
+   },
+   {
+    "id": "desempenho",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "achievement: latência p95"
+    ]
+   },
+   {
+    "id": "fintech",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "experience: Acme Pagamentos"
+    ]
+   },
+   {
+    "id": "faculdade",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "education: Ciência da Computação"
+    ]
+   },
+   {
+    "id": "pesquisa-academica",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "experience: iniciação científica"
+    ]
+   },
+   {
+    "id": "api",
+    "category": "semantico",
+    "recall": 0,
+    "found": 0,
+    "missing": [
+     "skill: REST",
+     "skill: GraphQL"
+    ]
+   }
+  ],
+  "byCategory": {
+   "exato": 1,
+   "agrupado": 0,
+   "traducao": 0,
+   "sinonimo": 0.2,
+   "semantico": 0
+  },
+  "overall": 0.19444444444444445
+ },
+ "cases": [
+  {
+   "id": "pontos-fracos",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.9444444444444444,
+   "judge": 0.3333333333333333,
+   "turnMsP50": 54601,
+   "searchesPerTurn": 6.666666666666667
+  },
+  {
+   "id": "salario-de-mercado",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.8666666666666667,
+   "judge": 0.5,
+   "turnMsP50": 24375,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "historia-livre",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.8888888888888888,
+   "judge": 1,
+   "turnMsP50": 6868,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "valor-pesquisado",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.3333333333333333,
+   "turnMsP50": 17352.5,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "especializado",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.8,
+   "judge": 0.6666666666666666,
+   "turnMsP50": 56042,
+   "searchesPerTurn": 13
+  },
+  {
+   "id": "vaga-no-chat",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.9444444444444444,
+   "judge": 0.8333333333333334,
+   "turnMsP50": 86727,
+   "searchesPerTurn": 7.666666666666667
+  },
+  {
+   "id": "vaga-no-chat-com-assunto",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.5,
+   "turnMsP50": 6657.5,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "analise-de-vaga",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.6666666666666666,
+   "turnMsP50": 96192,
+   "searchesPerTurn": 9.666666666666666
+  },
+  {
+   "id": "cv-pelo-chat",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.6666666666666666,
+   "turnMsP50": 8254,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "feedback-do-cv",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.3333333333333333,
+   "turnMsP50": 21751,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "corrigir-cargo",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 1,
+   "turnMsP50": 8672,
+   "searchesPerTurn": 1
+  },
+  {
+   "id": "formulario-reescrever",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.3333333333333333,
+   "turnMsP50": 12304,
+   "searchesPerTurn": 1
+  },
+  {
+   "id": "formulario-fato-novo",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.8,
+   "judge": 1,
+   "turnMsP50": 13919,
+   "searchesPerTurn": 1
+  },
+  {
+   "id": "formulario-sem-vaga",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.5,
+   "turnMsP50": 20364,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "formulario-autodeclaracao",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.8333333333333334,
+   "turnMsP50": 5663.5,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "analise-com-vaga-descartada",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 0.6666666666666666,
+   "turnMsP50": 85596,
+   "searchesPerTurn": 9
+  },
+  {
+   "id": "candidatura-etapa-e-agenda",
+   "samples": 3,
+   "errors": 0,
+   "graders": 0.9333333333333333,
+   "judge": 0.8333333333333334,
+   "turnMsP50": 21158,
+   "searchesPerTurn": 0
+  },
+  {
+   "id": "candidaturas-listar",
+   "samples": 3,
+   "errors": 0,
+   "graders": 1,
+   "judge": 1,
+   "turnMsP50": 9467,
+   "searchesPerTurn": 0
+  }
+ ]
+}
