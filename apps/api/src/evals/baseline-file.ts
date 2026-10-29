@@ -180,22 +180,35 @@ export class BaselineGate {
   record(
     key: string,
     scores: Record<string, number>,
-    meta: { versionId?: string; commit?: string; gate?: boolean; errors?: number } = {},
+    meta: {
+      versionId?: string;
+      commit?: string;
+      gate?: boolean;
+      errors?: number;
+      /** Amostras por caso na média de `scores` (gate dos estruturados): a tolerância cai com √N. */
+      samples?: number;
+    } = {},
   ): Regression[] {
     const found =
-      meta.gate === false ? [] : findRegressions(this.baselines, key, scores, this.tolerance(key));
+      meta.gate === false
+        ? []
+        : findRegressions(this.baselines, key, scores, this.tolerance(key, meta.samples));
     this.regressions.push(...found);
     const incomplete = (meta.errors ?? 0) + (Object.keys(scores).length === 0 ? 1 : 0);
     this.runs.push({ key, scores, versionId: meta.versionId, commit: meta.commit, incomplete });
     return found;
   }
 
-  /** Tolerância da nota: a padrão ou, se maior, a variação medida pelo A contra A (`ruido:*`). */
-  private tolerance(key: string): number {
+  /**
+   * Tolerância da nota: a padrão ou, se maior, a variação medida pelo A contra A (`ruido:*`). O ruído mede a média de
+   * uma repetição; a média de N amostras varia √N vezes menos (2026-10-29: com 1–2 casos, uma nota "parcial" do juiz
+   * movia a média de uma repetição em 50 pontos, e essa tolerância deixava passar quase qualquer queda).
+   */
+  private tolerance(key: string, samples = 1): number {
     const measured = Object.entries(this.baselines)
       .filter(([k]) => k.startsWith("ruido:"))
       .map(([, e]) => e.scores[key] ?? 0);
-    return Math.max(BASELINE_TOLERANCE, ...measured);
+    return Math.max(BASELINE_TOLERANCE, ...measured.map((m) => m / Math.sqrt(samples)));
   }
 
   /** Julga cada amostra do caso contra a aprovada; o caso mostra a maioria, e o placar soma as amostras. */

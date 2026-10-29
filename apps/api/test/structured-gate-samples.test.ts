@@ -482,6 +482,40 @@ describe("gate dos estruturados · ruído e --feature por prompt", () => {
   });
 });
 
+describe("tolerância das médias com N amostras (2026-10-29)", () => {
+  // o ruído mede a variação da média de UMA repetição; o gate compara a média de N: a tolerância cai com √N (com 1–2
+  // casos, uma nota "parcial" do juiz movia a média de uma repetição em 50 pontos, e a tolerância deixava passar tudo)
+  it("divide a variação medida por √N, sem ficar abaixo do piso de 5 pontos", () => {
+    const dir = mkdtempSync(join(tmpdir(), "narnia-tol-"));
+    try {
+      const path = join(dir, "baselines.json");
+      writeFileSync(
+        path,
+        JSON.stringify({
+          "narnia-build-digest": { scores: { padrao_de_entrega: 1 }, updatedAt: "t" },
+          "ruido:narnia-build-digest": { scores: { "narnia-build-digest": 0.5 }, updatedAt: "t" },
+        }),
+      );
+      const g = new BaselineGate({ gate: true, update: false, fixes: [] }, path);
+      // 1 amostra: tolerância de 50 pontos
+      expect(g.record("narnia-build-digest", { padrao_de_entrega: 0.6 })).toEqual([]);
+      // 4 amostras: 50 / √4 = 25 pontos
+      expect(g.record("narnia-build-digest", { padrao_de_entrega: 0.8 }, { samples: 4 })).toEqual(
+        [],
+      );
+      expect(
+        g.record("narnia-build-digest", { padrao_de_entrega: 0.7 }, { samples: 4 }),
+      ).toHaveLength(1);
+      // 10 000 amostras: o piso de 5 pontos
+      expect(
+        g.record("narnia-build-digest", { padrao_de_entrega: 0.96 }, { samples: 10_000 }),
+      ).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("retomada do gate dos estruturados", () => {
   it("guarda o experimento terminado por chave e devolve ao reabrir", () => {
     const dir = mkdtempSync(join(tmpdir(), "narnia-cp-"));

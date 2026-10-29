@@ -220,7 +220,12 @@ export async function runPromptEvals(args: string[]): Promise<number> {
         gate.record(
           def.name,
           Object.fromEntries(Object.entries(r.scores).map(([k, v]) => [k, v.mean])),
-          { versionId: def.hash, errors: r.errors.length, ...(commit ? { commit } : {}) },
+          {
+            versionId: def.hash,
+            errors: r.errors.length,
+            samples: plan.repetitions,
+            ...(commit ? { commit } : {}),
+          },
         );
         if (!op) continue;
         // lado A: amostras novas da versão aprovada (a saída guardada venceu o gate anterior e fica acima da média)
