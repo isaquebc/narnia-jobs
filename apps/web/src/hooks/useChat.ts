@@ -19,6 +19,7 @@ export const chatKeys = {
   research: (profileId: string | null) => ["chat", "research", profileId] as const,
   settings: ["chat", "settings"] as const,
   domains: ["chat", "domains"] as const,
+  aliases: ["chat", "fact-aliases"] as const,
 };
 
 /**
@@ -343,3 +344,15 @@ export function useTrustedDomains() {
 }
 
 export type { ChatSession };
+
+/** Termos aprendidos pela busca de fatos (F04-fix-fundamentacao, FF-1). */
+export function useFactAliases() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: chatKeys.aliases, queryFn: () => api.listFactAliases() });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteFactAlias(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: chatKeys.aliases }),
+  });
+  return { ...query, aliases: query.data?.aliases ?? [], remove };
+}

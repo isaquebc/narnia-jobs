@@ -18,6 +18,12 @@ export const GRADER_TYPES = [
   "no_unknown_companies",
   "trusted_sources_only",
   "within_budget",
+  // F04-fix-fundamentacao, R3: o que o juiz julgava "de olho" e dá para conferir sem modelo
+  "searched_before_absence",
+  "market_numbers_sourced",
+  "no_save_promise",
+  "max_reply_chars",
+  "mentions",
 ] as const;
 
 const GraderSchema = z.object({ type: z.enum(GRADER_TYPES), value: z.string().optional() });
@@ -66,7 +72,20 @@ export interface Transcript {
   maxTurns?: number;
   /** Nº de chamadas de tool em cada resposta (aproxima os turnos do SDK por mensagem). */
   toolsPerReply?: number[];
+  /** Tools de cada resposta, em ordem (do recrutador e do subagente): a busca precisa estar no mesmo turno. */
+  toolsByReply?: string[][];
 }
+
+/** Afirma que algo não está nos dados do usuário (A1). */
+const ABSENCE =
+  /(?<!\p{L})não\s+(?:está|aparece|consta|encontrei|achei|vi|há|tem|existe)(?!\p{L})[^.!?\n]{0,80}(?<!\p{L})(?:perfil|fatos|dados|histórico|currículo|cv)(?!\p{L})|(?<!\p{L})(?:perfil|fatos|histórico|currículo)\s+não\s+(?:tem|mostra|cita|traz|menciona|registra)(?!\p{L})/iu;
+/** Valor em dinheiro: "R$ 14 mil", "US$ 6,000", "BRL 15.000", "14 a 20 mil reais". */
+const MONEY =
+  /(?:R\$|US\$|USD|BRL|EUR|€)\s*\d[\d.,]*(?:\s*(?:a|–|-)\s*\d[\d.,]*)?(?:\s*(?:mil|k))?|\d[\d.,]*\s*(?:mil|k)\s*(?:reais|dólares)/gi;
+const digits = (s: string) => (s.match(/\d+/g) ?? []).map((d) => d.replace(/^0+/, ""));
+/** Promessa de gravar direto (A5): a informação nova passa pela revisão do usuário. */
+const SAVE_PROMISE =
+  /(?<!\p{L})(?:eu\s+)?(?:registro|gravo|salvo|anoto|adiciono|atualizo|vou\s+(?:registrar|gravar|salvar|anotar|adicionar|atualizar|incluir))(?!\p{L})[^.!?\n]{0,60}(?<!\p{L})(?:fatos?|perfil|dados|histórico)(?!\p{L})/iu;
 
 export interface GradeResult {
   type: Grader["type"];
@@ -197,6 +216,67 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
           detail: passed
             ? "manda para a revisão"
             : "não menciona a revisão ou afirma ter gravado direto",
+        };
+      }
+      case "searched_before_absence": {
+        const bad = t.replies.flatMap((r, i) =>
+          ABSENCE.test(r) &&
+          !(t.toolsByReply?.[i] ?? []).some((x) => x === "fact_search" || x === "fact_get")
+            ? [i + 1]
+            : [],
+        );
+        return {
+          type: g.type,
+          passed: bad.length === 0,
+          detail: bad.length
+            ? `afirma ausência sem buscar no mesmo turno (resposta ${bad.join(", ")})`
+            : "nenhuma ausência afirmada sem busca",
+        };
+      }
+      case "market_numbers_sourced": {
+        const known = new Set(digits([t.card, ...(t.userText ?? [])].join(" ")));
+        const unknown = [...all.matchAll(MONEY)]
+          .map((m) => m[0])
+          .filter((m) => digits(m).some((d) => !known.has(d)));
+        const researched = t.tools.includes("research_save") && (t.sources?.length ?? 0) > 0;
+        const passed = unknown.length === 0 || researched;
+        return {
+          type: g.type,
+          passed,
+          detail: passed
+            ? unknown.length
+              ? "valores com pesquisa registrada"
+              : "sem valor de mercado novo"
+            : `valor sem pesquisa registrada: ${unknown.slice(0, 3).join("; ")}`,
+        };
+      }
+      case "no_save_promise": {
+        const promise = sentences(all).find((x) => SAVE_PROMISE.test(x) && !/revis/i.test(x));
+        return {
+          type: g.type,
+          passed: !promise,
+          detail: promise
+            ? `promete gravar sem a revisão: "${promise.slice(0, 120)}"`
+            : "não promete gravar direto",
+        };
+      }
+      case "max_reply_chars": {
+        const max = Number(g.value ?? 1200);
+        const long = t.replies.map((r, i) => [i + 1, r.length] as const).filter(([, n]) => n > max);
+        return {
+          type: g.type,
+          passed: long.length === 0,
+          detail: long.length
+            ? `resposta acima de ${max} caracteres: ${long.map(([i, n]) => `${i} (${n})`).join(", ")}`
+            : `todas até ${max} caracteres`,
+        };
+      }
+      case "mentions": {
+        const passed = new RegExp(g.value ?? "", "i").test(all);
+        return {
+          type: g.type,
+          passed,
+          detail: passed ? `menciona ${g.value}` : `não menciona ${g.value}`,
         };
       }
       case "no_unknown_years": {

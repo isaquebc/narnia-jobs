@@ -116,14 +116,17 @@ export const CHAT_TOOLS = {
   ),
   "evidence.education.get": tool("Detalhe de uma formação.", ById, Detail),
   "fact.search": tool(
-    "Busca nos fatos e resumos do usuário sem ler tudo (acentos ignorados, prefixo). Use antes de listar.",
-    z.object({
-      q: z.string().trim().min(2).max(200),
-      kinds: z.array(FactSearchKindSchema).min(1).optional(),
-      from: PartialDateSchema.optional(),
-      to: PartialDateSchema.optional(),
-      limit: z.number().int().min(1).max(50).optional(),
-    }),
+    "Busca nos fatos e resumos do usuário sem ler tudo: qualquer um dos termos (OU), com sinônimos e tradução pt/en; acentos ignorados. Agrupe numa chamada só: vários termos em `q` ou vários assuntos em `queries` (cada item diz em `matched` quais consultas o acharam). Use antes de listar e antes de dizer que algo não está no perfil.",
+    z
+      .object({
+        q: z.string().trim().min(2).max(200).optional(),
+        queries: z.array(z.string().trim().min(2).max(200)).min(1).max(10).optional(),
+        kinds: z.array(FactSearchKindSchema).min(1).optional(),
+        from: PartialDateSchema.optional(),
+        to: PartialDateSchema.optional(),
+        limit: z.number().int().min(1).max(50).optional(),
+      })
+      .refine((v) => v.q || v.queries?.length, { message: "Informe q ou queries" }),
     z.object({
       items: z.array(
         z.object({
@@ -132,10 +135,21 @@ export const CHAT_TOOLS = {
           line: z.string(),
           period: z.string().nullable(),
           relevance: z.number().min(0).max(1).nullable(),
+          /** Consultas que acharam o item. */
+          matched: z.array(z.string()),
         }),
       ),
       total: z.number().int().min(0),
     }),
+  ),
+  "fact.alias_add": tool(
+    'Ensina um termo à busca: quando a busca por um termo não achou um fato que você achou por outro termo (ex.: buscou "orquestração" e achou Kubernetes), ligue o termo ao fato (tipo e id devolvidos pela busca). A próxima busca pelo termo acha o fato. Nunca ligue a um fato que você não viu.',
+    z.object({
+      term: z.string().trim().min(2).max(120),
+      kind: FactSearchKindSchema,
+      id: IdSchema,
+    }),
+    z.object({ id: IdSchema, term: z.string(), kind: FactSearchKindSchema, factId: IdSchema }),
   ),
   "fact.get": tool(
     "Detalhe de até 10 fatos pelo tipo e id (os devolvidos pela busca).",

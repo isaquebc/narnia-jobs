@@ -474,6 +474,29 @@ export interface FactSearchRepo {
    * Aspas e operadores digitados pelo usuário são neutralizados.
    */
   search(q: string, opts?: { kinds?: FactSearchKind[]; limit?: number }): FactSearchHit[];
+  /**
+   * Busca do recrutador (F04-fix-fundamentacao, R1): qualquer um dos termos (OU), ordenada pelo `bm25` (quem bate mais
+   * termos vem antes). Termo de uma palavra vira prefixo (`termo*`; com `*` no fim, é um radical); de várias, frase.
+   * A busca das vagas (evidência das palavras-chave) continua com `search`, que exige todas as palavras.
+   */
+  searchAny(terms: string[], opts?: { kinds?: FactSearchKind[]; limit?: number }): FactSearchHit[];
+}
+
+/** Termos do recrutador num MATCH seguro com OU (frases entre aspas; prefixo para palavras de 3+ letras). */
+export function toFtsAnyQuery(terms: string[]): string | null {
+  const parts = terms.flatMap((raw) => {
+    const stem = raw.endsWith("*");
+    const words = raw
+      .normalize("NFKC")
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((w) => w.length > 0);
+    if (words.length === 0) return [];
+    if (words.length > 1) return [`"${words.join(" ")}"`];
+    const w = words[0] as string;
+    return [stem || w.length >= 3 ? `"${w}"*` : `"${w}"`];
+  });
+  const unique = [...new Set(parts)].slice(0, 60);
+  return unique.length ? unique.join(" OR ") : null;
 }
 
 /** Converte o texto livre num MATCH seguro: só palavras, cada uma como prefixo entre aspas. */
@@ -488,29 +511,115 @@ export function toFtsQuery(text: string): string | null {
 }
 
 export function factSearchRepo(db: Db): FactSearchRepo {
+  const run = (match: string | null, o: { kinds?: FactSearchKind[]; limit?: number }) => {
+    if (!match) return [];
+    const params: unknown[] = [match];
+    let kinds = "";
+    if (o.kinds?.length) {
+      kinds = ` and kind in (${o.kinds.map(() => "?").join(", ")})`;
+      params.push(...o.kinds);
+    }
+    params.push(o.limit ?? 20);
+    const rows = db
+      .prepare(
+        `select kind, fact_id, title, bm25(fact_fts) as rank from fact_fts
+           where fact_fts match ?${kinds} order by rank limit ?`,
+      )
+      .all(...(params as never[])) as Row[];
+    return rows.map((r) => ({
+      kind: r.kind as FactSearchKind,
+      id: String(r.fact_id),
+      title: String(r.title),
+      rank: Number(r.rank),
+    }));
+  };
   return {
-    search(text, o = {}) {
-      const match = toFtsQuery(text);
-      if (!match) return [];
-      const params: unknown[] = [match];
-      let kinds = "";
-      if (o.kinds?.length) {
-        kinds = ` and kind in (${o.kinds.map(() => "?").join(", ")})`;
-        params.push(...o.kinds);
-      }
-      params.push(o.limit ?? 20);
+    search: (text, o = {}) => run(toFtsQuery(text), o),
+    searchAny: (terms, o = {}) => run(toFtsAnyQuery(terms), o),
+  };
+}
+
+/* ---------- apelidos aprendidos da busca (F04-fix-fundamentacao, FF-1) ---------- */
+
+export interface FactAlias {
+  id: string;
+  term: string;
+  kind: FactSearchKind;
+  factId: string;
+  sessionId: string | null;
+  createdAt: string;
+}
+
+export interface FactAliasesRepo {
+  /** Idempotente: o mesmo termo para o mesmo fato devolve o que já existe. */
+  add(input: {
+    term: string;
+    kind: FactSearchKind;
+    factId: string;
+    sessionId?: string | null;
+  }): FactAlias;
+  list(): FactAlias[];
+  /** Fatos ligados a qualquer um dos termos (normalizados). */
+  lookup(termsNorm: string[]): Array<{ kind: FactSearchKind; factId: string; term: string }>;
+  remove(id: string): boolean;
+}
+
+export const normalizeAliasTerm = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+export function factAliasesRepo(db: Db): FactAliasesRepo {
+  const map = (r: Row): FactAlias => ({
+    id: String(r.id),
+    term: String(r.term),
+    kind: r.kind as FactSearchKind,
+    factId: String(r.fact_id),
+    sessionId: r.session_id === null ? null : String(r.session_id),
+    createdAt: String(r.created_at),
+  });
+  return {
+    add(input) {
+      const termNorm = normalizeAliasTerm(input.term);
+      const found = db
+        .prepare("select * from fact_alias where term_norm = ? and kind = ? and fact_id = ?")
+        .get(termNorm, input.kind, input.factId) as Row | undefined;
+      if (found) return map(found);
+      const id = newId();
+      db.prepare(
+        "insert into fact_alias (id, term, term_norm, kind, fact_id, session_id, created_at) values (?, ?, ?, ?, ?, ?, ?)",
+      ).run(
+        id,
+        input.term.trim(),
+        termNorm,
+        input.kind,
+        input.factId,
+        input.sessionId ?? null,
+        nowUtc(),
+      );
+      return map(db.prepare("select * from fact_alias where id = ?").get(id) as Row);
+    },
+    list: () =>
+      (
+        db.prepare("select * from fact_alias order by created_at desc, rowid desc").all() as Row[]
+      ).map(map),
+    lookup(termsNorm) {
+      const terms = [...new Set(termsNorm.filter(Boolean))];
+      if (terms.length === 0) return [];
       const rows = db
         .prepare(
-          `select kind, fact_id, title, bm25(fact_fts) as rank from fact_fts
-           where fact_fts match ?${kinds} order by rank limit ?`,
+          `select kind, fact_id, term from fact_alias where term_norm in (${terms.map(() => "?").join(", ")})`,
         )
-        .all(...(params as never[])) as Row[];
+        .all(...terms) as Row[];
       return rows.map((r) => ({
         kind: r.kind as FactSearchKind,
-        id: String(r.fact_id),
-        title: String(r.title),
-        rank: Number(r.rank),
+        factId: String(r.fact_id),
+        term: String(r.term),
       }));
     },
+    remove: (id) => db.prepare("delete from fact_alias where id = ?").run(id).changes > 0,
   };
 }

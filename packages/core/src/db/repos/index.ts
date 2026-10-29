@@ -5,7 +5,9 @@ import {
   type ChatSessionsRepo,
   chatMessagesRepo,
   chatSessionsRepo,
+  type FactAliasesRepo,
   type FactSearchRepo,
+  factAliasesRepo,
   factSearchRepo,
   type ResearchSourcesRepo,
   researchSourcesRepo,
@@ -97,6 +99,7 @@ export interface Repos {
   researchSources: ResearchSourcesRepo;
   trustedDomains: TrustedDomainsRepo;
   factSearch: FactSearchRepo;
+  factAliases: FactAliasesRepo;
   // F06
   postings: PostingsRepo;
   postingContacts: PostingContactsRepo;
@@ -170,6 +173,7 @@ export function createRepos(db: Db): Repos {
     researchSources: researchSourcesRepo(db),
     trustedDomains: trustedDomainsRepo(db),
     factSearch: factSearchRepo(db),
+    factAliases: factAliasesRepo(db),
     postings: postingsRepo(db),
     postingContacts: postingContactsRepo(db),
     postingNotes: postingNotesRepo(db),

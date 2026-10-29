@@ -18,6 +18,7 @@ import { ChatSettingsSection } from "./ChatSettingsSection";
 import { CvTemplatesSection } from "./CvTemplatesSection";
 import { EvalsSettingsSection } from "./EvalsSettingsSection";
 import { ExtensionSettingsSection } from "./ExtensionSettingsSection";
+import { FactAliasesSection } from "./FactAliasesSection";
 import { GoogleCalendarSection } from "./GoogleCalendarSection";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { PluginSettingsSection } from "./PluginSettingsSection";
@@ -208,6 +209,7 @@ export function SettingsPage() {
       <h2 className="text-base font-semibold">{t("settings.integrations")}</h2>
       <GithubConnectCard />
       <ChatSettingsSection />
+      <FactAliasesSection />
       <ModelSettingsSection />
       <CvTemplatesSection />
       <WorkerSettingsSection />

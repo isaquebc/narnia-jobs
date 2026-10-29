@@ -1139,6 +1139,14 @@ export const ptBR = {
     create: "Criar reanálise",
   },
   settings: {
+    factAliases: {
+      title: "Termos aprendidos pela busca",
+      hint: "Quando a busca por um termo não achava um fato seu, o recrutador ligou o termo ao fato. Apague o que estiver errado.",
+      empty: "Nenhum termo aprendido ainda.",
+      orphan: "(fato apagado)",
+      remove: "Apagar o termo {term}",
+      removeShort: "Apagar",
+    },
     title: "Configurações",
     integrations: "Integrações",
     ingest: "Ingestão",

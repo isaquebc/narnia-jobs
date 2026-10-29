@@ -3,6 +3,7 @@ import { PERSONA_DEFAULTS, type Persona } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { getCard } from "../profile/cards";
 import { buildPersona } from "../profile/persona";
+import { factIndexText } from "./fact-index";
 
 /**
  * Contexto do recrutador geral (F06-8): ele atende o usuário inteiro, não um perfil. O prompt leva os cartões de todos
@@ -44,6 +45,10 @@ export function recruiterContext(repos: Repos): RecruiterContext {
     parts.push(`### ${p.name} · id ${p.id}${mark}\n${card.text}`);
     hashes.push(`${p.id}:${card.hash}${mark}`);
   }
+  // R2 (F04-fix-fundamentacao): todos os fatos numa linha cada, além dos cartões; o hash muda quando um fato muda
+  const index = factIndexText(repos);
+  parts.push(index);
+  hashes.push(hashOf([index]));
   return {
     persona,
     text: parts.join("\n\n"),

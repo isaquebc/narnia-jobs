@@ -30,6 +30,7 @@ import type {
   ExtensionCaptureActivityResponse,
   ExtensionDevicesResponse,
   ExtensionPairingResponse,
+  FactAliasDto,
   FileDigest,
   FileResponse,
   GithubAuthSourceSchema,
@@ -418,6 +419,9 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         method: "PUT",
         body: JSON.stringify(patch),
       }),
+    listFactAliases: () => request<{ aliases: FactAliasDto[] }>("/api/settings/fact-aliases"),
+    deleteFactAlias: (id: string) =>
+      request<void>(`/api/settings/fact-aliases/${encodeURIComponent(id)}`, { method: "DELETE" }),
     listTrustedDomains: () =>
       request<{ domains: TrustedDomain[] }>("/api/settings/trusted-domains"),
     addTrustedDomain: (d: { pattern: string; trustTag: TrustTag }) =>

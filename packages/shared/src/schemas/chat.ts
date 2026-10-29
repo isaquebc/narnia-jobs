@@ -153,3 +153,15 @@ export const FACT_SEARCH_KINDS = [
 ] as const;
 export const FactSearchKindSchema = z.enum(FACT_SEARCH_KINDS);
 export type FactSearchKind = z.infer<typeof FactSearchKindSchema>;
+
+/** Termo aprendido pela busca de fatos (F04-fix-fundamentacao, FF-1), com o rótulo do fato (null: fato apagado). */
+export const FactAliasSchema = z.object({
+  id: z.string(),
+  term: z.string(),
+  kind: FactSearchKindSchema,
+  factId: z.string(),
+  factLabel: z.string().nullable(),
+  sessionId: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type FactAliasDto = z.infer<typeof FactAliasSchema>;

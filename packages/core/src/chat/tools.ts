@@ -19,6 +19,7 @@ import {
   planFactChange,
 } from "../ingest/fact-change";
 import { isBelowReference } from "../salary";
+import { aliasKeys, expandQuery } from "./fact-search";
 import { resolveChatSettings } from "./settings";
 
 /**
@@ -413,12 +414,34 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
 
     "fact.search": wrap("fact.search", (input) => {
       const rel = relevance();
-      const hits = repos.factSearch.search(input.q, {
-        ...(input.kinds ? { kinds: input.kinds } : {}),
-        limit: 200,
-      });
-      const items = hits
-        .map((h, i) => {
+      const queries = [...(input.q ? [input.q] : []), ...(input.queries ?? [])];
+      // por consulta: termos com OU (expandidos pelo dicionário) e os apelidos aprendidos; o item guarda a melhor
+      // posição e as consultas que o acharam (R1, 2026-10-29)
+      const found = new Map<
+        string,
+        { kind: FactSearchKind; id: string; best: number; matched: string[] }
+      >();
+      for (const q of queries) {
+        const hits = [
+          ...repos.factAliases
+            .lookup(aliasKeys(q))
+            .map((a) => ({ kind: a.kind, id: a.factId, rank: Number.NEGATIVE_INFINITY })),
+          ...repos.factSearch.searchAny(expandQuery(q), {
+            ...(input.kinds ? { kinds: input.kinds } : {}),
+            limit: 200,
+          }),
+        ].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+        hits.forEach((h, i) => {
+          const key = `${h.kind}:${h.id}`;
+          const cur = found.get(key);
+          if (cur) {
+            cur.best = Math.min(cur.best, i);
+            if (!cur.matched.includes(q)) cur.matched.push(q);
+          } else found.set(key, { kind: h.kind, id: h.id, best: i, matched: [q] });
+        });
+      }
+      const items = [...found.values()]
+        .map((h) => {
           const d = describe(h.kind, h.id);
           if (
             !d ||
@@ -431,15 +454,35 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
             line: clip(d.line),
             period: period(d.start, d.end, d.current),
             relevance: rel.get(`${h.kind}:${h.id}`) ?? null,
-            order: i,
+            matched: h.matched,
+            order: h.best,
           };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null)
-        .sort((a, b) => (b.relevance ?? -1) - (a.relevance ?? -1) || a.order - b.order);
+        // quem bate em mais consultas, depois a posição na busca (bm25: quem bate mais termos), depois o perfil
+        .sort(
+          (a, b) =>
+            b.matched.length - a.matched.length ||
+            a.order - b.order ||
+            (b.relevance ?? -1) - (a.relevance ?? -1),
+        );
       return {
-        items: items.slice(0, input.limit ?? 10).map(({ order: _o, ...rest }) => rest),
+        items: items
+          .slice(0, input.limit ?? (queries.length > 1 ? 20 : 10))
+          .map(({ order: _o, ...rest }) => rest),
         total: items.length,
       };
+    }),
+    "fact.alias_add": wrap("fact.alias_add", (input) => {
+      if (!describe(input.kind, input.id))
+        throw new ChatToolError("fact_not_found", `Fato não encontrado: ${input.kind} ${input.id}`);
+      const a = repos.factAliases.add({
+        term: input.term,
+        kind: input.kind,
+        factId: input.id,
+        sessionId: ctx.sessionId ?? null,
+      });
+      return { id: a.id, term: a.term, kind: a.kind, factId: a.factId };
     }),
     "fact.get": wrap("fact.get", (input) => ({
       items: input.refs.map((r) => ({ id: r.id, kind: r.kind, detail: detail(r.kind, r.id) })),

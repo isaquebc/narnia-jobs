@@ -1,5 +1,6 @@
 import {
   CHAT_SETTING_KEYS,
+  listFactAliases,
   type Repos,
   resolveChatSettings,
   TrustedDomainError,
@@ -35,6 +36,14 @@ export function chatSettingsRoutes(deps: { repos: Repos }) {
     }
     return c.json(view());
   });
+
+  // termos aprendidos pela busca de fatos (F04-fix-fundamentacao, FF-1): a pessoa vê e apaga
+  app.get("/api/settings/fact-aliases", (c) => c.json({ aliases: listFactAliases(deps.repos) }));
+  app.delete("/api/settings/fact-aliases/:id", (c) =>
+    deps.repos.factAliases.remove(c.req.param("id"))
+      ? c.body(null, 204)
+      : apiError(c, 404, "not_found", "Termo não encontrado"),
+  );
 
   app.get("/api/settings/trusted-domains", (c) => c.json(domains()));
   app.post("/api/settings/trusted-domains/restore", (c) => {

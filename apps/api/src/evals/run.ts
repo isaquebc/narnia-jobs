@@ -252,6 +252,7 @@ export async function runEvalCases(
           ...(settings ? { maxTurns: settings.maxTurns } : {}),
           // o teto de turnos é do recrutador da conversa: as tools do especializado (F06-8) rodam no turno dele
           toolsPerReply: assistant.map((m) => m.toolCalls.filter((t) => !t.subagent).length),
+          toolsByReply: assistant.map((m) => m.toolCalls.map((t) => t.name)),
         },
         c.graders,
       );

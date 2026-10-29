@@ -434,6 +434,78 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
       "type": "object",
     },
   },
+  "fact.alias_add": {
+    "description": "Ensina um termo à busca: quando a busca por um termo não achou um fato que você achou por outro termo (ex.: buscou "orquestração" e achou Kubernetes), ligue o termo ao fato (tipo e id devolvidos pela busca). A próxima busca pelo termo acha o fato. Nunca ligue a um fato que você não viu.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "experience",
+            "achievement",
+            "project",
+            "skill",
+            "education",
+            "language",
+            "file",
+            "repo",
+          ],
+          "type": "string",
+        },
+        "term": {
+          "maxLength": 120,
+          "minLength": 2,
+          "type": "string",
+        },
+      },
+      "required": [
+        "term",
+        "kind",
+        "id",
+      ],
+      "type": "object",
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "factId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "experience",
+            "achievement",
+            "project",
+            "skill",
+            "education",
+            "language",
+            "file",
+            "repo",
+          ],
+          "type": "string",
+        },
+        "term": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "id",
+        "term",
+        "kind",
+        "factId",
+      ],
+      "type": "object",
+    },
+  },
   "fact.gaps": {
     "description": "Lacunas do perfil que a extração não preencheu (data de fim, resumo, métrica, nível, datas da formação, pesquisa pendente), uma linha cada com o que falta. Base da entrevista de descoberta.",
     "input": {
@@ -676,7 +748,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
     },
   },
   "fact.search": {
-    "description": "Busca nos fatos e resumos do usuário sem ler tudo (acentos ignorados, prefixo). Use antes de listar.",
+    "description": "Busca nos fatos e resumos do usuário sem ler tudo: qualquer um dos termos (OU), com sinônimos e tradução pt/en; acentos ignorados. Agrupe numa chamada só: vários termos em \`q\` ou vários assuntos em \`queries\` (cada item diz em \`matched\` quais consultas o acharam). Use antes de listar e antes de dizer que algo não está no perfil.",
     "input": {
       "additionalProperties": false,
       "properties": {
@@ -711,14 +783,21 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
           "minLength": 2,
           "type": "string",
         },
+        "queries": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 2,
+            "type": "string",
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "type": "array",
+        },
         "to": {
           "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$",
           "type": "string",
         },
       },
-      "required": [
-        "q",
-      ],
       "type": "object",
     },
     "output": {
@@ -748,6 +827,12 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
               "line": {
                 "type": "string",
               },
+              "matched": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
               "period": {
                 "type": [
                   "string",
@@ -773,6 +858,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
               "line",
               "period",
               "relevance",
+              "matched",
             ],
             "type": "object",
           },

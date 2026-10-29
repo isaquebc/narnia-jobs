@@ -2,6 +2,8 @@ import { profile } from "../components/profile-fixture";
 
 /** API mínima do shell (seletor de perfil, provider, bandeja) para testes de rota da F03. */
 export const shellApi = {
+  // F04-fix-fundamentacao: termos aprendidos pela busca (Configurações)
+  listFactAliases: async () => ({ aliases: [] }),
   // janela da extensão (2026-10-27): o andamento das abas
   getCaptureActivity: async () => ({ items: [] }),
   // F07/M5: lembretes da agenda das candidaturas (badge e bandeja)

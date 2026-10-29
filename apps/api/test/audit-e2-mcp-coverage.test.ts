@@ -176,6 +176,10 @@ const CASES: Record<string, Case> = {
     args: (c) => ({ id: first(c.ids.educationIds, "formação") }),
   },
   fact_search: { where: "career", args: () => ({ q: "kubernet" }) },
+  fact_alias_add: {
+    where: "career",
+    args: (c) => ({ term: "orquestração", kind: "skill", id: first(c.ids.skillIds, "skill") }),
+  },
   fact_get: {
     where: "career",
     args: (c) => ({
