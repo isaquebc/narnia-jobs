@@ -116,6 +116,8 @@ function neighborText(el: Element): string | null {
     if (!parent) return null;
     for (let s = child.previousElementSibling; s; s = s.previousElementSibling) {
       if (hasControl(s)) return null;
+      // o botão que abre o seletor de arquivo ("Attach resume") não é o rótulo (Inhire, 2026-10-29)
+      if (s.tagName === "BUTTON" || s.getAttribute("role") === "button") continue;
       const t = textOf(s);
       if (t) return t;
     }
@@ -128,8 +130,22 @@ function neighborText(el: Element): string | null {
 const GENERIC =
   /^(attach|anexar|upload|enviar( arquivo)?|escolher arquivo|choose file|browse|selecionar arquivo)$/i;
 
+const isFile = (el: Element) =>
+  el.tagName === "INPUT" && (el.getAttribute("type") ?? "").toLowerCase() === "file";
+
+/**
+ * Área de arrastar em volta do campo de arquivo sem rótulo próprio (Ashby, 2026-10-29: o quadro "Autofill from resume"):
+ * o título dentro do bloco ou, sem título, o texto dele. Sem isso, o texto vizinho pegava as abas da página.
+ */
+function dropzoneLabel(el: Element): string | null {
+  const zone = parentOf(el);
+  if (!zone || zone.querySelectorAll("input, select, textarea").length > 1) return null;
+  const heading = zone.querySelector("h1, h2, h3, h4, h5, h6, [role=heading]");
+  return (heading && textOf(heading)) || null;
+}
+
 function labelFor(el: Element): string | null {
-  const own = ownLabel(el);
+  const own = ownLabel(el, isFile(el));
   if (own && !GENERIC.test(own)) return own;
   const group = el.closest("[role=group]");
   return (
@@ -137,7 +153,7 @@ function labelFor(el: Element): string | null {
   );
 }
 
-function ownLabel(el: Element): string | null {
+function ownLabel(el: Element, file = false): string | null {
   const labelled = byIds(el, "aria-labelledby");
   if (labelled) return labelled;
   const id = el.getAttribute("id");
@@ -152,7 +168,10 @@ function ownLabel(el: Element): string | null {
     if (t) return t;
   }
   return (
-    clean(el.getAttribute("aria-label")) ?? clean(el.getAttribute("title")) ?? neighborText(el)
+    clean(el.getAttribute("aria-label")) ??
+    clean(el.getAttribute("title")) ??
+    (file ? dropzoneLabel(el) : null) ??
+    neighborText(el)
   );
 }
 
@@ -275,7 +294,10 @@ function scanForm(doc: Document): FormSnapshot & { elements: Element[] } {
         role === "combobox" ||
         role === "listbox" ||
         (el.getAttribute("contenteditable") ?? "false") !== "false";
-      if (!isControl || excluded(el) || hidden(el)) continue;
+      // o campo de arquivo costuma ficar escondido atrás de um botão ou de uma área de arrastar (Inhire: display none):
+      // vale o bloco em volta estar visível
+      const target = isFile(el) ? (parentOf(el) ?? el) : el;
+      if (!isControl || excluded(el) || hidden(target)) continue;
       const base = {
         name: clean(el.getAttribute("name")),
         placeholder: clean(el.getAttribute("placeholder")),

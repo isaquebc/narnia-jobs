@@ -114,6 +114,56 @@ describe("F12/M3 · readForm", () => {
     expect(fields[0]).toMatchObject({ control: "file", label: "Resume/CV*", required: true });
   });
 
+  // 2026-10-29 (vagas reais do dono): o campo de arquivo costuma ficar escondido atrás de um botão ou de uma área de
+  // arrastar; o que vale é o bloco em volta estar visível
+  it("Inhire real: arquivo com display none atrás do botão; rótulo do bloco, não do botão", () => {
+    const { fields } = readForm(
+      page(`
+      <form>
+        <div><label>Resume<span>*</span></label><div><span><svg></svg></span></div></div>
+        <button type="button" label="Resume"><span>Attach resume</span></button>
+        <input accept=".pdf,.docx" name="resume" required type="file" style="display: none;">
+      </form>`),
+    );
+    expect(fields).toEqual([
+      expect.objectContaining({
+        control: "file",
+        label: "Resume*",
+        name: "resume",
+        required: true,
+      }),
+    ]);
+  });
+
+  it("arquivo escondido numa seção escondida continua fora", () => {
+    const { fields } = readForm(
+      page(
+        `<div style="display: none"><label>CV</label><input type="file" name="cv" style="display: none"></div>`,
+      ),
+    );
+    expect(fields).toEqual([]);
+  });
+
+  it("Ashby real: o quadro de preenchimento automático usa o título dele, não as abas da página", () => {
+    const { fields } = readForm(
+      page(`
+      <nav role="tablist"><a role="tab"><span>Overview</span></a><a role="tab"><span>Application</span></a></nav>
+      <div role="tabpanel"><div><div role="presentation">
+        <input type="file" tabindex="-1" style="position: absolute; width: 1px; height: 1px; clip: rect(0px, 0px, 0px, 0px)">
+        <div><div><div><h3>Autofill from resume</h3></div><p>Upload your resume here to autofill key application fields.</p>
+        <div><button>Upload file</button></div></div></div>
+      </div></div>
+      <div><label for="_systemfield_resume">Resume</label><div role="presentation">
+        <input type="file" id="_systemfield_resume" required tabindex="-1" style="position: absolute; width: 1px">
+        <div><button><span>Upload File</span></button><p>or drag and drop here</p></div></div></div>
+      </div>`),
+    );
+    expect(fields.map((f) => [f.control, f.label])).toEqual([
+      ["file", "Autofill from resume"],
+      ["file", "Resume"],
+    ]);
+  });
+
   it("estilo Lever: label envolvendo o campo e texto de rótulo em div", () => {
     const { fields } = readForm(
       page(`
