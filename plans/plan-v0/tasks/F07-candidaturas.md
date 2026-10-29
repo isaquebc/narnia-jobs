@@ -2,7 +2,7 @@
 
 Entregável 7 do plan-v0. Cobre a feature **#3** de `../02-fluxos-do-usuario.md §F5` e o fluxo `§F5.1`: o rastreador de candidaturas em kanban, com etapas datadas, documentos, análise, contatos, notas e agenda. No MVP, a agenda exporta para o Google Calendar **sem autenticação** (link + `.ics`); a integração com o MCP oficial do Google (`../08-docker-calendar-voz.md §2`) entra como opção, prevista para a fase 7 do plano.
 
-Status: **em andamento** (2026-10-28): M1 a M7 implementados; faltam o teste manual com provider real (§6.4) e o teste do guia do Google por outra pessoa. Requisitos novos do dono em §0, que valem sobre o resto do arquivo onde houver conflito. Decisão global 12 fechada em 2026-10-07: integração autenticada com o Google Calendar **mantida como opcional**, com guia passo a passo; a feature funciona completa sem Google (link + `.ics`).
+Status: **em andamento** (2026-10-28): M1 a M7 implementados; faltam o teste manual com provider real (§6.4) e o teste do guia do Google por outra pessoa. Requisitos novos do dono em §0, que valem sobre o resto do arquivo onde houver conflito. Decisão global 12 fechada em 2026-10-07: integração autenticada com o Google Calendar **mantida como opcional**, com guia passo a passo; a feature funciona completa sem Google (link + `.ics`). **2026-10-29: o teste manual do dono (§6.4) funcionou; falta só a conexão com o Google Calendar (conta real e o guia testado por outra pessoa) e o E2E-10.**
 
 ---
 

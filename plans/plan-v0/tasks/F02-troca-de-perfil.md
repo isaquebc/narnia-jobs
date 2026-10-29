@@ -2,7 +2,7 @@
 
 Entregável 2 do plan-v0. Cobre o fluxo **F2** de `../02-fluxos-do-usuario.md`: o usuário base ganha vários perfis (lentes), troca entre eles no shell, e cada perfil carrega ênfases, narrativa, dados de carreira obrigatórios e a persona do recrutador. É pré-requisito direto de F04 (o cartão do perfil é o único contexto implícito do agente) e de F05 (o CV é gerado a partir das ênfases). Depende de F01 (tabela `profile`, fatos, dashboard, shell, jobs, provider).
 
-Status: **M1–M5 implementados** (2026-10-08). Decisões de §5 fechadas pelo dono; marcos em §6.1; registro em §8. Falta para fechar o F02: **§6.4** (análise de perfis com o histórico real do dono, tokens reais × estimativa, leitura do cartão de 3 perfis reais).
+Status: **M1–M5 implementados** (2026-10-08). Decisões de §5 fechadas pelo dono; marcos em §6.1; registro em §8. Falta para fechar o F02: **§6.4** (análise de perfis com o histórico real do dono, tokens reais × estimativa, leitura do cartão de 3 perfis reais). **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
 ---
 

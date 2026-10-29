@@ -2,7 +2,7 @@
 
 Entregável 3 do plan-v0. Cobre o fluxo **F3** de `../02-fluxos-do-usuario.md` além do que o F01 já entregou (CV e texto livre no primeiro uso): **GitHub** em análise pública ou privada, com coleta pelo `gh`, métricas quantitativas, orçamento de tokens ligado ao plano do usuário, análise incremental por commit e relatórios salvos; **segundo CV** e **texto livre adicional** ("Conte a sua história de carreira/vida") com detecção de "já lido"; **reconciliação** com os fatos existentes (novo / existente / conflito); **revisão anti-alucinação**; **área de notificações** para tudo que fica pendente com o usuário. Depende de F01 (cadeia de ingestão, revisão, provider, jobs) e F02 (perfis para tags, tarefas genéricas `enqueueTask`/`processTask`, `project`). A sessão de clarificação continua na F04 (aqui o botão existe desabilitado). LinkedIn foi adiado (§1, F03-7).
 
-Status: **M1–M5 implementados** (2026-10-09). Decisões F03-1 a F03-13 fechadas pelo dono, F03-14 a F03-45 registradas na implementação (§8). Falta para fechar a F03: **§6.4**, teste manual com o GitHub e o plano reais do dono (três profundidades, pública e privada, estimado × real), que depende dele; e reconstruir a instância do dono para ter o `gh` no container (`make dev-down && make dev`).
+Status: **M1–M5 implementados** (2026-10-09). Decisões F03-1 a F03-13 fechadas pelo dono, F03-14 a F03-45 registradas na implementação (§8). Falta para fechar a F03: **§6.4**, teste manual com o GitHub e o plano reais do dono (três profundidades, pública e privada, estimado × real), que depende dele; e reconstruir a instância do dono para ter o `gh` no container (`make dev-down && make dev`). **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
 ---
 

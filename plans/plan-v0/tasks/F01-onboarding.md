@@ -2,7 +2,7 @@
 
 Entregável 1 do plan-v0. Cobre o fluxo **F1** de `../02-fluxos-do-usuario.md` e toda a fundação técnica que ele exige (monorepo, Docker, banco, provider, testes). Os demais fluxos viram entregáveis próprios: F02 troca de perfil, F03 ingestão (GitHub/LinkedIn/profundidades), F04 chat com o recrutador, F05 features, F06 gestão de dados.
 
-Status: **M1–M7 implementados** (2026-10-07 a 2026-10-08). Decisões de §5 fechadas pelo dono do projeto; progresso e desvios em §8. Falta para fechar o F01: §6.4 (teste manual com provider real) e o smoke de `start.ps1 up` em Windows/macOS reais.
+Status: **M1–M7 implementados** (2026-10-07 a 2026-10-08). Decisões de §5 fechadas pelo dono do projeto; progresso e desvios em §8. Falta para fechar o F01: §6.4 (teste manual com provider real) e o smoke de `start.ps1 up` em Windows/macOS reais. **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
 ---
 

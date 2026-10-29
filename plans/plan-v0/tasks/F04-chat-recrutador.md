@@ -2,7 +2,7 @@
 
 Entregável 4 do plan-v0, o mais estrutural. Cobre o fluxo **F4** de `../02-fluxos-do-usuario.md` e entrega as duas peças que todos os fluxos seguintes usam: o **servidor MCP** (`/mcp`, streamable HTTP) com as tools de `../03-arquitetura.md §5`, e a pasta **`plugin/`** (persona, skills, hooks, `.mcp.json`), fonte única de prompts para os modos A (chat na web via Agent SDK) e B (Claude Code no host). Inclui a ingestão pela conversa, a clarificação pós-ingestão (agora possível: a F03 já foi entregue), a pesquisa na internet para dados obrigatórios, sessões múltiplas por perfil, o medidor por sessão e a observabilidade local com Arize Phoenix. Depende de F01, F02 e F03 (todas entregues).
 
-Status: **M1–M6 implementados** (2026-10-11; decisões F04-1 a F04-33 no §5 e no §8). Falta para fechar a F04: **§6.4** (teste manual com a assinatura real: conversa de 20 turnos, modos A e B, pesquisa salarial real, clarificação real) e o **E2E-09 real** do modo B (`scripts/smoke-plugin.sh --yes`), ambos com o dono.
+Status: **M1–M6 implementados** (2026-10-11; decisões F04-1 a F04-33 no §5 e no §8). Falta para fechar a F04: **§6.4** (teste manual com a assinatura real: conversa de 20 turnos, modos A e B, pesquisa salarial real, clarificação real) e o **E2E-09 real** do modo B (`scripts/smoke-plugin.sh --yes`), ambos com o dono. **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
 ---
 

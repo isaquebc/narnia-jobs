@@ -2,7 +2,7 @@
 
 Entregável 5 do plan-v0. Cobre a feature **#1** de `../02-fluxos-do-usuario.md §F5` e a arquitetura de `../03-arquitetura.md §14`: o agente gera o **conteúdo** do currículo em JSON, o servidor faz o **layout** a partir de templates e entrega PDF com bom padrão visual. É a peça fundamental do sistema (decisão 7 de `../06-decisoes-em-aberto.md`).
 
-Status: **M1 a M8 implementados (2026-10-16); falta o teste do dono para fechar** (replanejada pelo dono em 2026-10-15) (requisitos em §1.1, revisão contra o código em §2.0, decisões novas F05-10 a F05-23 em §5). Plano reescrito em 2026-10-16 depois da última revisão contra o código (§2 a §7); todas as decisões fechadas. Para fechar, com o dono: o teste manual com o modelo real e os perfis dele (§6.4) e a aprovação visual dos três modelos (§6.5).
+Status: **M1 a M8 implementados (2026-10-16); falta o teste do dono para fechar** (replanejada pelo dono em 2026-10-15) (requisitos em §1.1, revisão contra o código em §2.0, decisões novas F05-10 a F05-23 em §5). Plano reescrito em 2026-10-16 depois da última revisão contra o código (§2 a §7); todas as decisões fechadas. Para fechar, com o dono: o teste manual com o modelo real e os perfis dele (§6.4) e a aprovação visual dos três modelos (§6.5). **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
 > O texto original (2026-10-07 e 2026-10-11) fica como referência. Onde ele conflita com §1.1, §1.2 e §2.0, valem estas seções.
 

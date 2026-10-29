@@ -2,7 +2,7 @@
 
 Extensão da F04 pedida pelo dono em 2026-10-13: **todos os prompts versionados no Phoenix, com avaliadores salvos lá e rodáveis pelo Phoenix**, servindo de teste de prompt e de garantia do padrão de entrega das respostas.
 
-Status: **M1–M5 implementados** (2026-10-13, provados com o mock na instância `claude`); falta a rodada com o Claude real (custa a assinatura: só a pedido do dono). M6: README, CLAUDE.md, E2E-17.
+Status: **M1–M5 implementados** (2026-10-13, provados com o mock na instância `claude`); falta a rodada com o Claude real (custa a assinatura: só a pedido do dono). M6: README, CLAUDE.md, E2E-17. **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
 ## 1 · Decisões do dono
 
