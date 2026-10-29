@@ -1,0 +1,24 @@
+{"id":"kubernetes","category":"exato","query":"Kubernetes","expected":[{"kind":"skill","match":"Kubernetes"},{"kind":"achievement","match":"migração para Kubernetes"},{"kind":"experience","match":"Acme Pagamentos"}]}
+{"id":"mentoria","category":"exato","query":"mentoria","expected":[{"kind":"skill","match":"Mentoria"}]}
+{"id":"latencia","category":"exato","query":"latência","expected":[{"kind":"achievement","match":"latência p95"}]}
+{"id":"ingles","category":"exato","query":"inglês","expected":[{"kind":"language","match":"Inglês"}]}
+{"id":"mensageria-agrupada","category":"agrupado","query":"Kafka mensageria RabbitMQ Redis fila","expected":[{"kind":"skill","match":"Redis"},{"kind":"project","match":"fila-leve"},{"kind":"experience","match":"Beta Logística"}]}
+{"id":"lideranca-agrupada","category":"agrupado","query":"liderança mentoria time","expected":[{"kind":"skill","match":"Mentoria"},{"kind":"achievement","match":"Liderou a migração"}]}
+{"id":"testes-agrupado","category":"agrupado","query":"testes TDD qualidade","expected":[{"kind":"skill","match":"Testes automatizados"},{"kind":"achievement","match":"suíte de testes"}]}
+{"id":"cloud-agrupado","category":"agrupado","query":"AWS GCP Azure nuvem","expected":[{"kind":"skill","match":"AWS"},{"kind":"experience","match":"Beta Logística"}]}
+{"id":"mentoring","category":"traducao","query":"mentoring","expected":[{"kind":"skill","match":"Mentoria"}]}
+{"id":"leadership","category":"traducao","query":"leadership","expected":[{"kind":"achievement","match":"Liderou a migração"}]}
+{"id":"automated-tests","category":"traducao","query":"automated testing","expected":[{"kind":"skill","match":"Testes automatizados"},{"kind":"achievement","match":"suíte de testes"}]}
+{"id":"payments","category":"traducao","query":"payments","expected":[{"kind":"experience","match":"Acme Pagamentos"}]}
+{"id":"k8s","category":"sinonimo","query":"k8s","expected":[{"kind":"skill","match":"Kubernetes"},{"kind":"achievement","match":"migração para Kubernetes"}]}
+{"id":"postgres","category":"sinonimo","query":"Postgres","expected":[{"kind":"skill","match":"PostgreSQL"}]}
+{"id":"iac","category":"sinonimo","query":"IaC infraestrutura como código","expected":[{"kind":"skill","match":"Terraform"}]}
+{"id":"lideranca","category":"sinonimo","query":"liderança","expected":[{"kind":"achievement","match":"Liderou a migração"}]}
+{"id":"frontend","category":"sinonimo","query":"frontend","expected":[{"kind":"skill","match":"React"},{"kind":"experience","match":"Full Stack"}]}
+{"id":"banco-de-dados","category":"semantico","query":"banco de dados","expected":[{"kind":"skill","match":"PostgreSQL"},{"kind":"skill","match":"SQLite"}]}
+{"id":"monitoramento","category":"semantico","query":"monitoramento","expected":[{"kind":"skill","match":"Observabilidade"}]}
+{"id":"desempenho","category":"semantico","query":"otimização de desempenho","expected":[{"kind":"achievement","match":"latência p95"}]}
+{"id":"fintech","category":"semantico","query":"fintech","expected":[{"kind":"experience","match":"Acme Pagamentos"}]}
+{"id":"faculdade","category":"semantico","query":"faculdade","expected":[{"kind":"education","match":"Ciência da Computação"}]}
+{"id":"pesquisa-academica","category":"semantico","query":"pesquisa acadêmica","expected":[{"kind":"experience","match":"iniciação científica"}]}
+{"id":"api","category":"semantico","query":"APIs","expected":[{"kind":"skill","match":"REST"},{"kind":"skill","match":"GraphQL"}]}

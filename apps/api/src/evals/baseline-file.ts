@@ -69,12 +69,18 @@ export interface GateFlags {
    * no log. Só a pedido do dono, registrado no plano; rodada incompleta continua sem gravar.
    */
   ownerApproved?: boolean;
+  /**
+   * `--report=<rótulo>` (F04-fix-fundamentacao, FF-3): no chat, N amostras (padrão 3) de todos os casos com o juiz e o
+   * relatório da rodada em `evals/reports/`; não compara nem grava a linha de base.
+   */
+  report?: string;
 }
 
 export function gateFlags(args: string[]): GateFlags {
   const fixes = args.find((a) => a.startsWith("--fixes="))?.slice("--fixes=".length) ?? "";
   const feature = args.find((a) => a.startsWith("--feature="))?.slice("--feature=".length);
   const samples = Number(args.find((a) => a.startsWith("--samples="))?.slice("--samples=".length));
+  const report = args.find((a) => a.startsWith("--report="))?.slice("--report=".length);
   return {
     gate: args.includes("--gate"),
     update: args.includes("--update-baseline"),
@@ -84,6 +90,7 @@ export function gateFlags(args: string[]): GateFlags {
     ...(args.includes("--noise") ? { noise: true } : {}),
     ...(args.includes("--owner-approved") ? { ownerApproved: true } : {}),
     ...(feature ? { feature: feature.split(",").filter(Boolean) } : {}),
+    ...(report ? { report } : {}),
   };
 }
 

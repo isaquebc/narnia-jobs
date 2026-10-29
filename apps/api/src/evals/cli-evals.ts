@@ -36,6 +36,7 @@ import {
   limitConcurrency,
   openCheckpoint,
 } from "./checkpoint";
+import { searchRecallNow, writeRunReport } from "./cli-report";
 import { syncChatJudge, syncEvaluators } from "./eval-sync";
 import { chatJudge, judgeFor } from "./judges";
 import { judgeLocally, type LocalEvaluation, recordLocalExperiment } from "./local-eval";
@@ -140,6 +141,7 @@ function chatCheckpoint(only: string[], args: string[]): Checkpoint {
     flags.noise ?? false,
     flags.samples ?? null,
     flags.feature ?? [],
+    flags.report ?? null,
   ]);
   return openCheckpoint(checkpointPath(), key, { fresh: args.includes("--fresh") });
 }
@@ -159,7 +161,9 @@ async function chat(
   {
     const flags = gate?.flags;
     // gate: o primeiro erro para a rodada (rodada com erro não grava nada); o que terminou fica na retomada
-    const stopOnError = Boolean(flags && (flags.gate || flags.update || flags.noise));
+    const stopOnError = Boolean(
+      flags && (flags.gate || flags.update || flags.noise || flags.report),
+    );
     if (cp && (cp.resumed.runs > 0 || cp.resumed.completions > 0))
       console.log(
         `Retomando a rodada anterior (${checkpointPath()}): ${cp.resumed.runs} conversa(s) e ${cp.resumed.completions} julgamento(s) já feitos.`,
@@ -249,13 +253,17 @@ async function chat(
     const comparing = Boolean(flags && (flags.gate || flags.update));
     // gate: 5 amostras nos casos afetados (o placar soma as amostras, 2026-10-26); A contra A: 3 (a taxa por amostra não
     // depende de N)
-    const sampleCount = flags?.samples ?? (flags?.noise ? 3 : comparing ? 5 : 1);
+    const reporting = Boolean(flags?.report) && !comparing && !flags?.noise;
+    const sampleCount = flags?.samples ?? (flags?.noise ? 3 : comparing ? 5 : reporting ? 3 : 1);
     // A contra A: os casos sem mudança; gate: os que mudaram e têm aprovada (os outros não entram no placar)
     const featureIds = flags?.feature ?? [];
-    const extraIds = report
-      .filter((r) => !r.error && approved.has(r.id) && full)
-      .filter((r) => (flags?.noise ? unchanged(r) : comparing && !unchanged(r)))
-      .map((r) => r.id);
+    // relatório (FF-3): todas as conversas em N amostras, para a latência e as notas não dependerem de uma rodada
+    const extraIds = reporting
+      ? report.filter((r) => !r.error).map((r) => r.id)
+      : report
+          .filter((r) => !r.error && approved.has(r.id) && full)
+          .filter((r) => (flags?.noise ? unchanged(r) : comparing && !unchanged(r)))
+          .map((r) => r.id);
     // --feature: os casos novos (sem aprovada) também ganham as amostras; o lado A não existe para eles
     const featureRuns =
       comparing && !flags?.noise && full ? featureIds.filter((id) => !approved.has(id)) : [];
@@ -353,6 +361,17 @@ async function chat(
       for (const p of plugins) rmSync(p.dir, { recursive: true, force: true });
     }
     const samplesOf = (r: EvalCaseReport) => [r, ...(extras.get(r.id) ?? [])];
+    if (reporting && flags?.report)
+      writeRunReport({
+        label: flags.report,
+        samples: Array.from({ length: sampleCount }, (_, k) =>
+          report.flatMap((r) => {
+            const x = samplesOf(r)[k];
+            return x ? [x] : [];
+          }),
+        ),
+        recall: await searchRecallNow(),
+      });
     const errors = report.reduce(
       (n, r) => n + [...samplesOf(r), ...(against.get(r.id) ?? [])].filter((x) => x.error).length,
       0,
@@ -748,7 +767,7 @@ export async function runSandboxEvals(
   // retomada só no gate (as amostras e o pairwise são o que custa horas)
   const flags = gateFlags(args);
   const cp =
-    kind === "chat" && (flags.gate || flags.update || flags.noise)
+    kind === "chat" && (flags.gate || flags.update || flags.noise || flags.report)
       ? chatCheckpoint(only, args)
       : undefined;
   try {
@@ -770,7 +789,7 @@ export async function runSandboxEvals(
       return 1;
     }
     const regressed = gate.finish();
-    if (gate.wroteBaseline) cp?.clear();
+    if (gate.wroteBaseline || flags.report) cp?.clear();
     return (strict && failed > 0) || regressed ? 1 : 0;
   } finally {
     await shutdownTelemetry();

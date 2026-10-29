@@ -61,7 +61,23 @@ export interface EvalCaseReport {
   context?: string;
   /** Juízes com modelo (padrão de entrega), preenchidos pelo comando de avaliações. */
   judges?: Array<{ name: string; label: string; score: number; explanation: string }>;
+  /** Medidas da conversa para o relatório da rodada (F04-fix-fundamentacao, R0). */
+  metrics?: CaseMetrics;
   error?: string;
+}
+
+/** Por turno (uma resposta do recrutador) e da conversa inteira. */
+export interface CaseMetrics {
+  /** Do envio da mensagem até a resposta aparecer (ms). */
+  turnMs: number[];
+  /** Tools do recrutador por turno (sem as do subagente). */
+  toolsPerTurn: number[];
+  /** Chamadas à `fact_search` por turno (do recrutador e do subagente). */
+  searchesPerTurn: number[];
+  replyChars: number[];
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
 }
 
 interface SessionView {
@@ -135,32 +151,42 @@ export async function runEvalCases(
         : {}),
     });
     let sessionId = "";
+    const turnMs: number[] = [];
+    // tempo de um turno: do envio até a resposta aparecer
+    const timed = async (run: () => Promise<unknown>) => {
+      const t0 = Date.now();
+      await run();
+      turnMs.push(Date.now() - t0);
+    };
     try {
       let first = 0;
       if (c.open === "application_chat" || c.open === "application_chat_no_posting") {
         // F12/M5: conversa do formulário pela janela da extensão, num formulário novo da vaga do sandbox
         if (!o.newApplication) throw new Error("sandbox sem formulário para a conversa");
-        sessionId = (
-          await call<{ session: { id: string } }>(
-            `/api/applications/${o.newApplication({ withPosting: c.open === "application_chat" })}/chat`,
-            {
+        const appId = o.newApplication({ withPosting: c.open === "application_chat" });
+        await timed(async () => {
+          sessionId = (
+            await call<{ session: { id: string } }>(`/api/applications/${appId}/chat`, {
               method: "POST",
               body: JSON.stringify({ message: c.messages[0] }),
-            },
-          )
-        ).session.id;
-        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+            })
+          ).session.id;
+          await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        });
         first = 1;
       } else if (c.open === "job_application_chat") {
         // F07/M6: "Conversar sobre esta candidatura" na página da candidatura
         if (!o.jobApplication) throw new Error("sandbox sem candidatura para a conversa");
-        sessionId = (
-          await call<{ session: { id: string } }>(
-            `/api/job-applications/${o.jobApplication()}/chat`,
-            { method: "POST", body: JSON.stringify({ message: c.messages[0] }) },
-          )
-        ).session.id;
-        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        const jobAppId = o.jobApplication();
+        await timed(async () => {
+          sessionId = (
+            await call<{ session: { id: string } }>(`/api/job-applications/${jobAppId}/chat`, {
+              method: "POST",
+              body: JSON.stringify({ message: c.messages[0] }),
+            })
+          ).session.id;
+          await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        });
         first = 1;
       } else if (c.open === "document_feedback") {
         o.readyPostingCv?.();
@@ -174,13 +200,15 @@ export async function runEvalCases(
         }>("/api/documents?kind=cv");
         const cv = documents.find((d) => d.document.postingId && d.current?.status === "ready");
         if (!cv) throw new Error("sandbox sem CV para o feedback");
-        sessionId = (
-          await call<{ session: { id: string } }>(`/api/documents/${cv.document.id}/feedback`, {
-            method: "POST",
-            body: JSON.stringify({ message: c.messages[0] }),
-          })
-        ).session.id;
-        await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        await timed(async () => {
+          sessionId = (
+            await call<{ session: { id: string } }>(`/api/documents/${cv.document.id}/feedback`, {
+              method: "POST",
+              body: JSON.stringify({ message: c.messages[0] }),
+            })
+          ).session.id;
+          await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        });
         first = 1;
       } else
         sessionId = (
@@ -191,11 +219,13 @@ export async function runEvalCases(
         ).session.id;
       for (const [i, text] of c.messages.entries()) {
         if (i < first) continue;
-        await call(`/api/sessions/${sessionId}/messages`, {
-          method: "POST",
-          body: JSON.stringify({ text }),
+        await timed(async () => {
+          await call(`/api/sessions/${sessionId}/messages`, {
+            method: "POST",
+            body: JSON.stringify({ text }),
+          });
+          await waitReplies(call, sessionId, i + 1, o.turnTimeoutMs ?? 180_000, o.turnError);
         });
-        await waitReplies(call, sessionId, i + 1, o.turnTimeoutMs ?? 180_000, o.turnError);
       }
       const { messages } = await call<{ messages: Message[] }>(
         `/api/sessions/${sessionId}/messages?limit=200`,
@@ -271,6 +301,17 @@ export async function runEvalCases(
         replies,
         tools,
         context,
+        metrics: {
+          turnMs,
+          toolsPerTurn: assistant.map((m) => m.toolCalls.filter((t) => !t.subagent).length),
+          searchesPerTurn: assistant.map(
+            (m) => m.toolCalls.filter((t) => t.name === "fact_search").length,
+          ),
+          replyChars: assistant.map((m) => m.contentMd.length),
+          tokensIn: session.tokensIn,
+          tokensOut: session.tokensOut,
+          costUsd: session.costUsdEst,
+        },
       });
     } catch (e) {
       span.recordError(e);

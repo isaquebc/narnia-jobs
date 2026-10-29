@@ -151,9 +151,22 @@ switch (cmd) {
       const { runCalibration } = await import("./evals/calibration");
       code = await runCalibration(rest);
     }
-    if (!["prompts", "chat", "pdf", "cv-review", "calibration", "all"].includes(sub)) {
+    // relatórios da rodada (F04-fix-fundamentacao): recall da busca e comparação antes → depois
+    if (sub === "search") {
+      const { runSearchEvals } = await import("./evals/cli-report");
+      code = await runSearchEvals(rest);
+    }
+    if (sub === "compare") {
+      const { runCompare } = await import("./evals/cli-report");
+      code = runCompare(rest);
+    }
+    if (
+      !["prompts", "chat", "pdf", "cv-review", "calibration", "search", "compare", "all"].includes(
+        sub,
+      )
+    ) {
       console.log(
-        "narnia-jobs evals prompts|chat|pdf|cv-review|calibration|all [nome…] [--strict]",
+        "narnia-jobs evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict]",
       );
       code = 2;
     }

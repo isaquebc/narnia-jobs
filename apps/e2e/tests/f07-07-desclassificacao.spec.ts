@@ -38,8 +38,8 @@ test("F07/E2E-07 desclassificação › cola o e-mail na etapa › Encerrado com
 
   await page.goto("/candidaturas");
   await expect(
-    page.getByRole("region", { name: "Funil das candidaturas" }).getByText(
-      "Não aprovado por etapa: Case técnico: 1",
-    ),
+    page
+      .getByRole("region", { name: "Funil das candidaturas" })
+      .getByText("Não aprovado por etapa: Case técnico: 1"),
   ).toBeVisible();
 });

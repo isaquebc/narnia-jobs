@@ -38,6 +38,7 @@ export * from "./evals/calibration";
 export * from "./evals/graders";
 export * from "./evals/pairwise";
 export * from "./evals/prompt-evaluators";
+export * from "./evals/search-recall";
 export * from "./extension/captures";
 export * from "./extension/pairing";
 export * from "./extract";

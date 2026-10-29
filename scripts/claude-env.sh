@@ -118,6 +118,8 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   evals … --update-baseline --owner-approved  grava apesar do gate, só com aprovação explícita do dono
   evals prompts|pdf|cv-review|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, revisor do CV, ou tudo (mock = smoke; real só a pedido)
   evals calibration [id…] [--strict]  calibração dos juízes: falsos positivos e negativos em respostas rotuladas (evals/calibration)
+  evals search [--report=rótulo]       recall da busca de fatos (evals/search/recall.jsonl), sem modelo
+  evals compare <a.json> <b.json>     compara dois relatórios de evals/reports (antes → depois)
   wipe             remove containers, volumes e ./.claude-data da instância
 USAGE
 }
@@ -141,7 +143,7 @@ main() {
       # prompts (Playground pela ponte) | chat | pdf (banco temporário isolado) | all; sem subcomando = chat
       wait_api
       case "${1:-}" in
-        prompts | chat | pdf | cv-review | calibration | all) ;;
+        prompts | chat | pdf | cv-review | calibration | search | compare | all) ;;
         *) set -- chat "$@" ;;
       esac
       "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals "$@" ;;

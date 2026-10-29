@@ -446,7 +446,7 @@ Desenvolvimento (tudo em containers):
 
 # avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
 function Invoke-Evals([string[]] $Rest) {
-  if (-not $Rest -or $Rest[0] -notin @("prompts", "chat", "pdf", "cv-review", "calibration", "all")) { throw "uso: .\start.ps1 evals prompts|chat|pdf|cv-review|calibration|all [nome…] [--strict]" }
+  if (-not $Rest -or $Rest[0] -notin @("prompts", "chat", "pdf", "cv-review", "calibration", "search", "compare", "all")) { throw "uso: .\start.ps1 evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict]" }
   $devApi = & docker @script:DevCompose ps -q api 2>$null
   if ($devApi) { & docker @script:DevCompose exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals @Rest; return }
   if (Test-StackRunning) { Invoke-Prod (@("exec", "-T", "api", "narnia-jobs", "evals") + $Rest); return }
