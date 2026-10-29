@@ -104,7 +104,7 @@ export function createJobApplicationTools(
       a.column === "in_process" && s.progress.total > 0
         ? `${COLUMN[a.column]} ${s.progress.current}/${s.progress.total}`
         : a.column === "closed" && a.closedReason
-          ? `${COLUMN[a.column]} (${a.closedReason})`
+          ? `${COLUMN[a.column]} (${a.closedReason}${a.closedStage ? ` na etapa ${a.closedStage}` : ""})`
           : COLUMN[a.column];
     return [
       who,

@@ -24,6 +24,9 @@ export interface JobApplicationCreateRecord {
 export interface JobApplicationUpdate {
   column?: JobApplicationColumn | undefined;
   closedReason?: JobApplicationClosedReason | null | undefined;
+  /** Desclassificação: etapa (nome) e nota do e-mail; só em Encerrado. */
+  closedStage?: string | null | undefined;
+  closedEntryId?: string | null | undefined;
   appliedOn?: string | undefined;
   archived?: boolean | undefined;
 }
@@ -106,6 +109,12 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
     appliedOn: String(r.applied_on),
     column: String(r.board_column) as JobApplicationColumn,
     closedReason: (r.closed_reason as JobApplicationClosedReason | null) ?? null,
+    closedStage:
+      r.closed_stage === null || r.closed_stage === undefined ? null : String(r.closed_stage),
+    closedEntryId:
+      r.closed_entry_id === null || r.closed_entry_id === undefined
+        ? null
+        : String(r.closed_entry_id),
     stages: stagesOf(String(r.id)),
     currentStageId: r.current_stage_id === null ? null : String(r.current_stage_id),
     lastActivityAt: String(r.last_activity_at),
@@ -214,13 +223,23 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
               : null
           : null;
       if (column === "closed" && !reason) throw new Error("encerrar pede o motivo");
+      const keep = <T>(next: T | undefined, prev: T | null) =>
+        column !== "closed"
+          ? null
+          : next !== undefined
+            ? next
+            : cur.column === "closed"
+              ? prev
+              : null;
+      const stage = keep(patch.closedStage, cur.closedStage);
+      const entry = keep(patch.closedEntryId, cur.closedEntryId);
       const at = now.toISOString();
       const archivedAt = patch.archived === true ? (cur.archivedAt ?? at) : null;
       if (column !== cur.column) move(id, cur.column, column, at);
       db.prepare(
-        `update job_application set board_column = ?, closed_reason = ?, applied_on = ?, archived_at = ?,
-           last_activity_at = ?, updated_at = ? where id = ?`,
-      ).run(column, reason, patch.appliedOn ?? cur.appliedOn, archivedAt, at, at, id);
+        `update job_application set board_column = ?, closed_reason = ?, closed_stage = ?, closed_entry_id = ?,
+           applied_on = ?, archived_at = ?, last_activity_at = ?, updated_at = ? where id = ?`,
+      ).run(column, reason, stage, entry, patch.appliedOn ?? cur.appliedOn, archivedAt, at, at, id);
       return must(id);
     },
     setStages(id, stages, now = new Date()) {

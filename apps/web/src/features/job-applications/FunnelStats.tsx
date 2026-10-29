@@ -46,6 +46,16 @@ export function FunnelStats() {
               .join(" · ")}
           </p>
         ) : null}
+        {Object.keys(f.rejectedByStage ?? {}).length > 0 ? (
+          <p className="text-xs text-muted-fg">
+            {t("jobApplications.rejection.byStage", {
+              list: Object.entries(f.rejectedByStage)
+                .sort((x, y) => y[1] - x[1])
+                .map(([stage, n]) => `${stage}: ${n}`)
+                .join(" · "),
+            })}
+          </p>
+        ) : null}
       </Card>
     </section>
   );

@@ -170,6 +170,10 @@ export function jobApplicationFunnel(repos: Repos): JobApplicationFunnel {
   for (const a of apps)
     if (a.column === "closed" && a.closedReason)
       closedReasons[a.closedReason] = (closedReasons[a.closedReason] ?? 0) + 1;
+  const rejectedByStage: Record<string, number> = {};
+  for (const a of apps)
+    if (a.column === "closed" && a.closedReason === "rejected" && a.closedStage)
+      rejectedByStage[a.closedStage] = (rejectedByStage[a.closedStage] ?? 0) + 1;
   const avg = (xs: number[] | undefined) =>
     xs?.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 10) / 10 : null;
   return {
@@ -186,5 +190,6 @@ export function jobApplicationFunnel(repos: Repos): JobApplicationFunnel {
       return { from, to, rate: base === 0 ? null : (reached.get(to) ?? 0) / base };
     }),
     closedReasons,
+    rejectedByStage,
   };
 }

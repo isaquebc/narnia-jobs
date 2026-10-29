@@ -55,6 +55,7 @@ import type {
   JobApplicationEventPatch,
   JobApplicationFunnel,
   JobApplicationPatch,
+  JobApplicationReject,
   JobApplicationStagesPut,
   JobApplicationSummary,
   JobApplicationUpcoming,
@@ -737,6 +738,11 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ application: JobApplicationSummary }>(
         `/api/job-applications/${encodeURIComponent(id)}`,
         { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    rejectJobApplication: (id: string, body: JobApplicationReject) =>
+      request<{ application: JobApplicationSummary }>(
+        `/api/job-applications/${encodeURIComponent(id)}/reject`,
+        { method: "POST", body: JSON.stringify(body) },
       ),
     putJobApplicationStages: (id: string, stages: JobApplicationStagesPut["stages"]) =>
       request<{ application: JobApplicationSummary }>(

@@ -173,7 +173,8 @@ describe("F07/M5 · lembretes e funil", () => {
             { from: "first_interview", to: "in_process", rate: 2 / 3 },
             { from: "in_process", to: "offer", rate: null },
           ],
-          closedReasons: { rejected: 1 },
+          closedReasons: { rejected: 3 },
+          rejectedByStage: { Triagem: 1, "Case técnico": 2 },
         }),
       }) as never,
       initialUrl: "/candidaturas",
@@ -183,6 +184,10 @@ describe("F07/M5 · lembretes e funil", () => {
     expect(within(funnel).getByText("67%")).toBeInTheDocument();
     expect(within(funnel).getByText("—")).toBeInTheDocument();
     expect(within(funnel).getByText(/7,3 dias/)).toBeInTheDocument();
-    expect(within(funnel).getByText(/Não aprovado: 1/)).toBeInTheDocument();
+    expect(within(funnel).getByText(/Não aprovado: 3/)).toBeInTheDocument();
+    // desclassificação (2026-10-29): por etapa, a mais frequente primeiro
+    expect(
+      within(funnel).getByText("Não aprovado por etapa: Case técnico: 2 · Triagem: 1"),
+    ).toBeInTheDocument();
   });
 });

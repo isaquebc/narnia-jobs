@@ -16,6 +16,7 @@ import { ChatAboutCard } from "./ChatAboutCard";
 import { ContactChainCard } from "./ContactChainCard";
 import { EntriesCard } from "./EntriesCard";
 import { applicationWho, columnLabel, useMoveApplication } from "./JobApplicationsPage";
+import { RejectButton } from "./RejectDialog";
 import { StagesEditor } from "./StagesEditor";
 
 function LockedDoc({
@@ -108,6 +109,7 @@ export function JobApplicationPage({ id }: { id: string }) {
           >
             {t("jobApplications.detail.posting")}
           </NavLink>
+          {a.column !== "closed" ? <RejectButton application={a} /> : null}
           <Menu
             label={t("jobApplications.move")}
             items={JOB_APPLICATION_COLUMNS.filter((c) => c !== a.column).map((c) => ({
@@ -140,7 +142,11 @@ export function JobApplicationPage({ id }: { id: string }) {
         </div>
       </div>
       {a.column === "closed" && a.closedReason ? (
-        <p className="text-sm">{t(`jobApplications.closedReason.${a.closedReason}` as TKey)}</p>
+        <p className="text-sm">
+          {a.closedReason === "rejected" && a.closedStage
+            ? t("jobApplications.rejection.closedAt", { stage: a.closedStage })
+            : t(`jobApplications.closedReason.${a.closedReason}` as TKey)}
+        </p>
       ) : null}
       <Card className="flex flex-col gap-2">
         <LockedDoc label={t("jobApplications.detail.cv")} doc={a.cv} />

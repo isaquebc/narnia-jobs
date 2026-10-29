@@ -12,6 +12,7 @@ import {
   listJobApplications,
   listSavedPostings,
   type Repos,
+  rejectJobApplication,
   removeJobApplication,
   removeJobApplicationEntry,
   removeJobApplicationEvent,
@@ -31,6 +32,7 @@ import {
   JobApplicationEventInputSchema,
   JobApplicationEventPatchSchema,
   JobApplicationPatchSchema,
+  JobApplicationRejectSchema,
   JobApplicationStagesPutSchema,
 } from "@narnia-jobs/shared";
 import { Hono } from "hono";
@@ -52,6 +54,7 @@ const ERROR_STATUS: Record<JobApplicationError["code"], ContentfulStatusCode> = 
   entry_empty: 400,
   file_too_large: 413,
   invalid_datetime: 400,
+  already_closed: 409,
 };
 
 /**
@@ -165,6 +168,23 @@ export function jobApplicationsRoutes(deps: {
     changed(id, updated.postingId);
     return c.json({ application: summarize(repos, updated) });
   });
+
+  // desclassificação (2026-10-29): o e-mail colado vira nota e a candidatura vai para Encerrado com a etapa
+  app.post(
+    "/api/job-applications/:id/reject",
+    validate("json", JobApplicationRejectSchema),
+    (c) => {
+      const id = c.req.param("id");
+      try {
+        const updated = rejectJobApplication(repos, deps.dataDir, id, c.req.valid("json"));
+        changed(id, updated.postingId);
+        return c.json({ application: summarize(repos, updated) });
+      } catch (e) {
+        if (!(e instanceof JobApplicationError)) throw e;
+        return apiError(c, ERROR_STATUS[e.code], e.code, e.message);
+      }
+    },
+  );
 
   // F07/M2: o pipeline editado (adicionar, remover, reordenar)
   app.put(

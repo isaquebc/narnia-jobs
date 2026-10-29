@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ATTACHMENT_MAX_BYTES,
+  type JobApplication,
   type JobApplicationEntry,
   type JobApplicationEntryPatch,
 } from "@narnia-jobs/shared";
@@ -132,4 +133,45 @@ export function removeJobApplication(repos: Repos, dataDir: string, applicationI
   const ids = repos.jobApplicationEntries.attachmentIds(applicationId);
   repos.jobApplications.remove(applicationId);
   unlink(dataDir, ids);
+}
+
+/**
+ * Desclassificação (pedido do dono, 2026-10-29): o e-mail colado vira nota datada (decisão do dono: nota, não campo
+ * próprio), a candidatura vai para Encerrado com o motivo `rejected` e a etapa em que parou fica registrada (o nome,
+ * para o funil contar mesmo se o pipeline mudar depois). Tudo é conferido antes de gravar.
+ */
+export function rejectJobApplication(
+  repos: Repos,
+  dataDir: string,
+  applicationId: string,
+  input: { occurredOn: string; message: string; stageId: string | null },
+  now = new Date(),
+): JobApplication {
+  const app = repos.jobApplications.get(applicationId);
+  if (!app) throw new JobApplicationError("not_found", "Candidatura não encontrada");
+  if (app.column === "closed")
+    throw new JobApplicationError("already_closed", "A candidatura já está encerrada");
+  const message = input.message.trim();
+  if (!message) throw new JobApplicationError("entry_empty", "Cole o e-mail ou escreva o motivo");
+  const stage = input.stageId === null ? null : app.stages.find((s) => s.id === input.stageId);
+  if (stage === undefined)
+    throw new JobApplicationError("stage_not_found", "Etapa não encontrada no processo");
+  notAfterToday(input.occurredOn, now);
+  const entry = addJobApplicationEntry(
+    repos,
+    dataDir,
+    applicationId,
+    { occurredOn: input.occurredOn, body: message, files: [] },
+    now,
+  );
+  return repos.jobApplications.update(
+    applicationId,
+    {
+      column: "closed",
+      closedReason: "rejected",
+      closedStage: stage?.name ?? null,
+      closedEntryId: entry.id,
+    },
+    now,
+  );
 }

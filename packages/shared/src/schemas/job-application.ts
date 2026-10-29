@@ -61,6 +61,10 @@ export const JobApplicationSchema = z.object({
   appliedOn: CalendarDateSchema,
   column: JobApplicationColumnSchema,
   closedReason: JobApplicationClosedReasonSchema.nullable(),
+  /** Etapa em que a pessoa foi desclassificada (nome; null sem etapa ou fora de Encerrado). */
+  closedStage: z.string().nullable().default(null),
+  /** Nota com o e-mail da desclassificação. */
+  closedEntryId: IdSchema.nullable().default(null),
   stages: z.array(JobApplicationStageSchema),
   /** Etapa atual do pipeline (o "x" do "x/N"); null antes de começar. */
   currentStageId: IdSchema.nullable(),
@@ -290,5 +294,15 @@ export const JobApplicationFunnelSchema = z.object({
     }),
   ),
   closedReasons: z.partialRecord(JobApplicationClosedReasonSchema, z.number().int()),
+  /** Desclassificações por etapa (nome da etapa; as sem etapa ficam de fora). */
+  rejectedByStage: z.record(z.string(), z.number().int()).default({}),
 });
 export type JobApplicationFunnel = z.infer<typeof JobApplicationFunnelSchema>;
+
+/** Desclassificação (2026-10-29): o e-mail colado vira nota; a etapa é a do pipeline (null: sem etapa). */
+export const JobApplicationRejectSchema = z.object({
+  occurredOn: CalendarDateSchema,
+  message: z.string().trim().min(1).max(20_000),
+  stageId: IdSchema.nullable(),
+});
+export type JobApplicationReject = z.infer<typeof JobApplicationRejectSchema>;

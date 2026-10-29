@@ -37,7 +37,8 @@ export type JobApplicationErrorCode =
   | "not_found"
   | "entry_empty"
   | "file_too_large"
-  | "invalid_datetime";
+  | "invalid_datetime"
+  | "already_closed";
 
 export class JobApplicationError extends Error {
   constructor(
