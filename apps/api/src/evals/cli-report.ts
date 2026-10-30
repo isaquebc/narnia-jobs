@@ -56,7 +56,7 @@ export function writeRunReport(o: {
   });
   mkdirSync(reportsDir(), { recursive: true });
   const base = join(reportsDir(), `${at.slice(0, 10)}-${o.label.replace(/[^\w.-]+/g, "_")}`);
-  writeFileSync(`${base}.json`, `${JSON.stringify(json, null, 1)}\n`);
+  writeFileSync(`${base}.json`, `${JSON.stringify(json, null, 2)}\n`);
   writeFileSync(`${base}.md`, markdown);
   console.log(`\n${markdown}\nRelatório gravado em ${base}.md (e .json).`);
   return `${base}.json`;

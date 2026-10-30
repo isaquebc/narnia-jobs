@@ -1,437 +1,420 @@
 {
- "label": "r3-juiz-perguntas",
- "commit": "71659e1",
- "at": "2026-10-30T05:07:26.089Z",
- "provider": "claude-code",
- "samples": 3,
- "summary": {
-  "conversations": 72,
-  "errors": 0,
-  "turns": 81,
-  "turnMsP50": 10695,
-  "turnMsP95": 71755,
-  "toolsPerTurn": 2.691358024691358,
-  "searchesPerTurn": 0.654320987654321,
-  "replyCharsAvg": 1145.469135802469,
-  "tokensPerConversation": 1823.3194444444443,
-  "costPerConversation": 0.14454292638888896,
-  "graders": 0.9345794392523364,
-  "judge": 0.7777777777777778,
-  "recall": 0.7222222222222222
- },
- "recall": {
+  "label": "r3-juiz-perguntas",
+  "commit": "71659e1",
+  "at": "2026-10-30T05:07:26.089Z",
+  "provider": "claude-code",
+  "samples": 3,
+  "summary": {
+    "conversations": 72,
+    "errors": 0,
+    "turns": 81,
+    "turnMsP50": 10695,
+    "turnMsP95": 71755,
+    "toolsPerTurn": 2.691358024691358,
+    "searchesPerTurn": 0.654320987654321,
+    "replyCharsAvg": 1145.469135802469,
+    "tokensPerConversation": 1823.3194444444443,
+    "costPerConversation": 0.14454292638888896,
+    "graders": 0.9345794392523364,
+    "judge": 0.7777777777777778,
+    "recall": 0.7222222222222222
+  },
+  "recall": {
+    "cases": [
+      {
+        "id": "kubernetes",
+        "category": "exato",
+        "recall": 1,
+        "found": 3,
+        "missing": []
+      },
+      {
+        "id": "mentoria",
+        "category": "exato",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "latencia",
+        "category": "exato",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "ingles",
+        "category": "exato",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "mensageria-agrupada",
+        "category": "agrupado",
+        "recall": 1,
+        "found": 3,
+        "missing": []
+      },
+      {
+        "id": "lideranca-agrupada",
+        "category": "agrupado",
+        "recall": 1,
+        "found": 2,
+        "missing": []
+      },
+      {
+        "id": "testes-agrupado",
+        "category": "agrupado",
+        "recall": 1,
+        "found": 2,
+        "missing": []
+      },
+      {
+        "id": "cloud-agrupado",
+        "category": "agrupado",
+        "recall": 1,
+        "found": 2,
+        "missing": []
+      },
+      {
+        "id": "mentoring",
+        "category": "traducao",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "leadership",
+        "category": "traducao",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "automated-tests",
+        "category": "traducao",
+        "recall": 1,
+        "found": 2,
+        "missing": []
+      },
+      {
+        "id": "payments",
+        "category": "traducao",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "k8s",
+        "category": "sinonimo",
+        "recall": 1,
+        "found": 2,
+        "missing": []
+      },
+      {
+        "id": "postgres",
+        "category": "sinonimo",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "iac",
+        "category": "sinonimo",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "lideranca",
+        "category": "sinonimo",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "frontend",
+        "category": "sinonimo",
+        "recall": 0,
+        "found": 0,
+        "missing": ["skill: React", "experience: Full Stack"]
+      },
+      {
+        "id": "banco-de-dados",
+        "category": "semantico",
+        "recall": 0,
+        "found": 0,
+        "missing": ["skill: PostgreSQL", "skill: SQLite"]
+      },
+      {
+        "id": "monitoramento",
+        "category": "semantico",
+        "recall": 1,
+        "found": 1,
+        "missing": []
+      },
+      {
+        "id": "desempenho",
+        "category": "semantico",
+        "recall": 0,
+        "found": 0,
+        "missing": ["achievement: latência p95"]
+      },
+      {
+        "id": "fintech",
+        "category": "semantico",
+        "recall": 0,
+        "found": 0,
+        "missing": ["experience: Acme Pagamentos"]
+      },
+      {
+        "id": "faculdade",
+        "category": "semantico",
+        "recall": 0,
+        "found": 0,
+        "missing": ["education: Ciência da Computação"]
+      },
+      {
+        "id": "pesquisa-academica",
+        "category": "semantico",
+        "recall": 0,
+        "found": 0,
+        "missing": ["experience: iniciação científica"]
+      },
+      {
+        "id": "api",
+        "category": "semantico",
+        "recall": 0,
+        "found": 0,
+        "missing": ["skill: REST", "skill: GraphQL"]
+      }
+    ],
+    "byCategory": {
+      "exato": 1,
+      "agrupado": 1,
+      "traducao": 1,
+      "sinonimo": 0.8,
+      "semantico": 0.14285714285714285
+    },
+    "overall": 0.7222222222222222
+  },
   "cases": [
-   {
-    "id": "kubernetes",
-    "category": "exato",
-    "recall": 1,
-    "found": 3,
-    "missing": []
-   },
-   {
-    "id": "mentoria",
-    "category": "exato",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "latencia",
-    "category": "exato",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "ingles",
-    "category": "exato",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "mensageria-agrupada",
-    "category": "agrupado",
-    "recall": 1,
-    "found": 3,
-    "missing": []
-   },
-   {
-    "id": "lideranca-agrupada",
-    "category": "agrupado",
-    "recall": 1,
-    "found": 2,
-    "missing": []
-   },
-   {
-    "id": "testes-agrupado",
-    "category": "agrupado",
-    "recall": 1,
-    "found": 2,
-    "missing": []
-   },
-   {
-    "id": "cloud-agrupado",
-    "category": "agrupado",
-    "recall": 1,
-    "found": 2,
-    "missing": []
-   },
-   {
-    "id": "mentoring",
-    "category": "traducao",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "leadership",
-    "category": "traducao",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "automated-tests",
-    "category": "traducao",
-    "recall": 1,
-    "found": 2,
-    "missing": []
-   },
-   {
-    "id": "payments",
-    "category": "traducao",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "k8s",
-    "category": "sinonimo",
-    "recall": 1,
-    "found": 2,
-    "missing": []
-   },
-   {
-    "id": "postgres",
-    "category": "sinonimo",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "iac",
-    "category": "sinonimo",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "lideranca",
-    "category": "sinonimo",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "frontend",
-    "category": "sinonimo",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "skill: React",
-     "experience: Full Stack"
-    ]
-   },
-   {
-    "id": "banco-de-dados",
-    "category": "semantico",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "skill: PostgreSQL",
-     "skill: SQLite"
-    ]
-   },
-   {
-    "id": "monitoramento",
-    "category": "semantico",
-    "recall": 1,
-    "found": 1,
-    "missing": []
-   },
-   {
-    "id": "desempenho",
-    "category": "semantico",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "achievement: latência p95"
-    ]
-   },
-   {
-    "id": "fintech",
-    "category": "semantico",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "experience: Acme Pagamentos"
-    ]
-   },
-   {
-    "id": "faculdade",
-    "category": "semantico",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "education: Ciência da Computação"
-    ]
-   },
-   {
-    "id": "pesquisa-academica",
-    "category": "semantico",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "experience: iniciação científica"
-    ]
-   },
-   {
-    "id": "api",
-    "category": "semantico",
-    "recall": 0,
-    "found": 0,
-    "missing": [
-     "skill: REST",
-     "skill: GraphQL"
-    ]
-   }
-  ],
-  "byCategory": {
-   "exato": 1,
-   "agrupado": 1,
-   "traducao": 1,
-   "sinonimo": 0.8,
-   "semantico": 0.14285714285714285
-  },
-  "overall": 0.7222222222222222
- },
- "cases": [
-  {
-   "id": "pontos-fracos",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.9523809523809523,
-   "judge": 0.8333333333333334,
-   "turnMsP50": 46592,
-   "searchesPerTurn": 1.6666666666666667
-  },
-  {
-   "id": "salario-de-mercado",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.5,
-   "turnMsP50": 25820,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "historia-livre",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.8333333333333334,
-   "turnMsP50": 5483,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "valor-pesquisado",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 18984,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "especializado",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.8888888888888888,
-   "judge": 1,
-   "turnMsP50": 45760,
-   "searchesPerTurn": 2
-  },
-  {
-   "id": "vaga-no-chat",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 1,
-   "turnMsP50": 67888,
-   "searchesPerTurn": 2
-  },
-  {
-   "id": "vaga-no-chat-com-assunto",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.5,
-   "turnMsP50": 6187,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "analise-de-vaga",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.9047619047619048,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 80906,
-   "searchesPerTurn": 2.3333333333333335
-  },
-  {
-   "id": "cv-pelo-chat",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.8333333333333334,
-   "turnMsP50": 6871,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "feedback-do-cv",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.9333333333333333,
-   "judge": 1,
-   "turnMsP50": 19958,
-   "searchesPerTurn": 1
-  },
-  {
-   "id": "corrigir-cargo",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 7674,
-   "searchesPerTurn": 1
-  },
-  {
-   "id": "formulario-reescrever",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 1,
-   "turnMsP50": 9701,
-   "searchesPerTurn": 1
-  },
-  {
-   "id": "formulario-fato-novo",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.8888888888888888,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 11312,
-   "searchesPerTurn": 1
-  },
-  {
-   "id": "formulario-sem-vaga",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 6920,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "formulario-autodeclaracao",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 1,
-   "turnMsP50": 4980,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "analise-com-vaga-descartada",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.5,
-   "turnMsP50": 72530,
-   "searchesPerTurn": 2.3333333333333335
-  },
-  {
-   "id": "candidatura-etapa-e-agenda",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 1,
-   "turnMsP50": 18613,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "candidaturas-listar",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 1,
-   "turnMsP50": 5846,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "fato-existente",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.75,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 9677,
-   "searchesPerTurn": 1.3333333333333333
-  },
-  {
-   "id": "fato-ausente",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.75,
-   "judge": 1,
-   "turnMsP50": 10281,
-   "searchesPerTurn": 1
-  },
-  {
-   "id": "pretensao-sem-pesquisa",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.6666666666666666,
-   "judge": 0.5,
-   "turnMsP50": 24425,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "vaga-o-que-pede",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.6666666666666666,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 11731,
-   "searchesPerTurn": 0
-  },
-  {
-   "id": "fato-novo-no-chat",
-   "samples": 3,
-   "errors": 0,
-   "graders": 0.8888888888888888,
-   "judge": 0.8333333333333334,
-   "turnMsP50": 10482,
-   "searchesPerTurn": 1
-  },
-  {
-   "id": "pergunta-curta",
-   "samples": 3,
-   "errors": 0,
-   "graders": 1,
-   "judge": 0.6666666666666666,
-   "turnMsP50": 2631,
-   "searchesPerTurn": 0
-  }
- ]
+    {
+      "id": "pontos-fracos",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.9523809523809523,
+      "judge": 0.8333333333333334,
+      "turnMsP50": 46592,
+      "searchesPerTurn": 1.6666666666666667
+    },
+    {
+      "id": "salario-de-mercado",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.5,
+      "turnMsP50": 25820,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "historia-livre",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.8333333333333334,
+      "turnMsP50": 5483,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "valor-pesquisado",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 18984,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "especializado",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.8888888888888888,
+      "judge": 1,
+      "turnMsP50": 45760,
+      "searchesPerTurn": 2
+    },
+    {
+      "id": "vaga-no-chat",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 1,
+      "turnMsP50": 67888,
+      "searchesPerTurn": 2
+    },
+    {
+      "id": "vaga-no-chat-com-assunto",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.5,
+      "turnMsP50": 6187,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "analise-de-vaga",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.9047619047619048,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 80906,
+      "searchesPerTurn": 2.3333333333333335
+    },
+    {
+      "id": "cv-pelo-chat",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.8333333333333334,
+      "turnMsP50": 6871,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "feedback-do-cv",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.9333333333333333,
+      "judge": 1,
+      "turnMsP50": 19958,
+      "searchesPerTurn": 1
+    },
+    {
+      "id": "corrigir-cargo",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 7674,
+      "searchesPerTurn": 1
+    },
+    {
+      "id": "formulario-reescrever",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 1,
+      "turnMsP50": 9701,
+      "searchesPerTurn": 1
+    },
+    {
+      "id": "formulario-fato-novo",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.8888888888888888,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 11312,
+      "searchesPerTurn": 1
+    },
+    {
+      "id": "formulario-sem-vaga",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 6920,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "formulario-autodeclaracao",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 1,
+      "turnMsP50": 4980,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "analise-com-vaga-descartada",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.5,
+      "turnMsP50": 72530,
+      "searchesPerTurn": 2.3333333333333335
+    },
+    {
+      "id": "candidatura-etapa-e-agenda",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 1,
+      "turnMsP50": 18613,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "candidaturas-listar",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 1,
+      "turnMsP50": 5846,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "fato-existente",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.75,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 9677,
+      "searchesPerTurn": 1.3333333333333333
+    },
+    {
+      "id": "fato-ausente",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.75,
+      "judge": 1,
+      "turnMsP50": 10281,
+      "searchesPerTurn": 1
+    },
+    {
+      "id": "pretensao-sem-pesquisa",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.6666666666666666,
+      "judge": 0.5,
+      "turnMsP50": 24425,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "vaga-o-que-pede",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.6666666666666666,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 11731,
+      "searchesPerTurn": 0
+    },
+    {
+      "id": "fato-novo-no-chat",
+      "samples": 3,
+      "errors": 0,
+      "graders": 0.8888888888888888,
+      "judge": 0.8333333333333334,
+      "turnMsP50": 10482,
+      "searchesPerTurn": 1
+    },
+    {
+      "id": "pergunta-curta",
+      "samples": 3,
+      "errors": 0,
+      "graders": 1,
+      "judge": 0.6666666666666666,
+      "turnMsP50": 2631,
+      "searchesPerTurn": 0
+    }
+  ]
 }
