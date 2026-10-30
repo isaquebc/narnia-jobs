@@ -306,13 +306,13 @@
   "ruido:narnia-chat": {
     "scores": {
       "amostras": 3,
-      "casos": 11,
-      "chat:avaliadores": 0.039,
-      "chat:juiz": 0.182,
-      "decisivos_por_amostra": 0.485,
-      "pares": 33
+      "casos": 18,
+      "chat:avaliadores": 0.023,
+      "chat:juiz": 0.111,
+      "decisivos_por_amostra": 0.593,
+      "pares": 54
     },
-    "updatedAt": "2026-10-26T17:51:36.955Z"
+    "updatedAt": "2026-10-30T06:11:39.671Z"
   },
   "ruido:narnia-chat-title": {
     "scores": {
