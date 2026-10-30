@@ -208,7 +208,12 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
         };
       }
       case "mentions_review": {
-        const claimsWrite = /\b(gravei|salvei|atualizei)\b(?![^.]*sem você)/i.test(all);
+        // gravar a resposta do formulário, a análise ou a vaga é legítimo; só o fato passa pela revisão
+        const claimsWrite = sentences(all).some(
+          (x) =>
+            /\b(gravei|salvei|atualizei)\b(?![^.]*sem você)/i.test(x) &&
+            !/\b(resposta|formulário|análise|vaga)\b/i.test(x),
+        );
         const passed = /revis/i.test(all) && !claimsWrite;
         return {
           type: g.type,

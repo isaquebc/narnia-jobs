@@ -70,6 +70,23 @@ describe("F04/M5 · avaliadores do chat", () => {
     expect(gradeTranscript(bad, [{ type: "mentions_review" }])[0]?.passed).toBe(false);
   });
 
+  it("mentions_review aceita gravar a resposta do formulário (não é fato) e recusa gravar o fato", () => {
+    const answer = {
+      replies: [
+        "Gravei a resposta de motivação com a mentoria; ela está na janela, em Perguntas. A mentoria foi para a ingestão e passa pela sua revisão antes de valer.",
+      ],
+      tools: ["application_answer_save", "ingest_text"],
+      card: "",
+    };
+    const fact = {
+      replies: ["Gravei a mentoria nos seus dados. A resposta está na revisão."],
+      tools: ["ingest_text"],
+      card: "",
+    };
+    expect(gradeTranscript(answer, [{ type: "mentions_review" }])[0]?.passed).toBe(true);
+    expect(gradeTranscript(fact, [{ type: "mentions_review" }])[0]?.passed).toBe(false);
+  });
+
   it("parseEvalCases lê o JSONL e recusa caso sem mensagens ou com avaliador desconhecido", () => {
     const cases: EvalCase[] = parseEvalCases(
       '{"id":"fraco","messages":["o que está fraco?"],"graders":[{"type":"cites_source"}]}\n\n',
