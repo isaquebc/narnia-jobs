@@ -3,121 +3,157 @@
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:analise-de-vaga": {
     "scores": {
-      "graders": 1
+      "graders": 0.857
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:avaliadores": {
     "scores": {
-      "media": 0.978
+      "media": 0.935
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:candidatura-etapa-e-agenda": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:candidaturas-listar": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:corrigir-cargo": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:cv-pelo-chat": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:especializado": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
+  },
+  "chat:fato-ausente": {
+    "scores": {
+      "graders": 0.75
+    },
+    "updatedAt": "2026-10-30T11:48:10.308Z"
+  },
+  "chat:fato-existente": {
+    "scores": {
+      "graders": 0.75
+    },
+    "updatedAt": "2026-10-30T11:48:10.308Z"
+  },
+  "chat:fato-novo-no-chat": {
+    "scores": {
+      "graders": 1
+    },
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:feedback-do-cv": {
     "scores": {
-      "graders": 0.96
+      "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:formulario-autodeclaracao": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:formulario-fato-novo": {
     "scores": {
-      "graders": 0.92
+      "graders": 0.833
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:formulario-reescrever": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:formulario-sem-vaga": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:historia-livre": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:juiz": {
     "scores": {
-      "media": 0.728
+      "media": 0.75
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
+  },
+  "chat:pergunta-curta": {
+    "scores": {
+      "graders": 1
+    },
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:pontos-fracos": {
     "scores": {
-      "graders": 0.9
+      "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
+  },
+  "chat:pretensao-sem-pesquisa": {
+    "scores": {
+      "graders": 0.667
+    },
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:salario-de-mercado": {
     "scores": {
-      "graders": 0.88
+      "graders": 0.833
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:vaga-no-chat": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:vaga-no-chat-com-assunto": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
+  },
+  "chat:vaga-o-que-pede": {
+    "scores": {
+      "graders": 0.667
+    },
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "chat:valor-pesquisado": {
     "scores": {
       "graders": 1
     },
-    "updatedAt": "2026-10-28T20:03:38.152Z"
+    "updatedAt": "2026-10-30T11:48:10.308Z"
   },
   "narnia-application-answer": {
     "scores": {
