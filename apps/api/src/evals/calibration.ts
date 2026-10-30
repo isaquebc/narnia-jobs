@@ -66,6 +66,8 @@ export async function calibrateJudges(
         defect: x.defect,
         expect: x.expect,
         got: j.label as JudgeLabel,
+        checks: x.checks,
+        found: j.defects,
       };
     }
     // a pior no lugar da aprovada: a 1ª ordem tem a pior em A e a melhor em B
@@ -121,6 +123,13 @@ export async function runCalibration(args: string[]): Promise<number> {
     );
     console.log(`  falsos positivos (mais brando que o rótulo): ${a.falsePositives}`);
     console.log(`  falsos negativos (mais duro que o rótulo): ${a.falseNegatives}`);
+    const m = r.confusion;
+    console.log(
+      `  matriz (positivo = tem defeito): VP ${m.tp} · VN ${m.tn} · FP ${m.fp} · FN ${m.fn} · precisão ${m.precision === null ? "—" : pct(m.precision * 100, 100)} · recall ${m.recall === null ? "—" : pct(m.recall * 100, 100)}`,
+    );
+    if (Object.keys(r.byCheck).length) console.log("  por pergunta do juiz:");
+    for (const [id, c] of Object.entries(r.byCheck).sort())
+      console.log(`    ${id}: VP ${c.tp} · FP ${c.fp} · FN ${c.fn}`);
     console.log(`Pairwise: ${p.right}/${p.total} certos (${pct(p.right, p.total)})`);
     console.log(
       `  preferiu a pior: ${p.wrong} · viés de posição: ${p.positionBias} · empate: ${p.ties}`,

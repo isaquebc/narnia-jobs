@@ -54,7 +54,7 @@ export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): stri
     });
   for (const p of byRelevance("project", f.projects.list()))
     entries.push({
-      text: `- ${[p.name, p.description, span(p.startDate, p.endDate)].filter(Boolean).join(" · ")}`,
+      text: `- ${[p.name, p.description, p.role && `papel: ${p.role}`, span(p.startDate, p.endDate)].filter(Boolean).join(" · ")}`,
       facts: 1,
     });
 

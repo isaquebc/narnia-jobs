@@ -41,10 +41,18 @@ export async function judgeLocally(
   provider: { complete(input: CompleteInput): Promise<CompleteResult> },
   judge: JudgeDef,
   ctx: Record<string, unknown>,
-): Promise<{ name: string; label: string; score: number; explanation: string }> {
+): Promise<{
+  name: string;
+  label: string;
+  score: number;
+  explanation: string;
+  defects?: string[];
+}> {
   const vars = Object.fromEntries(
     Object.entries(judge.variables).map(([name, path]) => [name, asText(resolvePath(ctx, path))]),
   );
+  if (judge.checks?.length)
+    return judgeChecklist(provider, judge, renderTemplate(judge.body, vars));
   const r = await provider.complete({
     system: JUDGE_SYSTEM,
     prompt: renderTemplate(judge.body, vars),
@@ -65,6 +73,71 @@ export async function judgeLocally(
     label: found?.label ?? "nao_atende",
     score: found?.score ?? 0,
     explanation: found ? (out.explanation ?? "") : `rótulo inválido do juiz: ${String(out.label)}`,
+  };
+}
+
+/**
+ * Juiz em perguntas de sim/não (F04-fix-fundamentacao, FF-4): uma resposta por defeito, com o trecho; o rótulo sai
+ * por código (grave → nao_atende; só detalhe → parcial; nenhum → atende).
+ */
+async function judgeChecklist(
+  provider: { complete(input: CompleteInput): Promise<CompleteResult> },
+  judge: JudgeDef,
+  body: string,
+): Promise<{
+  name: string;
+  label: string;
+  score: number;
+  explanation: string;
+  defects: string[];
+}> {
+  const checks = judge.checks ?? [];
+  const ids = checks.map((c) => c.id);
+  const r = await provider.complete({
+    system: JUDGE_SYSTEM,
+    prompt: `${body}\n\nResponda por defeito, um item para cada id (${ids.join(", ")}): \`defeito\` true só se as respostas do recrutador têm o defeito, com o trecho exato em \`trecho\`; false com \`trecho\` vazio.`,
+    model: judge.modelName,
+    jsonSchema: {
+      type: "object",
+      properties: {
+        itens: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", enum: ids },
+              defeito: { type: "boolean" },
+              trecho: { type: "string" },
+            },
+            required: ["id", "defeito", "trecho"],
+          },
+        },
+      },
+      required: ["itens"],
+    },
+  });
+  const itens =
+    ((r.structured ?? {}) as { itens?: Array<{ id: string; defeito: boolean; trecho: string }> })
+      .itens ?? [];
+  const found = itens.filter((i) => i.defeito && ids.includes(i.id));
+  const severity = (id: string) => checks.find((c) => c.id === id)?.severity;
+  const label = found.some((i) => severity(i.id) === "grave")
+    ? "nao_atende"
+    : found.length > 0
+      ? "parcial"
+      : "atende";
+  const score = JUDGE_LABELS.find((l) => l.label === label)?.score ?? 0;
+  const explanation = found.length
+    ? found.map((i) => `${i.id}: «${i.trecho}»`).join(" · ")
+    : itens.length
+      ? "nenhum defeito"
+      : "o juiz não respondeu às perguntas";
+  return {
+    name: judge.name,
+    label: itens.length ? label : "nao_atende",
+    score: itens.length ? score : 0,
+    explanation,
+    defects: found.map((i) => i.id),
   };
 }
 

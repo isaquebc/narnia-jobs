@@ -67,3 +67,62 @@ describe("calibração dos juízes (pedido do dono, 2026-10-24)", () => {
     expect(r.byDefect.x).toEqual({ total: 4, right: 1 });
   });
 });
+
+/**
+ * Matriz de confusão (F04-fix-fundamentacao, FF-3): positivo = a resposta tem defeito (rótulo esperado ≠ atende).
+ * Por pergunta do juiz (G1…, D1…), quando o item diz quais defeitos tem (`checks`) e o juiz diz quais achou.
+ */
+describe("calibração · matriz de confusão", () => {
+  it("VP, VN, FP e FN no geral, com precisão e recall; e por pergunta", () => {
+    const r = scoreCalibration([
+      {
+        id: "a",
+        kind: "absolute",
+        defect: "x",
+        expect: "nao_atende",
+        got: "parcial",
+        checks: ["G2"],
+        found: ["D4"],
+      },
+      {
+        id: "b",
+        kind: "absolute",
+        defect: "x",
+        expect: "parcial",
+        got: "atende",
+        checks: ["D1"],
+        found: [],
+      },
+      {
+        id: "c",
+        kind: "absolute",
+        defect: "limpa",
+        expect: "atende",
+        got: "parcial",
+        checks: [],
+        found: ["D4"],
+      },
+      {
+        id: "d",
+        kind: "absolute",
+        defect: "limpa",
+        expect: "atende",
+        got: "atende",
+        checks: [],
+        found: [],
+      },
+    ]);
+    // a: tem defeito e o juiz achou algum (VP); b: tem e não achou (FN); c: limpa e achou (FP); d: VN
+    expect(r.confusion).toEqual({ tp: 1, tn: 1, fp: 1, fn: 1, precision: 0.5, recall: 0.5 });
+    expect(r.byCheck.G2).toEqual({ tp: 0, fp: 0, fn: 1 });
+    expect(r.byCheck.D4).toEqual({ tp: 0, fp: 2, fn: 0 });
+    expect(r.byCheck.D1).toEqual({ tp: 0, fp: 0, fn: 1 });
+  });
+
+  it("os itens aceitam a lista de defeitos esperados", () => {
+    const items = parseCalibrationItems(
+      '{"id":"n","kind":"absolute","case":"c","defect":"ausencia","expect":"nao_atende","checks":["G2"],"replies":["x"],"tools":[]}',
+    );
+    expect(items[0]).toMatchObject({ checks: ["G2"] });
+  });
+});

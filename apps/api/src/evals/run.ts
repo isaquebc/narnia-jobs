@@ -14,7 +14,7 @@ export interface EvalRunOptions {
   fetch?: FetchLike;
   turnTimeoutMs?: number;
   /** Todos os fatos do usuário (`knownFactsText`): datas e empresas que o recrutador leu pelas tools não são inventadas. */
-  knownFacts?: string;
+  knownFacts?: string | (() => string);
   /** F12/M5: cria um formulário novo no sandbox para cada caso aberto pela conversa do formulário. */
   newApplication?: (o?: { withPosting?: boolean }) => string;
   /** Antes de cada caso de feedback do documento: o CV da vaga volta à versão pronta (amostras repetidas). */
@@ -22,7 +22,7 @@ export interface EvalRunOptions {
   /** F07/M6: a candidatura do sandbox, para os casos abertos pela conversa da candidatura. */
   jobApplication?: () => string;
   /** Vagas salvas (empresa e cargo, uma por linha): citar a empresa da vaga não é inventar (F12/M5). */
-  savedPostings?: string;
+  savedPostings?: string | (() => string);
   /**
    * Erro do turno que a sessão registrou (o `chat.error` do sandbox): o limite de uso vira erro na hora, sem esperar o
    * tempo do turno (retomada do gate, 2026-10-28).
@@ -117,13 +117,23 @@ export async function runEvalCases(
     if (!r.ok) throw new Error(`${init.method ?? "GET"} ${path} → ${r.status} ${await r.text()}`);
     return (await r.json()) as T;
   };
-  // o que o recrutador recebe no system prompt (persona e cartões de todos os perfis)
-  const persona = await call<{ text: string }>("/api/profiles/active/persona-card")
-    .then((c) => c.text)
-    .catch(() => "");
-  const card = [persona, o.knownFacts ?? "", o.savedPostings ?? ""].join("\n");
-  // contexto do juiz: os cartões e os fatos que as ferramentas podem devolver (calibração, 2026-10-24)
-  const context = judgeContext(persona, o.knownFacts ?? "", o.savedPostings ?? "");
+  // o que o recrutador recebe no system prompt (persona e cartões de todos os perfis) e o contexto do juiz (os fatos e
+  // as vagas que as ferramentas podem devolver, calibração 2026-10-24). Lidos no fim de cada caso: os casos de uma
+  // amostra dividem o sandbox, e um caso pode salvar vagas ou fatos que o seguinte lê (2026-10-29: o juiz punia como
+  // invenção a vaga que o `vaga-no-chat` tinha salvado)
+  const value = (v: string | (() => string) | undefined) =>
+    typeof v === "function" ? v() : (v ?? "");
+  const snapshot = async () => {
+    const persona = await call<{ text: string }>("/api/profiles/active/persona-card")
+      .then((c) => c.text)
+      .catch(() => "");
+    const knownFacts = value(o.knownFacts);
+    const savedPostings = value(o.savedPostings);
+    return {
+      card: [persona, knownFacts, savedPostings].join("\n"),
+      context: judgeContext(persona, knownFacts, savedPostings),
+    };
+  };
   // tetos e domínios confiáveis valem para a rodada inteira (auditoria E2, 19b)
   const settings = await call<{ settings: { maxBudgetUsd: number | null; maxTurns: number } }>(
     "/api/settings/chat",
@@ -233,6 +243,7 @@ export async function runEvalCases(
       const assistant = messages.filter((m) => m.role === "assistant");
       replies = assistant.map((m) => m.contentMd);
       tools = messages.flatMap((m) => m.toolCalls.map((t) => t.name));
+      const { card, context } = await snapshot();
       const { session } = await call<{ session: SessionView }>(`/api/sessions/${sessionId}`);
       const { sources } = await call<{
         sources: Array<{ url: string; sessionId: string | null; userConfirmed?: boolean }>;

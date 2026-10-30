@@ -63,6 +63,43 @@ describe("métricas por conversa no runner do chat", () => {
     });
     expect(r?.metrics?.turnMs).toHaveLength(2);
   });
+
+  it("o contexto do juiz é lido no fim de cada caso (um caso pode salvar a vaga que o seguinte lê)", async () => {
+    const cases = parseEvalCases(
+      [
+        '{"id":"salva","messages":["salva a vaga"],"graders":[{"type":"asks_question"}]}',
+        '{"id":"le","messages":["o que a vaga pede?"],"graders":[{"type":"asks_question"}]}',
+      ].join("\n"),
+    );
+    const saved: string[] = [];
+    let n = 0;
+    const fetchFn = (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      const json = (body: unknown) => Promise.resolve(Response.json(body));
+      if (path === "/api/sessions" && init?.method === "POST")
+        return json({ session: { id: `s${++n}` } });
+      if (path.endsWith("/messages") && init?.method === "POST") {
+        // a primeira conversa salva uma vaga no sandbox
+        if (n === 1) saved.push("Initech Bank · Backend");
+        return json({});
+      }
+      if (path.endsWith("/messages"))
+        return json({ messages: [{ role: "assistant", contentMd: "Ok?", toolCalls: [] }] });
+      if (/^\/api\/sessions\/s\d$/.test(path))
+        return json({ session: { profileId: "p1", tokensIn: 0, tokensOut: 0, costUsdEst: 0 } });
+      if (path === "/api/research") return json({ sources: [] });
+      if (path.endsWith("/hibernate")) return json({});
+      return Promise.resolve(new Response("não", { status: 404 }));
+    };
+    const [a, b] = await runEvalCases(cases, {
+      baseUrl: "http://narnia.test",
+      token: "t",
+      fetch: fetchFn,
+      savedPostings: () => saved.join("\n"),
+    });
+    expect(a?.context).toContain("Initech Bank");
+    expect(b?.context).toContain("Initech Bank");
+  });
 });
 
 const caseReport = (id: string, o: Partial<EvalCaseReport> = {}): EvalCaseReport => ({

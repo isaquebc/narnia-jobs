@@ -39,9 +39,10 @@ describe("avaliação local", () => {
         return provider.complete(i);
       },
     };
-    const r = await judgeLocally(spy, chatJudge(), {
-      input: { messages: ["o que está fraco no meu perfil?"] },
-      output: { replies: ["Faltam métricas na Acme."], tools: ["evidence_experience_list"] },
+    // o juiz do recrutador virou perguntas (judge-checklist.test.ts); o rótulo único continua nos estruturados
+    const r = await judgeLocally(spy, judgeFor("chatTitle"), {
+      input: { message: "o que está fraco no meu perfil?" },
+      output: { messages: [{ role: "assistant", content: "Faltam métricas na Acme." }] },
     });
     expect(r).toEqual({
       name: "padrao_de_entrega",

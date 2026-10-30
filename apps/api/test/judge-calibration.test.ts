@@ -24,10 +24,10 @@ const fakeJudge = () => {
     provider: {
       complete: async (i: CompleteInput) => {
         seen.push(i);
-        if ("label" in ((i.jsonSchema?.properties as object) ?? {}))
+        // juiz do recrutador com perguntas (FF-4): G1 (inventa) para o que tem "INVENTADA"
+        if ("itens" in ((i.jsonSchema?.properties as object) ?? {}))
           return result({
-            label: i.prompt.includes("INVENTADA") ? "nao_atende" : "atende",
-            explanation: "ok",
+            itens: [{ id: "G1", defeito: i.prompt.includes("INVENTADA"), trecho: "INVENTADA" }],
           });
         const better = i.prompt.indexOf("MELHOR");
         const worse = i.prompt.indexOf("PIOR");
@@ -98,7 +98,8 @@ describe("calibração dos juízes · runner", () => {
     expect(absolute?.prompt).toContain("CARTÃO DA FIXTURE");
     expect(absolute?.prompt).toContain("mensagem do caso corrigir-cargo");
     // explicação do juiz por caso, para ler o motivo do erro
-    expect(r.explanations.brando).toBe("ok");
+    expect(r.explanations.brando).toBe("nenhum defeito");
+    expect(r.explanations.inventa).toBe("G1: «INVENTADA»");
     expect(j.seen).toHaveLength(3 + 2 * 2);
   });
 

@@ -238,7 +238,8 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
         const unknown = [...all.matchAll(MONEY)]
           .map((m) => m[0])
           .filter((m) => digits(m).some((d) => !known.has(d)));
-        const researched = t.tools.includes("research_save") && (t.sources?.length ?? 0) > 0;
+        // a pesquisa registrada na conversa (o registro da fonte pode ficar com a sessão do subagente)
+        const researched = t.tools.includes("research_save");
         const passed = unknown.length === 0 || researched;
         return {
           type: g.type,
@@ -391,7 +392,13 @@ export function knownFactsText(repos: Repos): string {
     ...f.education
       .list()
       .map((e) => `${e.institution} · ${e.course} · ${span(e.startDate, e.endDate)}`),
-    ...f.projects.list().map((p) => `${p.name} · ${span(p.startDate, p.endDate)}`),
+    ...f.projects
+      .list()
+      .map((p) =>
+        [p.name, p.description, p.role && `papel: ${p.role}`, span(p.startDate, p.endDate)]
+          .filter(Boolean)
+          .join(" · "),
+      ),
     ...f.languages.list().map((l) => (l.level ? `${l.name} (${l.level})` : l.name)),
     ...f.skills.list().map((s) => (s.level ? `${s.name} (nível ${s.level})` : s.name)),
   ].join("\n");

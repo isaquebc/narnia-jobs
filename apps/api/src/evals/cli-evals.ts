@@ -188,11 +188,11 @@ async function chat(
               return runEvalCases(todo, {
                 baseUrl: sandbox.baseUrl,
                 token: sandbox.token,
-                knownFacts: knownFactsText(sandbox.repos),
+                knownFacts: () => knownFactsText(sandbox.repos),
                 newApplication: (opts) => sandbox.newApplication(opts),
                 readyPostingCv: () => sandbox.readyPostingCv(),
                 jobApplication: () => sandbox.jobApplication(),
-                savedPostings: savedPostingsText(sandbox.repos),
+                savedPostings: () => savedPostingsText(sandbox.repos),
                 turnError: (id) => sandbox.turnError(id),
                 stopOnError,
                 onCase: (r) => cp?.putRun(`${slot}:${r.id}`, r),

@@ -20,6 +20,8 @@ const ItemSchema = z.discriminatedUnion("kind", [
     defect: z.string().min(1),
     why: z.string().optional(),
     expect: LabelSchema,
+    /** Defeitos que a resposta tem, pelas perguntas do juiz (G1…, D1…); vazio = limpa. */
+    checks: z.array(z.string()).optional(),
     ...AnswerSchema.shape,
   }),
   z.object({
@@ -49,7 +51,16 @@ export function parseCalibrationItems(text: string): CalibrationItem[] {
 }
 
 export type CalibrationVerdict =
-  | { id: string; kind: "absolute"; defect: string; expect: JudgeLabel; got: JudgeLabel }
+  | {
+      id: string;
+      kind: "absolute";
+      defect: string;
+      expect: JudgeLabel;
+      got: JudgeLabel;
+      /** Defeitos esperados e os que o juiz achou (juiz com perguntas). */
+      checks?: string[] | undefined;
+      found?: string[] | undefined;
+    }
   /** `first`: A = pior, B = melhor; `swapped`: A = melhor, B = pior. */
   | { id: string; kind: "pair"; defect: string; first: PairPick; swapped: PairPick };
 
@@ -67,6 +78,17 @@ export interface CalibrationReport {
   pairs: { total: number; right: number; wrong: number; positionBias: number; ties: number };
   byDefect: Record<string, { total: number; right: number }>;
   mistakes: CalibrationMistake[];
+  /** Positivo = a resposta tem defeito (esperado ≠ atende); o juiz "acha" quando dá ≠ atende. */
+  confusion: {
+    tp: number;
+    tn: number;
+    fp: number;
+    fn: number;
+    precision: number | null;
+    recall: number | null;
+  };
+  /** Por pergunta do juiz, nos itens com `checks`. */
+  byCheck: Record<string, { tp: number; fp: number; fn: number }>;
 }
 
 const RANK: Record<JudgeLabel, number> = { nao_atende: 0, parcial: 1, atende: 2 };
@@ -77,6 +99,13 @@ export function scoreCalibration(verdicts: CalibrationVerdict[]): CalibrationRep
     pairs: { total: 0, right: 0, wrong: 0, positionBias: 0, ties: 0 },
     byDefect: {},
     mistakes: [],
+    confusion: { tp: 0, tn: 0, fp: 0, fn: 0, precision: null, recall: null },
+    byCheck: {},
+  };
+  const check = (id: string) => {
+    const c = r.byCheck[id] ?? { tp: 0, fp: 0, fn: 0 };
+    r.byCheck[id] = c;
+    return c;
   };
   for (const v of verdicts) {
     const d = r.byDefect[v.defect] ?? { total: 0, right: 0 };
@@ -85,6 +114,16 @@ export function scoreCalibration(verdicts: CalibrationVerdict[]): CalibrationRep
     const miss = (kind: CalibrationMistake["kind"], severe: boolean, detail: string) =>
       r.mistakes.push({ id: v.id, defect: v.defect, kind, severe, detail });
     if (v.kind === "absolute") {
+      const bad = v.expect !== "atende";
+      const flagged = v.got !== "atende";
+      if (bad && flagged) r.confusion.tp++;
+      else if (bad) r.confusion.fn++;
+      else if (flagged) r.confusion.fp++;
+      else r.confusion.tn++;
+      if (v.checks && v.found) {
+        for (const id of v.found) v.checks.includes(id) ? check(id).tp++ : check(id).fp++;
+        for (const id of v.checks) if (!v.found.includes(id)) check(id).fn++;
+      }
       r.absolute.total++;
       const diff = RANK[v.got] - RANK[v.expect];
       const detail = `esperado ${v.expect}, juiz deu ${v.got}`;
@@ -117,5 +156,8 @@ export function scoreCalibration(verdicts: CalibrationVerdict[]): CalibrationRep
       miss("empate", false, detail);
     }
   }
+  const { tp, fp, fn } = r.confusion;
+  r.confusion.precision = tp + fp ? tp / (tp + fp) : null;
+  r.confusion.recall = tp + fn ? tp / (tp + fn) : null;
   return r;
 }

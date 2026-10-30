@@ -88,6 +88,11 @@ export interface JudgeDef {
   variables: Record<string, string>;
   modelName: string;
   hash: string;
+  /**
+   * Perguntas de sim/não do juiz (F04-fix-fundamentacao, FF-4): linhas `- [G1 grave] …` ou `- [D1 detalhe] …` no
+   * arquivo. Com elas, o modelo responde por defeito e o rótulo sai por código.
+   */
+  checks?: Array<{ id: string; severity: "grave" | "detalhe"; text: string }>;
 }
 
 const repoRoot = () => fileURLToPath(new URL("../../../../", import.meta.url));
@@ -106,7 +111,22 @@ function judge(
       JSON.stringify({ SYSTEM: JUDGE_SYSTEM, body, variables, modelName, labels: JUDGE_LABELS }),
     )
     .digest("hex");
-  return { operation, name: JUDGE_NAME, description, file, body, variables, modelName, hash };
+  const checks = [...body.matchAll(/^- \[([GD]\d+) (grave|detalhe)\] (.+)$/gm)].map((m) => ({
+    id: m[1] as string,
+    severity: m[2] as "grave" | "detalhe",
+    text: (m[3] as string).trim(),
+  }));
+  return {
+    operation,
+    name: JUDGE_NAME,
+    description,
+    file,
+    body,
+    variables,
+    modelName,
+    hash,
+    ...(checks.length ? { checks } : {}),
+  };
 }
 
 export function judgeFor(op: StructuredOperation): JudgeDef {
