@@ -199,3 +199,55 @@ describe("F04/M5 · avaliadores do chat", () => {
     });
   });
 });
+
+describe("R5 · citações", () => {
+  const base = { tools: [], card: "" };
+
+  it("citations_valid reprova citação que não confere e passa sem citação inválida", () => {
+    const ok = {
+      ...base,
+      replies: ["Na Acme [f:a1b2c3]."],
+      citationsByReply: [[{ ref: "f:a1b2c3", valid: true }]],
+    };
+    const bad = {
+      ...base,
+      replies: ["Na Acme [f:000000]."],
+      citationsByReply: [[{ ref: "f:000000", valid: false }]],
+    };
+    expect(gradeTranscript(ok, [{ type: "citations_valid" }])[0]?.passed).toBe(true);
+    const r = gradeTranscript(bad, [{ type: "citations_valid" }])[0];
+    expect(r?.passed).toBe(false);
+    expect(r?.detail).toContain("f:000000");
+  });
+
+  it("claims_cited reprova frase com dado checável sem citação (tolerância em value)", () => {
+    const t = {
+      ...base,
+      replies: ["Espere R$ 20 mil. Na Acme você liderou."],
+      uncitedByReply: [["Espere R$ 20 mil.", "Na Acme você liderou."]],
+    };
+    const r = gradeTranscript(t, [{ type: "claims_cited" }])[0];
+    expect(r?.passed).toBe(false);
+    expect(r?.detail).toContain("Espere R$ 20 mil.");
+    expect(gradeTranscript(t, [{ type: "claims_cited", value: "2" }])[0]?.passed).toBe(true);
+    expect(
+      gradeTranscript({ ...base, replies: ["Oi."], uncitedByReply: [[]] }, [
+        { type: "claims_cited" },
+      ])[0]?.passed,
+    ).toBe(true);
+  });
+});
+
+describe("R5 · cites_source aceita a citação por id", () => {
+  it("[f:…], [r:…] e [v:…] contam como fonte citada", () => {
+    for (const reply of [
+      "Na Acme [f:a1b2c3].",
+      "Média R$ 14 mil [r:00ff11].",
+      "A vaga [v:abcdef] pede Kafka.",
+    ])
+      expect(
+        gradeTranscript({ replies: [reply], tools: [], card: "" }, [{ type: "cites_source" }])[0]
+          ?.passed,
+      ).toBe(true);
+  });
+});

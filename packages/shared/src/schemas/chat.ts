@@ -74,6 +74,20 @@ export const ChatToolCallSchema = z.object({
 });
 export type ChatToolCall = z.infer<typeof ChatToolCallSchema>;
 
+/**
+ * Citação da resposta conferida pelo código (F04-fix-fundamentacao, R5): `f` fato, `r` pesquisa, `v` vaga; o balão da
+ * conversa mostra o rótulo e o link; `valid: false` é id que não existe.
+ */
+export const ChatCitationSchema = z.object({
+  kind: z.enum(["f", "r", "v"]),
+  ref: z.string(),
+  valid: z.boolean(),
+  label: z.string().nullable(),
+  detail: z.string().nullable(),
+  url: z.string().nullable(),
+});
+export type ChatCitation = z.infer<typeof ChatCitationSchema>;
+
 export const ChatMessageSchema = z.object({
   id: IdSchema,
   sessionId: IdSchema,
@@ -85,6 +99,9 @@ export const ChatMessageSchema = z.object({
     .object({ inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) })
     .nullable(),
   createdAt: IsoDateTimeSchema,
+  /** Só nas respostas lidas pela API: citações conferidas e frases com dado checável sem citação (R5). */
+  citations: z.array(ChatCitationSchema).optional(),
+  uncited: z.array(z.string()).optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 

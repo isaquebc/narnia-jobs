@@ -19,6 +19,7 @@ import {
   planFactChange,
 } from "../ingest/fact-change";
 import { isBelowReference } from "../salary";
+import { factRefs, researchRef } from "./citations";
 import { aliasKeys, expandQuery } from "./fact-search";
 import { resolveChatSettings } from "./settings";
 
@@ -112,6 +113,9 @@ function overlaps(
   return true;
 }
 
+/** Arquivo e repositório não são fatos citáveis (`f:`): só os seis tipos do registro. */
+const isFactKind = (kind: FactSearchKind) => kind !== "file" && kind !== "repo";
+
 const clip = (text: string, max = 160) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHandlers {
@@ -141,6 +145,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
   const page = <T extends { id: string; line: string; relevance: number | null }>(
     items: T[],
     input: { limit?: number | undefined; cursor?: string | undefined },
+    refOf?: (id: string) => string,
   ) => {
     const offset = Number(input.cursor ?? 0) || 0;
     const limit = input.limit ?? 20;
@@ -148,6 +153,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
     return {
       items: slice.map(({ id, line, relevance: rel }) => ({
         id,
+        ...(refOf ? { ref: refOf(id) } : {}),
         line: clip(line),
         relevance: rel,
       })),
@@ -286,7 +292,13 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
       case "experience": {
         const e = repos.facts.experiences.get(id);
         if (!e) throw notFound();
-        return { ...e, achievements: repos.facts.achievements.listByExperience(id) };
+        const refOf = factRefs(repos);
+        return {
+          ...e,
+          achievements: repos.facts.achievements
+            .listByExperience(id)
+            .map((a) => ({ ...a, ref: refOf(a.id) })),
+        };
       }
       case "achievement":
         return { ...(repos.facts.achievements.get(id) ?? throwIt(notFound())) };
@@ -362,10 +374,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           repos.facts.experiences.list().map((e) => ({ id: e.id, date: e.startDate })),
         ),
         input,
+        factRefs(repos),
       ),
     ),
     "evidence.experience.get": wrap("evidence.experience.get", (input) => ({
       id: input.id,
+      ref: factRefs(repos)(input.id),
       kind: "experience",
       detail: detail("experience", input.id),
     })),
@@ -376,10 +390,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           repos.facts.projects.list().map((p) => ({ id: p.id, date: p.startDate ?? null })),
         ),
         input,
+        factRefs(repos),
       ),
     ),
     "evidence.project.get": wrap("evidence.project.get", (input) => ({
       id: input.id,
+      ref: factRefs(repos)(input.id),
       kind: "project",
       detail: detail("project", input.id),
     })),
@@ -390,10 +406,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           repos.facts.skills.list().map((s) => ({ id: s.id })),
         ),
         input,
+        factRefs(repos),
       ),
     ),
     "evidence.skill.get": wrap("evidence.skill.get", (input) => ({
       id: input.id,
+      ref: factRefs(repos)(input.id),
       kind: "skill",
       detail: detail("skill", input.id),
     })),
@@ -404,10 +422,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           repos.facts.education.list().map((e) => ({ id: e.id, date: e.startDate ?? null })),
         ),
         input,
+        factRefs(repos),
       ),
     ),
     "evidence.education.get": wrap("evidence.education.get", (input) => ({
       id: input.id,
+      ref: factRefs(repos)(input.id),
       kind: "education",
       detail: detail("education", input.id),
     })),
@@ -440,6 +460,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           } else found.set(key, { kind: h.kind, id: h.id, best: i, matched: [q] });
         });
       }
+      const refOf = factRefs(repos);
       const items = [...found.values()]
         .map((h) => {
           const d = describe(h.kind, h.id);
@@ -451,6 +472,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           return {
             kind: h.kind,
             id: h.id,
+            ...(isFactKind(h.kind) ? { ref: refOf(h.id) } : {}),
             line: clip(d.line),
             period: period(d.start, d.end, d.current),
             relevance: rel.get(`${h.kind}:${h.id}`) ?? null,
@@ -485,7 +507,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
       return { id: a.id, term: a.term, kind: a.kind, factId: a.factId };
     }),
     "fact.get": wrap("fact.get", (input) => ({
-      items: input.refs.map((r) => ({ id: r.id, kind: r.kind, detail: detail(r.kind, r.id) })),
+      items: input.refs.map((r) => ({
+        id: r.id,
+        ...(isFactKind(r.kind) ? { ref: factRefs(repos)(r.id) } : {}),
+        kind: r.kind,
+        detail: detail(r.kind, r.id),
+      })),
     })),
     "fact.timeline": wrap("fact.timeline", (input) => {
       const rows = [
@@ -657,7 +684,12 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
         trustTag: match?.trustTag ?? "other",
         userConfirmed,
       });
-      return { id: saved.id, domain: saved.domain, trustTag: saved.trustTag };
+      return {
+        id: saved.id,
+        ref: researchRef(saved.id),
+        domain: saved.domain,
+        trustTag: saved.trustTag,
+      };
     }),
     "research.apply": wrap("research.apply", (input) => {
       const pid = profileId();
@@ -706,6 +738,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
           relevance: null,
         })),
         input,
+        researchRef,
       );
     }),
 

@@ -12,6 +12,7 @@ import {
   type PreAnalysis,
 } from "@narnia-jobs/shared";
 import type { z } from "zod";
+import { postingRef } from "../chat/citations";
 import type { Repos } from "../db";
 import type { JobAnalysisRecord } from "../db/repos/postings";
 import { editPostingNote } from "./notes";
@@ -273,6 +274,7 @@ export function createPostingTools(
       if (s?.category === "job" && !s.postingId) repos.chatSessions.setPosting(s.id, p.id);
       return {
         postingId: p.id,
+        ref: postingRef(p.id),
         status: p.status,
         url: postingUrl(p.id),
         title: postingSessionTitle(p),
@@ -299,6 +301,7 @@ export function createPostingTools(
           fields[k] = v;
       return {
         id: p.id,
+        ref: postingRef(p.id),
         status,
         fields,
         fieldSources,
@@ -330,7 +333,9 @@ export function createPostingTools(
     "posting.search": wrap("posting.search", (i) => {
       const hits = searchPostings(repos, i.query ?? "");
       return {
-        items: hits.slice(0, i.limit ?? 10).map((p) => ({ id: p.id, line: postingLine(p) })),
+        items: hits
+          .slice(0, i.limit ?? 10)
+          .map((p) => ({ id: p.id, ref: postingRef(p.id), line: postingLine(p) })),
       };
     }),
     "posting.update": wrap("posting.update", (i) => {

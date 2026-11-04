@@ -34,6 +34,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
         "kind": {
           "type": "string",
         },
+        "ref": {
+          "type": "string",
+        },
       },
       "required": [
         "id",
@@ -72,6 +75,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
                 "type": "string",
               },
               "line": {
+                "type": "string",
+              },
+              "ref": {
                 "type": "string",
               },
               "relevance": {
@@ -142,6 +148,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
         "kind": {
           "type": "string",
         },
+        "ref": {
+          "type": "string",
+        },
       },
       "required": [
         "id",
@@ -180,6 +189,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
                 "type": "string",
               },
               "line": {
+                "type": "string",
+              },
+              "ref": {
                 "type": "string",
               },
               "relevance": {
@@ -250,6 +262,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
         "kind": {
           "type": "string",
         },
+        "ref": {
+          "type": "string",
+        },
       },
       "required": [
         "id",
@@ -288,6 +303,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
                 "type": "string",
               },
               "line": {
+                "type": "string",
+              },
+              "ref": {
                 "type": "string",
               },
               "relevance": {
@@ -358,6 +376,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
         "kind": {
           "type": "string",
         },
+        "ref": {
+          "type": "string",
+        },
       },
       "required": [
         "id",
@@ -396,6 +417,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
                 "type": "string",
               },
               "line": {
+                "type": "string",
+              },
+              "ref": {
                 "type": "string",
               },
               "relevance": {
@@ -644,6 +668,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
               "kind": {
                 "type": "string",
               },
+              "ref": {
+                "type": "string",
+              },
             },
             "required": [
               "id",
@@ -838,6 +865,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
                   "string",
                   "null",
                 ],
+              },
+              "ref": {
+                "type": "string",
               },
               "relevance": {
                 "anyOf": [
@@ -1359,6 +1389,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
               "line": {
                 "type": "string",
               },
+              "ref": {
+                "type": "string",
+              },
               "relevance": {
                 "anyOf": [
                   {
@@ -1623,6 +1656,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
               "line": {
                 "type": "string",
               },
+              "ref": {
+                "type": "string",
+              },
               "relevance": {
                 "anyOf": [
                   {
@@ -1703,6 +1739,9 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
         },
         "id": {
           "minLength": 1,
+          "type": "string",
+        },
+        "ref": {
           "type": "string",
         },
         "trustTag": {

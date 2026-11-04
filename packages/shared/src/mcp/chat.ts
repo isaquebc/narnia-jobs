@@ -39,6 +39,8 @@ const Page = z.object({
 /** Linha compacta (30–40 tokens): o que o agente precisa para decidir se pede o detalhe. */
 const Line = z.object({
   id: IdSchema,
+  /** Id curto para citar na resposta (`[f:…]` fato, `[r:…]` pesquisa). */
+  ref: z.string().optional(),
   line: z.string(),
   relevance: z.number().min(0).max(1).nullable(),
 });
@@ -46,6 +48,8 @@ const Paged = z.object({ items: z.array(Line), nextCursor: z.string().nullable()
 const ById = z.object({ id: IdSchema });
 const Detail = z.object({
   id: IdSchema,
+  /** Id curto para citar na resposta (`[f:…]` fato, `[r:…]` pesquisa). */
+  ref: z.string().optional(),
   kind: z.string(),
   detail: z.record(z.string(), z.unknown()),
 });
@@ -132,6 +136,7 @@ export const CHAT_TOOLS = {
         z.object({
           kind: FactSearchKindSchema,
           id: IdSchema,
+          ref: z.string().optional(),
           line: z.string(),
           period: z.string().nullable(),
           relevance: z.number().min(0).max(1).nullable(),
@@ -229,7 +234,12 @@ export const CHAT_TOOLS = {
       usedFor: z.string().min(1).max(100),
       userConfirmed: z.boolean().optional(),
     }),
-    z.object({ id: IdSchema, domain: z.string(), trustTag: TrustTagSchema }),
+    z.object({
+      id: IdSchema,
+      ref: z.string().optional(),
+      domain: z.string(),
+      trustTag: TrustTagSchema,
+    }),
   ),
   "research.apply": tool(
     "Grava no perfil da conversa um dado de carreira pendente de pesquisa (needsResearch), com o valor que o usuário confirmou na conversa e a fonte registrada por research_save. Só chame depois da confirmação explícita do usuário.",

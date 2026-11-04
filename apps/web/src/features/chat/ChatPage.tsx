@@ -430,7 +430,7 @@ export function ChatView({ sessionId, draft }: { sessionId: string; draft?: stri
                   {m.role === "user" ? (
                     <UserContent text={m.contentMd} />
                   ) : (
-                    <Markdown text={m.contentMd} />
+                    <Markdown text={m.contentMd} citations={m.citations} uncited={m.uncited} />
                   )}
                   <RunLinks runIds={runsOf(m)} />
                   <PostingLinks message={m} />

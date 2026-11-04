@@ -5,6 +5,7 @@ export * from "./applications/self-declaration";
 export * from "./applications/steps";
 export * from "./applications/tools";
 export * from "./budget";
+export * from "./chat/citations";
 export * from "./chat/fact-search";
 export * from "./chat/prompt";
 export * from "./chat/recruiter-context";

@@ -1,4 +1,4 @@
-import type { Repos } from "@narnia-jobs/core";
+import { citationTerms, type Repos, resolveCitations, uncitedClaims } from "@narnia-jobs/core";
 import {
   ChatReadRequestSchema,
   ChatSendRequestSchema,
@@ -105,12 +105,23 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
         const id = c.req.param("id");
         sessions.get(id);
         const q = c.req.valid("query");
+        const messages = repos.chatMessages.list(id, {
+          ...(q.before ? { before: q.before } : {}),
+          ...(q.since ? { since: q.since } : {}),
+          ...(q.limit ? { limit: q.limit } : {}),
+        });
+        // R5 (FF-2): as citações de cada resposta, conferidas na leitura (um fato apagado depois deixa de valer)
+        const terms = citationTerms(repos);
         return c.json({
-          messages: repos.chatMessages.list(id, {
-            ...(q.before ? { before: q.before } : {}),
-            ...(q.since ? { since: q.since } : {}),
-            ...(q.limit ? { limit: q.limit } : {}),
-          }),
+          messages: messages.map((m) =>
+            m.role === "assistant"
+              ? {
+                  ...m,
+                  citations: resolveCitations(repos, m.contentMd),
+                  uncited: uncitedClaims(m.contentMd, terms),
+                }
+              : m,
+          ),
         });
       } catch (e) {
         return sessionError(c, e);

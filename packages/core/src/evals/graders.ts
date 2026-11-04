@@ -24,6 +24,9 @@ export const GRADER_TYPES = [
   "no_save_promise",
   "max_reply_chars",
   "mentions",
+  // R5: a citação aponta para o que existe e o dado checável vem citado
+  "citations_valid",
+  "claims_cited",
 ] as const;
 
 const GraderSchema = z.object({ type: z.enum(GRADER_TYPES), value: z.string().optional() });
@@ -74,6 +77,10 @@ export interface Transcript {
   toolsPerReply?: number[];
   /** Tools de cada resposta, em ordem (do recrutador e do subagente): a busca precisa estar no mesmo turno. */
   toolsByReply?: string[][];
+  /** Citações de cada resposta conferidas pela API (R5): `f:abc123`, válida ou não. */
+  citationsByReply?: Array<Array<{ ref: string; valid: boolean }>>;
+  /** Frases com número ou termo dos fatos sem citação, por resposta (R5). */
+  uncitedByReply?: string[][];
 }
 
 /** Afirma que algo não está nos dados do usuário (A1). */
@@ -184,6 +191,7 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
       }
       case "cites_source": {
         const passed =
+          /\[[frv]:[0-9a-f]{6,32}/i.test(all) ||
           /https?:\/\//.test(all) ||
           SOURCE_DOMAIN.test(all) ||
           SOURCE_WORD.test(all) ||
@@ -275,6 +283,30 @@ export function gradeTranscript(t: Transcript, graders: Grader[]): GradeResult[]
           detail: long.length
             ? `resposta acima de ${max} caracteres: ${long.map(([i, n]) => `${i} (${n})`).join(", ")}`
             : `todas até ${max} caracteres`,
+        };
+      }
+      case "citations_valid": {
+        const bad = (t.citationsByReply ?? []).flat().filter((c) => !c.valid);
+        return {
+          type: g.type,
+          passed: bad.length === 0,
+          detail: bad.length
+            ? `citação que não confere: ${bad.map((c) => c.ref).join(", ")}`
+            : `${(t.citationsByReply ?? []).flat().length} citação(ões), todas conferem`,
+        };
+      }
+      case "claims_cited": {
+        const max = Number(g.value ?? 0);
+        const loose = (t.uncitedByReply ?? []).flat();
+        return {
+          type: g.type,
+          passed: loose.length <= max,
+          detail: loose.length
+            ? `${loose.length} frase(s) sem citação: ${loose
+                .slice(0, 2)
+                .map((x) => `"${x.slice(0, 100)}"`)
+                .join("; ")}`
+            : "todo dado checável citado",
         };
       }
       case "mentions": {

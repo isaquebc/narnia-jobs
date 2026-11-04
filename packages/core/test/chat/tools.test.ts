@@ -272,3 +272,34 @@ describe("F04/M1 core · ingest.text/file/github pela conversa", () => {
     expect(ChatToolError).toBeDefined();
   });
 });
+
+describe("R5 · id curto para citar", () => {
+  const ref = (id: string) => id.replace(/-/g, "").slice(-6);
+
+  it("busca, listas e detalhes devolvem o ref do fato (as conquistas da experiência também)", async () => {
+    const t = tools();
+    const acme = ids.experienceIds[0] as string;
+    const s = await t["fact.search"]({ q: "acme", kinds: ["experience"] });
+    expect(s.items[0]).toMatchObject({ id: acme, ref: `f:${ref(acme)}` });
+    const list = await t["evidence.skill.list"]({ limit: 1 });
+    expect(list.items[0]?.ref).toBe(`f:${ref(list.items[0]?.id as string)}`);
+    const d = await t["evidence.experience.get"]({ id: acme });
+    expect(d.ref).toBe(`f:${ref(acme)}`);
+    const ach = (d.detail.achievements as Array<{ id: string; ref: string }>)[0];
+    expect(ach?.ref).toBe(`f:${ref(ach?.id as string)}`);
+    const g = await t["fact.get"]({ refs: [{ kind: "skill", id: ids.skillIds[0] as string }] });
+    expect(g.items[0]?.ref).toBe(`f:${ref(ids.skillIds[0] as string)}`);
+  });
+
+  it("pesquisa salva e listada devolve o ref r:", async () => {
+    const t = tools();
+    const r = await t["research.save"]({
+      url: "https://www.ibge.gov.br/x",
+      title: "Rendimento",
+      excerpt: "R$ 12.000",
+      usedFor: "salary",
+    });
+    expect(r.ref).toBe(`r:${ref(r.id)}`);
+    expect((await t["research.list"]({})).items[0]?.ref).toBe(`r:${ref(r.id)}`);
+  });
+});

@@ -1,4 +1,5 @@
 import type { Repos } from "../db";
+import { factRefs } from "./citations";
 
 /**
  * Índice dos fatos no contexto do recrutador (F04-fix-fundamentacao, R2, FF-6): todos os fatos do usuário, uma linha
@@ -12,6 +13,8 @@ const span = (a?: string | null, b?: string | null, current?: boolean) =>
 
 export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): string {
   const f = repos.facts;
+  const refOf = factRefs(repos);
+  const cite = (id: string) => ` [${refOf(id)}]`;
   const active = repos.profiles.active();
   const score = new Map<string, number>();
   if (active)
@@ -29,8 +32,8 @@ export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): stri
     const achievements = f.achievements.listByExperience(e.id);
     entries.push({
       text: [
-        `- ${[e.company, e.title, span(e.startDate, e.endDate, e.isCurrent)].filter(Boolean).join(" · ")}`,
-        ...achievements.map((a) => `  - ${a.text}${a.metric ? ` (${a.metric})` : ""}`),
+        `- ${[e.company, e.title, span(e.startDate, e.endDate, e.isCurrent)].filter(Boolean).join(" · ")}${cite(e.id)}`,
+        ...achievements.map((a) => `  - ${a.text}${a.metric ? ` (${a.metric})` : ""}${cite(a.id)}`),
       ].join("\n"),
       facts: 1 + achievements.length,
     });
@@ -38,29 +41,29 @@ export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): stri
   const skills = byRelevance("skill", f.skills.list());
   if (skills.length)
     entries.push({
-      text: `- Skills: ${skills.map((s) => (s.level ? `${s.name} (${s.level})` : s.name)).join(", ")}`,
+      text: `- Skills: ${skills.map((s) => `${s.level ? `${s.name} (${s.level})` : s.name}${cite(s.id)}`).join(", ")}`,
       facts: skills.length,
     });
   const languages = f.languages.list();
   if (languages.length)
     entries.push({
-      text: `- Idiomas: ${languages.map((l) => (l.level ? `${l.name} (${l.level})` : l.name)).join(", ")}`,
+      text: `- Idiomas: ${languages.map((l) => `${l.level ? `${l.name} (${l.level})` : l.name}${cite(l.id)}`).join(", ")}`,
       facts: languages.length,
     });
   for (const e of byRelevance("education", f.education.list()))
     entries.push({
-      text: `- ${[e.institution, e.course, e.degree, span(e.startDate, e.endDate)].filter(Boolean).join(" · ")}`,
+      text: `- ${[e.institution, e.course, e.degree, span(e.startDate, e.endDate)].filter(Boolean).join(" · ")}${cite(e.id)}`,
       facts: 1,
     });
   for (const p of byRelevance("project", f.projects.list()))
     entries.push({
-      text: `- ${[p.name, p.description, p.role && `papel: ${p.role}`, span(p.startDate, p.endDate)].filter(Boolean).join(" · ")}`,
+      text: `- ${[p.name, p.description, p.role && `papel: ${p.role}`, span(p.startDate, p.endDate)].filter(Boolean).join(" · ")}${cite(p.id)}`,
       facts: 1,
     });
 
   const max = o.maxChars ?? DEFAULT_MAX_CHARS;
   const head =
-    "### Índice dos seus fatos\nTodos os fatos registrados do usuário (o perfil só muda o destaque). Antes de dizer que algo não está aqui, busque com `fact_search`.";
+    "### Índice dos seus fatos\nTodos os fatos registrados do usuário (o perfil só muda o destaque). Antes de dizer que algo não está aqui, busque com `fact_search`. Cite o fato pelo id entre colchetes (`[f:…]`).";
   const out: string[] = [head];
   let size = head.length;
   let left = 0;

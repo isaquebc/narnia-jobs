@@ -91,6 +91,9 @@ interface Message {
   role: string;
   contentMd: string;
   toolCalls: Array<{ name: string; subagent?: boolean }>;
+  /** R5: citações conferidas e frases sem citação, só nas respostas. */
+  citations?: Array<{ kind: string; ref: string; valid: boolean }>;
+  uncited?: string[];
 }
 
 /**
@@ -264,6 +267,10 @@ export async function runEvalCases(
           // o teto de turnos é do recrutador da conversa: as tools do especializado (F06-8) rodam no turno dele
           toolsPerReply: assistant.map((m) => m.toolCalls.filter((t) => !t.subagent).length),
           toolsByReply: assistant.map((m) => m.toolCalls.map((t) => t.name)),
+          citationsByReply: assistant.map((m) =>
+            (m.citations ?? []).map((x) => ({ ref: `${x.kind}:${x.ref}`, valid: x.valid })),
+          ),
+          uncitedByReply: assistant.map((m) => m.uncited ?? []),
         },
         c.graders,
       );

@@ -45,6 +45,8 @@ export const POSTING_TOOLS = {
     }),
     z.object({
       postingId: IdSchema,
+      /** Id curto para citar a vaga na resposta (`[v:…]`). */
+      ref: z.string().optional(),
       status: PostingStatusSchema,
       url: z.string(),
       title: z.string(),
@@ -57,6 +59,7 @@ export const POSTING_TOOLS = {
     z.object({ id: IdSchema }),
     z.object({
       id: IdSchema,
+      ref: z.string().optional(),
       status: PostingStatusSchema,
       fields: z.record(z.string(), z.unknown()),
       fieldSources: z.record(z.string(), z.string()),
@@ -85,7 +88,7 @@ export const POSTING_TOOLS = {
       query: z.string().max(200).optional(),
       limit: z.number().int().min(1).max(50).optional(),
     }),
-    z.object({ items: z.array(Line) }),
+    z.object({ items: z.array(Line.extend({ ref: z.string().optional() })) }),
   ),
   "posting.update": tool(
     "Completa ou corrige campos de uma vaga salva com o que o usuário contou na conversa (ex.: cliente, faixa, data). Só os campos enviados mudam.",
