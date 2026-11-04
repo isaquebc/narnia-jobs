@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { parseEvalCases } from "@narnia-jobs/core";
+import { factIds, knownFactsText, parseEvalCases } from "@narnia-jobs/core";
 import { MockProvider } from "@narnia-jobs/providers";
 import { afterEach, describe, expect, it } from "vitest";
+import { savedPostingsText } from "../src/evals/cli-evals";
 import { runEvalCases } from "../src/evals/run";
 import { type EvalSandbox, openEvalSandbox, withEvalSandbox } from "../src/evals/sandbox";
 import { makeTestApp, type TestApp } from "./helpers";
@@ -156,4 +157,31 @@ describe("sandbox de avaliação", () => {
     ).rejects.toThrow("falhou");
     expect(existsSync(dir)).toBe(false);
   }, 20_000);
+  it("R5: a fixture tem os mesmos ids em todo sandbox (o juiz vê o índice de uma amostra e confere as citações de todas)", async () => {
+    const snap = async (s: EvalSandbox) => {
+      const card = await fetch(`${s.baseUrl}/api/profiles/active/persona-card`, {
+        headers: { authorization: `Bearer ${s.token}` },
+      }).then((r) => r.json() as Promise<{ text: string }>);
+      return {
+        ids: factIds(s.repos),
+        postings: s.repos.postings.list().map((p) => p.id),
+        facts: knownFactsText(s.repos),
+        saved: savedPostingsText(s.repos),
+        card: card.text,
+      };
+    };
+    const a = await withEvalSandbox({ provider: new MockProvider() }, snap);
+    const b = await withEvalSandbox({ provider: new MockProvider() }, snap);
+    expect(a.ids.length).toBeGreaterThan(0);
+    expect(b).toEqual(a);
+    expect(a.card).toMatch(/f:[0-9a-f]{6,}/);
+    // o que a conversa cria depois do preparo continua com ids novos (só a fixture é fixa)
+    const c = await withEvalSandbox({ provider: new MockProvider() }, async (s) =>
+      s.newApplication(),
+    );
+    const d = await withEvalSandbox({ provider: new MockProvider() }, async (s) =>
+      s.newApplication(),
+    );
+    expect(c).not.toBe(d);
+  }, 30_000);
 });

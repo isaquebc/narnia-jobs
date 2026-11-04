@@ -18,6 +18,7 @@ import {
   type StageName,
   seedFixture,
   stageJobId,
+  withSeededIds,
 } from "@narnia-jobs/core";
 import { MockProvider, type Provider } from "@narnia-jobs/providers";
 import { createApp } from "../app";
@@ -99,9 +100,16 @@ export async function openEvalSandbox(o: {
   const db = openDatabase(join(dir, "narnia.sqlite"));
   migrate(db);
   const repos = createRepos(db);
-  const seeded = seedFixture(repos, o.fixture ?? "engineer");
-  const postingCv = await seedPostingCv(repos, seeded.profileId);
-  seedDiscardedPosting(repos);
+  // R5 (2026-11-04): a fixture com os mesmos ids em todo sandbox (cada amostra e os dois lados do gate abrem um novo, e
+  // o juiz confere as citações `[f:…]` de todas contra o índice de uma). Só o preparo: o servidor e o que a conversa
+  // cria ficam fora do escopo, com ids aleatórios.
+  const fixture = o.fixture ?? "engineer";
+  const { seeded, postingCv } = await withSeededIds(`avaliacao:${fixture}`, async () => {
+    const seeded = seedFixture(repos, fixture);
+    const postingCv = await seedPostingCv(repos, seeded.profileId);
+    seedDiscardedPosting(repos);
+    return { seeded, postingCv };
+  });
   const token = randomBytes(24).toString("hex");
   const bus = new EventBus();
   const turnErrors = new Map<string, string>();
