@@ -25,34 +25,40 @@ const ORIGINS: ContactOrigin[] = ["linkedin", "whatsapp", "email", "other"];
 
 /**
  * Formulário de contato (F06 §1.1; LinkedIn e duplicata, 2026-10-19): na lista completa (em linha) e na modal do topo
- * da página. Mesmo LinkedIn ou e-mail de outro contato da vaga volta 409 com a mensagem do servidor.
+ * da página. Mesmo LinkedIn ou e-mail de outro contato da vaga volta 409 com a mensagem do servidor. Com `contact`
+ * (pedido do dono, 2026-11-04), edita: abre preenchido e salva o formulário inteiro (campo vazio apaga).
  */
 export function ContactForm({
   postingId,
   onSaved,
   layout = "inline",
   contacts = [],
+  contact,
 }: {
   postingId: string;
   onSaved?: () => void;
   layout?: "inline" | "stack";
   /** F07/M6: os contatos da vaga, para "indicado(a) por" (cadeia de contatos). */
   contacts?: PostingContact[];
+  /** Contato a editar; ausente = adicionar. */
+  contact?: PostingContact;
 }) {
   const api = useApi();
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [origin, setOrigin] = useState<ContactOrigin>("linkedin");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [role, setRole] = useState<ContactRole | "">("");
-  const [contactedOn, setContactedOn] = useState("");
-  const [referredById, setReferredById] = useState("");
-  const [summary, setSummary] = useState("");
+  const [name, setName] = useState(contact?.name ?? "");
+  const [origin, setOrigin] = useState<ContactOrigin>(contact?.origin ?? "linkedin");
+  const [email, setEmail] = useState(contact?.email ?? "");
+  const [phone, setPhone] = useState(contact?.phone ?? "");
+  const [linkedin, setLinkedin] = useState(contact?.linkedinUrl ?? "");
+  const [role, setRole] = useState<ContactRole | "">(contact?.role ?? "");
+  const [contactedOn, setContactedOn] = useState(contact?.contactedOn ?? "");
+  const [referredById, setReferredById] = useState(contact?.referredById ?? "");
+  const [summary, setSummary] = useState(contact?.summary ?? "");
+  // quem indica: outro contato da vaga (nunca a própria pessoa)
+  const referrers = contacts.filter((c) => c.id !== contact?.id);
   const add = useMutation({
-    mutationFn: () =>
-      api.addPostingContact(postingId, {
+    mutationFn: () => {
+      const body = {
         name: name.trim(),
         origin,
         email: email.trim() || null,
@@ -62,8 +68,17 @@ export function ContactForm({
         contactedOn: contactedOn || null,
         referredById: referredById || null,
         summary: summary.trim() || null,
-      }),
+      };
+      return contact
+        ? api.patchPostingContact(postingId, contact.id, body)
+        : api.addPostingContact(postingId, body);
+    },
     onSuccess: async () => {
+      if (contact) {
+        await qc.invalidateQueries({ queryKey: postingKeys.all });
+        onSaved?.();
+        return;
+      }
       setName("");
       setEmail("");
       setPhone("");
@@ -188,7 +203,7 @@ export function ContactForm({
           onChange={(e) => setContactedOn(e.target.value)}
         />,
       )}
-      {contacts.length > 0
+      {referrers.length > 0
         ? field(
             t("postings.contacts.referredBy"),
             "referred-by",
@@ -199,7 +214,7 @@ export function ContactForm({
               onChange={(e) => setReferredById(e.target.value)}
             >
               <option value="">{t("postings.contacts.noReferrer")}</option>
-              {contacts.map((c) => (
+              {referrers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -229,10 +244,51 @@ export function ContactForm({
       ) : null}
       <div className={stack ? "flex justify-end gap-2" : undefined}>
         <Button type="submit" disabled={!name.trim() || add.isPending}>
-          {stack ? t("postings.contacts.save") : t("postings.contacts.add")}
+          {contact
+            ? t("postings.contacts.saveEdit")
+            : stack
+              ? t("postings.contacts.save")
+              : t("postings.contacts.add")}
         </Button>
       </div>
     </form>
+  );
+}
+
+/** "Editar" de um contato: a modal com o formulário preenchido (pedido do dono, 2026-11-04). */
+export function ContactEditButton({
+  postingId,
+  contact,
+  contacts,
+}: {
+  postingId: string;
+  contact: PostingContact;
+  contacts: PostingContact[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        aria-label={t("postings.contacts.edit", { name: contact.name })}
+        onClick={() => setOpen(true)}
+      >
+        {t("postings.contacts.editShort")}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen} title={t("postings.contacts.editTitle")}>
+        {open ? (
+          <ContactForm
+            postingId={postingId}
+            layout="stack"
+            contacts={contacts}
+            contact={contact}
+            onSaved={() => setOpen(false)}
+          />
+        ) : null}
+      </Dialog>
+    </>
   );
 }
 
@@ -281,6 +337,7 @@ export function ContactsCard({
               <ContactLinkedin contact={c} />
               {c.email ? <span className="text-muted-fg">{c.email}</span> : null}
               {c.phone ? <span className="text-muted-fg">{c.phone}</span> : null}
+              <ContactEditButton postingId={postingId} contact={c} contacts={contacts} />
               <Button
                 type="button"
                 variant="ghost"

@@ -8,7 +8,7 @@ import { Dialog } from "../../components/ui/dialog";
 import { usePosting } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
-import { ContactForm, ContactLinkedin } from "../postings/PostingSections";
+import { ContactEditButton, ContactForm, ContactLinkedin } from "../postings/PostingSections";
 
 /** Ordem da cadeia: data da conversa (sem data, no fim), depois a criação. */
 export function orderChain(contacts: PostingContact[]): PostingContact[] {
@@ -56,6 +56,9 @@ export function ContactChainCard({ postingId }: { postingId: string }) {
                   {c.contactedOn ? ` · ${formatDate(c.contactedOn, tz)}` : ""}
                 </span>
                 <ContactLinkedin contact={c} />
+                <span className="ml-auto">
+                  <ContactEditButton postingId={postingId} contact={c} contacts={contacts} />
+                </span>
               </span>
               {ref ? (
                 <span className="text-xs text-muted-fg">

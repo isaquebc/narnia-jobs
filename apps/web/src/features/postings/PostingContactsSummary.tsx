@@ -8,7 +8,7 @@ import { Card, CardTitle } from "../../components/ui/card";
 import { Dialog } from "../../components/ui/dialog";
 import { postingKeys } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
-import { ContactForm, ContactLinkedin } from "./PostingSections";
+import { ContactEditButton, ContactForm, ContactLinkedin } from "./PostingSections";
 
 /** O fixado (se houver) e os dois últimos adicionados; o fixado não conta no limite nem se repete. */
 export function recentContacts(contacts: PostingContact[], limit = 2): PostingContact[] {
@@ -74,19 +74,21 @@ export function PostingContactsSummary({
                 <ContactLinkedin contact={c} />
                 {c.email ? <span className="text-xs text-muted-fg">{c.email}</span> : null}
                 {c.phone ? <span className="text-xs text-muted-fg">{c.phone}</span> : null}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto"
-                  disabled={pin.isPending}
-                  aria-label={t(c.pinned ? "postings.contacts.unpin" : "postings.contacts.pin", {
-                    name: c.name,
-                  })}
-                  onClick={() => pin.mutate({ id: c.id, pinned: !c.pinned })}
-                >
-                  {t(c.pinned ? "postings.contacts.unpinShort" : "postings.contacts.pinShort")}
-                </Button>
+                <span className="ml-auto flex gap-1">
+                  <ContactEditButton postingId={postingId} contact={c} contacts={contacts} />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={pin.isPending}
+                    aria-label={t(c.pinned ? "postings.contacts.unpin" : "postings.contacts.pin", {
+                      name: c.name,
+                    })}
+                    onClick={() => pin.mutate({ id: c.id, pinned: !c.pinned })}
+                  >
+                    {t(c.pinned ? "postings.contacts.unpinShort" : "postings.contacts.pinShort")}
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>

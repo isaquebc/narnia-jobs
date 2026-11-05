@@ -76,6 +76,7 @@ function api() {
     getPosting: async () => ({ posting: posting("v1"), contacts, notes: [], duplicates: [] }),
     listPostingAnalyses: async () => ({ analyses: [] }),
     addPostingContact: vi.fn(async () => ({ contact: contact("c3") })),
+    patchPostingContact: vi.fn(async () => ({ contact: contact("c2") })),
   };
 }
 
@@ -114,6 +115,30 @@ describe("F07/M6 · cadeia de contatos na candidatura", () => {
           contactedOn: "2026-10-25",
           referredById: "c2",
           summary: "Fez a entrevista técnica",
+        }),
+      ),
+    );
+  });
+
+  it("edita um contato da cadeia: quem indicou fica sem a própria pessoa", async () => {
+    const a = api();
+    renderApp({ api: a as never, initialUrl: "/candidaturas/a1" });
+    const chain = await screen.findByRole("list", { name: "Cadeia de contatos" });
+    await userEvent.click(await within(chain).findByRole("button", { name: "Editar João Lima" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar contato" });
+    const referrer = within(dialog).getByLabelText("Indicado(a) por");
+    expect(referrer).toHaveValue("c1");
+    expect(within(referrer).queryByRole("option", { name: "João Lima" })).toBeNull();
+    await userEvent.type(within(dialog).getByLabelText("Resumo"), "Gestor da área");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() =>
+      expect(a.patchPostingContact).toHaveBeenCalledWith(
+        "v1",
+        "c2",
+        expect.objectContaining({
+          name: "João Lima",
+          referredById: "c1",
+          summary: "Gestor da área",
         }),
       ),
     );

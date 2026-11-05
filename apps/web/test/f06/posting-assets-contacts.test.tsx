@@ -214,4 +214,55 @@ describe("Página da vaga · assets e contatos", () => {
     await userEvent.click(within(region).getByRole("button", { name: "Adicionar contato" }));
     expect(await screen.findByRole("dialog", { name: "Adicionar contato" })).toBeInTheDocument();
   });
+
+  it("editar: a modal abre preenchida, manda só o formulário inteiro e mostra a duplicata recusada", async () => {
+    const patchPostingContact = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ApiError(409, "duplicate_contact", "Esse contato já está na vaga (Joana)."),
+      )
+      .mockResolvedValueOnce({ contact: contact("c1") });
+    const contacts = [
+      contact("c1", {
+        name: "Ana Souza",
+        email: "ana@errado.com",
+        role: "recruiter",
+        linkedinUrl: "https://linkedin.com/in/ana",
+      }),
+    ];
+    renderApp({ api: api({ patchPostingContact }, contacts) as never, initialUrl: "/vagas/v1" });
+    const region = await screen.findByRole("region", { name: "Últimos contatos" });
+    await userEvent.click(within(region).getByRole("button", { name: "Editar Ana Souza" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar contato" });
+    const email = within(dialog).getByLabelText("E-mail");
+    expect(email).toHaveValue("ana@errado.com");
+    expect(within(dialog).getByLabelText("Papel")).toHaveValue("recruiter");
+    // quem indica não pode ser a própria pessoa
+    expect(within(dialog).queryByLabelText("Indicado(a) por")).toBeNull();
+    await userEvent.clear(email);
+    await userEvent.type(email, "ana.souza@globex.com");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar alterações" }));
+    expect(patchPostingContact).toHaveBeenCalledWith("v1", "c1", {
+      name: "Ana Souza",
+      origin: "linkedin",
+      email: "ana.souza@globex.com",
+      phone: null,
+      linkedinUrl: "https://linkedin.com/in/ana",
+      role: "recruiter",
+      contactedOn: null,
+      referredById: null,
+      summary: null,
+    });
+    expect(await within(dialog).findByText(/já está na vaga/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("a lista completa também edita", async () => {
+    const contacts = [contact("c1"), contact("c2"), contact("c3")];
+    renderApp({ api: api({}, contacts) as never, initialUrl: "/vagas/v1" });
+    const list = await screen.findByRole("list", { name: "Contatos" });
+    await userEvent.click(within(list).getByRole("button", { name: "Editar Pessoa c1" }));
+    expect(await screen.findByRole("dialog", { name: "Editar contato" })).toBeInTheDocument();
+  });
 });
