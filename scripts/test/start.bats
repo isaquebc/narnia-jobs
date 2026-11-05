@@ -265,7 +265,7 @@ docker_spy() { # substitui o docker por um registrador de chamadas em $TMP/calls
 
 @test "dev reconstrói as imagens antes de instalar dependências, entregar o token e subir" {
   docker_spy
-  export NARNIA_GH_BIN="$TMP/nao-existe/gh"
+  export NARNIA_GH_BIN="$TMP/nao-existe/gh" NARNIA_DATA_MOUNT="$TMP/data" NARNIA_BACKUP_MOUNT="$TMP/backups"
   main dev -d >/dev/null 2>&1
   first=$(head -n 1 "$TMP/calls")
   [[ "$first" == *"--profile app build"* ]]

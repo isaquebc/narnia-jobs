@@ -13,7 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Containers com o uid do runner (1001; os lançadores fazem o mesmo, ver start.sh)
-        run: printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+        run: |
+          printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          mkdir -p data backups   # antes do primeiro compose: senão o daemon cria as pastas montadas como root
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm lint
 
@@ -22,7 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Containers com o uid do runner (1001; os lançadores fazem o mesmo, ver start.sh)
-        run: printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+        run: |
+          printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          mkdir -p data backups   # antes do primeiro compose: senão o daemon cria as pastas montadas como root
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm typecheck
 
@@ -31,7 +35,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Containers com o uid do runner (1001; os lançadores fazem o mesmo, ver start.sh)
-        run: printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+        run: |
+          printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          mkdir -p data backups   # antes do primeiro compose: senão o daemon cria as pastas montadas como root
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm test:coverage
       - uses: actions/upload-artifact@v4
@@ -48,7 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Containers com o uid do runner (1001; os lançadores fazem o mesmo, ver start.sh)
-        run: printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+        run: |
+          printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          mkdir -p data backups   # antes do primeiro compose: senão o daemon cria as pastas montadas como root
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm build
 
@@ -57,7 +65,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Containers com o uid do runner (1001; os lançadores fazem o mesmo, ver start.sh)
-        run: printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+        run: |
+          printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          mkdir -p data backups   # antes do primeiro compose: senão o daemon cria as pastas montadas como root
       - run: docker compose -f docker-compose.dev.yml run --rm dev bats scripts/test
       - run: >
           docker run --rm -v "$PWD:/code:ro" -w /code -e NARNIA_PS_NO_MAIN=1 mcr.microsoft.com/powershell:7.4-ubuntu-22.04
@@ -84,7 +94,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Containers com o uid do runner (1001; os lançadores fazem o mesmo, ver start.sh)
-        run: printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+        run: |
+          printf 'NARNIA_UID=%s\nNARNIA_GID=%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          mkdir -p data backups   # antes do primeiro compose: senão o daemon cria as pastas montadas como root
       - run: docker compose -f docker-compose.dev.yml run --rm dev pnpm install --frozen-lockfile
       - name: Suíte e2e (Playwright em container contra a stack de produção com provider mock)
         run: ./start.sh e2e
