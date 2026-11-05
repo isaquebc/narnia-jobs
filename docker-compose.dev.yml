@@ -11,7 +11,7 @@ x-dev: &dev
     context: .
     dockerfile: docker/Dockerfile
     target: dev
-  user: node
+  user: "${NARNIA_UID:-1000}:${NARNIA_GID:-1000}"   # uid de quem chama (os lançadores exportam; padrão: node)
   working_dir: /app
   volumes:
     # código: a raiz ou, na instância do dono com cópia separada, `.owner-src` (C7/CM-4); dados e backups sempre da raiz

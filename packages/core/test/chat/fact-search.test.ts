@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { expandQuery, listFactAliases } from "../../src/chat/fact-search";
+import { expandQuery, factLabel, listFactAliases } from "../../src/chat/fact-search";
 import { ChatToolError, createChatTools } from "../../src/chat/tools";
 import { createRepos, migrate, openDatabase, type Repos } from "../../src/db";
 import { factSearchRecall, parseRecallCases } from "../../src/evals/search-recall";
@@ -112,5 +112,58 @@ describe("apelidos aprendidos na tela", () => {
       expect.objectContaining({ term: "sumiu", factLabel: null }),
       expect.objectContaining({ term: "orquestração", kind: "skill", factLabel: "Kubernetes" }),
     ]);
+  });
+});
+
+describe("factLabel: rótulo de cada tipo de fato nos termos aprendidos (null quando o fato sumiu)", () => {
+  it("rotula cada tipo de fato existente", () => {
+    const exp = repos.facts.experiences.get(ids.experienceIds[0] as string);
+    expect(factLabel(repos, "experience", exp?.id as string)).toBe(
+      `${exp?.company} · ${exp?.title}`,
+    );
+    const edu = repos.facts.education.get(ids.educationIds[0] as string);
+    expect(factLabel(repos, "education", edu?.id as string)).toBe(
+      `${edu?.institution} · ${edu?.course}`,
+    );
+    expect(factLabel(repos, "achievement", ids.achievementIds[0] as string)).toBeTruthy();
+    expect(factLabel(repos, "project", ids.projectIds[0] as string)).toBeTruthy();
+    expect(factLabel(repos, "skill", ids.skillIds[0] as string)).toBeTruthy();
+    expect(factLabel(repos, "language", ids.languageIds[0] as string)).toBeTruthy();
+    const base = { mime: "text/plain", size: 1, path: "p", kind: "text" } as const;
+    const named = repos.sourceFiles.insert({ ...base, sha256: "a", originalName: "cv.pdf" });
+    const free = repos.sourceFiles.insert({ ...base, sha256: "b" });
+    expect(factLabel(repos, "file", named.id)).toBe("cv.pdf");
+    expect(factLabel(repos, "file", free.id)).toBe("Texto livre");
+    const repo = repos.repos.upsert({
+      fullName: "ana-exemplo/api-pagamentos",
+      owner: "ana-exemplo",
+      url: "https://github.com/ana-exemplo/api-pagamentos",
+      description: null,
+      isPrivate: false,
+      isFork: false,
+      isArchived: false,
+      languages: {},
+      topics: [],
+      stars: 0,
+      pushedAt: null,
+      defaultBranch: "main",
+      headSha: null,
+      relevance: 0,
+    });
+    expect(factLabel(repos, "repo", repo.id)).toBe("ana-exemplo/api-pagamentos");
+  });
+
+  it("devolve null para o fato que não existe mais (apelido órfão), em todo tipo", () => {
+    for (const kind of [
+      "experience",
+      "achievement",
+      "project",
+      "skill",
+      "education",
+      "language",
+      "file",
+      "repo",
+    ] as const)
+      expect(factLabel(repos, kind, "nao-existe")).toBeNull();
   });
 });

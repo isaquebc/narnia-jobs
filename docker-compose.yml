@@ -10,6 +10,7 @@ x-app: &app
     target: runtime
   image: narnia-jobs/app
   restart: unless-stopped
+  user: "${NARNIA_UID:-1000}:${NARNIA_GID:-1000}"   # uid de quem chama: ./data fica do usuário do host (padrão: node)
   volumes:
     - ${NARNIA_DATA_DIR:-./data}:/data
     - ${NARNIA_BACKUP_HOST_DIR:-./backups}:/backups   # backups fora da pasta de dados (F03-fix L1)

@@ -41,6 +41,9 @@ if [[ -n "${NARNIA_PROD_PROJECT_NAME:-}" ]]; then PROD_COMPOSE=(docker compose -
 E2E_PROJECT=${NARNIA_E2E_PROJECT:-narnia-e2e}
 E2E_COMPOSE=(docker compose -p "$E2E_PROJECT" -f docker-compose.yml -f docker-compose.e2e.yml)
 E2E_DATA_DIR=./.e2e-data
+# uid/gid de quem chama: api, worker e dev rodam com ele (`user:` dos composes), para gravar no checkout e em ./data em
+# qualquer Linux (uid ≠ 1000, como o runner do GitHub, uid 1001); os arquivos de ./data ficam do usuário do host
+export NARNIA_UID="${NARNIA_UID:-$(id -u)}" NARNIA_GID="${NARNIA_GID:-$(id -g)}"
 
 die() { printf 'erro: %s\n' "$*" >&2; exit 1; }
 info() { printf '» %s\n' "$*"; }
@@ -288,7 +291,22 @@ require_docker() {
   docker compose version >/dev/null 2>&1 || die "Docker Compose v2 não encontrado (comando 'docker compose')."
 }
 
-dev_run() { "${DEV_COMPOSE[@]}" run --rm dev "$@"; }
+# check_host_dirs DIR… -> falha com a correção exata se alguma pasta montada existe e o usuário não grava nela (criada
+# como root por um `docker compose` chamado direto, antes do lançador): o api pararia "unhealthy" sem dizer por quê
+check_host_dirs() {
+  local d
+  for d in "$@"; do
+    [[ ! -e "$d" || -w "$d" ]] || die "a pasta ${d} não é gravável pelo seu usuário (criada como root por um docker compose chamado direto?). Corrija com: sudo chown -R $(id -u):$(id -g) ${d}"
+  done
+}
+
+# dev_run CMD… -> comando no container de dev. As pastas montadas nascem antes do Docker, do usuário do host: senão o
+# daemon as cria como root e o api (com o uid de quem chama) não grava nelas depois
+dev_run() {
+  check_host_dirs "${NARNIA_DATA_MOUNT:-./data}" "${NARNIA_BACKUP_MOUNT:-./backups}"
+  mkdir -p "${NARNIA_DATA_MOUNT:-./data}" "${NARNIA_BACKUP_MOUNT:-./backups}"
+  "${DEV_COMPOSE[@]}" run --rm dev "$@"
+}
 
 ensure_installed() {
   # node_modules vive em volume nomeado: instala quando o volume está vazio ou o lockfile mudou
@@ -341,6 +359,7 @@ cmd_up() {
     port=$(env_value "$ENV_FILE" NARNIA_PORT)
     info "stack já no ar na porta ${port:-?}; aplicando alterações"
   else
+    check_host_dirs "${NARNIA_DATA_DIR:-./data}" "$(prod_backup_host_dir)"
     mkdir -p "${NARNIA_DATA_DIR:-./data}" "$(prod_backup_host_dir)"   # antes do Docker, para pertencerem ao usuário
     mkdir -p "$(dirname "$ENV_FILE")"
     port=$(choose_port "$ENV_FILE") || die "nenhuma porta livre entre ${NARNIA_PORT_START} e ${NARNIA_PORT_END}."
@@ -412,8 +431,7 @@ dev_project_name() { "${DEV_COMPOSE[@]}" config 2>/dev/null | sed -n 's/^name: /
 e2e_env() {
   NARNIA_DEV_PROJECT=$(dev_project_name)
   [[ -n "$NARNIA_DEV_PROJECT" ]] || die "não consegui descobrir o projeto do compose de dev."
-  export NARNIA_DEV_PROJECT NARNIA_UID NARNIA_GID
-  NARNIA_UID=$(id -u); NARNIA_GID=$(id -g)
+  export NARNIA_DEV_PROJECT
 }
 
 e2e_up() {
@@ -690,7 +708,7 @@ main() {
       dev_run bash ;;
     cli)
       require_docker; ensure_installed
-      "${DEV_COMPOSE[@]}" run --rm dev pnpm --filter @narnia-jobs/api exec tsx src/cli.ts "$@" ;;
+      dev_run pnpm --filter @narnia-jobs/api exec tsx src/cli.ts "$@" ;;
     e2e)
       cmd_e2e "$@" ;;
     test:sh)

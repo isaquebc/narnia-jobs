@@ -21,7 +21,8 @@ ENV PNPM_HOME=/pnpm \
     NODE_OPTIONS=--no-warnings=ExperimentalWarning \
     CI=true \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
-    TESSDATA_PATH=/usr/share/tessdata
+    TESSDATA_PATH=/usr/share/tessdata \
+    HOME=/home/node
 # poppler-utils: `pdftoppm` renderiza páginas de PDF para o OCR (F01-25). Dados de idioma do Tesseract (por+eng,
 # tessdata_fast) ficam em /usr/share/tessdata para o OCR rodar sem rede (F01 §2.1). bats: testes do start.sh (F01-65).
 # GitHub CLI (F03-1): coleta da ingestão do GitHub pela API e fluxo de dispositivo, do repositório oficial.
@@ -37,7 +38,10 @@ RUN apt-get update \
  && corepack enable \
  && corepack prepare pnpm@${PNPM_VERSION} --activate \
  && mkdir -p /app/node_modules /pnpm/store /pnpm/corepack /home/node/.claude /home/node/.config/gh \
- && chown -R node:node /app /pnpm /home/node/.claude /home/node/.config
+ && chown -R node:node /app /pnpm /home/node/.claude /home/node/.config \
+ && chmod -R a+rwX /app/node_modules /pnpm /home/node
+# o compose roda com o uid de quem chama (NARNIA_UID): sem entrada no /etc/passwd, o HOME seria `/`; as pastas acima
+# (e os volumes novos, que herdam o modo) são graváveis por qualquer uid
 USER node
 WORKDIR /app
 CMD ["pnpm", "--version"]
@@ -77,7 +81,8 @@ ENV NODE_OPTIONS=--no-warnings=ExperimentalWarning \
     NODE_ENV=production \
     TESSDATA_PATH=/usr/share/tessdata \
     NARNIA_DATA_DIR=/data \
-    PORT=3100
+    PORT=3100 \
+    HOME=/home/node
 # gh (F03-1) pela mesma chave e lista do repositório oficial copiadas do estágio dev (o runtime não tem curl)
 COPY --from=dev /usr/share/keyrings/githubcli-archive-keyring.gpg /usr/share/keyrings/githubcli-archive-keyring.gpg
 COPY --from=dev /etc/apt/sources.list.d/github-cli.list /tmp/github-cli.list
@@ -89,7 +94,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git poppler-utils gh \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data /home/node/.claude /home/node/.config/gh \
- && chown -R node:node /data /home/node/.claude /home/node/.config
+ && chown -R node:node /data /home/node/.claude /home/node/.config \
+ && chmod -R a+rwX /data /home/node
+# compose com o uid de quem chama (NARNIA_UID): HOME fixo e pastas graváveis por qualquer uid, como no estágio dev
 COPY --from=dev /usr/share/tessdata /usr/share/tessdata
 WORKDIR /app
 COPY --from=deps-prod --chown=node:node /app /app

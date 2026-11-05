@@ -298,3 +298,19 @@ Describe "Invoke-Evals (avaliações no Phoenix, M5)" {
     { Invoke-Evals @("prompts") } | Should -Throw "*suba a aplicação*"
   }
 }
+
+Describe "Set-HostUser (containers com o uid de quem chama)" {
+  It "usa o uid e o gid do usuário quando o id existe" -Skip:(-not (Get-Command id -ErrorAction SilentlyContinue)) {
+    $old = $env:NARNIA_UID, $env:NARNIA_GID
+    try {
+      Remove-Item Env:NARNIA_UID, Env:NARNIA_GID -ErrorAction SilentlyContinue
+      Set-HostUser
+      $env:NARNIA_UID | Should -Be "$(& id -u)"
+      $env:NARNIA_GID | Should -Be "$(& id -g)"
+    } finally { $env:NARNIA_UID, $env:NARNIA_GID = $old }
+  }
+  It "respeita NARNIA_UID já definido" {
+    $old = $env:NARNIA_UID
+    try { $env:NARNIA_UID = "4242"; Set-HostUser; $env:NARNIA_UID | Should -Be "4242" } finally { $env:NARNIA_UID = $old }
+  }
+}

@@ -555,3 +555,51 @@ fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma
   [ "$status" -eq 0 ]
   grep -q -- "src/cli.ts evals chat pontos-fracos" "$TMP/calls"
 }
+
+# --- abertura do código: containers com o uid de quem chama (runner do GitHub = uid 1001; Linux com uid ≠ 1000) ---------
+
+@test "start.sh exporta NARNIA_UID e NARNIA_GID do usuário que chama, para todo comando do compose" {
+  run bash -c 'unset NARNIA_UID NARNIA_GID; source ./start.sh; printf "%s:%s" "$NARNIA_UID" "$NARNIA_GID"; bash -c "printf \" %s:%s\" \"\$NARNIA_UID\" \"\$NARNIA_GID\""'
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(id -u):$(id -g) $(id -u):$(id -g)" ]
+}
+
+@test "start.sh respeita NARNIA_UID e NARNIA_GID já definidos" {
+  run bash -c 'NARNIA_UID=4242 NARNIA_GID=4343 bash -c "source ./start.sh; printf %s:%s \"\$NARNIA_UID\" \"\$NARNIA_GID\""'
+  [ "$output" = "4242:4343" ]
+}
+
+@test "api, worker e dev rodam com o uid de quem chama (dev e produção)" {
+  for pair in docker-compose.yml:app docker-compose.dev.yml:dev; do
+    f=${pair%%:*}
+    grep -q 'user: "${NARNIA_UID:-1000}:${NARNIA_GID:-1000}"' "$f" || { echo "$f sem user do host"; return 1; }
+  done
+  ! grep -qE '^\s+user: node' docker-compose.dev.yml
+}
+
+@test "imagem: HOME fixo e pastas internas graváveis por qualquer uid (volumes novos herdam o modo)" {
+  grep -q 'HOME=/home/node' docker/Dockerfile
+  [ "$(grep -c 'chmod -R a+rwX' docker/Dockerfile)" -ge 2 ]   # dev (node_modules, pnpm, home) e runtime (data, home)
+}
+
+@test "dev_run cria as pastas de dados e de backup antes do Docker (senão o daemon as cria como root e o up não grava)" {
+  NARNIA_DATA_MOUNT="$TMP/d" NARNIA_BACKUP_MOUNT="$TMP/b"
+  DEV_COMPOSE=(true)
+  dev_run pnpm lint
+  [ -d "$TMP/d" ] && [ -d "$TMP/b" ]
+  [ "$(stat -c %u "$TMP/d")" = "$(id -u)" ]
+}
+
+@test "check_host_dirs: pasta montada que o usuário não grava para antes do Docker, com o chown exato" {
+  mkdir -p "$TMP/ok" "$TMP/ro"
+  chmod 0555 "$TMP/ro"
+  run check_host_dirs "$TMP/ok" "$TMP/nao-existe-ainda"
+  [ "$status" -eq 0 ]
+  if [ "$(id -u)" -ne 0 ]; then
+    run check_host_dirs "$TMP/ok" "$TMP/ro"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"$TMP/ro"* ]]
+    [[ "$output" == *"chown -R $(id -u):$(id -g)"* ]]
+  fi
+  chmod 0755 "$TMP/ro"
+}

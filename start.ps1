@@ -31,6 +31,14 @@ $script:PortEnd    = if ($env:NARNIA_PORT_END)   { [int]$env:NARNIA_PORT_END }  
 $script:EnvFile    = if ($env:NARNIA_ENV_FILE)   { $env:NARNIA_ENV_FILE }        else { ".env" }
 $script:DevCompose  = @("compose", "-f", "docker-compose.dev.yml")
 $script:ProdCompose = @("compose", "-f", "docker-compose.yml")
+# uid/gid de quem chama (ver start.sh): api, worker e dev rodam com ele. No Windows (Docker Desktop) fica o padrão dos
+# composes (1000); com `id` (PowerShell no Linux ou macOS), o do usuário. Valor já definido vence.
+function Set-HostUser {
+  if (-not $env:NARNIA_UID -and (Get-Command id -ErrorAction SilentlyContinue)) {
+    $env:NARNIA_UID = "$(& id -u)"; $env:NARNIA_GID = "$(& id -g)"
+  }
+}
+Set-HostUser
 if ($env:NARNIA_DEV_PROJECT_NAME)  { $script:DevCompose  = @("compose", "-p", $env:NARNIA_DEV_PROJECT_NAME, "-f", "docker-compose.dev.yml") }
 if ($env:NARNIA_PROD_PROJECT_NAME) { $script:ProdCompose = @("compose", "-p", $env:NARNIA_PROD_PROJECT_NAME, "-f", "docker-compose.yml") }
 
