@@ -114,6 +114,30 @@ export const POSTING_TOOLS = {
     }),
     z.object({ id: IdSchema, duplicate: z.boolean().optional() }),
   ),
+  "posting.contact_update": tool(
+    "Corrige ou completa um contato já registrado na vaga (o `id` que `posting_get` ou `job_application_get` devolve em `contacts`): só os campos enviados mudam; `null` apaga o campo (e-mail, telefone, LinkedIn, papel, data, resumo, quem indicou). Quem indicou vai pelo nome de outro contato da vaga. Mesmo LinkedIn ou e-mail de outro contato da vaga é recusado.",
+    z
+      .object({
+        id: IdSchema,
+        name: z.string().trim().min(1).optional(),
+        origin: ContactOriginSchema.optional(),
+        role: ContactRoleSchema.nullable().optional(),
+        contactedOn: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional(),
+        summary: z.string().max(2000).nullable().optional(),
+        referredBy: z.string().min(1).nullable().optional(),
+        email: z.email().nullable().optional(),
+        phone: z.string().min(7).nullable().optional(),
+        linkedinUrl: z.string().min(1).nullable().optional(),
+      })
+      .refine((v) => Object.keys(v).some((k) => k !== "id"), {
+        message: "Envie ao menos um campo para mudar",
+      }),
+    z.object({ id: IdSchema, updated: z.array(z.string()) }),
+  ),
   "posting.note_add": tool(
     "Adiciona uma nota do recrutador à vaga (o que combinaram, próximos passos, impressões).",
     z.object({ postingId: IdSchema, body: z.string().min(1).max(4000) }),

@@ -6,6 +6,7 @@ import {
   normalizeLinkedinUrl,
   POSTING_TOOLS,
   type Posting,
+  type PostingContactInput,
   type PostingFields,
   type PostingRole,
   type PostingToolName,
@@ -379,6 +380,58 @@ export function createPostingTools(
       const c = repos.postingContacts.add(i.postingId, input);
       ctx.ports.changed?.(i.postingId);
       return { id: c.id };
+    }),
+    "posting.contact_update": wrap("posting.contact_update", (i) => {
+      const cur = repos.postingContacts.get(i.id);
+      if (!cur) throw new PostingToolError("contact_not_found", `Contato não encontrado: ${i.id}`);
+      const { id: _id, referredBy, linkedinUrl: rawLinkedin, ...rest } = i;
+      const patch: Partial<PostingContactInput> = {};
+      for (const [k, v] of Object.entries(rest))
+        if (v !== undefined) (patch as Record<string, unknown>)[k] = v;
+      if (rawLinkedin !== undefined) {
+        const linkedinUrl = rawLinkedin === null ? null : normalizeLinkedinUrl(rawLinkedin);
+        if (rawLinkedin !== null && !linkedinUrl)
+          throw new Error(
+            "Link do LinkedIn inválido: use o endereço do perfil (linkedin.com/in/…).",
+          );
+        patch.linkedinUrl = linkedinUrl;
+      }
+      if (referredBy !== undefined) {
+        if (referredBy === null) patch.referredById = null;
+        else {
+          const norm = (s: string) =>
+            s.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
+          const referrer = repos.postingContacts
+            .list(cur.postingId)
+            .find((c) => c.id === referredBy || norm(c.name) === norm(referredBy));
+          if (!referrer)
+            throw new Error(
+              `Quem indicou (${referredBy}) não está nos contatos da vaga: registre essa pessoa antes.`,
+            );
+          if (referrer.id === cur.id) throw new Error("Um contato não pode indicar a si mesmo.");
+          patch.referredById = referrer.id;
+        }
+      }
+      const dup = repos.postingContacts.findDuplicate(
+        cur.postingId,
+        {
+          name: patch.name ?? cur.name,
+          email: patch.email === undefined ? cur.email : patch.email,
+          linkedinUrl: patch.linkedinUrl === undefined ? cur.linkedinUrl : patch.linkedinUrl,
+        },
+        cur.id,
+      );
+      if (dup)
+        throw new PostingToolError(
+          "duplicate_contact",
+          `Esse LinkedIn ou e-mail já é de outro contato da vaga (${dup.name}).`,
+        );
+      repos.postingContacts.update(cur.id, patch);
+      ctx.ports.changed?.(cur.postingId);
+      const updated = Object.keys(i).filter(
+        (k) => k !== "id" && i[k as keyof typeof i] !== undefined,
+      );
+      return { id: cur.id, updated };
     }),
     "posting.note_add": wrap("posting.note_add", (i) => {
       must(i.postingId);

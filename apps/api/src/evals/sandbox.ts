@@ -318,6 +318,14 @@ async function seedPostingCv(repos: Repos, profileId: string) {
     jdText:
       "Desenvolvedora Backend Sênior. Requisitos: Node.js, TypeScript, PostgreSQL e Kubernetes. Diferenciais: AWS e Kafka.",
   });
+  // a recrutadora da Globex, com o e-mail antigo (caso `corrigir-contato`: o recrutador corrige, não cria outro)
+  repos.postingContacts.add(posting.id, {
+    name: "Ana Souza",
+    origin: "email",
+    role: "recruiter",
+    email: "ana.souza@globex-antigo.example",
+    contactedOn: "2026-10-15",
+  });
   const doc = repos.documents.create({
     kind: "cv",
     profileId,

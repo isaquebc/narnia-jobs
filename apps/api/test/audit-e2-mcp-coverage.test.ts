@@ -29,6 +29,8 @@ interface Ctx {
   /** F06: vaga criada por posting_create e nota do usuário que o recrutador edita. */
   postingId?: string;
   noteId?: string;
+  /** Contato criado por posting_contact_add, corrigido por posting_contact_update. */
+  contactId?: string;
   /** F05: documento gerado por cv_generate e o conteúdo lido por cv_get (para o cv_edit). */
   documentId?: string;
   draft?: unknown;
@@ -275,6 +277,13 @@ const CASES: Record<string, Case> = {
   posting_contact_add: {
     where: "career",
     args: (c) => ({ postingId: c.postingId, name: "Joana", origin: "linkedin" }),
+    after: (c, out) => {
+      c.contactId = (out as { id: string }).id;
+    },
+  },
+  posting_contact_update: {
+    where: "career",
+    args: (c) => ({ id: c.contactId, email: "joana@globex.example" }),
   },
   posting_note_add: {
     where: "career",
