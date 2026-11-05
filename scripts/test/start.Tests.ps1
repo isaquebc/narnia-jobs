@@ -199,6 +199,17 @@ Describe "C7 / CM-4: cópia separada da instância do dono (.owner-src)" {
     finally { Remove-Item env:NARNIA_OWNER_SRC_DIR, env:NARNIA_INSTANCE, env:NARNIA_SRC_DIR, env:NARNIA_DATA_MOUNT, env:NARNIA_BACKUP_MOUNT, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue }
     $out | Should -Be ".|./.claude-data/dev|./.claude-data/backups"
   }
+  It "promote com árvore suja leva só o commit e avisa (pedido do dono, 2026-11-04)" -Skip:(-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    $repo = Join-Path $script:Tmp "repo-sujo"; New-Item -ItemType Directory -Force -Path $repo | Out-Null
+    git -C $repo init -q; git -C $repo config user.email t@t; git -C $repo config user.name t
+    Set-Content -Path (Join-Path $repo "a.txt") -Value "a"; git -C $repo add a.txt; git -C $repo commit -qm um
+    Set-Content -Path (Join-Path $repo "a.txt") -Value "mudou"
+    try { $out = pwsh -NoProfile -Command "Set-Location '$repo'; . '$($script:Ps1)'; Invoke-Promote" 2>&1 | Out-String }
+    finally { Remove-Item env:NARNIA_SRC_DIR, env:NARNIA_DATA_MOUNT, env:NARNIA_BACKUP_MOUNT, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue }
+    $out | Should -Match "ficam de fora"
+    (git -C (Join-Path $repo ".owner-src") rev-parse HEAD) | Should -Be (git -C $repo rev-parse HEAD)
+    (Get-Content (Join-Path $repo ".owner-src/a.txt")) | Should -Be "a"
+  }
   It "promote recusa pela instância claude" {
     $env:NARNIA_INSTANCE = "claude"
     try { $out = pwsh -NoProfile -Command ". '$($script:Ps1)'; try { Invoke-Promote } catch { `$_.Exception.Message }" 2>&1 | Out-String }

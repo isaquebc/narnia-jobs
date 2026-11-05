@@ -334,13 +334,18 @@ git_repo() { # git_repo DIR -> repositório git com um commit
   [[ "$output" == *"make dev-down && make dev"* ]]
 }
 
-@test "promote recusa árvore suja e recusa rodar pela instância claude" {
+@test "promote com árvore suja leva só o commit e avisa que as alterações ficam de fora (pedido do dono, 2026-11-04)" {
   git_repo "$TMP/repo"
   echo mudou > "$TMP/repo/a.txt"
   run bash -c "cd '$TMP/repo' && source '$BATS_TEST_DIRNAME/../../start.sh' && cmd_promote"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"alterações não commitadas"* ]]
-  git -C "$TMP/repo" checkout -q a.txt
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"alterações não commitadas"*"ficam de fora"* ]]
+  [[ "$(git -C "$TMP/repo/.owner-src" rev-parse HEAD)" == "$(git -C "$TMP/repo" rev-parse HEAD)" ]]
+  [[ "$(cat "$TMP/repo/.owner-src/a.txt")" == "a" ]]
+}
+
+@test "promote recusa rodar pela instância claude" {
+  git_repo "$TMP/repo"
   run bash -c "cd '$TMP/repo' && export NARNIA_INSTANCE=claude && source '$BATS_TEST_DIRNAME/../../start.sh' && cmd_promote"
   [ "$status" -ne 0 ]
   [[ "$output" == *"dono"* ]]

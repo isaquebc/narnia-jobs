@@ -546,9 +546,10 @@ cmd_promote() {
   command -v git >/dev/null 2>&1 || die "git não encontrado."
   local commit=${1:-HEAD} dir sha
   dir=$(owner_src_dir)
-  [[ -z "$(git status --porcelain --untracked-files=no)" ]] \
-    || die "há alterações não commitadas na raiz; commite (ou descarte) antes de promover."
   sha=$(git rev-parse --verify --quiet "${commit}^{commit}") || die "commit inválido: ${commit}"
+  # árvore suja (ex.: o Claude no meio de uma avaliação): promove só o commit, que vem do git (pedido do dono, 2026-11-04)
+  [[ -z "$(git status --porcelain --untracked-files=no)" ]] \
+    || info "aviso: há alterações não commitadas na raiz; elas ficam de fora: promovo só o commit ${sha:0:7}."
   if [[ -d "$dir" ]]; then
     git -C "$dir" checkout -q --detach "$sha" || die "não consegui mover ${dir} para ${sha:0:7}."
   else

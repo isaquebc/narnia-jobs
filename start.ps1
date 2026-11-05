@@ -121,9 +121,10 @@ function Invoke-Promote([string] $Commit = "HEAD") {
   }
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Fail "git não encontrado." }
   $dir = Get-OwnerSrcDir
-  if (git status --porcelain --untracked-files=no) { Fail "há alterações não commitadas na raiz; commite (ou descarte) antes de promover." }
   $sha = git rev-parse --verify --quiet "$Commit^{commit}"
   if (-not $sha) { Fail "commit inválido: $Commit" }
+  # árvore suja (ex.: o Claude no meio de uma avaliação): promove só o commit, que vem do git (pedido do dono, 2026-11-04)
+  if (git status --porcelain --untracked-files=no) { Info "aviso: há alterações não commitadas na raiz; elas ficam de fora: promovo só o commit $($sha.Substring(0,7))." }
   if (Test-Path $dir) { git -C $dir checkout -q --detach $sha; if ($LASTEXITCODE -ne 0) { Fail "não consegui mover $dir." } }
   else { git worktree add -q --detach $dir $sha *> $null; if ($LASTEXITCODE -ne 0) { Fail "não consegui criar $dir." } }
   Info "instância do dono agora no commit $($sha.Substring(0,7)) ($dir)."
