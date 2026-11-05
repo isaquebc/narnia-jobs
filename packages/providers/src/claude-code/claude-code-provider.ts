@@ -228,7 +228,7 @@ const AUTH_METHODS: ReadonlySet<string> = new Set([
   "third_party",
 ]);
 
-/** JSON Schema da análise de perfis (F02), gerado uma vez por processo (sem `$schema`, fix e06eeda). */
+/** JSON Schema da análise de perfis (F02), gerado uma vez por processo (sem `$schema`, fix a558955). */
 export const ANALYZE_PROFILES_JSON_SCHEMA = toJsonSchema(AnalyzeProfilesOutputSchema);
 
 async function defaultQuery(params: {

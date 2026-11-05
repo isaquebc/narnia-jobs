@@ -1,6 +1,6 @@
 # Relatório r3-juiz-perguntas
 
-2026-10-30T05:07:26.089Z · commit 71659e1 · provider claude-code · 3 amostra(s)
+2026-10-30T05:07:26.089Z · commit 2b6c0b1 · provider claude-code · 3 amostra(s)
 
 - Conversas: 72 (0 com erro) · turnos: 81
 - Latência por turno: p50 10,7 s · p95 71,8 s

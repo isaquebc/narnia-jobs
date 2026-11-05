@@ -1,6 +1,6 @@
 # Relatório r1r2-busca-indice
 
-2026-10-29T21:06:14.089Z · commit 2c74439 · provider claude-code · 3 amostra(s)
+2026-10-29T21:06:14.089Z · commit a737b92 · provider claude-code · 3 amostra(s)
 
 - Conversas: 54 (0 com erro) · turnos: 63
 - Latência por turno: p50 12,3 s · p95 70,1 s

@@ -169,7 +169,7 @@
       "respostas_conferidas": 1
     },
     "versionId": "eef122e2046e0ce30a392e5a6b3123162fc253c6f070d18b2bf7f463714a7ee6",
-    "commit": "0d8b846",
+    "commit": "be4fde6",
     "updatedAt": "2026-10-23T22:56:39.898Z"
   },
   "narnia-application-locate": {
@@ -180,7 +180,7 @@
       "tipos_esperados": 0.958
     },
     "versionId": "df1ec4ab1401b15ee78205f69e683db55f704fd6bd17397368f06b3283303cc9",
-    "commit": "75ace96",
+    "commit": "4fb05ce",
     "updatedAt": "2026-10-23T20:15:25.211Z"
   },
   "narnia-application-roleplay": {
@@ -202,7 +202,7 @@
       "padrao_de_entrega": 0.667
     },
     "versionId": "99edb633f55afa93b9c37ec66cb480aa0536d231701a9b479f766f0d24ddc193",
-    "commit": "af9f29d",
+    "commit": "61c6912",
     "updatedAt": "2026-10-21T19:36:39.990Z"
   },
   "narnia-cover-letter-generate": {
@@ -216,7 +216,7 @@
       "tamanho_da_carta": 1
     },
     "versionId": "2bd1f15622671bd0e231ef2525a4e9225efc25c3823b96b34a474b0a0749499b",
-    "commit": "15aae49",
+    "commit": "fb89490",
     "updatedAt": "2026-10-16T20:12:53.802Z"
   },
   "narnia-cv-generate": {
@@ -230,7 +230,7 @@
       "sem_termo_sem_evidencia": 1
     },
     "versionId": "2f5281413a7a0f4ee365d548d0dc0bdbf6d9bf682a869f2d5fc9a084f4343736",
-    "commit": "15aae49",
+    "commit": "fb89490",
     "updatedAt": "2026-10-16T20:00:11.275Z"
   },
   "narnia-cv-review": {
@@ -249,7 +249,7 @@
       "padrao_de_entrega": 1
     },
     "versionId": "b57df168df6effd8eeb0993e3791171b3e223a210b2079c4b9289709b8eeed3f",
-    "commit": "c609a8e",
+    "commit": "620d4b3",
     "updatedAt": "2026-10-15T00:46:55.826Z"
   },
   "narnia-posting-extract": {
@@ -260,7 +260,7 @@
       "sem_anos_inventados": 1
     },
     "versionId": "20c55fa3f367a2df070891f950b35d778c284034f821b3579c22639c99080613",
-    "commit": "c1da356",
+    "commit": "d09a692",
     "updatedAt": "2026-10-29T17:12:23.677Z"
   },
   "narnia-posting-merge": {
@@ -271,7 +271,7 @@
       "sem_anos_inventados": 1
     },
     "versionId": "338cd33d4fbd065be3caf009ca2da256564a1ad93271b519f7a4c32755550688",
-    "commit": "c609a8e",
+    "commit": "620d4b3",
     "updatedAt": "2026-10-15T00:48:21.702Z"
   },
   "narnia-profile-motivations": {
