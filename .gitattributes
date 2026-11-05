@@ -1,0 +1,20 @@
+# Fim de linha LF no repositório e no checkout, em qualquer sistema: os scripts rodam dentro de containers Linux
+# (um .sh com CRLF quebra no container quando o Windows clona com core.autocrlf=true).
+* text=auto eol=lf
+
+# PowerShell aceita LF; os .ps1 seguem a regra geral.
+
+# binários: nunca convertidos
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.docx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.traineddata binary
+*.gz binary

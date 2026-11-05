@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # narnia-jobs · lançador para Linux/macOS. Só depende de Docker (com Compose v2).
-# Produção:        up | down [--purge] | login | doctor | logs | status | restore
-# Desenvolvimento: dev | dev-down | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
+# Uso:             up | down [--purge] | login | doctor | logs | status | restore | extension | install-plugin | google
+# Desenvolvimento: dev | dev-down | test | lint | typecheck | build | shell | cli | test:sh | e2e | install | evals
+#                  promote (cópia .owner-src do mantenedor). Ajuda completa: ./start.sh help
 set -euo pipefail
 
 # --- instâncias: a do dono (padrão) e a do Claude (NARNIA_INSTANCE=claude, valores em .env.claude) -----------------
@@ -622,16 +623,18 @@ usage() {
 narnia-jobs · ./start.sh <comando>
 
 Uso (produção, só Docker no host):
-  up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis e imprime a URL
+  up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis + browser e imprime a URL
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
-  promote [c]   leva a instância do dono (.owner-src) para um commit verde (padrão HEAD)
+  promote [c]   atualiza a cópia .owner-src do código para um commit (padrão HEAD; fluxo do mantenedor, CONTRIBUTING.md)
   extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
   install-plugin [--prod]  instala o recrutador no Claude Code deste computador (MCP + plugin, modo B)
-  evals prompts|chat|pdf|all [nome…] [--strict]  avaliações no Phoenix: prompts pela ponte; chat e pdf num banco temporário isolado (consome a assinatura)
+  evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict] [--gate]
+                avaliações no Phoenix: prompts pela ponte; chat, pdf e cv-review num banco temporário isolado
+                (consome a assinatura; ver CONTRIBUTING.md)
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 

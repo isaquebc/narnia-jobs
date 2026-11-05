@@ -1,32 +1,52 @@
 # narnia-jobs
 
-Projeto **open source**: clone, rode localmente e use a assinatura da IA que preferir (Claude Code primeiro; Codex planejado). Coleção de ferramentas locais para apoiar a busca de emprego: um recrutador(a) sênior como agente, perfis múltiplos (um por cargo-alvo), ingestão de dados (CV, GitHub, LinkedIn) e features isoladas (gerar CV, analisar vaga, candidaturas, simular entrevista). Roda na máquina do usuário via Docker (Linux, Windows e Mac), com dados persistidos em pasta do host fora do versionamento.
+[![CI](https://github.com/isaquebc/narnia-jobs/actions/workflows/ci.yml/badge.svg)](https://github.com/isaquebc/narnia-jobs/actions/workflows/ci.yml) · [English](README.en.md)
 
-**Estado:** F01 (primeiro uso), F02 (perfis), F03 (ingestão de CV, texto e GitHub, com notificações), F04 (chat com o recrutador na web e no terminal, com rastros locais no Phoenix), F06 (análise de vagas, com recrutador global e especializado) e F05 (currículo e carta de apresentação em PDF, revisados) implementados. O plano está em `plans/plan-v0/`; as próximas entregas (candidaturas, entrevista) seguem a ordem de `plans/plan-v0/tasks/README.md`.
+**Um assistente de busca de emprego que roda no seu computador.** Você envia o seu currículo, o narnia-jobs organiza a sua carreira em fatos com fonte, e um recrutador sênior com IA (o Claude, pela sua assinatura) conversa com você, analisa vagas, monta currículos e cartas em PDF sem inventar nada e acompanha as suas candidaturas. Tudo fica numa pasta da sua máquina, em Docker.
 
-| Documento | Conteúdo |
-|-----------|----------|
-| [plans/plan-v0/01-viabilidade.md](plans/plan-v0/01-viabilidade.md) | análise de viabilidade, política da Anthropic sobre assinatura e a decisão de dois modos |
-| [plans/plan-v0/02-fluxos-do-usuario.md](plans/plan-v0/02-fluxos-do-usuario.md) | onboarding, troca de perfil, ingestão, chat, features, gestão de dados |
-| [plans/plan-v0/03-arquitetura.md](plans/plan-v0/03-arquitetura.md) | plugin + MCP + UI web local, storage, ingestão por profundidade, economia de tokens, fases |
-| [plans/plan-v0/04-escopo-de-dados.md](plans/plan-v0/04-escopo-de-dados.md) | usuário base, perfil, features, modelo de fato com fonte |
-| [plans/plan-v0/05-layouts.md](plans/plan-v0/05-layouts.md) | wireframes de todas as telas |
-| [plans/plan-v0/06-decisoes-em-aberto.md](plans/plan-v0/06-decisoes-em-aberto.md) | decisões que dependem do dono do projeto |
-| [plans/plan-v0/07-dois-modos.md](plans/plan-v0/07-dois-modos.md) | viabilidade de manter wrapper local (Agent SDK) e modo plugin ao mesmo tempo |
-| [plans/plan-v0/09-metodologia-tdd.md](plans/plan-v0/09-metodologia-tdd.md) | TDD obrigatório, e2e por fluxo e registro para o harness futuro |
-| [plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md) | **entregáveis F01–F11**: um por fluxo/feature, com ordem e dependências; cada um com arquitetura, dados, layouts, decisões e testes |
-| [plans/plan-v0/08-docker-calendar-voz.md](plans/plan-v0/08-docker-calendar-voz.md) | viabilidade de rodar em Docker, integrar Google Calendar via MCP e entrevista por voz mãos livres |
+- **Perfis a partir do CV.** Lê PDF, DOCX ou texto livre (com OCR para PDF escaneado) e o seu GitHub; cada fato vira uma proposta com o trecho de origem, e nada entra sem a sua revisão. Vários perfis sobre os mesmos fatos, um por cargo-alvo.
+- **Recrutador no chat.** Conhece a sua carreira e todos os perfis, busca nos seus dados, cita a fonte de cada afirmação e pesquisa o mercado registrando as fontes. Também roda dentro do Claude Code, como plugin.
+- **Análise de vaga.** Cole o texto ou o link: fit por perfil, o que você atende (ligado aos seus fatos), lacunas, riscos, palavras-chave de ATS e perguntas prováveis.
+- **Currículo e carta.** PDF de até 2 páginas no idioma da vaga, revisado por checagens automáticas e por um segundo modelo antes de chegar a você; três modelos prontos e os seus.
+- **Candidaturas.** Quadro por etapa, agenda com `.ics` e, opcionalmente, o Google Calendar.
+- **Extensão do Chrome.** Leva vagas de qualquer site e ajuda a preencher formulários de candidatura com respostas a partir dos seus dados.
 
-## Uso
+A interface está em **português (Brasil)**. Os currículos e cartas saem no idioma da vaga (português ou inglês).
 
-Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS; Docker Engine + Compose v2 no Linux). Nada mais é instalado no host: a aplicação roda em cinco containers (web, api, worker, redis e browser, o Chromium headless que lê vagas por link quando a página precisa de JS ou tem banner de cookies e monta os PDFs dos currículos, sempre sem acesso a nada além do que recebe).
+## O que ainda não existe
+
+Entrevista simulada por voz, mensagem a recrutador e otimização do LinkedIn, exportar e apagar os dados pela interface, o medidor de uso completo e um segundo provedor de IA (Codex) estão planejados ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md)). A importação do export do LinkedIn foi adiada.
+
+## Antes de começar
+
+- **Docker** com Compose v2: Docker Desktop no Windows e no macOS; Docker Engine no Linux. Nada mais é instalado no computador.
+- **Uma assinatura do Claude com acesso ao Claude Code** (Pro ou Max). O uso consome os limites do seu plano, como usar o Claude Code; a tela de ingestão mostra a estimativa antes de rodar, e o chat mostra o gasto de cada conversa.
+- **Espaço:** cerca de 2,5 GB de disco para as imagens e 1 GB de RAM livre (o Phoenix, opcional, soma 1 GB de disco e 500 MB de RAM; a busca por sentido, opcional, 113 MB e 400 MB).
+- Opcionais: o **GitHub CLI** (`gh`) logado no computador, para importar repositórios privados sem novo login; o **Chrome**, para a extensão; o **Claude Code** instalado, para usar o recrutador no terminal.
+
+Testado em Linux; no Windows e no macOS roda pelo Docker Desktop (as funções do lançador são testadas no CI dos três sistemas).
+
+### Sobre o uso da assinatura do Claude
+
+O narnia-jobs usa o **CLI oficial do Claude Code** dentro de um container, logado com a **sua** conta, na **sua** máquina. Ele nunca recebe, guarda fora do seu computador ou repassa a sua credencial.
+
+A documentação do Agent SDK da Anthropic diz que, sem aprovação prévia, desenvolvedores terceiros não podem oferecer o login do claude.ai ou os limites da assinatura nos seus produtos. O narnia-jobs não é um serviço: cada pessoa roda a própria cópia com o próprio login, como outros projetos abertos que embrulham o Claude Code. Ainda assim, a regra existe e a decisão é sua. Por isso há dois modos sobre o mesmo núcleo:
+
+- **Modo A, interface web:** o chat e as tarefas em segundo plano usam o CLI logado no container (o padrão).
+- **Modo B, plugin do Claude Code:** você conversa no seu próprio Claude Code e o narnia-jobs entra como plugin e servidor MCP. É o caminho inequivocamente dentro das regras ([tutorial, passo 8](docs/tutorial.md#8-o-recrutador-no-claude-code-modo-b)).
+
+A análise completa está em [plans/plan-v0/01-viabilidade.md](plans/plan-v0/01-viabilidade.md).
+
+## Instalação rápida
 
 ```bash
-git clone <este repositório> && cd narnia-jobs-helpper
-./start.sh up          # Windows: .\start.ps1 up
+git clone https://github.com/isaquebc/narnia-jobs.git
+cd narnia-jobs
+./start.sh up        # Windows: .\start.ps1 up
+./start.sh login     # uma vez: login da sua assinatura do Claude dentro do container
 ```
 
-O `up` escolhe a primeira porta livre entre 3100 e 3199 (gravada em `.env` como `NARNIA_PORT` e reutilizada enquanto estiver livre), constrói as imagens na primeira vez, espera a api ficar saudável e imprime a URL de abertura, já com o token de acesso local:
+O `up` constrói as imagens (a primeira vez leva alguns minutos), escolhe uma porta livre entre 3100 e 3199 e imprime o endereço já com o token de acesso:
 
 ```
   narnia-jobs está no ar:
@@ -34,207 +54,68 @@ O `up` escolhe a primeira porta livre entre 3100 e 3199 (gravada em `.env` como 
     http://127.0.0.1:3100/?token=…
 ```
 
-Abra essa URL no navegador. O token protege a API local contra outros sites abertos no mesmo navegador; ele é gerado uma vez e guardado em `./data/.token`, então a URL continua a mesma depois de reiniciar.
+Abra esse endereço no navegador e siga o primeiro uso. O passo a passo completo, do currículo à primeira candidatura, está no **[tutorial](docs/tutorial.md)**.
 
-### Login da assinatura do Claude
+## Privacidade: o que fica e o que sai do seu computador
 
-A extração do currículo e o recrutador usam a **sua** assinatura do Claude, pelo CLI oficial dentro do container. Dois caminhos:
+**Fica no seu computador:** tudo o que é seu, na pasta `./data` (banco SQLite, currículos enviados, documentos gerados) e os backups em `./backups`. O login da assinatura fica num volume do Docker. O narnia-jobs não tem telemetria própria nem servidor na nuvem; o Phoenix, quando ligado, também é local.
 
-1. **Padrão, login no volume** (uma vez): `./start.sh login`. O CLI imprime uma URL; abra, autorize e cole o código de volta. A credencial fica no volume `claude-auth`, renova sozinha e sobrevive a reinícios e reboots.
-2. **Alternativa, token de longa duração**: no seu computador, com o Claude Code instalado, rode `claude setup-token` e cole o valor em `.env` como `CLAUDE_CODE_OAUTH_TOKEN=…`. Quando essa variável existe, ela prevalece sobre o login do volume. O token expira em um ano.
+**Sai, e para onde:**
 
-`./start.sh doctor` mostra qual mecanismo está ativo (volume, token ou nenhum), além de Redis, pasta de dados e worker.
+| Para | O quê | Quando |
+|------|-------|--------|
+| Anthropic (pelo CLI do Claude Code, na sua conta) | o conteúdo de que o modelo precisa: currículo, fatos, mensagens do chat, vagas, textos dos documentos | em toda tarefa com IA; segue a política de dados da Anthropic, inclusive a telemetria do próprio CLI |
+| Anthropic (busca na web) | as buscas que o recrutador faz (salários, empresas): a ferramenta de busca roda do lado da Anthropic | quando ele pesquisa |
+| Os sites pesquisados | o pedido das páginas que o recrutador lê | quando ele lê uma página; no chat web, só dos domínios confiáveis (Configurações › Chat) |
+| O site da vaga | o pedido da página e, se ela precisar de JavaScript, os recursos que ela carrega (num navegador isolado, sem imagens nem fontes) | quando você salva uma vaga pelo link |
+| Os links do seu currículo | uma visita a cada link (identificada como um Chrome comum) | ao gerar o PDF, para não publicar link quebrado |
+| API do GitHub | consultas aos seus repositórios | quando você importa o GitHub |
+| Hugging Face | o download do modelo de 113 MB, uma vez | quando você liga a busca por sentido |
+| Google | eventos da agenda | só se você conectar o Google Calendar |
 
-### Perfis
-
-Depois do primeiro uso, **Perfis** (menu lateral ou "Gerenciar perfis" no seletor do topo) permite ter vários perfis sobre os mesmos fatos, um por cargo-alvo: criar do zero ou clonar, trocar o ativo pelo seletor (todas as abas acompanham), renomear, arquivar e desarquivar. Em cada perfil: **Ênfases** (destacar, ocultar e ordenar experiências, projetos, skills, formação e idiomas, com prévia do cartão), **Narrativa** (seu pitch), **Recrutador** (persona: tom, honestidade, rigor e senioridade do recrutador, com restaurar padrão) e **Cartão** (o resumo de ~300 tokens que o recrutador recebe; mostra se está desatualizado e tem o botão "Atualizar cartão"). O dashboard sugere perfis por heurística, sem custo; o botão **Analisar possíveis perfis** usa o modelo sobre todo o seu histórico e, por isso, mostra a estimativa de tokens e pede confirmação antes.
-
-### Ingestão e GitHub
-
-Em **Ingestão** você adiciona dados depois do primeiro uso: **GitHub**, **Currículo** (outro CV) e **Texto livre** ("conte a sua história de carreira e de vida"). Reenviar o mesmo arquivo ou texto avisa "já lido" e aponta a execução anterior.
-
-- **Conectar o GitHub.** Se o `gh` do seu computador estiver logado, o app reaproveita esse login (o lançador entrega o token ao container a cada `up`/`dev`). Senão, escolha **Login próprio do app**: aparece um código; clique em **Abrir GitHub**, cole o código e autorize. A escolha fica em **Configurações**. Depois de atualizar o código do projeto, reconstrua a stack uma vez para ter o `gh` no container: `make dev-down && make dev` (ou `./start.sh down && ./start.sh up`).
-- **Pública ou privada.** A análise pública lê só repositórios públicos e funciona sem login (sem as métricas de contribuição, que o GitHub só entrega logado). A privada inclui os privados e exige o GitHub conectado; o app só lê.
-- **Orçamento e plano.** Antes de rodar, a tela mostra seu plano, quanto já usou das janelas de 5 horas e semanal, a estimativa e um orçamento recomendado. O GitHub sempre pede confirmação; CV e texto seguem sozinhos abaixo de 10 mil tokens.
-- **Freio.** Se o orçamento acabar, a execução para e pergunta: continuar com mais orçamento, encerrar com o que foi feito, ou deixar para depois.
-- **Pendências.** O sino no topo e a página **Pendências** reúnem revisões, conflitos, execuções esperando decisão, sugestões de perfil e análises concluídas; cada item some sozinho quando você resolve.
-- **Evidências.** Repositórios analisados com relatório, métricas, resumo editável e **Reanalisar** (atualizar com commits novos, aprofundar ou cobrir o que ficou de fora).
-- **Contrato, carga horária, salário e benefícios.** Cada experiência pode ter (todos opcionais) o tipo de contrato (CLT, PJ, freelance, estágio, temporário), a carga horária semanal (separada do contrato: um PJ pode ter 20, 30 ou 44 horas), o salário com valor, período (hora, mês ou ano) e moeda, e benefícios de uma lista (vale-refeição, plano de saúde, odontológico, seguro de vida, vale-transporte, auxílio home office, PLR/bônus, ações, 13º, férias remuneradas, auxílio educação, previdência privada, academia, day off de aniversário) mais outros em texto livre. A ingestão de CV ou texto extrai o que estiver escrito, com a citação do trecho, sem converter nem estimar; uma experiência já conhecida recebe esses dados como atualização para você aprovar. O cartão do perfil mostra a **trajetória do salário** pelo equivalente mensal (salário por hora × carga semanal), com a variação entre experiências na mesma moeda, e o recrutador usa isso para dizer se você está subindo ou descendo. Para trazer o salário de um texto já ingerido, ingira de novo (**Ler de novo**).
-
-### Chat com o recrutador
-
-Menu › **Geral** › **Chat**. O recrutador é **global**: conhece a sua carreira e todos os seus perfis, e para uma análise dirigida a um perfil (aderência a uma vaga, o que estudar, o que melhorar no currículo) chama o **recrutador especializado** daquele perfil, que roda dentro do mesmo turno (os chips das ferramentas dele aparecem marcados "especializado"). As conversas não pertencem a um perfil: trocar o perfil ativo não fecha nenhuma, e o menu as agrupa por tema (Carreira, Vaga, Clarificação…). Até 5 ficam abertas ao mesmo tempo (a sexta pergunta qual encerrar) e conversas paradas por 1 hora hibernam e retomam do ponto na próxima mensagem (Configurações › Chat ajusta os limites e o modelo padrão, Sonnet). O recrutador já começa conhecendo a persona e o cartão do seu perfil, busca detalhes nos seus dados pelas ferramentas (os chips mostram quais usou) e cita a fonte do que afirma. Você pode colar um texto da sua história, mandar um arquivo ou um link do GitHub: ele cria a ingestão e as propostas vão para a revisão (nada é gravado sem você aprovar; o GitHub sempre pede confirmação do orçamento). Pesquisas na internet usam só domínios confiáveis (lista editável em Configurações › Chat). Na revisão de uma ingestão, **Clarificar com o recrutador** abre uma conversa cujas respostas viram propostas da mesma execução.
-
-**Custo:** cada mensagem usa a sua assinatura do Claude; o rodapé do chat mostra os tokens do turno e da conversa, o custo equivalente e o teto por conversa, se você definir um em Configurações › Chat.
-
-### Vagas
-
-Cole uma vaga (ou o link dela) no **Chat** ou em **Vagas** (menu › Geral). A vaga é sempre salva (salvar não é se candidatar). Pelo link, o servidor lê a página; se ela depende de JavaScript ou de aceitar cookies, abre num navegador headless isolado (serviço `browser`); sites que exigem login ou bloqueiam robôs (LinkedIn, por exemplo) pedem para colar o texto.
-
-- **Na hora, sem tokens**, uma heurística local extrai cargo, senioridade, role, local, contrato, moeda, faixa, benefícios, requisitos e diferenciais, e procura cada palavra-chave da vaga nos seus dados (cobertura dos obrigatórios e riscos para cada perfil, como "vaga híbrida e perfil só remoto").
-- **Em segundo plano**, um modelo barato (Haiku por padrão) extrai a vaga de novo e um segundo agente junta as duas extrações. Na página da vaga, cada campo mostra de onde veio: heurística, modelo, os dois concordando, ou você. O que você edita nunca é sobrescrito.
-- Vaga com a mesma empresa, cliente, cargo e role de uma já salva abre um **modal com o diff** e a certeza de ser a mesma vaga: atualizar a salva, salvar como nova ou descartar.
-- **A análise** roda numa conversa própria, com o título "contratante/cliente - role": o recrutador compara a vaga com todos os seus perfis pelo especializado de cada um, e grava o fit por perfil, o recomendado, o que você atende (cada item ligado a um fato seu), as lacunas (só depois de buscar e não achar), riscos, palavras-chave que faltam, perguntas prováveis, o que estudar e o que melhorar no currículo. Se os seus dados ou a vaga mudarem depois, a página avisa e oferece **Reanalisar** (nada é refeito sozinho, para não gastar tokens; a extração do modelo terminando depois da análise não conta como mudança). A bandeja mostra a análise em andamento e, quando ela fica pronta, o link para a vaga.
-- **Página da vaga:** todos os campos e a descrição editáveis, contatos (com quem você falou, por LinkedIn, WhatsApp ou e-mail) e notas. Quando o recrutador altera uma nota sua, a mudança espera a sua confirmação na bandeja (**Aguardando você**) e em Pendências. Se você já registrou outra vaga da mesma empresa com o mesmo role, a página mostra **Vagas parecidas** com os links. O botão **Gerar** faz o CV ou a cover letter da vaga (veja Currículos e cartas). O alerta de candidatura repetida chega com as candidaturas (F07).
-- **Busca** na página Vagas por empresa, cliente, cargo, role ou nome de contato.
-- **Configurações › Modelos** escolhe o modelo do Claude de cada tarefa (extração, junção, comparação de vaga repetida, análise, geração e revisão do currículo).
-
-### Currículos e cartas
-
-Cada perfil tem o seu currículo (**Perfis › Currículo**) e cada vaga pode ter um CV e uma carta de apresentação por perfil (botão **Gerar** na página da vaga, com o perfil recomendado pela análise já escolhido). Também dá para pedir ao recrutador no chat ("gera meu CV para esta vaga, com mais peso em liderança") e, depois de pronto, pedir alterações.
-
-- **Nunca mente.** O modelo (Sonnet por padrão) escreve só os textos e diz de qual fato seu cada linha veio; empresa, cargo, datas, contato e links vêm dos seus dados. Termo que a vaga pede e você não tem nunca aparece; uma experiência próxima aparece com o nome verdadeiro (Docker para quem não tem Kubernetes).
-- **Breve e no idioma da vaga.** No máximo 2 páginas, com as experiências e skills de maior aderência (o score de match aparece na tela); as menos aderentes de uma carreira longa ficam fora do PDF e viram um **roteiro para aprofundar na entrevista**. O CV da vaga sai no idioma da vaga; se o seu currículo não mostra esse idioma fluente, a tela pergunta antes.
-- **Revisado.** Antes de chegar a você, o PDF passa por checagens (links que existem e respondem, fonte, espaçamento, quebras de página, até 2 páginas, aderência a ATS de pelo menos 90%) e por um revisor (Haiku por padrão) que lê as páginas e o texto atrás de invenção, fatos errados, relevância e problemas visuais. Reprovado, é gerado de novo uma vez com os apontamentos; se reprovar outra vez, chega com o alerta **Não passou na revisão** e os motivos. **Atualizar** gera de novo (quantas vezes quiser, com instruções opcionais).
-- **Links clicáveis** para e-mail, WhatsApp, LinkedIn, GitHub e portfólio; o que falta aparece na tela com um campo para cadastrar.
-- **Carta de apresentação** opcional, junto com o CV da vaga ou sozinha, em PDF ou em texto para colar: o que a vaga pede, o que você cobre e as principais lacunas, com abertura para aprender.
-- **Versões**: cada geração, edição ou troca de modelo é uma versão nova, com a data; dá para baixar qualquer uma e comparar com a anterior. **Editar** muda o texto, a ordem e as seções sem gastar tokens do gerador; o documento é montado e revisado de novo.
-- **Modelos**: Clássico, Moderno e Compacto, e os seus (**Configurações › Modelos de currículo**, formato em [docs/templates-de-cv.md](docs/templates-de-cv.md)). Papel A4 ou Letter.
-- **Desatualizado**: se os seus dados, o perfil ou a vaga mudarem depois, o documento avisa; nada é refeito sozinho.
-- **Processos** (menu › Geral) lista tudo o que roda em segundo plano, com cancelar e tentar de novo; **Configurações › Processos simultâneos** define quantos jobs de cada fila rodam juntos.
-
-### Extensão do Chrome (vagas e formulários de candidatura)
-
-A extensão leva vagas de qualquer site para o narnia e ajuda nos formulários de candidatura, numa janela ao lado. Ela lê a página só quando você clica no ícone e manda o conteúdo para a sua instância, no seu computador.
-
-**Instalar** (o passo a passo com os endereços desta instância está em **Configurações › Extensão do navegador › Como instalar no Chrome**):
-
-1. Gere a extensão: `./start.sh extension` (Windows: `.\start.ps1 extension`). O `promote` já gera junto.
-2. Em `chrome://extensions`, ligue o **Modo do desenvolvedor**, clique em **Carregar sem compactação** e escolha `apps/extension/dist` (na instância atualizada pelo `promote`, `.owner-src/apps/extension/dist`).
-3. Fixe o ícone do narnia na barra.
-4. **Parear:** em Configurações › Extensão do navegador, gere um código (vale 10 minutos e uma vez só). Nas opções da extensão (botão direito no ícone › Opções), informe o endereço da instância e o código. Os navegadores conectados aparecem em Configurações, com **Desconectar**.
-
-Depois de cada atualização do narnia, clique em recarregar no cartão do narnia em `chrome://extensions`: o Chrome não recarrega sozinho extensões sem compactação.
-
-**Usar:** numa página, clique no ícone e escolha **Analisar a vaga** (salva a vaga, mostra o fit por perfil e gera CV e carta) ou **Ajudar no formulário** (organiza as perguntas, sugere as respostas com os seus dados e a vaga, deixa copiar, editar, ajustar no chat e preencher na página, e anexa o CV da vaga). Cada página vira uma aba na janela, num menu que mostra o que está processando e o que terminou sem você ver. O formulário aberto na mesma aba da vaga entra na aba dela (ou pelo botão **Procurar o formulário nesta aba**), sem duplicar a vaga. Formulário em várias páginas: avance nele na mesma aba e clique no ícone a cada etapa (ou em **Ler a próxima etapa nesta aba**); as perguntas aparecem por etapa, e **Preencher** vale na etapa aberta.
-
-**Limites:**
-- Só no Chrome (e navegadores baseados nele).
-- O Chrome só deixa a extensão ler a página depois do seu clique, e só no site em que você clicou. Se o formulário abriu em outro site, clique no ícone de novo nele.
-- Formulário embutido de outro site (Greenhouse, Lever, Workday): o Chrome pede a sua permissão para aquele site na primeira vez.
-- A extensão nunca envia o formulário e nunca lê o que você digitou; preenche só quando você clica. Consentimentos ficam com você, e autodeclaração (raça, gênero, deficiência…) só é respondida com o que você mesmo declarou no chat.
-- As páginas lidas e os formulários ficam no banco (entram no backup diário); páginas que não viraram vaga nem formulário são apagadas depois de 30 dias.
-
-### Recrutador no terminal (Claude Code, modo B)
-
-O mesmo recrutador do chat roda no Claude Code do seu computador, com o mesmo cartão do perfil e as mesmas tools:
+## Atualizar
 
 ```bash
-make dev            # ou ./start.sh up; a instância precisa estar no ar
-./start.sh install-plugin   # Windows: .\start.ps1 install-plugin  (com a produção no ar: --prod)
+git pull
+./start.sh up
 ```
 
-O `install-plugin` registra o servidor MCP do narnia-jobs no Claude Code (escopo do usuário; o token fica num arquivo só seu na cópia `.plugin-build/`, que precisa continuar lá) e instala o plugin (persona, skills, o hook que traz o cartão e o que registra o uso no medidor) por um marketplace local. Mudou a persona em Configurações? Rode o `install-plugin` de novo para o agente do terminal acompanhar. Reinicie o Claude Code e use `/narnia-jobs:recrutador`, `/narnia-jobs:perfil`, `/narnia-jobs:clarificar <execução>`, `/narnia-jobs:descoberta` (pergunta só o que falta no perfil) ou `/narnia-jobs:github-publico` (revisão do seu perfil público do GitHub a partir dos relatórios da ingestão) ou `/narnia-jobs:analisar-vaga` (cole a vaga: ela é salva e analisada contra todos os perfis; a análise completa abre em Vagas) ou `/narnia-jobs:gerar-cv` (currículo do perfil ou para uma vaga, e a carta; devolve o link do documento revisado). O recrutador especializado vem junto no plugin, como subagente. Se a porta mudar, rode o `install-plugin` de novo; o `./start.sh doctor` avisa quando o MCP ou o plugin estão desatualizados.
+As migrações do banco rodam sozinhas, com um backup antes de cada uma. Depois de atualizar, recarregue a extensão em `chrome://extensions` e, se usa o recrutador no terminal, rode `./start.sh install-plugin` de novo.
 
-### Rastros e avaliações (Arize Phoenix local)
-
-No `make dev` o Phoenix sobe junto: abra `http://127.0.0.1:6006`. Nada sai do seu computador.
-
-- **Projeto `narnia-jobs`:** um rastro por mensagem do chat. O turno é a raiz (sua pergunta e a resposta), e dentro dele aparecem, em ordem, cada chamada ao modelo (system prompt, mensagens, texto e ferramentas pedidas, modelo, tokens e cache) e cada ferramenta (argumentos e resultado, com a execução no servidor MCP como filha). As conversas aparecem na aba **Sessions**. Cada job do worker (leitura do PDF, fatos, GitHub) também vira um rastro, com as chamadas ao modelo dentro, e as etapas de uma ingestão ficam agrupadas como uma sessão.
-- **Anotações em cada turno:** os avaliadores que não gastam tokens (anos e empresas fora do perfil, fontes fora da lista de domínios confiáveis, teto de custo e de turnos) avaliam cada resposta e gravam "passou/falhou" com a explicação, mais uma nota de resumo (custo, ferramentas e o que falhou).
-- **Conteúdo:** perguntas, respostas, prompts e resultados de ferramentas vão para o Phoenix por padrão. Para deixar só metadados (modelo, tokens, custo, tempo), defina `NARNIA_OTEL_CONTENT=0` no `.env`.
-
-Na produção (`./start.sh up`) o Phoenix fica desligado; para ligar, ponha no `.env`:
-
-```
-COMPOSE_PROFILES=observability
-NARNIA_OTEL_ENDPOINT=http://phoenix:6006/v1/traces
-```
-
-As avaliações do recrutador (`evals/chat/`, conversas de referência com regras sem tokens e o juiz `evals/judges/narnia-recrutador.md`) rodam com `./start.sh evals chat`, sempre num **banco temporário isolado**: o comando abre um banco descartável com um perfil fictício, um `/mcp` próprio em `127.0.0.1` e conversa pelo Claude de verdade com as ferramentas desse banco; no fim apaga tudo. Os seus dados nunca entram. O resultado vira experimento do dataset `narnia-chat` e os rastros das conversas vão para o projeto `narnia-evals`, separados dos seus. `./start.sh evals pdf` faz o mesmo com a leitura de um PDF fictício, `./start.sh evals cv-review` avalia o revisor do currículo com as imagens reais das páginas (um CV correto, um com fato inventado e um com o cabeçalho sobreposto de propósito; precisa do serviço `browser`), e `./start.sh evals all` roda tudo.
-
-#### Prompts e avaliadores no Phoenix (ponte pela assinatura)
-
-Os prompts do narnia-jobs ficam **versionados no Phoenix** (Prompts) e cada prompt estruturado tem um **dataset** com exemplos fictícios e **avaliadores presos a ele**, que são o teste de prompt e garantem o padrão de entrega das respostas:
-
-- **29 prompts**: as 15 chamadas estruturadas (leitura do PDF, fatos, registro de contexto, sugestão de perfis, escolha de arquivos, análise de repositório, síntese, revisão anti-alucinação, título da conversa; da análise de vagas, extração, junção e comparação de vaga repetida; do currículo, geração do CV, da carta e revisão), a persona do recrutador geral e o recrutador especializado, as 5 notas de contexto do chat e as 7 skills do terminal. O repositório é a fonte: a sincronização cria uma versão nova quando um prompt muda (com o commit na descrição) e marca a versão em uso com a tag `production`.
-- **Avaliadores de código** (TypeScript, rodam no sandbox Deno do próprio Phoenix, sem rede): JSON no schema, citações literais da fonte, nenhum ano fora da fonte, idioma, limites (arquivos, um veredito por item), ids de apoio do histórico e cobertura dos termos esperados (com termos proibidos para pegar instrução escondida no documento). O código mora em `packages/core/src/evals/prompt-evaluators/` e é publicado como arquivo único.
-- **Juízes** (avaliador com modelo, `padrao_de_entrega`): o padrão de entrega de cada prompt em `evals/judges/<prompt>.md`, com rótulos `atende`, `parcial` e `nao_atende`.
-
-**Como rodar pelo Phoenix:** abra um prompt (`narnia-…`) no Playground, escolha o dataset de mesmo nome e rode: o modelo responde pela ponte e os avaliadores rodam sozinhos, com as notas no experimento. **Pelo terminal:** `./start.sh evals prompts [nome…] [--strict]` (Windows: `.\start.ps1 evals prompts`) roda os prompts estruturados sobre os datasets como experimentos do Phoenix e imprime as notas; `--strict` sai com erro quando alguma avaliação fica abaixo de 100%. **Bloqueador de regressão:** `--gate` compara a rodada com a linha de base versionada em `evals/baselines.json` e sai com erro se algum avaliador cair mais de 5 pontos (no chat, pela média da rodada inteira, porque uma amostra por caso oscila); `--update-baseline` grava a rodada como nova linha de base, só quando não há regressão. Todo prompt novo ou alterado passa por essa rodada com o Claude real antes do commit. A leitura do PDF usa a tool Read e roda por `./start.sh evals pdf` (abaixo).
-
-**Ponte pela assinatura.** O Phoenix chama o modelo pela API; como o narnia-jobs usa a sua assinatura do Claude (sem chave de API), a api oferece um endereço compatível com a API de mensagens da Anthropic (`/bridge/anthropic`) que responde pelo Claude Code com o seu login. Quando o api sobe com o Phoenix no ar, ele registra a ponte no Phoenix (AI Providers, provedor `narnia-assinatura`) e sincroniza prompts, datasets e avaliadores. Em **Configurações › Avaliações** você liga ou desliga a ponte, escolhe o modelo padrão e quantas chamadas rodam ao mesmo tempo, troca a chave, registra de novo, sincroniza e, se preferir pagar por token, guarda uma chave de API da Anthropic, que fica só no Phoenix.
-
-Limites da ponte: executa uma tool só quando ela é forçada (o formato dos juízes do Phoenix); prompts com tools de verdade rodam pelo comando; ignora temperatura, `top_p` e `stop_sequences` (avisa no header `x-narnia-ignored-params`); junta um histórico de várias mensagens numa transcrição; e consome a cota da assinatura, como o chat. Ela só aceita a própria chave (nunca o token de boot) e escuta na rede dos containers e em `127.0.0.1`.
-
-### Onde ficam os dados e como fazer backup
-
-Tudo que é seu fica em `./data` (ou na pasta apontada por `NARNIA_DATA_DIR` no `.env`): banco SQLite, currículos enviados, textos extraídos, documentos gerados e logs de uso. Essa pasta nunca entra no repositório (`.gitignore`). O login da assinatura fica no volume Docker `claude-auth`, e a fila no volume `redis-data`.
-
-**Backups automáticos** ficam em `./backups`, na raiz do projeto, **fora** de `./data` (ou em `NARNIA_BACKUP_DIR`, por exemplo um disco externo ou uma pasta sincronizada): uma cópia consistente do banco no primeiro boot de cada dia em que há dados e outra antes de cada migration, mais os uploads e os modelos de currículo enviados (`.zip`) copiados sem duplicar; os PDFs gerados não entram, porque o conteúdo fica no banco e eles podem ser montados de novo. Ficam no máximo 5 cópias no total (configurável em Configurações › Backups); ao bater o teto, a mais antiga sai. **Apagar `./data` apaga os seus dados, mas não os backups.** Se o banco for recriado vazio e houver backup, a aplicação avisa com uma notificação crítica que traz o comando de restauração.
-
-Para restaurar: `./start.sh restore backups/<arquivo>.sqlite` (para a stack, guarda o banco atual em `backups/narnia-before-restore-…`, copia o escolhido e sobe de novo). Backup manual continua valendo: copiar `./data` com os serviços parados (`./start.sh down`).
-
-### Comandos
-
-| Comando | Faz |
-|---------|-----|
-| `./start.sh up` | sobe (ou atualiza) os serviços e imprime a URL |
-| `./start.sh down` | para os serviços; dados e login preservados |
-| `./start.sh down --purge` | para e **remove os volumes**: apaga o login da assinatura e a fila; a pasta `./data` fica |
-| `./start.sh login` | login da assinatura dentro do container |
-| `./start.sh doctor` | diagnóstico: login, Redis, worker, caminho e tamanho do banco e do WAL, processo com o banco apagado ainda aberto, último backup e última requisição |
-| `./start.sh restore <arquivo>` | restaura um backup de `./backups` (guarda o banco atual antes) |
-| `./start.sh install-plugin` | instala o recrutador no Claude Code deste computador (MCP + plugin) |
-| `./start.sh logs [api\|worker\|web\|redis]` | acompanha os logs |
-| `./start.sh status` | estado dos containers |
-
-No Windows, `.\start.ps1` tem os mesmos subcomandos. `docker compose down -v` equivale a `down --purge`.
-
-### Portas e rede
-
-Só a porta escolhida (`NARNIA_PORT`) é publicada, e apenas em `127.0.0.1`: nada fica acessível pela rede local. A porta `8089` é reservada ao callback OAuth do Google Calendar (feature futura). Se a porta salva estiver ocupada na próxima vez, o `up` escolhe outra e avisa; os dados não dependem da porta.
-
-## Desenvolvimento
-
-Pré-requisito único: **Docker** (Docker Desktop no Windows/macOS, Docker Engine + Compose v2 no Linux). Node, pnpm e todas as ferramentas rodam dentro de containers; nada é instalado no host.
+## Desinstalar
 
 ```bash
-./start.sh dev        # sobe web (http://127.0.0.1:5173/?token=dev-token), api (http://127.0.0.1:3100), worker e redis com hot reload
-./start.sh test       # testes unitários (Vitest) de todos os pacotes
-./start.sh lint       # Biome
-./start.sh typecheck  # tsc
-./start.sh build      # build de todos os pacotes
-./start.sh shell      # shell no container de desenvolvimento
-./start.sh cli doctor # CLI narnia-jobs dentro do container de dev: doctor | login | install-plugin
-./start.sh test:sh    # testes dos lançadores: start.sh (bats) e start.ps1 (Pester), em containers
-./start.sh e2e        # ponta a ponta: Playwright em container contra a stack de produção com provider mock (--ui-only pula as fases de down/up, worker e porta)
+./start.sh down --purge                           # para tudo e remove os volumes (logins do Claude e do GitHub, fila, Phoenix)
+docker image rm narnia-jobs/app narnia-jobs/web narnia-jobs/browser
+# se instalou o recrutador no Claude Code:
+claude mcp remove -s user narnia-jobs
+claude plugin uninstall narnia-jobs@narnia-jobs-local
+claude plugin marketplace remove narnia-jobs-local
 ```
 
-No Windows, use `.\start.ps1` com os mesmos subcomandos. Em Linux/macOS há também um `Makefile` fino sobre o `start.sh`: `make help` lista tudo; os principais são `make dev` (modo desenvolvimento, hot reload e provider mock), `make up` / `make down` / `make login` / `make doctor` (modo produção local), `make check` (lint + typecheck + testes), `make e2e` e `make tunnel` (URL pública temporária via `cloudflared`, já com o token; exige o `cloudflared` no host). Os modos dev e produção publicam ambos a porta 3100 no host, então suba um de cada vez. Imagens de produção: `docker/Dockerfile` (api e worker; a fonte TypeScript roda com `tsx`) e `docker/web.Dockerfile` (nginx + SPA). `docker-compose.e2e.yml` sobrepõe o compose de produção com provider mock, token fixo e pasta de dados descartável (`./.e2e-data`) para os testes de ponta a ponta.
+Remova a extensão em `chrome://extensions`. Por fim, apague a pasta do projeto: ela contém `./data` e `./backups`, ou seja, **todos os seus dados**. Guarde uma cópia antes, se quiser.
 
-O modo dev funciona como a produção: provider **Claude Code** com a sua assinatura (o login de `./start.sh login` fica no mesmo volume `claude-auth` e vale para os dois modos; `CLAUDE_CODE_OAUTH_TOKEN` no `.env` também é respeitado). A diferença é o hot reload. Para desenvolver a interface sem gastar a assinatura, suba com `NARNIA_PROVIDER=mock ./start.sh dev`: o mock devolve sempre o mesmo currículo fictício, não lê o arquivo enviado. O token de boot em dev é `dev-token` (`NARNIA_TOKEN`); em produção é aleatório, persistido em `data/.token` e impresso pelo lançador.
+## Problemas comuns
 
-### Duas instâncias: a sua e a de testes do agente
+- **`./start.sh doctor`** diagnostica login, Redis, pasta de dados, worker, último backup e o plugin no Claude Code. Comece por ele.
+- **"Não logado" ou login vencido:** `./start.sh login` de novo. Alternativa: `claude setup-token` no seu computador e `CLAUDE_CODE_OAUTH_TOKEN=…` no `.env`.
+- **Porta ocupada:** o `up` escolhe outra entre 3100 e 3199 e avisa. A porta `8089` (retorno do login do Google Calendar) também precisa estar livre. Se não estiver, `NARNIA_OAUTH_PORT=<outra>` no `.env` faz o `up` subir, mas o Google Calendar não conecta enquanto a 8089 não for a porta.
+- **"a pasta ./data não é gravável":** a pasta foi criada como root (por um `docker compose` chamado direto); o erro traz o `sudo chown` exato.
+- **Windows:** use o PowerShell (`.\start.ps1 up`). Se o script for bloqueado, rode `powershell -ExecutionPolicy Bypass -File .\start.ps1 up`. Clonar dentro do WSL2 deixa o Docker bem mais rápido.
+- **Docker parado:** o lançador avisa; inicie o Docker Desktop (ou `sudo systemctl start docker`).
 
-**Código da sua instância (`.owner-src`).** Para que edições em andamento não cheguem à sua instância, ela pode rodar de uma cópia separada do código: `./start.sh promote` cria (na primeira vez) ou atualiza a pasta `.owner-src` para o último commit, e o `make dev` passa a usá-la sozinho. Dados (`./data`), backups (`./backups`) e `.env` continuam na raiz. Rode `promote` quando o agente avisar que um marco fechou verde; se mudaram dependências, composes ou a imagem, depois rode `make dev-down && make dev`. Para voltar a usar o código da raiz, apague `.owner-src` com `git worktree remove .owner-src`.
+## Documentação
 
-O mesmo código roda em duas instâncias independentes. A **sua** (`make dev`, dados em `./data`, :5173/:3100) é a de uso real e nunca é tocada pelos testes. A **do agente de desenvolvimento** (`NARNIA_INSTANCE=claude`, valores em `.env.claude`, dados em `./.claude-data`, :5174/:3200, provider mock) é operada por `scripts/claude-env.sh` (`make claude-up`, `make claude-seed ARGS=engineer`, `make claude-wipe`…). Regras completas em `CLAUDE.md`.
+| | |
+|---|---|
+| [Tutorial](docs/tutorial.md) · [Tutorial (English)](docs/en/tutorial.md) | do primeiro uso à primeira candidatura, passo a passo |
+| [Guia de uso](docs/guia-de-uso.md) | referência de cada funcionalidade, configurações, comandos, dados e backup |
+| [Modelos de currículo](docs/templates-de-cv.md) | como criar o seu modelo (`.zip`) |
+| [Google Calendar](docs/google-calendar.md) | conexão opcional da agenda das candidaturas |
+| [Contribuir](CONTRIBUTING.md) | ambiente de desenvolvimento, testes, avaliações dos prompts |
+| [Segurança](SECURITY.md) | como relatar uma vulnerabilidade e o modelo de ameaça |
+| [Planos](plans/README.md) | documentos internos de projeto e decisões |
 
-### Fluxo completo da API com `curl` (provider mock)
+## Licença
 
-```bash
-NARNIA_PROVIDER=mock ./start.sh dev -d api worker   # api em 127.0.0.1:3100
-H='Authorization: Bearer dev-token'; B=http://127.0.0.1:3100
-curl -s $B/api/health
-curl -s -H "$H" $B/api/provider/status                                   # logado (mock)
-FILE=$(curl -s -H "$H" -F file=@packages/core/test/fixtures/cv_text.pdf $B/api/files | jq -r .id)
-curl -s -H "$H" "$B/api/files/$FILE/estimate"                             # três chamadas por modelo
-RUN=$(curl -s -H "$H" -H 'content-type: application/json' -d "{\"fileId\":\"$FILE\"}" $B/api/ingestions | jq -r .id)
-watch -n1 "curl -s -H '$H' $B/api/jobs | jq -c '.jobs[] | {type,status,progress}'"   # até as 6 etapas ficarem done
-curl -s -H "$H" $B/api/ingestions/$RUN | jq '{status, proposals: (.proposals|length), digest: .digest.summary}'
-# revisão: aceitar tudo
-DEC=$(curl -s -H "$H" $B/api/ingestions/$RUN | jq -c '{decisions: [.proposals[] | {proposalId: .id, decision: "accepted"}]}')
-curl -s -H "$H" -H 'content-type: application/json' -d "$DEC" $B/api/ingestions/$RUN/review
-curl -s -H "$H" -H 'content-type: application/json' -X PUT -d @docs-examples/user.json $B/api/user        # identidade + telefone
-curl -s -H "$H" -H 'content-type: application/json' -d @docs-examples/profile.json $B/api/profiles      # primeiro perfil
-curl -s -H "$H" $B/api/dashboard
-```
-
-Os corpos de exemplo de `user.json` e `profile.json` estão em `apps/api/test/helpers.ts` (`VALID_USER`, `VALID_PROFILE`). O WebSocket de progresso fica em `ws://127.0.0.1:3100/ws?token=dev-token`.
-
-### Interface web (M5)
-
-Com `./start.sh dev` no ar, abra `http://127.0.0.1:5173/?token=dev-token`. O `?token=` vira cookie (`/api/auth/enter`) e a página volta para `/`, que redireciona ao passo salvo do onboarding ou ao dashboard. O Vite faz proxy de `/api` e `/ws` para a api. Fluxo do primeiro uso em 6 passos: provider → currículo (arquivo ou texto livre, com opções de OCR e leitura pelo modelo e estimativa por chamada) → extração (etapas da cadeia, também na bandeja de atividades do topo) → revisão (identidade com telefone obrigatório, propostas com origem por trecho) → perfil (dados de carreira obrigatórios, "não sei" marca para pesquisa, alerta informativo do piso DIEESE) → entrevista de descoberta (opcional: o recrutador pergunta só o que ficou faltando e as respostas vão para a revisão) → dashboard. Tema claro/escuro no ícone do topo; textos vêm todos de `apps/web/src/i18n/pt-BR.ts`.
-
-Estrutura: `apps/web` (React + Vite), `apps/api` (Hono: REST, WS, enfileira jobs, CLI `narnia-jobs`), `apps/e2e` (Playwright, um arquivo por cenário: `e2e-NN-*` do F01, `f02-NN-*` do F02 e `f03-NN-*` do F03), `apps/worker` (BullMQ: cadeia de ingestão), `packages/shared` (schemas zod, contratos, tempo, i18n), `packages/core` (domínio, storage, leituras de PDF, consolidação), `packages/providers` (Claude Code via Agent SDK e mock). Metodologia: TDD, conforme `plans/plan-v0/09-metodologia-tdd.md`.
+[MIT](LICENSE). Contribuições são bem-vindas: veja o [CONTRIBUTING](CONTRIBUTING.md) e o [código de conduta](CODE_OF_CONDUCT.md).

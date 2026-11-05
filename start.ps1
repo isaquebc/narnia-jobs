@@ -426,14 +426,18 @@ function Show-Usage {
 narnia-jobs · .\start.ps1 <comando>
 
 Uso (produção, só Docker no host):
-  up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis e imprime a URL
+  up            escolhe uma porta livre (3100–3199), sobe web + api + worker + redis + browser e imprime a URL
   down          para os serviços (dados e login preservados)
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
   login         login da assinatura dentro do container (uma vez)
-  doctor        diagnóstico: login, Redis, pasta de dados, worker
-  evals prompts|chat|pdf|all [nome…] [--strict]  avaliações no Phoenix (chat e pdf num banco temporário isolado)
+  doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
+  install-plugin [--prod]  instala o recrutador no Claude Code deste computador (MCP + plugin, modo B)
+  promote [c]   atualiza a cópia .owner-src do código para um commit (padrão HEAD; fluxo do mantenedor, CONTRIBUTING.md)
+  evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict] [--gate]
+                avaliações no Phoenix: prompts pela ponte; chat, pdf e cv-review num banco temporário isolado
+                (consome a assinatura; ver CONTRIBUTING.md)
   logs [svc]    acompanha os logs (api | worker | web | redis)
   status        estado dos serviços
 

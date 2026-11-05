@@ -86,7 +86,7 @@ describe("EmphasisBoard · modos, ordem por botões, salvar em lote e prévia (F
       }),
     ).toHaveValue("highlight");
     await userEvent.click(screen.getByRole("tab", { name: "Projetos" }));
-    expect(await screen.findByText(/Projetos chegam com a ingestão do GitHub/)).toBeInTheDocument();
+    expect(await screen.findByText(/Os projetos vêm da ingestão do GitHub/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Skills" }));
     expect(await screen.findByRole("combobox", { name: "Ênfase de PHP" })).toHaveValue("hidden");
     // F05 §2.9: conquistas com a experiência, para destacar ou ocultar no CV

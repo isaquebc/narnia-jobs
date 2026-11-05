@@ -1,0 +1,46 @@
+name: Problema · Bug
+description: Algo não funciona como deveria · Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar! **Nunca cole dados pessoais** (currículo, e-mail, telefone, vagas reais) nem o token da URL.
+        Thanks for reporting! **Never paste personal data** (CV, e-mail, phone, real job postings) or the URL token.
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu · What happened
+      description: O que você fez, o que esperava e o que viu (mensagens de erro, prints sem dados pessoais).
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir · Steps to reproduce
+      placeholder: "1. ./start.sh up\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Saída do doctor · Doctor output
+      description: "Rode `./start.sh doctor` (Windows: `.\\start.ps1 doctor`) e cole aqui."
+      render: text
+  - type: input
+    id: system
+    attributes:
+      label: Sistema · System
+      placeholder: "Ubuntu 24.04 / macOS 15 / Windows 11 + WSL2, Docker 27.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Onde · Where
+      options:
+        - Interface web (modo A)
+        - Claude Code / plugin (modo B)
+        - Extensão do Chrome
+        - Lançador (start.sh / start.ps1)
+        - Outro

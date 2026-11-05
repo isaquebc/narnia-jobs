@@ -2,7 +2,7 @@
 
 A agenda das candidaturas funciona sem conectar nenhuma conta: cada evento (entrevista, teste, prazo, retorno) tem o botão **Adicionar ao Google Calendar**, que abre o modelo de evento já preenchido, e o **Baixar .ics**, que importa em qualquer calendário (Google, Outlook, Apple). Editar o evento no narnia sobe a sequência do `.ics`, então importar de novo atualiza o evento em vez de duplicar.
 
-Conectar o Google Calendar é opcional (decisão F07-4). Conectado, o recrutador cria e consulta os eventos direto no seu calendário pelas tools do servidor MCP oficial do Google, e guarda o id de cada evento criado.
+Conectar o Google Calendar é opcional. Conectado, o recrutador cria e consulta os eventos direto no seu calendário pelas tools do servidor MCP oficial do Google, e guarda o id de cada evento criado.
 
 ## Como conectar
 

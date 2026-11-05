@@ -346,7 +346,8 @@ export const ptBR = {
     loggedInOther: "Logado ({method})",
     loggedOut: "Não logado",
     execError: "Não foi possível executar o CLI do Claude.",
-    execErrorHint: "Reconstrua a imagem (./start.sh build) e verifique de novo.",
+    execErrorHint:
+      "Reconstrua as imagens (./start.sh up; no modo dev, make dev-down && make dev) e verifique de novo.",
     privacy:
       "Usamos a sua assinatura. Nenhum dado sai do seu computador além das mensagens enviadas ao modelo.",
     login: {
@@ -706,8 +707,7 @@ export const ptBR = {
     dragHandle: "Arrastar {label}",
     relevance: "Relevância {score}",
     empty: "Nada neste tipo ainda.",
-    projectsEmpty:
-      "Projetos chegam com a ingestão do GitHub (F03). A aba já existe para as ênfases.",
+    projectsEmpty: "Os projetos vêm da ingestão do GitHub (Ingestão › GitHub).",
     save: "Salvar ênfases",
     saved: "Ênfases salvas.",
     unsaved: "Alterações não salvas",
@@ -748,7 +748,7 @@ export const ptBR = {
   },
   card: {
     title: "Cartão do perfil",
-    hint: "~300 tokens que o recrutador recebe no início de cada conversa (F04). É o único contexto implícito.",
+    hint: "~300 tokens que o recrutador recebe no início de cada conversa. É o único contexto implícito.",
     tokens: "~{tokens} tokens · {chars} caracteres",
     updatedAt: "Atualizado em {date}",
     valid: "Atualizado",
@@ -1683,12 +1683,12 @@ export const ptBR = {
     revokeLabel: "Desconectar {name}",
     title: "Instalar a extensão no Chrome",
     intro:
-      "A extensão lê a página só quando você clica no ícone do narnia e manda o conteúdo para esta instância, no seu computador. Ela nunca preenche nem envia formulários.",
+      "A extensão lê a página só quando você clica no ícone do narnia e manda o conteúdo para esta instância, no seu computador. Ela nunca envia formulários e só preenche quando você clica em Preencher.",
     stepsLabel: "Passos da instalação",
     step: {
       build: {
         title: "Gere a extensão",
-        body: "No terminal, na pasta do narnia, rode o comando do seu sistema. Se você atualiza o narnia com promote, a extensão já é gerada junto.",
+        body: "No terminal, na pasta do narnia, rode o comando do seu sistema. (No fluxo de desenvolvimento com promote, a extensão já é gerada junto.)",
         linux: "Linux e macOS",
         windows: "Windows (PowerShell)",
       },
@@ -1703,7 +1703,8 @@ export const ptBR = {
       load: {
         title: "Carregue a pasta da extensão",
         body: 'Clique em "Carregar sem compactação" e escolha esta pasta, dentro da pasta do narnia:',
-        ownerSrc: "Se a sua instância roda pelo promote, use a mesma pasta dentro de .owner-src.",
+        ownerSrc:
+          "No fluxo de desenvolvimento com promote (veja o CONTRIBUTING), use a mesma pasta dentro de .owner-src.",
       },
       pin: {
         title: "Fixe o ícone na barra",
@@ -1791,8 +1792,7 @@ export const ptBR = {
     searchHint: "Empresa, cliente, cargo, role ou contato",
     searchEmpty: "Nenhuma vaga encontrada para “{q}”.",
     related: "Vagas parecidas",
-    relatedText:
-      "Você já registrou {count} vaga da mesma empresa com o mesmo role. O alerta de candidatura repetida chega com as candidaturas (F07).",
+    relatedText: "Você já registrou {count} vaga da mesma empresa com o mesmo role.",
     status: {
       draft: "Rascunho",
       extracting: "Extraindo…",
