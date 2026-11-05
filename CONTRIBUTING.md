@@ -1,8 +1,8 @@
 # Contribuir com o narnia-jobs
 
-> **English summary.** Everything runs in Docker: the only host requirement is Docker with Compose v2 (no Node or pnpm on the host). Start the dev stack with `./start.sh dev` (hot reload; `NARNIA_PROVIDER=mock ./start.sh dev` to avoid spending your Claude subscription), run `./start.sh lint`, `typecheck`, `test`, `e2e` and `test:sh`, and write a failing test before the fix (TDD is mandatory). Commits follow `type(scope): message` in Portuguese. Never commit real personal data (names, companies, job postings, e-mails): use fictional ones (Acme, Globex, Ana Maria Exemplo). Changing a prompt requires the evaluation gate against the real model (see below). Code, comments, docs and the UI are in Brazilian Portuguese; English issues and pull requests are welcome.
+> **English summary.** Everything runs in Docker: the only host requirement is Docker with Compose v2 (no Node or pnpm on the host). Start the dev stack with `./start.sh dev` (hot reload; `NARNIA_PROVIDER=mock ./start.sh dev` to avoid spending your Claude subscription), run `./start.sh lint`, `typecheck`, `test`, `e2e` and `test:sh`, and write a failing test before the fix (TDD is mandatory). Commits follow `type(scope): message` in Portuguese. Step-by-step tutorial (fork, branch, tests, pull request): [docs/en/contributing.md](docs/en/contributing.md). Never commit real personal data (names, companies, job postings, e-mails): use fictional ones (Acme, Globex, Ana Maria Exemplo). Changing a prompt requires the evaluation gate against the real model (see below). Code, comments, docs and the UI are in Brazilian Portuguese; English issues and pull requests are welcome.
 
-Obrigado por querer contribuir. Este guia cobre o ambiente, os testes, as convenções e as avaliações dos prompts. Para usar o narnia-jobs, veja o [README](README.md) e o [tutorial](docs/tutorial.md).
+Obrigado por querer contribuir. Para o passo a passo (fork, branch, testes e pull request), comece pelo [tutorial de contribuição](docs/contribuir.md). Este guia é a referência do ambiente, dos testes, das convenções e das avaliações dos prompts. Para usar o narnia-jobs, veja o [README](README.md) e o [tutorial](docs/tutorial.md).
 
 ## Ambiente
 
@@ -114,5 +114,7 @@ A instância de uso do mantenedor roda de uma cópia separada do código, `.owne
 `make tunnel` publica a sua instância numa URL pública temporária (`cloudflared`) **com o token embutido**: qualquer pessoa com a URL acessa os seus dados. Use só para testar no celular, por exemplo, e encerre logo depois.
 
 ## CI
+
+A `main` é protegida: as mudanças entram por pull request, com o CI verde, a aprovação do mantenedor e as conversas resolvidas; push forçado e exclusão da branch são bloqueados.
 
 `.github/workflows/ci.yml` roda lint, typecheck, testes com cobertura, build, os testes dos lançadores (bats e Pester), o build das imagens com o smoke do `up`, o e2e completo e a checagem de dados pessoais, além do smoke das funções do lançador no Linux, macOS e Windows. O smoke do plugin com o Claude Code real (`plugin-smoke`) só roda por disparo manual, com o segredo `CLAUDE_CODE_OAUTH_TOKEN`.

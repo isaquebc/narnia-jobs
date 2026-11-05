@@ -114,9 +114,10 @@ Remove the extension at `chrome://extensions`. Finally, delete the project folde
 | [Usage guide](docs/guia-de-uso.md) (Portuguese) | reference for every feature, settings, commands, data and backup |
 | [Résumé templates](docs/templates-de-cv.md) (Portuguese) | how to build your own template (`.zip`) |
 | [Google Calendar](docs/google-calendar.md) (Portuguese) | optional calendar connection for applications |
+| [First contribution](docs/en/contributing.md) | from fork to merged pull request, step by step |
 | [Contributing](CONTRIBUTING.md) | development setup, tests, prompt evaluations (Portuguese, with an English summary) |
 | [Security](SECURITY.md) | how to report a vulnerability and the threat model |
 
 ## License
 
-[MIT](LICENSE). Contributions are welcome: see [CONTRIBUTING](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
+[MIT](LICENSE). Contributions are welcome: start with the [contribution tutorial](docs/en/contributing.md), see [CONTRIBUTING](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).

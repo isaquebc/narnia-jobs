@@ -114,10 +114,11 @@ Remova a extensão em `chrome://extensions`. Por fim, apague a pasta do projeto:
 | [Guia de uso](docs/guia-de-uso.md) | referência de cada funcionalidade, configurações, comandos, dados e backup |
 | [Modelos de currículo](docs/templates-de-cv.md) | como criar o seu modelo (`.zip`) |
 | [Google Calendar](docs/google-calendar.md) | conexão opcional da agenda das candidaturas |
+| [Primeira contribuição](docs/contribuir.md) · [First contribution](docs/en/contributing.md) | do fork ao pull request aceito, passo a passo |
 | [Contribuir](CONTRIBUTING.md) | ambiente de desenvolvimento, testes, avaliações dos prompts |
 | [Segurança](SECURITY.md) | como relatar uma vulnerabilidade e o modelo de ameaça |
 | [Planos](plans/README.md) | documentos internos de projeto e decisões |
 
 ## Licença
 
-[MIT](LICENSE). Contribuições são bem-vindas: veja o [CONTRIBUTING](CONTRIBUTING.md) e o [código de conduta](CODE_OF_CONDUCT.md).
+[MIT](LICENSE). Contribuições são bem-vindas: comece pelo [tutorial de contribuição](docs/contribuir.md), veja o [CONTRIBUTING](CONTRIBUTING.md) e o [código de conduta](CODE_OF_CONDUCT.md).
