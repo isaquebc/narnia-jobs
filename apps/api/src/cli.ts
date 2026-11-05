@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  googleCalendarCallbackPort,
   googleCalendarConnectSteps,
   parseGoogleCalendarStatus,
   resolveBackupDir,
@@ -65,7 +66,8 @@ function login(): number {
 
 /**
  * Google Calendar opcional (F07/M7, F07-4): `google status` lê o `claude mcp list`; `google connect <client-id>`
- * registra o MCP oficial com o cliente OAuth da pessoa (o CLI pede o segredo) e abre o login (callback na 8089).
+ * registra o MCP oficial com o cliente OAuth da pessoa (o CLI pede o segredo) e abre o login (callback na
+ * NARNIA_OAUTH_PORT, 8089 por padrão).
  */
 function google(sub: string, clientId: string | undefined): number {
   const bin = resolveClaudeBinary({ explicit: process.env.NARNIA_CLAUDE_BIN });
@@ -82,7 +84,10 @@ function google(sub: string, clientId: string | undefined): number {
   }
   // o client ID vai para o shell: só o formato do Google (dígitos, letras, ponto e hífen)
   if (sub === "connect" && clientId && /^[\w.-]+$/.test(clientId)) {
-    const steps = googleCalendarConnectSteps({ clientId, callbackPort: 8089 });
+    const steps = googleCalendarConnectSteps({
+      clientId,
+      callbackPort: googleCalendarCallbackPort(process.env),
+    });
     console.log(`URI de redirecionamento do cliente OAuth: ${steps.redirectUri}`);
     const add = spawnSync("sh", ["-c", steps.add.replace(/^claude /, `"${bin}" `)], {
       stdio: "inherit",

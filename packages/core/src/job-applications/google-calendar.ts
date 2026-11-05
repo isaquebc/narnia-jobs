@@ -36,6 +36,12 @@ export function parseGoogleCalendarStatus(
   return { status: "error", detail: state || null };
 }
 
+/** Porta do callback do OAuth (NARNIA_OAUTH_PORT): a mesma no host e no container; ausente ou inválida = 8089. */
+export function googleCalendarCallbackPort(env: Record<string, string | undefined>): number {
+  const port = Number(env.NARNIA_OAUTH_PORT);
+  return Number.isInteger(port) && port > 0 && port < 65536 ? port : 8089;
+}
+
 /** Comandos para conectar (rodam dentro do container do api; o segredo é pedido pelo próprio CLI, nunca vai por argumento). */
 export function googleCalendarConnectSteps(o: { clientId: string; callbackPort: number }) {
   return {

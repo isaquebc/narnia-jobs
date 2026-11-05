@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { defaultGhConfigDir, type Repos } from "@narnia-jobs/core";
+import { defaultGhConfigDir, googleCalendarCallbackPort, type Repos } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
@@ -187,7 +187,7 @@ export function createApp(deps: AppDeps) {
     "/",
     integrationsRoutes({
       ...(fake ? { runMcpList: async () => ({ stdout: "" }) } : {}),
-      oauthPort: Number(process.env.NARNIA_OAUTH_PORT ?? 8089) || 8089,
+      oauthPort: googleCalendarCallbackPort(process.env),
     }),
   );
   {

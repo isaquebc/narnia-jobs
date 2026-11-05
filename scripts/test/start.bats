@@ -211,6 +211,32 @@ fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
   [[ "$output" == "./.claude-data/backups|./.claude-data/prod-backups" ]]
 }
 
+@test "pastas da produção: o ambiente vence o .env, que vence o padrão (o compose segue a mesma ordem)" {
+  unset NARNIA_DATA_DIR NARNIA_BACKUP_HOST_DIR
+  ENV_FILE="$TMP/.env"
+  [[ "$(prod_data_host_dir)|$(prod_backup_host_dir)" == "./data|./backups" ]]
+  printf 'NARNIA_DATA_DIR=/srv/narnia\nNARNIA_BACKUP_HOST_DIR=/mnt/narnia-bk\n' > "$ENV_FILE"
+  [[ "$(prod_data_host_dir)|$(prod_backup_host_dir)" == "/srv/narnia|/mnt/narnia-bk" ]]
+  NARNIA_DATA_DIR=/outra NARNIA_BACKUP_HOST_DIR=/outra-bk
+  [[ "$(prod_data_host_dir)|$(prod_backup_host_dir)" == "/outra|/outra-bk" ]]
+}
+
+@test "oauth_port: o ambiente vence o .env, que vence a 8089" {
+  unset NARNIA_OAUTH_PORT
+  ENV_FILE="$TMP/.env"
+  [[ "$(oauth_port)" == "8089" ]]
+  printf 'NARNIA_OAUTH_PORT=8090\n' > "$ENV_FILE"
+  [[ "$(oauth_port)" == "8090" ]]
+  NARNIA_OAUTH_PORT=8091
+  [[ "$(oauth_port)" == "8091" ]]
+}
+
+@test "compose: o callback do Google escuta no container na mesma porta do host, e o api sabe qual é" {
+  grep -qF '"127.0.0.1:${NARNIA_OAUTH_PORT-8089}:${NARNIA_OAUTH_PORT:-8089}"' docker-compose.yml
+  run awk '/^  api:/{f=1;next} f&&/^  [a-z-]+:$/{f=0} f' docker-compose.yml
+  [[ "$output" == *'NARNIA_OAUTH_PORT=${NARNIA_OAUTH_PORT:-8089}'* ]]
+}
+
 @test "resolve_backup_file aceita caminho ou nome dentro da pasta e recusa inexistente" {
   mkdir -p "$TMP/b"; : > "$TMP/b/narnia-boot-2026-10-10T08-00-00-000Z.sqlite"
   [[ "$(resolve_backup_file "$TMP/b" narnia-boot-2026-10-10T08-00-00-000Z.sqlite)" == "$TMP/b/narnia-boot-2026-10-10T08-00-00-000Z.sqlite" ]]
@@ -462,6 +488,25 @@ fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma
   install_plugin_with "$TMP/stage" narnia-jobs "http://127.0.0.1:3101" narnia-jobs-local >/dev/null
   grep -q 'mcp add-json -s user narnia-jobs {"type":"http","url":"http://127.0.0.1:3101/mcp"' "$TMP/claude.calls"
   grep -qx "NARNIA_API_URL=http://127.0.0.1:3101" "$TMP/stage/plugin/.narnia-env"
+}
+
+@test "plugin_mode: --prod/--dev vencem; senão a instância no ar (dev primeiro); nenhuma no ar = none" {
+  [[ "$(plugin_mode --prod 1 0)" == prod ]]
+  [[ "$(plugin_mode --dev 0 1)" == dev ]]
+  [[ "$(plugin_mode "" 1 1)" == dev ]]
+  [[ "$(plugin_mode "" 0 1)" == prod ]]
+  [[ "$(plugin_mode "" 0 0)" == none ]]
+}
+
+@test "plugin_doctor aceita várias URLs: sem instância no ar, dev ou produção em outra porta não é porta mudou" {
+  fake_claude
+  printf 'narnia-jobs:\n  URL: http://127.0.0.1:3142/mcp\n' > "$TMP/claude.mcpget"
+  printf '[{"id":"narnia-jobs@narnia-jobs-local"}]\n' > "$TMP/claude.pluginlist"
+  run plugin_doctor narnia-jobs "http://127.0.0.1:3100 http://127.0.0.1:3142" narnia-jobs-local
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"MCP narnia-jobs: ok (http://127.0.0.1:3142/mcp)"* ]]
+  run plugin_doctor narnia-jobs "http://127.0.0.1:3100" narnia-jobs-local
+  [[ "$output" == *"porta mudou"* ]]
 }
 
 @test "plugin_doctor: ok com MCP na porta certa e plugin instalado; acusa porta mudou e plugin ausente" {

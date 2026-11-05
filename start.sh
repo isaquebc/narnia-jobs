@@ -134,8 +134,22 @@ dev_backup_host_dir() {
   printf './%s\n' "${d#/app/}"
 }
 
+# setting KEY DEFAULT -> valor de KEY na ordem do compose: ambiente, depois o $ENV_FILE, depois DEFAULT. Sem isso, um
+# valor só no .env vale para o compose e não para o lançador (pasta criada como root, restore na pasta errada)
+setting() {
+  local v=${!1:-}
+  [[ -n "$v" ]] || v=$(env_value "$ENV_FILE" "$1")
+  printf '%s\n' "${v:-$2}"
+}
+
+# prod_data_host_dir -> pasta de dados montada em /data na produção local
+prod_data_host_dir() { setting NARNIA_DATA_DIR ./data; }
+
 # prod_backup_host_dir -> pasta de backups montada em /backups na produção local
-prod_backup_host_dir() { printf '%s\n' "${NARNIA_BACKUP_HOST_DIR:-./backups}"; }
+prod_backup_host_dir() { setting NARNIA_BACKUP_HOST_DIR ./backups; }
+
+# oauth_port -> porta do callback do OAuth do Google no host (a mesma dentro do container: o endereço de retorno é um só)
+oauth_port() { setting NARNIA_OAUTH_PORT 8089; }
 
 # dev_down_cmd -> comando que derruba a stack de dev DESTA instância (nunca a do dono a partir da instância claude)
 dev_down_cmd() { printf '%s\n' "${DEV_COMPOSE[*]} --profile app down --remove-orphans"; }
@@ -251,14 +265,31 @@ install_plugin_with() {
   info "Mantenha $abs: o Claude Code lê o token de lá. Mudou a persona? Rode install-plugin de novo."
 }
 
-# plugin_doctor NAME URL MARKETPLACE -> confere no Claude Code do host: MCP registrado na porta certa e plugin instalado
+# plugin_mode FLAG DEV_UP PROD_UP -> instância do plugin: --prod/--dev vencem; senão a que está no ar (dev primeiro,
+# como o doctor); nenhuma no ar = none. DEV_UP e PROD_UP são 1 ou 0.
+plugin_mode() {
+  case "${1:-}" in --prod) echo prod; return ;; --dev) echo dev; return ;; esac
+  if [[ "${2:-0}" == 1 ]]; then echo dev; elif [[ "${3:-0}" == 1 ]]; then echo prod; else echo none; fi
+}
+
+# running_plugin_mode FLAG -> plugin_mode com o estado real das stacks desta instância
+running_plugin_mode() {
+  local dev=0 prod=0
+  [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]] && dev=1
+  stack_running && prod=1
+  plugin_mode "${1:-}" "$dev" "$prod"
+}
+
+# plugin_doctor NAME "URL…" MARKETPLACE -> confere no Claude Code do host: MCP registrado numa das URLs aceitas (a da
+# instância no ar; sem nenhuma no ar, a do dev ou a da produção) e plugin instalado
 plugin_doctor() {
-  local name=$1 url=$2 mkt=$3 bin=${NARNIA_CLAUDE_BIN:-claude} out rc=0
+  local name=$1 urls=$2 mkt=$3 bin=${NARNIA_CLAUDE_BIN:-claude} out rc=0 url ok=""
   if ! command -v "$bin" >/dev/null 2>&1; then
     printf 'modo B: Claude Code não encontrado neste computador (opcional)\n'; return 0
   fi
   if out=$("$bin" mcp get "$name" 2>/dev/null); then
-    if grep -q "$url/mcp" <<<"$out"; then printf 'MCP %s: ok (%s/mcp)\n' "$name" "$url"
+    for url in $urls; do grep -qF "$url/mcp" <<<"$out" && { ok=$url; break; }; done
+    if [[ -n "$ok" ]]; then printf 'MCP %s: ok (%s/mcp)\n' "$name" "$ok"
     else printf 'MCP %s: porta mudou; rode ./start.sh install-plugin\n' "$name"; rc=1; fi
   else
     printf 'MCP %s: não registrado; rode ./start.sh install-plugin\n' "$name"; rc=1
@@ -272,9 +303,8 @@ plugin_doctor() {
 }
 
 cmd_install_plugin() {
-  local mode=dev ep url token
-  [[ "${1:-}" == --prod ]] && mode=prod
-  if [[ $mode == dev ]] && stack_running && [[ -z "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then mode=prod; fi
+  local mode ep url token
+  mode=$(running_plugin_mode "${1:-}"); [[ $mode == none ]] && mode=dev
   ep=$(plugin_endpoint "$mode"); url=${ep%%|*}; token=${ep#*|}
   [[ -n "$token" && "$url" != *: ]] || die "instância fora do ar: suba com make dev ou ./start.sh up antes de instalar o plugin."
   stage_plugin ./plugin "$(plugin_stage_dir)" "$url" "$token" "$(plugin_marketplace_name)" "$(mcp_server_name)"
@@ -356,12 +386,16 @@ read_token() { "${PROD_COMPOSE[@]}" exec -T api cat /data/.token 2>/dev/null | t
 cmd_up() {
   require_docker
   local port
+  # as pastas que o compose monta, resolvidas uma vez (ambiente, .env, padrão) e exportadas: mesmo valor nos dois lados
+  export NARNIA_DATA_DIR NARNIA_BACKUP_HOST_DIR NARNIA_OAUTH_PORT
+  NARNIA_DATA_DIR=$(prod_data_host_dir); NARNIA_BACKUP_HOST_DIR=$(prod_backup_host_dir)
+  [[ -n "${NARNIA_OAUTH_PORT+x}" ]] || NARNIA_OAUTH_PORT=$(oauth_port)   # vazio de propósito (e2e) = porta aleatória
   if stack_running; then
     port=$(env_value "$ENV_FILE" NARNIA_PORT)
     info "stack já no ar na porta ${port:-?}; aplicando alterações"
   else
-    check_host_dirs "${NARNIA_DATA_DIR:-./data}" "$(prod_backup_host_dir)"
-    mkdir -p "${NARNIA_DATA_DIR:-./data}" "$(prod_backup_host_dir)"   # antes do Docker, para pertencerem ao usuário
+    check_host_dirs "$NARNIA_DATA_DIR" "$NARNIA_BACKUP_HOST_DIR"
+    mkdir -p "$NARNIA_DATA_DIR" "$NARNIA_BACKUP_HOST_DIR"   # antes do Docker, para pertencerem ao usuário
     mkdir -p "$(dirname "$ENV_FILE")"
     port=$(choose_port "$ENV_FILE") || die "nenhuma porta livre entre ${NARNIA_PORT_START} e ${NARNIA_PORT_END}."
     write_env "$ENV_FILE" NARNIA_PORT "$port"
@@ -385,14 +419,14 @@ cmd_up() {
   else
     info "login da assinatura (uma vez): ./start.sh login   · diagnóstico: ./start.sh doctor"
   fi
-  info "dados em ${NARNIA_DATA_DIR:-./data} · parar: ./start.sh down"
+  info "dados em $NARNIA_DATA_DIR · parar: ./start.sh down"
 }
 
 cmd_down() {
   require_docker
   if [[ "${1:-}" == "--purge" ]]; then
     printf 'Isso remove também os volumes: o LOGIN da assinatura (claude-auth) e a fila (redis-data).\n'
-    printf 'A pasta de dados (%s) NÃO é apagada. Continuar? [s/N] ' "${NARNIA_DATA_DIR:-./data}"
+    printf 'A pasta de dados (%s) NÃO é apagada. Continuar? [s/N] ' "$(prod_data_host_dir)"
     local answer; read -r answer
     [[ "$answer" =~ ^[sSyY]$ ]] || die "cancelado."
     "${PROD_COMPOSE[@]}" down -v --remove-orphans
@@ -414,13 +448,15 @@ MSG
 }
 
 # cmd_google status|connect <client-id> -> Google Calendar opcional (F07/M7): roda no api de produção (volume claude-auth
-# e callback do OAuth na 8089); com a stack parada, num container avulso com a porta do callback publicada só no localhost
+# e callback do OAuth na oauth_port, a mesma no host e no container); com a stack parada, num container avulso com a
+# porta do callback publicada só no localhost
 cmd_google() {
   require_docker
   if stack_running; then "${PROD_COMPOSE[@]}" exec api narnia-jobs google "$@"
   else
-    local port; port=$(env_value "$ENV_FILE" NARNIA_OAUTH_PORT || true)
-    "${PROD_COMPOSE[@]}" run --rm --no-deps -p "127.0.0.1:${port:-8089}:8089" api narnia-jobs google "$@"
+    local port; port=$(oauth_port)
+    "${PROD_COMPOSE[@]}" run --rm --no-deps -p "127.0.0.1:${port}:${port}" -e "NARNIA_OAUTH_PORT=${port}" \
+      api narnia-jobs google "$@"
   fi
 }
 
@@ -547,7 +583,7 @@ cmd_restore() {
   fi
   local -a compose data bdir file running
   if [[ "$mode" == dev ]]; then compose=("${DEV_COMPOSE[@]}" --profile app); data=$(dev_data_host_dir); bdir=$(dev_backup_host_dir)
-  else compose=("${PROD_COMPOSE[@]}"); data=${NARNIA_DATA_DIR:-./data}; bdir=$(prod_backup_host_dir); fi
+  else compose=("${PROD_COMPOSE[@]}"); data=$(prod_data_host_dir); bdir=$(prod_backup_host_dir); fi
   file=$(resolve_backup_file "$bdir" "$arg") || exit 1
   running=$("${compose[@]}" ps -q api 2>/dev/null || true)
   info "restaurando $(basename "$file") em $data (modo $mode); o banco atual fica guardado em $bdir"
@@ -668,8 +704,14 @@ main() {
         "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts doctor
       elif stack_running; then "${PROD_COMPOSE[@]}" exec -T api narnia-jobs doctor
       else "${PROD_COMPOSE[@]}" run --rm api narnia-jobs doctor; fi
-      local ep; ep=$(plugin_endpoint dev)
-      plugin_doctor "$(mcp_server_name)" "${ep%%|*}" "$(plugin_marketplace_name)" || true ;;
+      local mode urls; mode=$(running_plugin_mode "")
+      case "$mode" in
+        dev) urls=$(plugin_endpoint dev) ;;
+        prod) urls="http://127.0.0.1:$(env_value "$ENV_FILE" NARNIA_PORT)" ;;
+        *) urls="$(plugin_endpoint dev) http://127.0.0.1:$(env_value "$ENV_FILE" NARNIA_PORT)" ;;
+      esac
+      urls=$(sed -E 's/\|[^ ]*//g' <<<"$urls")   # só as URLs, sem os tokens
+      plugin_doctor "$(mcp_server_name)" "$urls" "$(plugin_marketplace_name)" || true ;;
     restore) cmd_restore "$@" ;;
     google) cmd_google "$@" ;;
     install-plugin) cmd_install_plugin "$@" ;;

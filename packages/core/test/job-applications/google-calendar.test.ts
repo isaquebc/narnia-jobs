@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GOOGLE_CALENDAR_MCP_URL,
+  googleCalendarCallbackPort,
   googleCalendarConnectSteps,
   parseGoogleCalendarStatus,
 } from "../../src/job-applications/google-calendar";
@@ -48,5 +49,18 @@ describe("F07/M7 · status do Google Calendar", () => {
     );
     expect(steps.login).toBe("claude mcp login google-calendar");
     expect(steps.redirectUri).toBe("http://localhost:8089/callback");
+  });
+});
+
+describe("F07/M7 · porta do callback do OAuth", () => {
+  it("NARNIA_OAUTH_PORT trocada vale no endereço de retorno; vazia ou inválida cai na 8089", () => {
+    expect(googleCalendarCallbackPort({ NARNIA_OAUTH_PORT: "8190" })).toBe(8190);
+    expect(googleCalendarConnectSteps({ clientId: "x", callbackPort: 8190 }).redirectUri).toBe(
+      "http://localhost:8190/callback",
+    );
+    expect(googleCalendarCallbackPort({})).toBe(8089);
+    expect(googleCalendarCallbackPort({ NARNIA_OAUTH_PORT: "" })).toBe(8089);
+    expect(googleCalendarCallbackPort({ NARNIA_OAUTH_PORT: "abc" })).toBe(8089);
+    expect(googleCalendarCallbackPort({ NARNIA_OAUTH_PORT: "70000" })).toBe(8089);
   });
 });

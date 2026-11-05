@@ -90,7 +90,17 @@ function Get-AppUrl([int] $Port, [string] $Token) { return "http://127.0.0.1:$Po
 # --- backups e restauração (F03-fix L1, incidente de 2026-10-10) ------------------------------------------------------
 function Get-DevDataHostDir { $d = if ($env:NARNIA_DEV_DATA_DIR) { $env:NARNIA_DEV_DATA_DIR } else { "/app/data" }; return "./" + ($d -replace '^/app/', '') }
 function Get-DevBackupHostDir { $d = if ($env:NARNIA_DEV_BACKUP_DIR) { $env:NARNIA_DEV_BACKUP_DIR } else { "/app/backups" }; return "./" + ($d -replace '^/app/', '') }
-function Get-ProdBackupHostDir { if ($env:NARNIA_BACKUP_HOST_DIR) { return $env:NARNIA_BACKUP_HOST_DIR } else { return "./backups" } }
+# Valor na ordem do compose: ambiente, depois o .env ($script:EnvFile), depois o padrão. Sem isso, um valor só no .env
+# vale para o compose e não para o lançador (pasta criada pelo Docker, restore na pasta errada).
+function Get-Setting([string] $Key, [string] $Default) {
+  $v = [Environment]::GetEnvironmentVariable($Key)
+  if (-not $v) { $v = Get-EnvValue $script:EnvFile $Key }
+  if ($v) { return $v } else { return $Default }
+}
+function Get-ProdDataHostDir { return Get-Setting "NARNIA_DATA_DIR" "./data" }
+function Get-ProdBackupHostDir { return Get-Setting "NARNIA_BACKUP_HOST_DIR" "./backups" }
+# porta do callback do OAuth do Google no host (a mesma dentro do container: o endereço de retorno é um só)
+function Get-OAuthPort { return Get-Setting "NARNIA_OAUTH_PORT" "8089" }
 function Get-DevDownArgs { return @($script:DevCompose + @("--profile", "app", "down", "--remove-orphans")) }
 
 function Resolve-BackupFile([string] $Dir, [string] $Arg) {
@@ -174,7 +184,7 @@ function Invoke-Restore {
     $mode = if ($devApi) { "dev" } elseif (Test-StackRunning) { "prod" } else { "dev" }
   }
   if ($mode -eq "dev") { $compose = $script:DevCompose + @("--profile", "app"); $data = Get-DevDataHostDir; $bdir = Get-DevBackupHostDir }
-  else { $compose = $script:ProdCompose; $data = if ($env:NARNIA_DATA_DIR) { $env:NARNIA_DATA_DIR } else { "./data" }; $bdir = Get-ProdBackupHostDir }
+  else { $compose = $script:ProdCompose; $data = Get-ProdDataHostDir; $bdir = Get-ProdBackupHostDir }
   try { $file = Resolve-BackupFile $bdir $arg } catch { Fail $_.Exception.Message }
   $running = & docker @compose ps -q api 2>$null
   Info "restaurando $(Split-Path -Leaf $file) em $data (modo $mode); o banco atual fica guardado em $bdir"
@@ -257,17 +267,29 @@ function Install-PluginWith([string] $Stage, [string] $Name, [string] $Url, [str
   Info "Claude Code: servidor MCP '$Name' -> $Url/mcp e plugin narnia-jobs@$Mkt instalados. Reinicie o Claude Code."
   Info "Mantenha ${abs}: o Claude Code lê o token de lá. Mudou a persona? Rode install-plugin de novo."
 }
-function Test-PluginInstall([string] $Name, [string] $Url, [string] $Mkt) {
+# Instância do plugin: --prod/--dev vencem; senão a que está no ar (dev primeiro, como o doctor); nenhuma no ar = none
+function Get-PluginMode([string[]] $Flags, [bool] $DevUp, [bool] $ProdUp) {
+  if ($Flags -contains "--prod") { return "prod" }
+  if ($Flags -contains "--dev") { return "dev" }
+  if ($DevUp) { return "dev" } elseif ($ProdUp) { return "prod" } else { return "none" }
+}
+function Get-RunningPluginMode([string[]] $Flags) {
+  $devApi = & docker @script:DevCompose ps -q api 2>$null
+  return Get-PluginMode $Flags ([bool]"$devApi".Trim()) (Test-StackRunning)
+}
+# MCP registrado numa das URLs aceitas (a da instância no ar; sem nenhuma no ar, a do dev ou a da produção)
+function Test-PluginInstall([string] $Name, [string[]] $Urls, [string] $Mkt) {
   $out = (Invoke-ClaudeCli @("mcp", "get", $Name)) -join "`n"
+  $ok = if ($out) { $Urls | Where-Object { $out.Contains("$_/mcp") } | Select-Object -First 1 }
   if ($LASTEXITCODE -ne 0 -or -not $out) { "MCP ${Name}: não registrado; rode .\start.ps1 install-plugin" }
-  elseif ($out -match [regex]::Escape("$Url/mcp")) { "MCP ${Name}: ok ($Url/mcp)" }
+  elseif ($ok) { "MCP ${Name}: ok ($ok/mcp)" }
   else { "MCP ${Name}: porta mudou; rode .\start.ps1 install-plugin" }
   $list = (Invoke-ClaudeCli @("plugin", "list", "--json")) -join "`n"
   if ($list -match [regex]::Escape("narnia-jobs@$Mkt")) { "plugin narnia-jobs@${Mkt}: instalado" }
   else { "plugin narnia-jobs@${Mkt}: não instalado; rode .\start.ps1 install-plugin" }
 }
 function Invoke-InstallPlugin {
-  $mode = if ($Rest -contains "--prod") { "prod" } else { "dev" }
+  $mode = Get-RunningPluginMode $Rest; if ($mode -eq "none") { $mode = "dev" }
   $ep = Get-PluginEndpoint $mode; $url, $token = $ep -split '\|', 2
   if (-not $token) { Fail "instância fora do ar: suba com make dev ou .\start.ps1 up antes de instalar o plugin." }
   Build-PluginStage "./plugin" (Get-PluginStageDir) $url $token (Get-PluginMarketplaceName) (Get-McpServerName)
@@ -366,8 +388,10 @@ function Wait-Healthy([string] $Service, [int] $Seconds = 120) {
 
 function Invoke-Up {
   Assert-Docker
-  $dataDir = if ($env:NARNIA_DATA_DIR) { $env:NARNIA_DATA_DIR } else { "./data" }
-  New-Item -ItemType Directory -Force -Path $dataDir, (Get-ProdBackupHostDir) *> $null
+  # as pastas que o compose monta, resolvidas uma vez (ambiente, .env, padrão) e exportadas: mesmo valor nos dois lados
+  $dataDir = Get-ProdDataHostDir; $env:NARNIA_DATA_DIR = $dataDir; $env:NARNIA_BACKUP_HOST_DIR = Get-ProdBackupHostDir
+  if ($null -eq $env:NARNIA_OAUTH_PORT) { $env:NARNIA_OAUTH_PORT = Get-OAuthPort }
+  New-Item -ItemType Directory -Force -Path $dataDir, $env:NARNIA_BACKUP_HOST_DIR *> $null
   if (Test-StackRunning) {
     $port = Get-EnvValue $script:EnvFile "NARNIA_PORT"
     Info "stack já no ar na porta $port; aplicando alterações"
@@ -403,13 +427,14 @@ function Invoke-Down {
   }
 }
 
-# Google Calendar opcional (F07/M7): no api de produção (volume claude-auth, callback na 8089) ou num container avulso
+# Google Calendar opcional (F07/M7): no api de produção (volume claude-auth, callback na Get-OAuthPort, a mesma no host e
+# no container) ou num container avulso
 function Invoke-Google([string[]] $Rest) {
   Assert-Docker
   if (Test-StackRunning) { Invoke-Prod (@("exec", "api", "narnia-jobs", "google") + $Rest) }
   else {
-    $port = Get-EnvValue $script:EnvFile "NARNIA_OAUTH_PORT"; if (-not $port) { $port = "8089" }
-    Invoke-Prod (@("run", "--rm", "--no-deps", "-p", "127.0.0.1:${port}:8089", "api", "narnia-jobs", "google") + $Rest)
+    $port = Get-OAuthPort
+    Invoke-Prod (@("run", "--rm", "--no-deps", "-p", "127.0.0.1:${port}:${port}", "-e", "NARNIA_OAUTH_PORT=$port", "api", "narnia-jobs", "google") + $Rest)
   }
 }
 
@@ -480,7 +505,10 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       elseif (Test-StackRunning) { Invoke-Prod @("exec", "-T", "api", "narnia-jobs", "doctor") }
       else { Invoke-Prod @("run", "--rm", "api", "narnia-jobs", "doctor") }
       if (Get-Command ($(if ($env:NARNIA_CLAUDE_BIN) { $env:NARNIA_CLAUDE_BIN } else { "claude" })) -ErrorAction SilentlyContinue) {
-        $ep = Get-PluginEndpoint "dev"; Test-PluginInstall (Get-McpServerName) ($ep -split '\|', 2)[0] (Get-PluginMarketplaceName)
+        $devUrl = ((Get-PluginEndpoint "dev") -split '\|', 2)[0]
+        $prodUrl = "http://127.0.0.1:$(Get-EnvValue $script:EnvFile 'NARNIA_PORT')"
+        $urls = switch (Get-RunningPluginMode @()) { "dev" { @($devUrl) } "prod" { @($prodUrl) } default { @($devUrl, $prodUrl) } }
+        Test-PluginInstall (Get-McpServerName) $urls (Get-PluginMarketplaceName)
       }
     }
     "install-plugin" { Invoke-InstallPlugin }

@@ -62,9 +62,12 @@ services:
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 deixa só metadados nos rastros
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # vaga por URL que precisa de navegador (vazio desliga)
+      - NARNIA_OAUTH_PORT=${NARNIA_OAUTH_PORT:-8089}   # porta do callback do Google (endereço de retorno e --callback-port)
     networks: [default, browser]
     ports:
-      - "127.0.0.1:${NARNIA_OAUTH_PORT-8089}:8089"      # callback OAuth do Google Calendar (F07); porta fixa
+      # callback OAuth do Google Calendar (F07): a mesma porta no host e no container, porque o endereço de retorno
+      # (http://localhost:<porta>/callback) é um só; vazia (e2e) publica uma porta aleatória
+      - "127.0.0.1:${NARNIA_OAUTH_PORT-8089}:${NARNIA_OAUTH_PORT:-8089}"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s

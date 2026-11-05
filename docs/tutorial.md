@@ -136,7 +136,7 @@ As encerradas ficam na coluna **Encerrado**; as arquivadas (por você ou sem ati
 O mesmo recrutador, com os mesmos dados e ferramentas, roda dentro do Claude Code do seu computador. Com o narnia-jobs no ar (`./start.sh up`):
 
 ```bash
-./start.sh install-plugin     # Windows, com a stack do up no ar: .\start.ps1 install-plugin --prod
+./start.sh install-plugin     # Windows: .\start.ps1 install-plugin
 ```
 
 Isso registra o servidor MCP do narnia-jobs no Claude Code e instala o plugin. O token fica num arquivo só seu em `.plugin-build/`, então mantenha essa pasta. Reinicie o Claude Code e use:

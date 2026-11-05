@@ -115,6 +115,20 @@ Describe "Backups e restore (F03-fix L1)" {
     Get-ProdBackupHostDir | Should -Be "./backups"
     (Get-DevDownArgs) -join " " | Should -Be "compose -f docker-compose.dev.yml --profile app down --remove-orphans"
   }
+  It "pastas da produção e porta do OAuth: o ambiente vence o .env, que vence o padrão" {
+    $saved = $script:EnvFile; $old = @($env:NARNIA_DATA_DIR, $env:NARNIA_BACKUP_HOST_DIR, $env:NARNIA_OAUTH_PORT)
+    try {
+      $env:NARNIA_DATA_DIR = $null; $env:NARNIA_BACKUP_HOST_DIR = $null; $env:NARNIA_OAUTH_PORT = $null
+      $script:EnvFile = Join-Path $script:Tmp "pastas.env"
+      "$(Get-ProdDataHostDir)|$(Get-ProdBackupHostDir)|$(Get-OAuthPort)" | Should -Be "./data|./backups|8089"
+      Set-Content -Path $script:EnvFile -Value "NARNIA_DATA_DIR=/srv/narnia`nNARNIA_BACKUP_HOST_DIR=/mnt/narnia-bk`nNARNIA_OAUTH_PORT=8090"
+      "$(Get-ProdDataHostDir)|$(Get-ProdBackupHostDir)|$(Get-OAuthPort)" | Should -Be "/srv/narnia|/mnt/narnia-bk|8090"
+      $env:NARNIA_DATA_DIR = "/outra"; $env:NARNIA_BACKUP_HOST_DIR = "/outra-bk"; $env:NARNIA_OAUTH_PORT = "8091"
+      "$(Get-ProdDataHostDir)|$(Get-ProdBackupHostDir)|$(Get-OAuthPort)" | Should -Be "/outra|/outra-bk|8091"
+    } finally {
+      $script:EnvFile = $saved; $env:NARNIA_DATA_DIR, $env:NARNIA_BACKUP_HOST_DIR, $env:NARNIA_OAUTH_PORT = $old
+    }
+  }
   It "Resolve-BackupFile aceita nome dentro da pasta e recusa inexistente" {
     $b = Join-Path $script:Tmp "bk"; New-Item -ItemType Directory -Force -Path $b | Out-Null
     $f = Join-Path $b "narnia-boot-x.sqlite"; Set-Content -Path $f -Value ""
@@ -264,6 +278,18 @@ Describe "F04/M5 · modo B (install-plugin e diagnóstico no host)" {
     ($script:Calls | Where-Object { $_ -like "mcp add-json -s user narnia-jobs *headersHelper*mcp-headers.json*" }) | Should -Not -BeNullOrEmpty
     ($script:Calls -join "`n") | Should -Not -Match "dev-token"
     $script:Calls | Should -Contain "plugin install narnia-jobs@narnia-jobs-local --scope user"
+  }
+  It "Get-PluginMode: --prod/--dev vencem; senão a instância no ar (dev primeiro); nenhuma no ar = none" {
+    Get-PluginMode @("--prod") $true $false | Should -Be "prod"
+    Get-PluginMode @("--dev") $false $true | Should -Be "dev"
+    Get-PluginMode @() $true $true | Should -Be "dev"
+    Get-PluginMode @() $false $true | Should -Be "prod"
+    Get-PluginMode @() $false $false | Should -Be "none"
+  }
+  It "Test-PluginInstall aceita várias URLs: produção em outra porta não é porta mudou" {
+    $script:McpGet = "URL: http://127.0.0.1:3142/mcp"; $script:PluginList = "narnia-jobs@narnia-jobs-local"
+    $out = Test-PluginInstall "narnia-jobs" @("http://127.0.0.1:3100", "http://127.0.0.1:3142") "narnia-jobs-local" | Out-String
+    $out | Should -Match "ok \(http://127.0.0.1:3142/mcp\)"
   }
   It "Test-PluginInstall acusa porta mudou e plugin ausente" {
     $script:McpGet = "URL: http://127.0.0.1:3999/mcp"; $script:PluginList = "[]"

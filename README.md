@@ -101,7 +101,7 @@ Remova a extensão em `chrome://extensions`. Por fim, apague a pasta do projeto:
 
 - **`./start.sh doctor`** diagnostica login, Redis, pasta de dados, worker, último backup e o plugin no Claude Code. Comece por ele.
 - **"Não logado" ou login vencido:** `./start.sh login` de novo. Alternativa: `claude setup-token` no seu computador e `CLAUDE_CODE_OAUTH_TOKEN=…` no `.env`.
-- **Porta ocupada:** o `up` escolhe outra entre 3100 e 3199 e avisa. A porta `8089` (retorno do login do Google Calendar) também precisa estar livre. Se não estiver, `NARNIA_OAUTH_PORT=<outra>` no `.env` faz o `up` subir, mas o Google Calendar não conecta enquanto a 8089 não for a porta.
+- **Porta ocupada:** o `up` escolhe outra entre 3100 e 3199 e avisa. A porta `8089` (retorno do login do Google Calendar) também precisa estar livre. Se não estiver, ponha `NARNIA_OAUTH_PORT=<outra>` no `.env` e use `http://localhost:<outra>/callback` como endereço de retorno no cliente OAuth do Google.
 - **"a pasta ./data não é gravável":** a pasta foi criada como root (por um `docker compose` chamado direto); o erro traz o `sudo chown` exato.
 - **Windows:** use o PowerShell (`.\start.ps1 up`). Se o script for bloqueado, rode `powershell -ExecutionPolicy Bypass -File .\start.ps1 up`. Clonar dentro do WSL2 deixa o Docker bem mais rápido.
 - **Docker parado:** o lançador avisa; inicie o Docker Desktop (ou `sudo systemctl start docker`).

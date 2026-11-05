@@ -138,7 +138,7 @@ Closed ones stay in the **Encerrado** column; archived ones (by you, or with no 
 The same recruiter, with the same data and tools, runs inside Claude Code on your computer. With narnia-jobs running (`./start.sh up`):
 
 ```bash
-./start.sh install-plugin     # Windows, with the up stack running: .\start.ps1 install-plugin --prod
+./start.sh install-plugin     # Windows: .\start.ps1 install-plugin
 ```
 
 This registers the narnia-jobs MCP server in Claude Code and installs the plugin. The token lives in a file only you can read, in `.plugin-build/`, so keep that folder. Restart Claude Code and use:
