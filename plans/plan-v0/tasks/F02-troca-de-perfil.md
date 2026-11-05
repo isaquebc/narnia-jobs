@@ -36,7 +36,7 @@ Uma pessoa que concluiu o onboarding (F01) consegue:
 - Cadastro e ingestão de projetos (GitHub) → F03; aqui só a tabela vazia e a aba com estado vazio.
 - Edição livre dos fatos do usuário base, apagar perfil arquivado, configuração de concorrência dos workers → F10.
 - Pesquisa na internet para "não sei" → F04. Aqui o campo continua aceitando `needsResearch`.
-- Reordenação assistida pelo modelo → issue [#1](https://github.com/isaquebc/narnia-jobs-helpper/issues/1).
+- Reordenação assistida pelo modelo → issue [#1](https://github.com/isaquebc/narnia-jobs/issues/1).
 
 ---
 
