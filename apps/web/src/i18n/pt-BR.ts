@@ -787,6 +787,7 @@ export const ptBR = {
       posting_analysis_incomplete: "Análises de vaga não concluídas",
       document_ready: "Currículos e cartas prontos",
       document_review_failed: "Currículos e cartas que não passaram na revisão",
+      search_index_full: "Fatos acima do contexto do recrutador",
     },
   },
   ingestion: {
@@ -1139,6 +1140,22 @@ export const ptBR = {
     create: "Criar reanálise",
   },
   settings: {
+    semanticSearch: {
+      title: "Busca por sentido",
+      hint: 'O recrutador acha seus fatos pelo assunto, não só pelas palavras (ex.: "fintech" acha uma experiência em pagamentos). Roda no seu computador: baixa um modelo de 113 MB na primeira vez e usa cerca de 400 MB de memória.',
+      alert:
+        "{n} fatos não cabem mais no contexto do recrutador e ele só os acha pela busca por termos. Ligue a busca por sentido para ele achá-los pelo assunto.",
+      enable: "Ligar busca por sentido",
+      disable: "Desligar busca por sentido",
+      status: {
+        off: "Desligada.",
+        loading: "Carregando o modelo…",
+        downloading: "Baixando o modelo: {pct}%",
+        indexing: "Preparando seus fatos…",
+        ready: "Ligada: {n} fatos prontos para a busca por sentido.",
+        error: "Não deu para ligar: {error}",
+      },
+    },
     factAliases: {
       title: "Termos aprendidos pela busca",
       hint: "Quando a busca por um termo não achava um fato seu, o recrutador ligou o termo ao fato. Apague o que estiver errado.",

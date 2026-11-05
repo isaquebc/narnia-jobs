@@ -22,6 +22,7 @@ import { FactAliasesSection } from "./FactAliasesSection";
 import { GoogleCalendarSection } from "./GoogleCalendarSection";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { PluginSettingsSection } from "./PluginSettingsSection";
+import { SemanticSearchSection } from "./SemanticSearchSection";
 import { WorkerSettingsSection } from "./WorkerSettingsSection";
 
 const GB = 1024 ** 3;
@@ -210,6 +211,7 @@ export function SettingsPage() {
       <GithubConnectCard />
       <ChatSettingsSection />
       <FactAliasesSection />
+      <SemanticSearchSection />
       <ModelSettingsSection />
       <CvTemplatesSection />
       <WorkerSettingsSection />

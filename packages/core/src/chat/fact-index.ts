@@ -7,11 +7,13 @@ import { factRefs } from "./citations";
  * na ordem da relevância do perfil ativo. Com teto de tamanho, o fim é cortado e o resto fica para a `fact_search`.
  */
 const DEFAULT_MAX_CHARS = 12_000;
+/** Teto do índice (caracteres); ausente = 12 mil. Os testes do alerta da R6 baixam o teto por aqui. */
+export const FACT_INDEX_MAX_KEY = "chat.fact_index_max_chars";
 
 const span = (a?: string | null, b?: string | null, current?: boolean) =>
   a ? `${a}–${b ?? (current ? "atual" : a)}` : "";
 
-export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): string {
+function buildFactIndex(repos: Repos, o: { maxChars?: number }): { text: string; left: number } {
   const f = repos.facts;
   const refOf = factRefs(repos);
   const cite = (id: string) => ` [${refOf(id)}]`;
@@ -61,7 +63,7 @@ export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): stri
       facts: 1,
     });
 
-  const max = o.maxChars ?? DEFAULT_MAX_CHARS;
+  const max = o.maxChars ?? repos.settings.get<number>(FACT_INDEX_MAX_KEY) ?? DEFAULT_MAX_CHARS;
   const head =
     "### Índice dos seus fatos\nTodos os fatos registrados do usuário (o perfil só muda o destaque). Antes de dizer que algo não está aqui, busque com `fact_search`. Cite o fato pelo id entre colchetes (`[f:…]`).";
   const out: string[] = [head];
@@ -74,5 +76,17 @@ export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): stri
     } else left += e.facts;
   }
   if (left > 0) out.push(`- … e mais ${left} fatos: use fact_search para achá-los.`);
-  return out.join("\n");
+  return { text: out.join("\n"), left };
+}
+
+export function factIndexText(repos: Repos, o: { maxChars?: number } = {}): string {
+  return buildFactIndex(repos, o).text;
+}
+
+/**
+ * Fatos que não cabem no índice do contexto (R6, FF-7): acima de zero, o recrutador depende da busca para vê-los, e o
+ * app avisa que a busca por sentido pode ser ligada.
+ */
+export function factIndexOverflow(repos: Repos, o: { maxChars?: number } = {}): number {
+  return buildFactIndex(repos, o).left;
 }

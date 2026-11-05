@@ -51,10 +51,12 @@ import { profilesRoutes } from "./routes/profiles";
 import { providerRoutes } from "./routes/provider";
 import { reposRoutes } from "./routes/repos";
 import { salaryReferenceRoutes } from "./routes/salary-reference";
+import { semanticSearchRoutes } from "./routes/semantic-search";
 import { snapshotsRoutes } from "./routes/snapshots";
 import { usageRoutes } from "./routes/usage";
 import { userRoutes } from "./routes/user";
 import { workerSettingsRoutes } from "./routes/worker-settings";
+import { defaultEmbedderFactory, SemanticSearchService } from "./services/semantic-search";
 
 export interface AppDeps {
   version: string;
@@ -79,6 +81,8 @@ export interface AppDeps {
   phoenixUrl?: string | null;
   /** Hosts aceitos (DNS rebinding); ausente = padrões + NARNIA_PUBLIC_URL + NARNIA_ALLOWED_HOSTS. */
   allowedHosts?: Set<string>;
+  /** R6: busca por sentido; ausente = serviço padrão (modelo real; vetorizador de conceitos com o mock). */
+  semantic?: SemanticSearchService;
 }
 
 /** Monta a aplicação Hono (F01 §2.6). Tudo atrás do token de boot, exceto health e a rota de entrada. */
@@ -111,6 +115,23 @@ export function createApp(deps: AppDeps) {
   app.get("/api/auth/enter", enterHandler(deps.token));
 
   const fake = deps.provider.id === "mock";
+  const semantic =
+    deps.semantic ??
+    new SemanticSearchService({
+      repos: deps.repos,
+      factory: defaultEmbedderFactory({ dataDir: deps.dataDir, mock: fake }),
+      ...(fake ? {} : { log: (msg: string) => console.log(msg) }),
+      emit: (ev) =>
+        deps.bus.emit({
+          type: ev.created ? "notification.created" : "notification.updated",
+          notification: ev.notification,
+        }),
+    });
+  semantic.boot();
+  // fatos mudaram (cartão invalidado): o índice pode ter passado do teto
+  deps.bus.on((e) => {
+    if (e.type === "profile.card_invalidated") semantic.syncAlert();
+  });
   const ghConfigDir = deps.ghConfigDir ?? defaultGhConfigDir();
   const githubAuth: GithubAuthDeps = {
     repos: deps.repos,
@@ -153,6 +174,7 @@ export function createApp(deps: AppDeps) {
       queue: deps.queue,
       bus: deps.bus,
       version: deps.version,
+      semantic: () => semantic.search(),
       // a conversa nova da análise (F06) vem do SessionManager, montado mais abaixo
       openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
     }),
@@ -294,6 +316,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", snapshotsRoutes({ repos: deps.repos, dataDir: deps.dataDir, bus: deps.bus }));
   app.route("/", usageRoutes({ repos: deps.repos }));
   app.route("/", workerSettingsRoutes({ repos: deps.repos }));
+  app.route("/", semanticSearchRoutes({ semantic }));
   app.route("/", userRoutes({ repos: deps.repos, bus: deps.bus }));
   app.route("/", profilesRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue }));
   app.route("/", salaryReferenceRoutes({ repos: deps.repos }));

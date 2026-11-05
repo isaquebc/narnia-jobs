@@ -775,7 +775,7 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
     },
   },
   "fact.search": {
-    "description": "Busca nos fatos e resumos do usuário sem ler tudo: qualquer um dos termos (OU), com sinônimos e tradução pt/en; acentos ignorados. Agrupe numa chamada só: vários termos em \`q\` ou vários assuntos em \`queries\` (cada item diz em \`matched\` quais consultas o acharam). Use antes de listar e antes de dizer que algo não está no perfil.",
+    "description": "Busca nos fatos e resumos do usuário sem ler tudo: qualquer um dos termos (OU), com sinônimos e tradução pt/en; acentos ignorados. Agrupe numa chamada só: vários termos em \`q\` ou vários assuntos em \`queries\` (cada item diz em \`matched\` quais consultas o acharam). Use antes de listar e antes de dizer que algo não está no perfil. Com a busca por sentido ligada, \`bySense\` marca o item que só é parecido (não contém o termo): confira o que ele diz antes de afirmar.",
     "input": {
       "additionalProperties": false,
       "properties": {
@@ -834,6 +834,10 @@ exports[`F04/M1 shared · tools MCP do chat > JSON Schema sem $schema e estável
           "items": {
             "additionalProperties": false,
             "properties": {
+              "bySense": {
+                "const": true,
+                "type": "boolean",
+              },
               "id": {
                 "minLength": 1,
                 "type": "string",

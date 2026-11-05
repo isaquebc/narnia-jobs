@@ -19,6 +19,7 @@ import {
   planFactChange,
 } from "../ingest/fact-change";
 import { isBelowReference } from "../salary";
+import type { SemanticSearchPort } from "../search/semantic";
 import { factRefs, researchRef } from "./citations";
 import { aliasKeys, expandQuery } from "./fact-search";
 import { resolveChatSettings } from "./settings";
@@ -85,9 +86,28 @@ export interface ChatToolsContext {
   ingest: ChatIngestPort;
   /** Sessão do chat (modo A, header da sessão); ausente no modo B (terminal). */
   sessionId?: string | null;
+  /** R6: busca por sentido, só quando ligada; a `fact_search` junta com a busca por termos (RRF). */
+  semantic?: SemanticSearchPort | null;
 }
 
 const runUrl = (runId: string) => `/ingestao/${runId}`;
+
+/** R6: itens da busca por sentido por consulta (8: recall 92% no benchmark, igual a 10; 5 dava 86%). */
+const SENSE_LIMIT = 8;
+
+/** Reciprocal Rank Fusion (k = 60): junta listas ordenadas sem comparar as notas de cada uma. */
+function fuseRrf<T extends { kind: FactSearchKind; id: string }>(lists: T[][]): T[] {
+  const score = new Map<string, { h: T; s: number; first: number }>();
+  let n = 0;
+  for (const list of lists)
+    list.forEach((h, i) => {
+      const key = `${h.kind}:${h.id}`;
+      const cur = score.get(key) ?? { h, s: 0, first: n++ };
+      cur.s += 1 / (60 + i);
+      score.set(key, cur);
+    });
+  return [...score.values()].sort((a, b) => b.s - a.s || a.first - b.first).map((x) => x.h);
+}
 
 /* ---------- períodos (datas parciais YYYY, YYYY-MM, YYYY-MM-DD) ---------- */
 
@@ -432,17 +452,17 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
       detail: detail("education", input.id),
     })),
 
-    "fact.search": wrap("fact.search", (input) => {
+    "fact.search": wrap("fact.search", async (input) => {
       const rel = relevance();
       const queries = [...(input.q ? [input.q] : []), ...(input.queries ?? [])];
       // por consulta: termos com OU (expandidos pelo dicionário) e os apelidos aprendidos; o item guarda a melhor
       // posição e as consultas que o acharam (R1, 2026-10-29)
       const found = new Map<
         string,
-        { kind: FactSearchKind; id: string; best: number; matched: string[] }
+        { kind: FactSearchKind; id: string; best: number; matched: string[]; bySense: boolean }
       >();
       for (const q of queries) {
-        const hits = [
+        const lexical = [
           ...repos.factAliases
             .lookup(aliasKeys(q))
             .map((a) => ({ kind: a.kind, id: a.factId, rank: Number.NEGATIVE_INFINITY })),
@@ -451,13 +471,24 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
             limit: 200,
           }),
         ].filter((h) => !input.kinds || input.kinds.includes(h.kind));
-        hits.forEach((h, i) => {
+        // R6: a busca por sentido entra com poucos itens (as notas do modelo não separam o parecido do sem relação) e
+        // marcados; erro do modelo não derruba a busca por termos
+        const sense = ctx.semantic
+          ? await ctx.semantic
+              .search(q, { ...(input.kinds ? { kinds: input.kinds } : {}), limit: SENSE_LIMIT })
+              .catch(() => [])
+          : [];
+        const byTerm = new Set(lexical.map((h) => `${h.kind}:${h.id}`));
+        fuseRrf<{ kind: FactSearchKind; id: string }>([lexical, sense]).forEach((h, i) => {
           const key = `${h.kind}:${h.id}`;
           const cur = found.get(key);
+          const onlySense = !byTerm.has(key);
           if (cur) {
             cur.best = Math.min(cur.best, i);
             if (!cur.matched.includes(q)) cur.matched.push(q);
-          } else found.set(key, { kind: h.kind, id: h.id, best: i, matched: [q] });
+            cur.bySense &&= onlySense;
+          } else
+            found.set(key, { kind: h.kind, id: h.id, best: i, matched: [q], bySense: onlySense });
         });
       }
       const refOf = factRefs(repos);
@@ -477,6 +508,7 @@ export function createChatTools(repos: Repos, ctx: ChatToolsContext): ChatToolHa
             period: period(d.start, d.end, d.current),
             relevance: rel.get(`${h.kind}:${h.id}`) ?? null,
             matched: h.matched,
+            ...(h.bySense ? { bySense: true as const } : {}),
             order: h.best,
           };
         })

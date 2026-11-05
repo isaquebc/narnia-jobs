@@ -49,6 +49,26 @@ Status: **em andamento** (2026-10-29). Decisões FF-1 a FF-6 do dono (§5). Marc
 
 Gate do chat em todo marco que mexe em prompt ou tool (`--feature` para os casos novos).
 
+### R6 · RAG híbrido (proposta, 2026-11-04)
+
+Medição na fixture `engineer` (39 fatos, `evals/search/recall.jsonl`, top 10; script `.claude-data/r6/spike.mts`):
+
+| Busca | Geral | Exato | Agrupado | Tradução | Sinônimo | Semântico |
+|---|---|---|---|---|---|---|
+| atual (R1) | 72% | 100% | 100% | 100% | 80% | 14% |
+| só vetor, e5-small q8 | 81% | 75% | 79% | 75% | 100% | 64% |
+| **fusão RRF, e5-small q8** | **92%** | 100% | 100% | 100% | 100% | 64% |
+| fusão RRF, MiniLM-L12 q8 | 89% | 100% | 100% | 100% | 80% | 79% |
+
+`Xenova/multilingual-e5-small` quantizado (q8): 113 MB em disco, ~410 MB de RAM com o modelo carregado, carga 4,6 s,
+3 ms por fato na CPU; fp32 não melhora o recall e dobra a memória. Biblioteca: `@huggingface/transformers` 4.3.1
+(onnxruntime-node, binário de CPU no pacote). O vetor sozinho perde nos casos exatos; a fusão mantém o lexical e soma
+o semântico.
+
+Proposta: e5-small q8; vetores numa tabela (`fact_vector`: tipo, id, modelo, hash do texto, 384 floats), derivados
+(fora do backup); força bruta (ms até milhares de fatos); `fact.search` junta lexical e vetor por RRF quando ativo,
+sem mudar o contrato da tool; testes com um vetorizador falso determinístico (o modelo real só no benchmark).
+
 ## 5 · Decisões do dono
 
 | Id | Decisão |
@@ -58,6 +78,7 @@ Gate do chat em todo marco que mexe em prompt ou tool (`--feature` para os casos
 | FF-3 | Medir antes e depois: relatório por marco (latência, custo, tools, recall, notas); calibração do revisor/juiz com matriz de confusão |
 | FF-4 | Ruído do juiz: perguntas sim/não por critério (5.1) e o que é objetivo passa para código (5.2) |
 | FF-5 | RAG híbrido viável e opcional, com alerta para ativar (o sistema também será usado por terceiros) |
+| FF-7 | R6 (2026-11-04): busca vetorial opcional; alerta quando o índice no contexto chega ao teto (fatos cortados), e o usuário pode ativar antes quando quiser |
 | FF-6 | Os fatos são do usuário; o perfil é o viés que decide o que se destaca: índice e busca mostram tudo, ordenado pela relevância do perfil ativo |
 
 ## 6 · Registro
@@ -72,3 +93,5 @@ Gate do chat em todo marco que mexe em prompt ou tool (`--feature` para os casos
 | 2026-10-30 | R3 (linha de base) | Linha de base do chat regravada na régua nova com `--update-baseline --owner-approved` (aprovação explícita do dono na conversa: a base antiga era do juiz de rótulo único e os casos novos reprovam de propósito, alvos da R4). Uma amostra, sem pairwise (mesma versão): avaliadores 93,5%, 12 de 24 conversas sem ressalvas; aprovadas regravadas (24 casos). |
 | 2026-10-30 | R4 | Prompt do recrutador: número de mercado só com fonte registrada em `research_save` (e sem explicar a fonte sem fonte), fato novo "passa pela revisão" (nunca "gravei" para fato), nenhum aviso sobre a vaga depois de abrir a análise em outra conversa (só a duplicata), resultado primeiro com teto de tamanho (pergunta direta ~800, análise ~1.500) e um próximo passo no lugar do menu (regra 12). Avaliador `mentions_review`: gravar a resposta do formulário, a análise ou a vaga não conta como gravar fato. Gate (5 amostras × 24 casos de cada lado): **68 vitórias, 21 derrotas, 31 empates** (margem 9), sem regressão; linha de base e aprovadas regravadas. Pendente: o tamanho ainda passa do limite em `pretensao-sem-pesquisa`, `fato-existente`, `fato-ausente` e `vaga-o-que-pede`; `cites_source` não aceita a citação pela empresa ("na Beta Logística") nem pela categoria ("das suas experiências"). |
 | 2026-10-30 | R4 (medição) | Relatório `r4-prompt` (3 amostras) contra `r3-juiz-perguntas`: resposta 1.145 → 971 caracteres, custo por conversa −13%, avaliadores 93% → 95%, juiz 78% → 72% (dentro do ruído de 11 pontos do juiz; o pairwise do gate, que compara lado a lado, deu 68 × 21), latência p50 10,7 → 14,2 s. Defeitos que sobram, alvos da R5 (citação conferida por código): ausência afirmada com o fato no perfil (`pontos-fracos`: "nada mostra time mentorado" com Mentoria nível 4), número de mercado sem fonte (`pretensao-sem-pesquisa`: "contraproposta perto de R$ 18–20 mil"), lacuna sem busca (`vaga-o-que-pede`: Kafka), inferência sem marca (`fato-ausente`). |
+| 2026-11-04 | R5 | Citação por id conferida por código (`packages/core/src/chat/citations.ts`): índice e tools com `ref`, o recrutador cita `[f:…]`, `[r:…]`, `[v:…]`; a rota confere se o id existe (não se veio de uma tool da conversa: desde a R2 o índice está no contexto); balão com a fonte, "?" no inválido, frases sem fonte marcadas; avaliadores `citations_valid` e `claims_cited`, juiz avisado (calibração 31/31). Bug do medidor corrigido (fixture do sandbox com ids fixos, `withSeededIds`): o juiz julgava as citações de todas as amostras contra o índice da 1ª. Ruído 65% (47/72); gate 62 V × 25 D × 33 E, margem 9, sem regressão. Commits 948dff7 e 4bfd805. |
+| 2026-11-04 | R6 | Busca por sentido opcional (FF-5, FF-7): `@huggingface/transformers` 4.3.1 com `Xenova/multilingual-e5-small` q8 (113 MB, ~410 MB de RAM), só no api; vetores em `fact_vector` (migração 0036; hash do texto e modelo, refeitos sozinhos, por isso no mesmo banco e no backup); a `fact_search` junta termos e sentido por RRF com até 8 itens por consulta e marca `bySense` (as notas do e5 ficam entre 0,80 e 0,90 com ou sem relação: "culinária" 0,867 → Kubernetes; nenhum piso separa). Configurações › Busca por sentido (ligar antes, progresso do download) e o alerta `search.index_full` no sino quando o índice do contexto corta fatos e a busca está desligada. Testes com vetorizador de conceitos (mock e e2e nunca baixam). `evals search --semantic`: recall 72% → 92% (semântico 14% → 64%, sinônimo 80% → 100%). |

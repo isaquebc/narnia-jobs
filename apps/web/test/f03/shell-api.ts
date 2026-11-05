@@ -4,6 +4,16 @@ import { profile } from "../components/profile-fixture";
 export const shellApi = {
   // F04-fix-fundamentacao: termos aprendidos pela busca (Configurações)
   listFactAliases: async () => ({ aliases: [] }),
+  getSemanticSearch: async () => ({
+    enabled: false,
+    status: "off" as const,
+    progress: null,
+    error: null,
+    model: "Xenova/multilingual-e5-small",
+    cutFacts: 0,
+    alert: false,
+    vectors: 0,
+  }),
   // janela da extensão (2026-10-27): o andamento das abas
   getCaptureActivity: async () => ({ items: [] }),
   // F07/M5: lembretes da agenda das candidaturas (badge e bandeja)

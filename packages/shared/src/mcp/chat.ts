@@ -120,7 +120,7 @@ export const CHAT_TOOLS = {
   ),
   "evidence.education.get": tool("Detalhe de uma formação.", ById, Detail),
   "fact.search": tool(
-    "Busca nos fatos e resumos do usuário sem ler tudo: qualquer um dos termos (OU), com sinônimos e tradução pt/en; acentos ignorados. Agrupe numa chamada só: vários termos em `q` ou vários assuntos em `queries` (cada item diz em `matched` quais consultas o acharam). Use antes de listar e antes de dizer que algo não está no perfil.",
+    "Busca nos fatos e resumos do usuário sem ler tudo: qualquer um dos termos (OU), com sinônimos e tradução pt/en; acentos ignorados. Agrupe numa chamada só: vários termos em `q` ou vários assuntos em `queries` (cada item diz em `matched` quais consultas o acharam). Use antes de listar e antes de dizer que algo não está no perfil. Com a busca por sentido ligada, `bySense` marca o item que só é parecido (não contém o termo): confira o que ele diz antes de afirmar.",
     z
       .object({
         q: z.string().trim().min(2).max(200).optional(),
@@ -142,6 +142,8 @@ export const CHAT_TOOLS = {
           relevance: z.number().min(0).max(1).nullable(),
           /** Consultas que acharam o item. */
           matched: z.array(z.string()),
+          /** R6: achado só pela busca por sentido (parecido, sem o termo). */
+          bySense: z.literal(true).optional(),
         }),
       ),
       total: z.number().int().min(0),

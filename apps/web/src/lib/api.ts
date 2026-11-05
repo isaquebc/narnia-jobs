@@ -472,6 +472,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       ),
     listJobs: () => request<{ jobs: Job[] }>("/api/jobs"),
     getWorkerSettings: () => request<WorkerSettings>("/api/settings/workers"),
+    getSemanticSearch: () => request<SemanticSearchView>("/api/settings/semantic-search"),
+    putSemanticSearch: (body: { enabled: boolean }) =>
+      request<SemanticSearchView>("/api/settings/semantic-search", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
     putWorkerSettings: (patch: Partial<WorkerSettings["concurrency"]>) =>
       request<WorkerSettings>("/api/settings/workers", {
         method: "PUT",
@@ -984,6 +990,17 @@ export interface DocumentView {
   missingLinks: CvLinkKind[];
 }
 /** Configurações › Processos (F05 M7): jobs simultâneos por fila. */
+/** Configurações › Busca por sentido (R6, FF-5, FF-7). */
+export interface SemanticSearchView {
+  enabled: boolean;
+  status: "off" | "loading" | "indexing" | "ready" | "error";
+  progress: number | null;
+  error: string | null;
+  model: string;
+  cutFacts: number;
+  alert: boolean;
+  vectors: number;
+}
 export interface WorkerSettings {
   concurrency: { ingest: number; ocr: number; extract: number };
   defaults: { ingest: number; ocr: number; extract: number };

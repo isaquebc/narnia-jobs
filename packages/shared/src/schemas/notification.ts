@@ -28,6 +28,8 @@ export const NOTIFICATION_KINDS = [
   "document.ready",
   /** CV ou carta que não passou na revisão depois da regeração automática (F05-13): alerta com os apontamentos. */
   "document.review_failed",
+  /** R6 (FF-7): o índice dos fatos no contexto do recrutador chegou ao teto; sugere ligar a busca por sentido. */
+  "search.index_full",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

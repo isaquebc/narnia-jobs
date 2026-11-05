@@ -8,6 +8,9 @@ allowBuilds:
   msgpackr-extract: false
   # tesseract.js: postinstall só imprime aviso de uso; sem binário nativo
   tesseract.js: false
+  # transformers.js (R6): o binário de CPU vem no pacote; o postinstall só baixa CUDA. protobufjs: só checa versão
+  onnxruntime-node: false
+  protobufjs: false
 
 minimumReleaseAgeExclude:
   - docx@9.9.0

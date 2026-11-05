@@ -13,6 +13,7 @@ import {
   friendlyError,
   friendlyText,
   type Repos,
+  type SemanticSearchPort,
 } from "@narnia-jobs/core";
 import {
   APPLICATION_TOOL_JSON_SCHEMAS,
@@ -78,7 +79,11 @@ function entries(
 
 /** Porta da conversa nova da análise (F06): o SessionManager, montado depois das rotas do MCP. */
 export type OpenPostingAnalysis = (postingId: string) => { id: string; title: string };
-type McpDeps = IngestionStartDeps & { openAnalysis?: OpenPostingAnalysis | undefined };
+type McpDeps = IngestionStartDeps & {
+  openAnalysis?: OpenPostingAnalysis | undefined;
+  /** R6: a busca por sentido pronta, ou `null` (desligada ou carregando). */
+  semantic?: (() => SemanticSearchPort | null) | undefined;
+};
 
 /** Registro único das tools (F04 §2.2): perfil (F02), arquivos e ingestão (F03), as da conversa (F04) e da vaga (F06). */
 function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
@@ -97,7 +102,11 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
     ...entries(
       CHAT_TOOLS,
       CHAT_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
-      createChatTools(deps.repos, { ingest: createChatIngestPort(deps, sessionId), sessionId }),
+      createChatTools(deps.repos, {
+        ingest: createChatIngestPort(deps, sessionId),
+        sessionId,
+        semantic: deps.semantic?.() ?? null,
+      }),
     ),
     ...entries(
       POSTING_TOOLS,

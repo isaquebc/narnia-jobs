@@ -4,12 +4,15 @@ import { fileURLToPath } from "node:url";
 import {
   createChatTools,
   createRepos,
+  createSemanticSearch,
+  type Embedder,
   factSearchRecall,
   migrate,
   openDatabase,
   parseRecallCases,
   type RecallReport,
   seedFixture,
+  transformersEmbedder,
 } from "@narnia-jobs/core";
 import { gitCommit } from "./phoenix-setup";
 import { buildRunReport, compareRunReports, type RunReportJson } from "./report";
@@ -23,14 +26,20 @@ import type { EvalCaseReport } from "./run";
 const repoRoot = () => fileURLToPath(new URL("../../../../", import.meta.url));
 const reportsDir = () => join(repoRoot(), "evals/reports");
 
-/** Recall da `fact_search` real sobre a fixture fictícia, num banco em memória. */
-export async function searchRecallNow(): Promise<RecallReport> {
+/**
+ * Recall da `fact_search` real sobre a fixture fictícia, num banco em memória. Com `embedder` (R6), a busca por sentido
+ * entra junto, como na fact_search ligada.
+ */
+export async function searchRecallNow(o: { embedder?: Embedder } = {}): Promise<RecallReport> {
   const db = openDatabase(":memory:");
   try {
     migrate(db);
     const repos = createRepos(db);
     seedFixture(repos, "engineer");
-    const tools = createChatTools(repos, { ingest: {} as never });
+    const tools = createChatTools(repos, {
+      ingest: {} as never,
+      ...(o.embedder ? { semantic: createSemanticSearch(repos, o.embedder) } : {}),
+    });
     const cases = parseRecallCases(
       readFileSync(join(repoRoot(), "evals/search/recall.jsonl"), "utf8"),
     );
@@ -66,7 +75,18 @@ export const reportFlag = (args: string[]) =>
   args.find((a) => a.startsWith("--report="))?.slice("--report=".length) || undefined;
 
 export async function runSearchEvals(args: string[]): Promise<number> {
-  const recall = await searchRecallNow();
+  // --semantic: com a busca por sentido (o modelo real; baixa para <dados>/models na primeira vez)
+  const semantic = args.includes("--semantic");
+  if (semantic) console.log("Busca por sentido ligada (modelo real).");
+  const recall = await searchRecallNow(
+    semantic
+      ? {
+          embedder: transformersEmbedder({
+            cacheDir: join(process.env.NARNIA_DATA_DIR ?? "/data", "models"),
+          }),
+        }
+      : {},
+  );
   const label = reportFlag(args);
   if (label) writeRunReport({ label, samples: [], recall });
   else {

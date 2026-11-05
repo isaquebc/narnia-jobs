@@ -118,7 +118,7 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   evals … --update-baseline --owner-approved  grava apesar do gate, só com aprovação explícita do dono
   evals prompts|pdf|cv-review|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, revisor do CV, ou tudo (mock = smoke; real só a pedido)
   evals calibration [id…] [--strict]  calibração dos juízes: falsos positivos e negativos em respostas rotuladas (evals/calibration)
-  evals search [--report=rótulo]       recall da busca de fatos (evals/search/recall.jsonl), sem modelo
+  evals search [--semantic] [--report=rótulo]  recall da busca de fatos (evals/search/recall.jsonl); --semantic junta a busca por sentido (R6)
   evals compare <a.json> <b.json>     compara dois relatórios de evals/reports (antes → depois)
   wipe             remove containers, volumes e ./.claude-data da instância
 USAGE
