@@ -25,6 +25,8 @@ export function createWsClient(opts: WsClientOptions) {
   const maxQueue = opts.maxQueue ?? 200;
   const listeners = new Set<(e: WsEvent) => void>();
   const statusListeners = new Set<(s: WsStatus) => void>();
+  const reconnectListeners = new Set<() => void>();
+  let opened = false;
   const queue: WsEvent[] = [];
   let socket: SocketLike | null = null;
   let attempt = 0;
@@ -65,6 +67,9 @@ export function createWsClient(opts: WsClientOptions) {
     s.onopen = () => {
       attempt = 0;
       setStatus("open");
+      // reabriu depois de cair: os eventos do intervalo se perderam (o servidor não guarda), quem ouve ressincroniza
+      if (opened) for (const l of reconnectListeners) l();
+      opened = true;
     };
     s.onmessage = (ev) => {
       try {
@@ -119,10 +124,30 @@ export function createWsClient(opts: WsClientOptions) {
         statusListeners.delete(listener);
       };
     },
+    /** Avisa cada vez que a conexão reabre depois de cair (nunca na primeira conexão). */
+    onReconnect(listener: () => void) {
+      reconnectListeners.add(listener);
+      return () => {
+        reconnectListeners.delete(listener);
+      };
+    },
     get status() {
       return status;
     },
   };
+}
+
+/**
+ * Depois de uma queda do WS, recarrega as consultas: as telas que só andam por evento (o painel da ingestão no chat,
+ * sem polling) ficariam paradas na última etapa recebida antes da queda (e2e F04/E2E-19 no CI, 2026-11-05).
+ */
+export function resyncOnReconnect(
+  ws: Pick<WsClient, "onReconnect">,
+  qc: { invalidateQueries: () => unknown },
+): () => void {
+  return ws.onReconnect(() => {
+    void qc.invalidateQueries();
+  });
 }
 
 export type WsClient = ReturnType<typeof createWsClient>;

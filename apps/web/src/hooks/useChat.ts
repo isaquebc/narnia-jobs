@@ -169,6 +169,8 @@ export function useChatSession(sessionId: string) {
           void qc.invalidateQueries({ queryKey: chatKeys.session(sessionId) });
           // fontes e perfil podem ter mudado no turno (research_save/research_apply, auditoria E1)
           void qc.invalidateQueries({ queryKey: ["chat", "research"] });
+          // o painel da ingestão anda só por evento: relido aqui, não fica parado se um `ingestion.updated` se perdeu
+          void qc.invalidateQueries({ queryKey: ["ingestion"] });
           // o histórico recarregado já tem o turno (inclusive a parcial de um turno interrompido): some o provisório
           settle();
           break;
@@ -186,6 +188,8 @@ export function useChatSession(sessionId: string) {
           void qc.invalidateQueries({ queryKey: chatKeys.session(sessionId) });
           // nota do sistema gravada sem turno (ex.: ingestão pronta com o teto de custo atingido)
           void qc.invalidateQueries({ queryKey: chatKeys.messages(sessionId) });
+          // a nota "ingestão pronta" diz que a execução mudou: o painel relê mesmo sem o `ingestion.updated` (CI 2026-11-05)
+          void qc.invalidateQueries({ queryKey: ["ingestion"] });
           break;
       }
     });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createWsClient } from "../../src/lib/ws";
+import { createWsClient, resyncOnReconnect } from "../../src/lib/ws";
 
 class FakeSocket {
   static instances: FakeSocket[] = [];
@@ -104,5 +104,50 @@ describe("lib/ws · eventos de perfil (F02)", () => {
       { type: "profile.switched", profileId: "p2" },
       { type: "profile.card_invalidated", profileIds: ["p1", "p2"] },
     ]);
+  });
+});
+
+describe("lib/ws · ressincronização depois de uma queda (CI de 2026-11-05)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeSocket.instances = [];
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("onReconnect avisa só quando reabre depois de cair, nunca na primeira conexão", () => {
+    const client = createWsClient({
+      url: "ws://x/ws",
+      factory: (u) => new FakeSocket(u),
+      backoffMs: [10],
+    });
+    let reconnects = 0;
+    client.onReconnect(() => {
+      reconnects += 1;
+    });
+    client.connect();
+    (FakeSocket.instances[0] as FakeSocket).open();
+    expect(reconnects).toBe(0);
+    (FakeSocket.instances[0] as FakeSocket).close();
+    vi.advanceTimersByTime(10);
+    (FakeSocket.instances[1] as FakeSocket).open();
+    expect(reconnects).toBe(1);
+  });
+
+  it("resyncOnReconnect recarrega as consultas: os eventos perdidos na queda não deixam a tela parada", () => {
+    const client = createWsClient({
+      url: "ws://x/ws",
+      factory: (u) => new FakeSocket(u),
+      backoffMs: [10],
+    });
+    const qc = { invalidateQueries: vi.fn() };
+    const stop = resyncOnReconnect(client, qc);
+    client.connect();
+    (FakeSocket.instances[0] as FakeSocket).open();
+    expect(qc.invalidateQueries).not.toHaveBeenCalled();
+    (FakeSocket.instances[0] as FakeSocket).close();
+    vi.advanceTimersByTime(10);
+    (FakeSocket.instances[1] as FakeSocket).open();
+    expect(qc.invalidateQueries).toHaveBeenCalledTimes(1);
+    stop();
   });
 });

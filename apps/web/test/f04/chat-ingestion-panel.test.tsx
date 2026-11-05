@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { proposal } from "../f03/fixtures";
@@ -132,6 +132,41 @@ describe("ingestão da conversa no painel da direita", () => {
         ],
       }),
     );
+  });
+
+  it("a nota do fim (session_updated ou turn_end) relê a ingestão: o painel não fica parado se o evento da ingestão se perdeu (CI 2026-11-05)", async () => {
+    let run: Record<string, unknown> = {
+      status: "running",
+      timeline: { steps: steps(4), current: 4, total: 6, stuck: false },
+    };
+    const api = chatApi(null, {
+      listChatMessages: vi.fn(async () => ({
+        messages: [
+          message("a1", {
+            contentMd: "Abri a ingestão do seu texto.",
+            toolCalls: [
+              { name: "ingest_text", args: "{}", durationMs: 5, isError: false, runId: "r1" },
+            ],
+          }),
+        ],
+      })),
+      getIngestion: vi.fn(async (id: string) => ({
+        id,
+        source: "text",
+        fileId: "f1",
+        jobs: [],
+        proposals: [],
+        ...run,
+      })),
+    });
+    const { ws } = renderApp({ api: api as never, initialUrl: "/chat/s1" });
+    const panel = await screen.findByRole("region", { name: "Ingestão da conversa" });
+    expect(await within(panel).findByText(/etapa 4 de 6/)).toBeInTheDocument();
+    // a ingestão terminou, mas o `ingestion.updated` não chegou: só a nota do sistema na conversa
+    run = { status: "review", proposals: [proposal("p1", { proposal: skill("Go") })] };
+    act(() => ws.emit({ type: "chat.session_updated", sessionId: "s1", state: "live" }));
+    const list = await within(panel).findByRole("list", { name: "Propostas para revisar" });
+    expect(within(list).getByRole("listitem", { name: "Go" })).toBeInTheDocument();
   });
 
   it("aguardando confirmação: estimativa e 'Confirmar ingestão' no painel", async () => {

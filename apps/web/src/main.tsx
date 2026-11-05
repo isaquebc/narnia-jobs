@@ -10,7 +10,7 @@ import { currentTimezone } from "./app/timezone";
 import { createApiClient } from "./lib/api";
 import { applyTheme, resolveInitialTheme, safeLocalStorage, systemPrefersDark } from "./lib/theme";
 import { enterUrl, loadToken, readTokenFromSearch, saveToken } from "./lib/token";
-import { createWsClient } from "./lib/ws";
+import { createWsClient, resyncOnReconnect } from "./lib/ws";
 
 applyTheme(
   document.documentElement,
@@ -33,6 +33,7 @@ if (urlToken) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: 1, staleTime: 5_000 } },
   });
+  resyncOnReconnect(ws, queryClient);
   const router = createAppRouter({ services, queryClient });
 
   const root = document.getElementById("root");
