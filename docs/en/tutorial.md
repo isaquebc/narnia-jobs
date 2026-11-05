@@ -23,6 +23,8 @@ From zero to your first application, in ten steps. It takes about 30 minutes, pl
 
 You need **Docker** (Docker Desktop on Windows and macOS; Docker Engine with Compose v2 on Linux) and a **Claude subscription with Claude Code access** (Pro or Max). Read the note on [using your subscription](../../README.en.md#about-using-your-claude-subscription) first.
 
+> **On Windows:** the app has not been tested end to end on Windows yet (the author has no Windows machine). If something fails, please [open an issue](https://github.com/isaquebc/narnia-jobs/issues).
+
 ```bash
 git clone https://github.com/isaquebc/narnia-jobs.git
 cd narnia-jobs

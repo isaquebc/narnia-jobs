@@ -165,7 +165,7 @@ Para restaurar: `./start.sh restore backups/<arquivo>.sqlite` (para o api e o wo
 | `./start.sh logs [api\|worker\|web\|redis\|browser]` | acompanha os logs |
 | `./start.sh status` | estado dos containers |
 
-No Windows, `.\start.ps1` tem os mesmos subcomandos. `docker compose down -v` equivale a `down --purge`.
+No Windows, `.\start.ps1` tem os mesmos subcomandos (sem teste de ponta a ponta no Windows: o autor não tem Windows). `docker compose down -v` equivale a `down --purge`.
 
 ## Portas e rede
 

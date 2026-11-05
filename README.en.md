@@ -26,6 +26,8 @@ Voice interview practice, recruiter messages and LinkedIn optimization, exportin
 
 Tested on Linux; on Windows and macOS it runs through Docker Desktop (the launcher functions are tested in CI on all three systems).
 
+> **Warning:** the app has never been tested end to end on Windows, because the author has no Windows machine. `start.ps1` and its functions pass in CI, but real use may hit problems. If something fails, please [open an issue](https://github.com/isaquebc/narnia-jobs/issues).
+
 ### About using your Claude subscription
 
 narnia-jobs runs the **official Claude Code CLI** inside a container, logged in with **your** account, on **your** machine. It never receives, stores outside your computer or forwards your credential.

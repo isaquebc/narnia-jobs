@@ -21,6 +21,8 @@ Do zero à primeira candidatura, em dez passos. Leva uns 30 minutos, mais o temp
 
 Você precisa do **Docker** (Docker Desktop no Windows e no macOS; Docker Engine com Compose v2 no Linux) e de uma **assinatura do Claude com acesso ao Claude Code** (Pro ou Max). Leia antes a nota sobre [o uso da assinatura](../README.md#sobre-o-uso-da-assinatura-do-claude).
 
+> **No Windows:** o app ainda não foi testado de ponta a ponta no Windows (o autor não tem Windows). Se algo falhar, [abra uma issue](https://github.com/isaquebc/narnia-jobs/issues).
+
 ```bash
 git clone https://github.com/isaquebc/narnia-jobs.git
 cd narnia-jobs

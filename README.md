@@ -26,6 +26,8 @@ Entrevista simulada por voz, mensagem a recrutador e otimização do LinkedIn, e
 
 Testado em Linux; no Windows e no macOS roda pelo Docker Desktop (as funções do lançador são testadas no CI dos três sistemas).
 
+> **Aviso:** o app nunca foi testado de ponta a ponta no Windows, porque o autor não tem uma máquina com Windows. O `start.ps1` e as funções dele passam no CI, mas o uso real pode ter problemas. Se algo falhar, [abra uma issue](https://github.com/isaquebc/narnia-jobs/issues).
+
 ### Sobre o uso da assinatura do Claude
 
 O narnia-jobs usa o **CLI oficial do Claude Code** dentro de um container, logado com a **sua** conta, na **sua** máquina. Ele nunca recebe, guarda fora do seu computador ou repassa a sua credencial.
