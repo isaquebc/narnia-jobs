@@ -44,6 +44,21 @@ export function conceptEmbedder(concepts: string[][], model = "conceitos"): Embe
 export const SEMANTIC_MODEL = "Xenova/multilingual-e5-small";
 export const SEMANTIC_MODEL_DTYPE = "q8";
 
+/**
+ * A resposta como instância do `Response` global do momento. O `@hono/node-server` troca o `Response` global pela
+ * classe dele, o `fetch` do Node devolve o nativo, e o transformers.js só grava no cache o que é `instanceof
+ * Response`: sem isso, o download termina e o modelo não é achado ("Unable to get model file path or buffer").
+ */
+export function asGlobalResponse(r: Response): Response {
+  // o tipo diz que `r` já é um Response; em runtime pode ser de outra classe (a troca do servidor)
+  if ((r as unknown) instanceof globalThis.Response) return r;
+  return new globalThis.Response(r.body, {
+    status: r.status,
+    statusText: r.statusText,
+    headers: r.headers,
+  });
+}
+
 type Extractor = (
   text: string | string[],
   o: { pooling: "mean"; normalize: boolean },
@@ -67,6 +82,8 @@ export function transformersEmbedder(o: {
       const tf = await import("@huggingface/transformers");
       tf.env.cacheDir = o.cacheDir;
       tf.env.allowLocalModels = false;
+      tf.env.fetch = async (input: string | URL | Request, init?: RequestInit) =>
+        asGlobalResponse(await fetch(input, init));
       const files = new Map<string, { loaded: number; total: number }>();
       const extractor = await tf.pipeline("feature-extraction", model, {
         dtype: (o.dtype ?? SEMANTIC_MODEL_DTYPE) as never,

@@ -1147,6 +1147,7 @@ export const ptBR = {
         "{n} fatos não cabem mais no contexto do recrutador e ele só os acha pela busca por termos. Ligue a busca por sentido para ele achá-los pelo assunto.",
       enable: "Ligar busca por sentido",
       disable: "Desligar busca por sentido",
+      retry: "Tentar de novo",
       status: {
         off: "Desligada.",
         loading: "Carregando o modelo…",

@@ -74,4 +74,19 @@ describe("Configurações › Busca por sentido", () => {
     );
     await waitFor(() => expect(api.putSemanticSearch).toHaveBeenCalledWith({ enabled: false }));
   });
+
+  it("com erro, mostra o motivo e tenta de novo sem desligar", async () => {
+    const api = {
+      ...base,
+      getSemanticSearch: vi.fn(async () =>
+        view({ enabled: true, status: "error", error: "sem rede" }),
+      ),
+      putSemanticSearch: vi.fn(async () => view({ enabled: true, status: "loading" })),
+    };
+    renderApp({ api: api as never, initialUrl: "/configuracoes" });
+    const section = await screen.findByRole("region", { name: "Busca por sentido" });
+    expect(await within(section).findByText(/Não deu para ligar: sem rede/)).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(api.putSemanticSearch).toHaveBeenCalledWith({ enabled: true }));
+  });
 });

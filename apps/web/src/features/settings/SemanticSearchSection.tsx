@@ -59,6 +59,16 @@ export function SemanticSearchSection() {
           <p className="text-sm" aria-live="polite">
             {statusText(v)}
           </p>
+          {v.status === "error" ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={save.isPending}
+              onClick={() => save.mutate(true)}
+            >
+              {t("settings.semanticSearch.retry")}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
