@@ -15,7 +15,7 @@ A interface está em **português (Brasil)**. Os currículos e cartas saem no id
 
 ## O que ainda não existe
 
-Entrevista simulada por voz, mensagem a recrutador e otimização do LinkedIn, exportar e apagar os dados pela interface, o medidor de uso completo e um segundo provedor de IA (Codex) estão planejados ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md)). A importação do export do LinkedIn foi adiada.
+Entrevista simulada por voz, análise dos vídeos gravados das entrevistas, leitura e envio automático de e-mails, mensagem a recrutador e otimização do LinkedIn, exportar e apagar os dados pela interface, o medidor de uso completo e um segundo provedor de IA (Codex) estão planejados ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md)). A importação do export do LinkedIn foi adiada.
 
 ## Antes de começar
 

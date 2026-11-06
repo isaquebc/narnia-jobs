@@ -15,7 +15,7 @@
 
 ## Not there yet
 
-Voice interview practice, recruiter messages and LinkedIn optimization, exporting and deleting your data from the UI, the full usage meter and a second AI provider (Codex) are planned ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md), in Portuguese). Importing the LinkedIn data export was postponed.
+Voice interview practice, analysis of recorded interview videos, reading and sending e-mails automatically, recruiter messages and LinkedIn optimization, exporting and deleting your data from the UI, the full usage meter and a second AI provider (Codex) are planned ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md), in Portuguese). Importing the LinkedIn data export was postponed.
 
 ## Before you start
 
