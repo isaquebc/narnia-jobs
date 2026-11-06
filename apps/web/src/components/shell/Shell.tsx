@@ -3,6 +3,7 @@ import { useTimezone } from "../../app/context";
 import { useWsStatus } from "../../hooks/useWsStatus";
 import { type TKey, t } from "../../i18n";
 import { ActivityTray } from "./ActivityTray";
+import { Logo } from "./Logo";
 import { NotificationBell } from "./NotificationBell";
 import { ProfileSwitcher } from "./ProfileSwitcher";
 import { ProviderIndicator } from "./ProviderIndicator";
@@ -17,7 +18,10 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
         <div className="flex items-center gap-4">
-          <span className="font-semibold">{t("app.name")}</span>
+          <span className="flex items-center gap-2 font-semibold">
+            <Logo className="h-7 w-7" />
+            {t("app.name")}
+          </span>
           <ProfileSwitcher />
         </div>
         <div className="flex items-center gap-3">

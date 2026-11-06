@@ -64,4 +64,29 @@ describe("Shell · L0 mínimo", () => {
     expect(root.className).toMatch(/overflow-hidden/);
     expect(main.parentElement?.className).toMatch(/min-h-0/);
   });
+
+  it("cabeçalho com o logo da porta ao lado do nome (decorativo: o nome é o texto)", async () => {
+    renderWithProviders(
+      <Shell>
+        <p>conteúdo</p>
+      </Shell>,
+      {
+        api: {
+          listJobs: async () => ({ jobs: [] }),
+          getProviderStatus: async () => ({
+            installed: true,
+            loggedIn: true,
+            authMethod: "claude.ai",
+            version: "1",
+            loginHint: null,
+          }),
+          listProfiles: async () => ({ profiles: [] }),
+        },
+      },
+    );
+    const header = (await screen.findByText("narnia-jobs")).closest("header") as HTMLElement;
+    const logo = header.querySelector("svg[data-logo='narnia-jobs']");
+    expect(logo).not.toBeNull();
+    expect(logo?.getAttribute("aria-hidden")).toBe("true");
+  });
 });

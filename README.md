@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/banner.pt.png" alt="narnia-jobs: não se candidate a tudo, prepare-se para a vaga certa" width="100%"></p>
+
 # narnia-jobs
 
 [![CI](https://github.com/isaquebc/narnia-jobs/actions/workflows/ci.yml/badge.svg)](https://github.com/isaquebc/narnia-jobs/actions/workflows/ci.yml) · [English](README.en.md)
