@@ -88,5 +88,8 @@ describe("Shell · L0 mínimo", () => {
     const logo = header.querySelector("svg[data-logo='narnia-jobs']");
     expect(logo).not.toBeNull();
     expect(logo?.getAttribute("aria-hidden")).toBe("true");
+    // as mesmas cores do favicon, da extensão e do banner em qualquer tema: porta branca no verde do narnia
+    expect(logo?.querySelector("rect")?.getAttribute("fill")).toBe("#0f5c5a");
+    expect(logo?.querySelector("path")?.getAttribute("stroke")).toBe("#fff");
   });
 });
