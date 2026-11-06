@@ -1,5 +1,6 @@
 import type { DashboardResponse } from "@narnia-jobs/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useApi, useTimezone } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
@@ -23,8 +24,15 @@ const NEXT: Array<{ key: "chat" | "ingest" | "cv" | "jobs"; task: string; to?: s
 export function Dashboard() {
   const api = useApi();
   const tz = useTimezone();
+  const qc = useQueryClient();
   const dashboard = useQuery({ queryKey: ["dashboard"], queryFn: () => api.getDashboard() });
   const user = useQuery({ queryKey: ["user"], queryFn: () => api.getUser() });
+  // O GET do dashboard sincroniza a notificação das sugestões de perfil; o evento do WS pode chegar antes de a conexão
+  // abrir e se perder (CI 2026-11-06, F03/E2E-12), então o sino relê as pendências a cada carga do dashboard.
+  const loadedAt = dashboard.dataUpdatedAt;
+  useEffect(() => {
+    if (loadedAt) void qc.invalidateQueries({ queryKey: ["notifications"] });
+  }, [loadedAt, qc]);
   if (dashboard.isError)
     return <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />;
   if (!dashboard.data) return <p className="text-sm text-muted-fg">{t("app.loading")}</p>;

@@ -1,5 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { Shell } from "../../src/components/shell/Shell";
 import { Dashboard } from "../../src/features/dashboard/Dashboard";
 import { renderWithProviders } from "../helpers";
 
@@ -225,5 +226,44 @@ describe("Dashboard · F02: resumo do cartão, ênfases e banner de sugestão", 
     expect(rows[2]).toHaveTextContent("chat.job.subagente");
     expect(rows[2]).toHaveTextContent("no custo da conversa");
     expect(screen.getByText(/US\$ 1,25 no total/)).toBeInTheDocument();
+  });
+
+  it("o sino relê as pendências quando o dashboard carrega, sem depender do evento do WS (CI 2026-11-06, F03/E2E-12)", async () => {
+    // o GET /api/dashboard cria a notificação das sugestões; o evento pode chegar antes de o WS abrir e se perder
+    let synced = false;
+    renderWithProviders(
+      <Shell>
+        <Dashboard />
+      </Shell>,
+      {
+        api: {
+          listJobs: async () => ({ jobs: [] }),
+          listProfiles: async () => ({ profiles: [] }),
+          getProviderStatus: async () => ({
+            installed: true,
+            loggedIn: true,
+            authMethod: "claude.ai",
+            version: "1",
+            loginHint: null,
+          }),
+          listNotifications: async () => ({ notifications: [], unresolved: synced ? 1 : 0 }),
+          getDashboard: async () => {
+            await new Promise((r) => setTimeout(r, 30));
+            synced = true;
+            return {
+              profile,
+              counts: { experiences: 0, skills: 0, education: 0, files: 0, projects: 0 },
+              usage: { totalTokens: 0, byCategory: {} },
+              pendingResearch: 0,
+              card: null,
+              emphasis: { highlighted: 0, hidden: 0 },
+              suggestions: 1,
+            };
+          },
+          getUser: async () => ({ user: null }),
+        },
+      },
+    );
+    expect(await screen.findByTestId("notifications-count")).toHaveTextContent("1");
   });
 });
