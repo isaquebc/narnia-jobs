@@ -2,7 +2,7 @@
 
 Entregável 13 do plan-v0. O usuário envia o vídeo de uma entrevista real, e o recrutador devolve transcrição por pessoa, medições de voz, áudio, rosto, câmera e iluminação, leitura das reações e anotações de quem entrevistou, e feedback do discurso com minuto e trecho. Depende de F04 (`plugin/`, MCP, chat), F06 (vaga e análise), F07 (candidatura e etapas), do gate de prompts (F04-avaliacoes M7) e do padrão de tarefas da F05. Não depende da F08.
 
-Status: **em escopo** (2026-11-09). Viabilidade medida em §8; nada implementado. Primeira a ser feita depois da F12 (decisão do dono, 2026-11-09), antes de F09, F08 e F10.
+Status: **plano aprovado pelo dono** (2026-11-09). Viabilidade medida em §8; nada implementado. Primeira a ser feita depois da F12 (decisão do dono, 2026-11-09), antes de F09, F08 e F10.
 
 > **Regra de uso, em destaque no README e na documentação ao entregar (decisão do dono):** a análise existe só para a pessoa se desenvolver durante o processo seletivo. Nenhum vídeo, dado ou leitura pode ser publicado ou compartilhado. Cabe a quem usa respeitar a lei e as regras sobre a gravação e o consentimento dos presentes.
 
@@ -81,7 +81,7 @@ Cada medição de rosto traz a porcentagem de tempo detectável e o tamanho do r
 ### 2.5 Cadeia do recrutador e relatório
 Prompts estruturados: (1) modelo barato separa perguntas e respostas; (2) Sonnet avalia cada resposta com vaga, CV enviado, dados e histórico do processo; (3) leitura dos quadros pela tool `Read`; (4) consolidação.
 
-Ordem do relatório: veredito · o que não deveria ter dito · respostas erradas ou incompletas, com reescrita sem inventar experiência (`[completar]`) · o que funcionou · discurso e forma · sorriso e expressão · reações e anotações · câmera, iluminação e áudio · ficha de cada presente · três treinos · limitações.
+Ordem do relatório (aprovada pelo dono no teste, F13-14): veredito · o que não deveria ter dito · respostas erradas ou incompletas, com reescrita sem inventar experiência (`[completar]`) · o que funcionou · discurso e forma · sorriso e expressão · reações e anotações · câmera, iluminação e áudio · ficha de cada presente · três treinos · limitações.
 
 **Checagem por código:** citação literal tem de existir na transcrição, no turno e na pessoa indicados; tempo tem de existir no vídeo; sem isso, o item é corrigido com o texto real ou removido, nos moldes do `assembleCv`. Sugestões de reescrita ficam em campo separado das citações.
 
@@ -122,13 +122,14 @@ Visual em aberto (F13-13). Telas necessárias: envio na etapa da candidatura e a
 | F13-4 | Sorriso sempre reportado, com alerta e % de detecção | Fechada (dono, 2026-11-09) |
 | F13-5 | pyannote como padrão, token pedido ao ativar; sem token, aproximação por boca e correção manual | Fechada (dono, 2026-11-09) |
 | F13-6 | `media` em perfil Docker separado, desligado por padrão | Fechada (dono, 2026-11-09) |
-| F13-7 | Tudo local, exceto transcrição, medições e quadros selecionados que vão ao modelo na assinatura | Proposta |
+| F13-7 | Tudo local, exceto transcrição, medições e quadros selecionados que vão ao modelo na assinatura | Fechada (dono, 2026-11-09, plano aprovado) |
 | F13-8 | Anotações por fala e imagem; leitura como hipótese, indeterminada por padrão | Fechada (dono, 2026-11-09) |
 | F13-9 | Sem classificador até haver rótulos; usuário poderá marcar o que descobriu depois | Fechada (dono, 2026-11-09) |
-| F13-10 | Provedor GPU: override opcional do compose, documentado | Proposta |
+| F13-10 | Provedor GPU: override opcional do compose, documentado | Fechada (dono, 2026-11-09, plano aprovado) |
 | F13-11 | Limites de tamanho e duração do upload | Em aberto (medir no M1) |
 | F13-12 | Modelo de cada elo da cadeia | Em aberto (decidir no gate) |
 | F13-13 | Visual do relatório | Em aberto (conversa com o dono) |
+| F13-14 | Conteúdo e ordem do relatório (§2.5) mantidos como no teste do recrutador, que o dono aprovou; vira o caso de referência do gate (com fixture sintética, nunca a entrevista real) | Fechada (dono, 2026-11-09) |
 
 ---
 
