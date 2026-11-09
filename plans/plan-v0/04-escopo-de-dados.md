@@ -161,7 +161,7 @@ Todo timestamp é gravado em **UTC** (ISO 8601 ou epoch). A UI converte para o f
 | `usage_event` (completada) | `session_id`, `provider_session_id`, `turn_index` |
 
 ## E. Dados explicitamente fora do escopo
-CPF/RG/passaporte, endereço completo, dados bancários, dados de saúde, histórico salarial detalhado por empresa (apenas a faixa pretendida, se o usuário quiser), credenciais de sites de emprego, gravações de áudio das entrevistas.
+CPF/RG/passaporte, endereço completo, dados bancários, dados de saúde, histórico salarial detalhado por empresa (apenas a faixa pretendida, se o usuário quiser), credenciais de sites de emprego, gravações de áudio das entrevistas simuladas (F08). **Exceção (F13, decisão do dono, 2026-11-09):** a gravação de uma entrevista real que o próprio usuário envia para análise fica na pasta de dados, fora do backup, só para desenvolvimento pessoal e nunca publicável.
 
 ## F. Credenciais de integrações
 Client ID/secret do Google ficam na configuração do Claude Code dentro do volume `claude-auth` (é ele quem faz o OAuth); credencial do GitHub no volume `gh-auth` (arquivo do `gh` ou token do `gh` do computador em arquivo 0600, renovado pelo lançador), nunca em banco, log, `.env` ou resposta da API. Nenhum deles entra no repositório nem nas exportações.

@@ -30,7 +30,7 @@ Com uma candidatura cadastrada, o usuário consegue, sem tocar no teclado depois
 ### Fora do escopo (e para onde vai)
 - Whisper no servidor (`whisper.cpp` no container) → fase 7 do plano; fica o provider registrado como "em breve".
 - Provedores pagos funcionais → fase 7; F08 entrega só a interface e o cadastro de chave.
-- Gravação de áudio → nunca (decisão em `04 §E`).
+- Gravação de áudio → nunca nesta feature (decisão em `04 §E`; a análise de gravação real enviada pelo usuário é a F13).
 - Entrevista no modo B → não existe; a skill `entrevista` no terminal roda em texto.
 - Agendamento da entrevista real no calendário → F07.
 - Avaliação com rubricas por empresa/cargo específicas → futuro; F08 usa rubrica genérica por tipo.

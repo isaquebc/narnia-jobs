@@ -15,6 +15,7 @@ Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo
 | [F09-carta-e-linkedin](F09-carta-e-linkedin.md) | F5.5/5.6 | mensagem curta a recrutador e otimização de LinkedIn (a carta foi para a F05, F05-21) | F05, F07, F12 (lê o perfil do LinkedIn pela extensão, F12-7) |
 | [F08-entrevista-voz](F08-entrevista-voz.md) | F5.4 | entrevista mãos livres com Whisper local + TTS local (padrão de N provedores), só modo A | F04, F07 |
 | [F12-extensao-navegador](F12-extensao-navegador.md) | F5 | extensão do Chrome: captura de vagas e janela de ajuda nos formulários de candidatura (Haiku localiza, skill sugere, copiar/refazer/chat); o LinkedIn fica na F09 (F12-7) | F04, F05, F06; gate pairwise (F04-avaliacoes M7) |
+| [F13-entrevista-gravada](F13-entrevista-gravada.md) | F5 | análise pelo recrutador do vídeo de uma entrevista real: transcrição por pessoa, voz, áudio, rosto, anotações do entrevistador e feedback do discurso; serviço `media` opcional | F04, F06, F07; gate de prompts |
 | [F11-provider-codex](F11-provider-codex.md) | — | segundo provider (Codex) nos modos A e B; exige verificação documental antes de implementar | F04, F10 |
 
 ## Ordem sugerida (ondas)
@@ -25,7 +26,7 @@ Onda 2  F02 ──► F03 ──► F04   (decisão do dono, 2026-10-09: F03 ant
 Onda 3  F10
 Onda 4  F06 ──► F05 ──► F07  (features; o dono pôs a F06 antes da F05 em 2026-10-14)
 Onda 4b gate pairwise (F04-avaliacoes M7) ──► F12 ──► F07   (decisão do dono, 2026-10-21: extensão antes das candidaturas)
-Onda 5  F09   F08   (F09 depois da F12, decisão do dono 2026-10-22)
+Onda 5  F13 ──► F09   F08   (F09 depois da F12, decisão do dono 2026-10-22; F13 primeiro, decisão do dono 2026-11-09)
 Onda 6  F11
 ```
 
