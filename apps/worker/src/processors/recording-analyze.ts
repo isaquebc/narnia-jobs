@@ -31,6 +31,32 @@ const MAX_NETWORK_ERRORS = 10;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Peso de cada etapa na barra, pelo tempo medido no teste de viabilidade (54 min em CPU: transcrição ~21 min, vozes
+ * ~16 min, rostos ~2 min); as outras são segundos.
+ */
+const STEP_WEIGHT: Record<string, number> = {
+  transcribe: 45,
+  diarize: 35,
+  faces: 8,
+  layout: 2,
+  voice: 3,
+};
+
+/** Porcentagem da execução do media pelo peso das etapas: as já feitas + a fração da atual. */
+export function weightedProgress(
+  steps: string[],
+  step: string | null,
+  stepProgress: number,
+): number {
+  const w = (s: string) => STEP_WEIGHT[s] ?? 1;
+  const total = steps.reduce((a, s) => a + w(s), 0) || 1;
+  const i = step ? steps.indexOf(step) : -1;
+  if (i < 0) return 0;
+  const done = steps.slice(0, i).reduce((a, s) => a + w(s), 0);
+  return Math.min(100, (100 * (done + (w(step as string) * stepProgress) / 100)) / total);
+}
+
 /** Etapas com imagem quando o vídeo tem trilha de vídeo; só áudio, sem as visuais. */
 export function mediaSteps(hasVideoStream: boolean): string[] {
   return [...MEDIA_BASE_STEPS, ...(hasVideoStream ? MEDIA_VIDEO_STEPS : MEDIA_AUDIO_ONLY_STEPS)];
@@ -92,7 +118,11 @@ export const recordingAnalyze: TaskHandler = async (data, ctx, deps) => {
       }
       if (state.state === "failed")
         throw new Error(state.error?.message ?? "O serviço de análise de vídeo falhou.");
-      const pct = Math.round(span[0] + ((span[1] - span[0]) * state.progress) / 100);
+      const frac =
+        state.state === "done"
+          ? 100
+          : weightedProgress(steps, state.step, state.step_progress ?? 0);
+      const pct = Math.round(span[0] + ((span[1] - span[0]) * frac) / 100);
       const key = `${state.step}:${pct}`;
       if (key !== last) {
         last = key;

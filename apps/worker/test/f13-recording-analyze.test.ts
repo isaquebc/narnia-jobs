@@ -218,3 +218,15 @@ describe("F13/M5 · recording.report", () => {
     expect(h.repos.recordingAnalysis.persons(h.rec.id)).toHaveLength(2);
   });
 });
+
+describe("F13/M4 · barra de progresso pelo peso das etapas", async () => {
+  const { weightedProgress, mediaSteps } = await import("../src/processors/recording-analyze");
+  it("a transcrição pela metade já é perto de um quarto do todo; etapas rápidas quase não andam a barra", () => {
+    const steps = mediaSteps(true);
+    expect(weightedProgress(steps, "audio", 100)).toBeLessThan(3);
+    expect(Math.round(weightedProgress(steps, "transcribe", 50))).toBeGreaterThan(20);
+    expect(weightedProgress(steps, "diarize", 0)).toBeGreaterThan(40);
+    expect(weightedProgress(steps, "frames", 100)).toBe(100);
+    expect(weightedProgress(steps, null, 0)).toBe(0);
+  });
+});
