@@ -39,6 +39,7 @@ const toSec = (a: string, b: string, c?: string) =>
   c !== undefined ? Number(a) * 3600 + Number(b) * 60 + Number(c) : Number(a) * 60 + Number(b);
 
 type Seek = (s: number) => void;
+const CITE_LEAD_S = 3;
 
 function SeekButton({ at, onSeek }: { at: number; onSeek: Seek }) {
   return (
@@ -465,21 +466,54 @@ function Report({ a, onSeek }: { a: RecordingAnalysis; onSeek: Seek }) {
   );
 }
 
-function Transcript({ a, onSeek }: { a: RecordingAnalysis; onSeek: Seek }) {
+/** Turno que está tocando: o último que já começou. */
+export function activeTurnIdx(turns: RecordingAnalysis["turns"], now: number): number | null {
+  let cur: number | null = null;
+  for (const x of turns) if (x.start <= now) cur = x.idx;
+  return cur;
+}
+
+function Transcript({ a, onSeek, now }: { a: RecordingAnalysis; onSeek: Seek; now: number }) {
   const api = useApi();
   const qc = useQueryClient();
   const titleId = useId();
+  const list = useRef<HTMLOListElement>(null);
+  const active = activeTurnIdx(a.turns, now);
   const fix = useMutation({
     mutationFn: ({ turnId, personId }: { turnId: string; personId: string }) =>
       api.patchRecordingTurn(a.recording.id, turnId, personId),
     onSuccess: () => void qc.invalidateQueries({ queryKey: recordingPageKey(a.recording.id) }),
   });
+  useEffect(() => {
+    // acompanha o vídeo rolando só a lista (scrollIntoView rolaria a página inteira)
+    const ol = list.current;
+    if (active === null || !ol) return;
+    const li = ol.querySelector<HTMLElement>(`[data-turn="${active}"]`);
+    if (!ol || !li) return;
+    const top = li.offsetTop - ol.offsetTop;
+    if (top < ol.scrollTop || top + li.offsetHeight > ol.scrollTop + ol.clientHeight)
+      ol.scrollTop = Math.max(0, top - ol.clientHeight / 3);
+  }, [active]);
   return (
-    <Card role="region" aria-labelledby={titleId} className="flex flex-col gap-2">
+    <Card
+      role="region"
+      aria-labelledby={titleId}
+      className="flex min-h-0 flex-col gap-2 p-3 lg:min-h-[16rem] lg:flex-1"
+    >
       <CardTitle id={titleId}>{t("recordingPage.transcript")}</CardTitle>
-      <ol className="flex max-h-[32rem] flex-col gap-2 overflow-y-auto text-sm">
+      <ol
+        ref={list}
+        className="flex max-h-[24rem] min-h-0 flex-col gap-1 overflow-y-auto text-sm lg:max-h-none lg:flex-1"
+      >
         {a.turns.map((x) => (
-          <li key={x.id} className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
+          <li
+            key={x.id}
+            data-turn={x.idx}
+            aria-current={x.idx === active ? "true" : undefined}
+            className={`flex flex-col gap-1 rounded-md p-1 sm:flex-row sm:items-start sm:gap-2 ${
+              x.idx === active ? "bg-primary/10 ring-1 ring-primary/40" : ""
+            }`}
+          >
             <span className="flex shrink-0 items-center gap-2">
               <SeekButton at={x.start} onSeek={onSeek} />
               <select
@@ -506,6 +540,151 @@ function Transcript({ a, onSeek }: { a: RecordingAnalysis; onSeek: Seek }) {
         ))}
       </ol>
       {fix.isError ? <Alert tone="danger">{errorText(fix.error)}</Alert> : null}
+    </Card>
+  );
+}
+
+type Frame = RecordingAnalysis["frames"][number];
+
+/** Título do quadro pelo que foi detectado nele ("Anotação provável · P1 · Marina"). */
+function frameTitle(a: RecordingAnalysis, f: Frame): string {
+  const byKey = new Map(a.events.map((e) => [e.key, e]));
+  const kinds =
+    f.reason === "reference"
+      ? [t("recordingPage.frameKind.reference")]
+      : [
+          ...new Set(
+            f.events.map((k) => {
+              const e = byKey.get(k);
+              if (!e) return k;
+              return t(
+                `recordingPage.frameKind.${e.type === "note" ? `note_${e.level ?? "probable"}` : e.type}` as TKey,
+              );
+            }),
+          ),
+        ];
+  const p = a.persons.find((x) => x.id === f.personId);
+  return [kinds.join(" + "), p ? `${p.key} · ${personLabel(p)}` : null].filter(Boolean).join(" · ");
+}
+
+/**
+ * Quadros com algo detectado, embaixo do vídeo como num editor: régua com o ponto atual e as marcas, e as miniaturas
+ * em ordem. Clicar leva o vídeo ao segundo exato do quadro e abre o que foi visto nele.
+ */
+function FramesTimeline({ a, now, onSeek }: { a: RecordingAnalysis; now: number; onSeek: Seek }) {
+  const api = useApi();
+  const titleId = useId();
+  const detailsId = useId();
+  const [open, setOpen] = useState<string | null>(null);
+  const frames = [...a.frames].sort((x, y) => x.t - y.t);
+  const duration = a.recording.durationS || Math.max(1, ...frames.map((f) => f.t));
+  const pct = (s: number) => `${Math.min(100, Math.max(0, (100 * s) / duration))}%`;
+  const r = a.report?.content as RecordingReportContent | undefined;
+  const sel = frames.find((f) => f.file === open);
+  const reading = sel ? r?.frameReadings?.find((x) => x.file === sel.file) : undefined;
+  const events = sel ? a.events.filter((e) => sel.events.includes(e.key)) : [];
+  return (
+    <Card role="region" aria-labelledby={titleId} className="flex shrink-0 flex-col gap-2 p-3">
+      <CardTitle id={titleId} className="text-sm">
+        {t("recordingPage.timeline")}
+      </CardTitle>
+      <div aria-hidden="true" className="relative h-3 rounded bg-muted">
+        {frames.map((f) => (
+          <span
+            key={f.file}
+            className={`absolute top-0 h-3 w-1 -translate-x-1/2 rounded ${f.file === open ? "bg-primary" : "bg-warn"}`}
+            style={{ left: pct(f.t) }}
+          />
+        ))}
+        <span className="absolute -top-1 h-5 w-0.5 bg-fg" style={{ left: pct(now) }} />
+      </div>
+      <ol className="flex gap-2 overflow-x-auto pb-1">
+        {frames.map((f) => {
+          const title = frameTitle(a, f);
+          const near = Math.abs(now - f.t) < 2;
+          return (
+            <li key={f.file} className="shrink-0">
+              <button
+                type="button"
+                aria-pressed={f.file === open}
+                aria-label={`${title} · ${mmss(f.t)}`}
+                onClick={() => {
+                  setOpen(f.file === open ? null : f.file);
+                  onSeek(f.t);
+                }}
+                title={`${mmss(f.t)} · ${title}`}
+                className={`flex w-28 flex-col gap-0.5 rounded-md border p-1 text-left text-xs ${
+                  f.file === open || near ? "border-primary" : "border-border"
+                }`}
+              >
+                <img
+                  src={api.recordingFrameUrl(a.recording.id, f.file)}
+                  alt={t("recordingPage.frameAlt", { at: mmss(f.t), who: title })}
+                  className="h-12 w-full rounded object-cover"
+                />
+                <span className="font-mono">{mmss(f.t)}</span>
+                <span className="truncate">{title}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {sel ? (
+        <section
+          aria-labelledby={detailsId}
+          className="flex flex-col gap-2 rounded-md border border-border p-2 text-sm"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 id={detailsId} className="font-semibold">
+              {t("recordingPage.frameDetails")}
+            </h3>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(null)}>
+              {t("recordingPage.frameClose")}
+            </Button>
+          </div>
+          <span className="text-xs text-muted-fg">
+            <SeekButton at={sel.t} onSeek={onSeek} /> {frameTitle(a, sel)}
+          </span>
+          {reading ? (
+            <>
+              <span>
+                <strong>{t("recordingPage.observed")}:</strong> {reading.observed}
+              </span>
+              <span>
+                <strong>{t("recordingPage.frameHypothesis")}:</strong> {reading.hypothesis}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-muted-fg">{t("recordingPage.noFrameReading")}</span>
+          )}
+          {events.map((e) => {
+            const reaction = r?.reactions.find((x) => x.event === e.key);
+            return (
+              <div key={e.key} className="flex flex-col gap-1 border-t border-border pt-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <strong>
+                    {t(
+                      `recordingPage.frameKind.${e.type === "note" ? `note_${e.level ?? "probable"}` : e.type}` as TKey,
+                    )}
+                  </strong>
+                  <SeekButton at={e.t} onSeek={onSeek} />
+                  {e.reading ? (
+                    <Badge tone={e.reading === "indeterminate" ? "neutral" : "warn"}>
+                      {t(`recordingPage.reading.${e.reading}` as TKey)}
+                    </Badge>
+                  ) : null}
+                </span>
+                {e.reason ? <span className="text-xs">{e.reason}</span> : null}
+                {reaction ? (
+                  <span className="text-xs">
+                    {reaction.observed} <em>({reaction.hypothesis})</em>
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+        </section>
+      ) : null}
     </Card>
   );
 }
@@ -565,12 +744,17 @@ export function RecordingPage({ id, startAt }: { id: string; startAt?: number | 
     mutationFn: () => api.regenerateRecordingReport(id),
     onSuccess: refresh,
   });
+  const [now, setNow] = useState(startAt ?? 0);
+  /** Segundo exato (transcrição e quadros). */
   const seek: Seek = (s) => {
     const v = video.current;
     if (!v) return;
-    v.currentTime = s;
-    v.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    v.currentTime = Math.max(0, s);
+    setNow(v.currentTime);
   };
+  /** Tempo citado no texto: 3 s antes, para pegar o contexto (pedido do dono). */
+  const seekCited: Seek = (s) => seek(s - CITE_LEAD_S);
+
   if (q.isError) return <ErrorState error={q.error} />;
   const a = q.data;
   if (!a) return <p className="text-sm text-muted-fg">…</p>;
@@ -578,7 +762,7 @@ export function RecordingPage({ id, startAt }: { id: string; startAt?: number | 
   const stepLabel = rec.step ? t(`recordingPage.steps.${rec.step as RecordingStep}` as TKey) : "";
   const error = analyze.error ?? regenerate.error;
   return (
-    <div className="flex max-w-4xl flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <NavLink
@@ -642,84 +826,67 @@ export function RecordingPage({ id, startAt }: { id: string; startAt?: number | 
           ) : null}
         </div>
       </div>
-      <Alert tone="warn">{t("videoAnalysis.rule")}</Alert>
-      {rec.state === "analyzing" ? (
-        <div className="flex flex-col gap-1">
-          <Progress
-            value={rec.progress}
-            label={t("recordingPage.analyzing", { step: stepLabel, pct: rec.progress })}
-          />
-          <span className="text-xs text-muted-fg">
-            {t("recordingPage.analyzing", { step: stepLabel, pct: rec.progress })}
-          </span>
+      <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,42%)]">
+        <div className="flex min-w-0 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
+          <Alert tone="warn">{t("videoAnalysis.rule")}</Alert>
+          {rec.state === "analyzing" ? (
+            <div className="flex flex-col gap-1">
+              <Progress
+                value={rec.progress}
+                label={t("recordingPage.analyzing", { step: stepLabel, pct: rec.progress })}
+              />
+              <span className="text-xs text-muted-fg">
+                {t("recordingPage.analyzing", { step: stepLabel, pct: rec.progress })}
+              </span>
+            </div>
+          ) : null}
+          {rec.state === "uploaded" && !rec.analyzedAt ? (
+            <Alert tone="info">{t("recordingPage.waiting")}</Alert>
+          ) : null}
+          {rec.state === "failed" && rec.error ? <Alert tone="danger">{rec.error}</Alert> : null}
+          {error ? <Alert tone="danger">{errorText(error)}</Alert> : null}
+          {rec.approximate ? (
+            <Alert tone="warn">
+              {t("recordingPage.approximate")}{" "}
+              <NavLink to="/configuracoes" className="underline">
+                {t("recordingPage.approximateLink")}
+              </NavLink>
+            </Alert>
+          ) : null}
+          {a.persons.length ? (
+            <Card role="region" aria-labelledby={peopleId} className="flex flex-col gap-2">
+              <CardTitle id={peopleId}>{t("recordingPage.people")}</CardTitle>
+              <p className="text-xs text-muted-fg">{t("recordingPage.peopleHint")}</p>
+              <ul className="flex flex-col gap-2">
+                {a.persons.map((p) => (
+                  <PersonCard key={`${p.id}:${p.name}:${p.isCandidate}`} recId={id} p={p} />
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+          {rec.analyzedAt ? <Report a={a} onSeek={seekCited} /> : null}
+          {rec.analyzedAt ? <ChatBox id={id} /> : null}
         </div>
-      ) : null}
-      {rec.state === "uploaded" && !rec.analyzedAt ? (
-        <Alert tone="info">{t("recordingPage.waiting")}</Alert>
-      ) : null}
-      {rec.state === "failed" && rec.error ? <Alert tone="danger">{rec.error}</Alert> : null}
-      {error ? <Alert tone="danger">{errorText(error)}</Alert> : null}
-      {rec.approximate ? (
-        <Alert tone="warn">
-          {t("recordingPage.approximate")}{" "}
-          <NavLink to="/configuracoes" className="underline">
-            {t("recordingPage.approximateLink")}
-          </NavLink>
-        </Alert>
-      ) : null}
-      {rec.hasVideo ? (
-        // biome-ignore lint/a11y/useMediaCaption: gravação da pessoa; a transcrição clicável está abaixo
-        <video
-          ref={video}
-          src={api.recordingVideoUrl(id)}
-          controls
-          preload="metadata"
-          className="max-h-[28rem] w-full rounded bg-black"
-          onLoadedMetadata={(e) => {
-            if (startAt !== undefined) e.currentTarget.currentTime = startAt;
-          }}
-        />
-      ) : null}
-      {a.persons.length ? (
-        <Card role="region" aria-labelledby={peopleId} className="flex flex-col gap-2">
-          <CardTitle id={peopleId}>{t("recordingPage.people")}</CardTitle>
-          <p className="text-xs text-muted-fg">{t("recordingPage.peopleHint")}</p>
-          <ul className="flex flex-col gap-2">
-            {a.persons.map((p) => (
-              <PersonCard key={`${p.id}:${p.name}:${p.isCandidate}`} recId={id} p={p} />
-            ))}
-          </ul>
-        </Card>
-      ) : null}
-      {rec.analyzedAt ? <Report a={a} onSeek={seek} /> : null}
-      {a.frames.length ? (
-        <Card className="flex flex-col gap-2">
-          <CardTitle>{t("recordingPage.frames")}</CardTitle>
-          <div className="flex flex-wrap gap-2">
-            {a.frames.map((f) => {
-              const p = a.persons.find((x) => x.id === f.personId);
-              const alt = t("recordingPage.frameAlt", { at: mmss(f.t), who: p ? p.key : "?" });
-              return (
-                <button
-                  key={f.file}
-                  type="button"
-                  onClick={() => seek(f.t)}
-                  className="flex flex-col text-xs"
-                >
-                  <img
-                    src={api.recordingFrameUrl(id, f.file)}
-                    alt={alt}
-                    className="h-28 rounded border border-border"
-                  />
-                  <span>{alt}</span>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-      ) : null}
-      {a.turns.length ? <Transcript a={a} onSeek={seek} /> : null}
-      {rec.analyzedAt ? <ChatBox id={id} /> : null}
+        <aside className="order-first flex min-w-0 flex-col gap-3 lg:order-none lg:min-h-0 lg:overflow-y-auto">
+          {rec.hasVideo ? (
+            // biome-ignore lint/a11y/useMediaCaption: gravação da pessoa; a transcrição clicável está abaixo
+            <video
+              ref={video}
+              src={api.recordingVideoUrl(id)}
+              controls
+              preload="metadata"
+              className="max-h-[34vh] w-full shrink-0 rounded bg-black"
+              onLoadedMetadata={(e) => {
+                if (startAt !== undefined) e.currentTarget.currentTime = startAt;
+              }}
+              onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
+              onSeeked={(e) => setNow(e.currentTarget.currentTime)}
+            />
+          ) : null}
+          {a.frames.length ? <FramesTimeline a={a} now={now} onSeek={seek} /> : null}
+          {a.turns.length ? <Transcript a={a} onSeek={seek} now={now} /> : null}
+        </aside>
+      </div>
     </div>
   );
 }

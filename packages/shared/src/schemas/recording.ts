@@ -339,6 +339,8 @@ export const RecordingReportContentSchema = InterviewReportDraftSchema.extend({
   ),
   // relatórios gravados antes da nota não têm estes campos
   scores: InterviewReportDraftSchema.shape.scores.optional(),
+  /** Leitura de cada quadro (o que se vê e a hipótese), para os detalhes do quadro na página. */
+  frameReadings: InterviewFramesOutputSchema.shape.frames.optional(),
   score: InterviewScoreSchema.optional(),
 });
 export type RecordingReportContent = z.infer<typeof RecordingReportContentSchema>;

@@ -238,7 +238,8 @@ test("F13/E2E-04 análise completa com o media falso › acompanhar, quem é que
     .poll(() =>
       page.locator("video").evaluate((v) => Math.round((v as HTMLVideoElement).currentTime)),
     )
-    .toBe((mm ?? 0) * 60 + (ss ?? 0));
+    // tempo citado no relatório: 3 s antes, para pegar o contexto (pedido do dono)
+    .toBe(Math.max(0, (mm ?? 0) * 60 + (ss ?? 0) - 3));
 
   const transcript = page.getByRole("region", { name: "Transcrição" });
   const who = transcript.getByLabel("Quem falou o turno 0");

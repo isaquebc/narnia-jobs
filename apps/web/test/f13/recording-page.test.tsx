@@ -174,6 +174,13 @@ const analysis = (over: Partial<RecordingAnalysis["recording"]> = {}): Recording
         { title: "Apoio", how: "Menos 'né'." },
       ],
       limitations: ["Rosto em miniatura."],
+      frameReadings: [
+        {
+          file: "f01-001260.jpg",
+          observed: "Cabeça baixa sobre o caderno.",
+          hypothesis: "Pode estar anotando.",
+        },
+      ],
       score: {
         overall: 58,
         criteria: [
@@ -268,7 +275,40 @@ describe("F13/M6 · página da entrevista", () => {
       within(report).getAllByRole("button", { name: "Ir para 01:37" })[0] as HTMLElement,
     );
     const video = document.querySelector("video") as HTMLVideoElement;
-    expect(video.currentTime).toBe(97);
+    // 3 s antes do tempo citado, para pegar o contexto (pedido do dono)
+    expect(video.currentTime).toBe(94);
+  });
+
+  it("vídeo e transcrição juntos: a fala do momento atual fica em destaque", async () => {
+    renderApp({ api: api() as never, initialUrl: "/entrevistas/r1" });
+    const transcript = await screen.findByRole("region", { name: "Transcrição" });
+    const video = document.querySelector("video") as HTMLVideoElement;
+    video.currentTime = 100;
+    video.dispatchEvent(new Event("timeupdate"));
+    await waitFor(() =>
+      expect(
+        within(transcript).getByText("O B-tree é melhor para texto livre.").closest("li"),
+      ).toHaveAttribute("aria-current", "true"),
+    );
+    expect(
+      within(transcript).getByText("Quando usar B-tree e GIN?").closest("li"),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("linha do tempo dos quadros: o quadro tem o título do que foi detectado; clicar abre os detalhes e vai ao segundo exato", async () => {
+    renderApp({ api: api() as never, initialUrl: "/entrevistas/r1" });
+    const timeline = await screen.findByRole("region", { name: "Linha do tempo dos quadros" });
+    const frame = within(timeline).getByRole("button", {
+      name: /Anotação provável · P1 · Marina Duarte/,
+    });
+    await userEvent.click(frame);
+    const video = document.querySelector("video") as HTMLVideoElement;
+    expect(video.currentTime).toBe(126);
+    const details = screen.getByRole("region", { name: "Detalhes do quadro" });
+    expect(within(details).getByText("Cabeça baixa sobre o caderno.")).toBeInTheDocument();
+    expect(within(details).getByText("Pode estar anotando.")).toBeInTheDocument();
+    expect(within(details).getByText("Possivelmente desfavorável")).toBeInTheDocument();
+    expect(within(details).getByText(/Anotou logo depois da resposta errada/)).toBeInTheDocument();
   });
 
   it("quem é quem: confirmar o candidato e corrigir quem falou um turno; refazer o relatório", async () => {

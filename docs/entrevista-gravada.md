@@ -83,6 +83,14 @@ de rosto perde você boa parte do tempo, o sorriso não pode ser medido e a câm
 
 ## A página da entrevista
 
+Em tela grande, o vídeo fica fixo à direita, com a linha do tempo dos quadros e a transcrição embaixo; o resto (quem é
+quem, nota, relatório e a conversa) fica à esquerda, com rolagem própria. No celular, o vídeo vem primeiro.
+
+- **Tempos no texto** (`[03:27]`) levam o vídeo para **3 segundos antes** (03:24), para pegar o contexto.
+- **Transcrição:** a fala do momento atual do vídeo fica em destaque e a lista acompanha.
+- **Linha do tempo dos quadros:** os quadros em que algo foi detectado (anotação, sorriso, sobrancelha, referência de
+  cada pessoa), com o título do que foi detectado. Clicar leva o vídeo ao segundo exato do quadro e abre os detalhes: o
+  que se vê, a hipótese e a leitura de cada evento.
 - **Quem é quem:** o nome vem da etiqueta da chamada (OCR em faixas ampliadas do quadro, para ler a letra miúda do
   Teams), nunca do rosto. A etiqueta da sua miniatura vale mesmo com uma palavra só ("Ana"). Confirme quem é você (o
   narnia sugere pelo seu nome ou por quem mais fala) e corrija nomes.

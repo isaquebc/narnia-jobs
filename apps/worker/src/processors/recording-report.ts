@@ -92,7 +92,12 @@ export const recordingReport: TaskHandler = async (data, ctx, deps) => {
       fresh,
       repos.recordingAnalysis.turnWords(id),
     );
-    repos.recordingAnalysis.addReport(id, { content, warnings, model: m, usageEventId: usage.id });
+    repos.recordingAnalysis.addReport(id, {
+      content: { ...content, frameReadings: frames },
+      warnings,
+      model: m,
+      usageEventId: usage.id,
+    });
     for (const n of content.notes)
       repos.recordingAnalysis.updateEvent(id, n.event, { reading: n.reading, reason: n.reason });
     const byKey = new Map(fresh.persons.map((p) => [p.key, p.id]));

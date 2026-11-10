@@ -201,6 +201,11 @@ describe("F13/M5 · recording.report", () => {
     expect(rep?.content.shouldNotHaveSaid.length).toBeGreaterThan(0);
     expect(rep?.content.smile.alert).toMatch(/% do tempo/);
     expect(rep?.content.drills).toHaveLength(3);
+    // a leitura de cada quadro fica no relatório: a página mostra o que foi visto ao clicar no quadro
+    expect(rep?.content.frameReadings?.length).toBeGreaterThan(0);
+    expect(rep?.content.frameReadings?.[0]).toEqual(
+      expect.objectContaining({ file: expect.any(String), observed: expect.any(String) }),
+    );
     const notes = h.repos.recordingAnalysis.events(h.rec.id).filter((e) => e.type === "note");
     expect(notes.every((e) => e.reason)).toBe(true);
     expect(h.repos.recordingAnalysis.persons(h.rec.id).every((p) => p.card)).toBe(true);
