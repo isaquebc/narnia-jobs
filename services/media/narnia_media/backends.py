@@ -64,9 +64,12 @@ class RealBackends:
             download_root=str(self.models_dir / "whisper"),
         )
         duration = len(wav) / sr or 1.0
-        # áudio já em memória: o PyAV do faster-whisper quebrava ao decodificar gravações do Teams (F13 §8)
+        # áudio já em memória: o PyAV do faster-whisper quebrava ao decodificar gravações do Teams (F13 §8).
+        # Sem idioma fixo, detecta o idioma em cada trecho: entrevista que passa para o inglês sai em inglês, não
+        # "traduzida" para o idioma do começo.
         segments, info = model.transcribe(
-            wav, language=language, word_timestamps=True, vad_filter=True, beam_size=5
+            wav, language=language, multilingual=language is None, word_timestamps=True, vad_filter=True,
+            beam_size=5,
         )
         words = []
         for seg in segments:
@@ -76,7 +79,7 @@ class RealBackends:
             progress(min(1.0, seg.end / duration))
         return {"model": f"faster-whisper {self.whisper_model}", "device": device,
                 "language": info.language, "language_probability": round(info.language_probability, 3),
-                "words": words}
+                "multilingual": language is None, "words": words}
 
     def diarize(self, wav: np.ndarray, sr: int, token: str, progress: Progress) -> list[dict]:
         import torch
@@ -137,18 +140,58 @@ class RealBackends:
         return detect
 
     def ocr(self, rgb: np.ndarray) -> list[dict]:
-        """Linhas de texto com caixa, pelo Tesseract (CLI). A imagem vai ampliada 2× para etiquetas pequenas."""
+        """Linhas de texto com caixa, pelo Tesseract (CLI). A etiqueta de nome do Teams tem ~11 px de altura: no quadro
+        inteiro o Tesseract não lê (fundo poluído, letra miúda); em faixas horizontais, cinza e ampliadas 3×, lê com
+        ~95% de confiança (teste com gravação real, F13 §8)."""
         import subprocess
+        from concurrent.futures import ThreadPoolExecutor
 
         import cv2
 
-        big = cv2.resize(rgb, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-        ok, png = cv2.imencode(".png", cv2.cvtColor(big, cv2.COLOR_RGB2BGR))
-        if not ok:
-            return []
-        res = subprocess.run(["tesseract", "stdin", "stdout", "-l", "por+eng", "--psm", "11", "tsv"],
-                             input=png.tobytes(), capture_output=True)
-        return parse_tsv(res.stdout.decode("utf-8", "replace"), scale=2)
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+
+        def band(span: tuple[int, int]) -> tuple[int, list[dict]]:
+            big = cv2.resize(gray[span[0] : span[1]], None, fx=OCR_SCALE, fy=OCR_SCALE, interpolation=cv2.INTER_CUBIC)
+            ok, png = cv2.imencode(".png", big)
+            if not ok:
+                return span[0], []
+            res = subprocess.run(["tesseract", "stdin", "stdout", "-l", "por+eng", "--psm", "11", "tsv"],
+                                 input=png.tobytes(), capture_output=True, env={**os.environ, "OMP_THREAD_LIMIT": "1"})
+            return span[0], parse_tsv(res.stdout.decode("utf-8", "replace"), scale=OCR_SCALE)
+
+        with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
+            return merge_band_lines(list(pool.map(band, ocr_bands(gray.shape[0]))))
+
+
+OCR_SCALE = 3
+
+
+def ocr_bands(height: int, frac: float = 0.12) -> list[tuple[int, int]]:
+    """Faixas horizontais de ~12% da altura, sobrepostas pela metade: uma etiqueta sempre cabe inteira em uma delas."""
+    size = max(32, int(height * frac))
+    step = max(1, size // 2)
+    out = []
+    y = 0
+    while True:
+        end = min(height, y + size)
+        out.append((y, end))
+        if end >= height:
+            return out
+        y += step
+
+
+def merge_band_lines(bands: list[tuple[int, list[dict]]]) -> list[dict]:
+    """Volta cada linha para a coordenada do quadro e junta a mesma linha lida em duas faixas (fica a de maior
+    confiança)."""
+    best: dict[tuple, dict] = {}
+    for y0, lines in bands:
+        for line in lines:
+            x, y, w, h = line["bbox"]
+            moved = {**line, "bbox": [x, y + y0, w, h]}
+            key = (line["text"], round(x / 20), round((y + y0) / 20))
+            if key not in best or moved["conf"] > best[key]["conf"]:
+                best[key] = moved
+    return list(best.values())
 
 
 def parse_tsv(tsv: str, scale: float = 1.0) -> list[dict]:

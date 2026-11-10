@@ -1282,6 +1282,15 @@ export class MockProvider implements Provider {
         { title: "Pergunta de volta", how: "Simulação." },
       ],
       limitations: ["Simulação: análise do mock."],
+      scores: {
+        completeness: {
+          points: 6,
+          reason: "Simulação: uma resposta incompleta.",
+          turns: answer ? [answer.turn] : [],
+        },
+        objectivity: { points: 7, reason: "Simulação.", turns: [] },
+        clarity: { points: 7, reason: "Simulação.", turns: [] },
+      },
     };
     return this.result(draft, input.transcript, input.model);
   }

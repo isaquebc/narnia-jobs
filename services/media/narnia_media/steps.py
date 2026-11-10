@@ -154,7 +154,7 @@ def step_layout(ctx: Ctx) -> dict:
         ctx.report((k + 1) / 6)
     names = assign_names(tracks, samples)
     return {"meeting_start_s": round(start, 1), "width": faces["width"], "height": faces["height"],
-            "tracks": tracks, "names": names, "leftover_names": leftover_names(names, samples)}
+            "tracks": tracks, "names": names, "leftover_names": leftover_names(names, samples, height)}
 
 
 def step_link(ctx: Ctx) -> dict:

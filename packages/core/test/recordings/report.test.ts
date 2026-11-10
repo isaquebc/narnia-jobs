@@ -59,6 +59,53 @@ const empty = (): InterviewReportDraft => ({
   people: [],
   drills: [],
   limitations: [],
+  scores: {
+    completeness: { points: 8, reason: "Respondeu quase tudo.", turns: [] },
+    objectivity: { points: 6, reason: "Algumas voltas.", turns: [] },
+    clarity: { points: 7, reason: "Clara.", turns: [] },
+  },
+});
+
+describe("F13 · nota da entrevista", () => {
+  it("pesos 40/20/20/20; setup pela média do que foi medido; câmera sem rosto detectável fica fora", () => {
+    const { a } = setup();
+    const { content } = checkInterviewReport(empty(), a);
+    const s = content.score;
+    if (!s) throw new Error("sem nota");
+    expect(s.criteria.map((c) => [c.key, c.weight, c.points])).toEqual([
+      ["completeness", 40, 8],
+      ["objectivity", 20, 6],
+      ["clarity", 20, 7],
+      ["setup", 20, 5],
+    ]);
+    expect(s.setup.map((x) => [x.key, x.points])).toEqual([
+      ["camera", null],
+      ["audio", 10],
+      ["noise", 0],
+    ]);
+    expect(s.setup[0]?.reason).toMatch(/não medid/);
+    expect(s.overall).toBe(68);
+  });
+
+  it("turnos que não existem saem da justificativa; sem falas da pessoa candidata, o conteúdo não é avaliado", () => {
+    const { a } = setup();
+    const draft = empty();
+    draft.scores.clarity.turns = [1, 9999];
+    const { content, warnings } = checkInterviewReport(draft, a);
+    expect(content.score?.criteria.find((c) => c.key === "clarity")?.turns).toEqual([1]);
+    expect(warnings.some((w) => w.includes("9999"))).toBe(true);
+
+    const cand = a.persons.find((p) => p.isCandidate);
+    const noCand = { ...a, turns: a.turns.filter((t) => t.personId !== cand?.id) };
+    const s = checkInterviewReport(empty(), noCand).content.score;
+    expect(s?.criteria.filter((c) => c.key !== "setup").map((c) => c.points)).toEqual([
+      null,
+      null,
+      null,
+    ]);
+    // nota só do setup enganaria: sem conteúdo avaliado, não há nota geral
+    expect(s?.overall).toBeNull();
+  });
 });
 
 describe("F13/M5 · transcrição e resumo", () => {
@@ -95,6 +142,36 @@ describe("F13/M5 · transcrição e resumo", () => {
       ]),
     );
     expect(brief.frames).toEqual([expect.objectContaining({ observed: "Cabeça baixa." })]);
+  });
+
+  it("leva os dados de carreira da pessoa: experiências com conquistas, projetos, formação, skills e idiomas", () => {
+    const { r, rec } = setup();
+    const brief = buildInterviewBrief(r, rec.id) as unknown as {
+      candidate: {
+        experiences: Array<Record<string, unknown>>;
+        skills: string[];
+        projects: unknown[];
+        education: unknown[];
+        languages: unknown[];
+        card: string | null;
+      };
+    };
+    const acme = brief.candidate.experiences.find((e) => e.company === "Acme Pagamentos");
+    expect(acme).toEqual(
+      expect.objectContaining({
+        title: "Engenheira de Software Sênior",
+        period: "2023-02 – atual",
+        achievements: expect.arrayContaining([
+          "Reduziu a latência p95 do checkout (de 800 ms para 300 ms)",
+        ]),
+      }),
+    );
+    expect(acme).not.toHaveProperty("compensation");
+    expect(brief.candidate.skills).toContain("TypeScript");
+    expect(brief.candidate.projects.length).toBeGreaterThan(0);
+    expect(brief.candidate.education.length).toBeGreaterThan(0);
+    expect(brief.candidate.languages.length).toBeGreaterThan(0);
+    expect(brief.candidate.card).toMatch(/\S/);
   });
 });
 

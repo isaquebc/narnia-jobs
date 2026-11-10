@@ -420,6 +420,15 @@ function seedRecording(repos: Repos, dataDir: string, applicationId: string): st
       { title: "Menos palavras de apoio", how: "Grave 2 minutos e conte os 'né'." },
     ],
     limitations: ["Rosto da pessoa candidata em miniatura."],
+    scores: {
+      completeness: {
+        points: 5,
+        reason: "Errou os índices e foi vago sobre qualidade.",
+        turns: [],
+      },
+      objectivity: { points: 6, reason: "Uma tangente longa.", turns: [] },
+      clarity: { points: 6, reason: "Muitas palavras de apoio.", turns: [] },
+    },
   };
   const { content, warnings } = checkInterviewReport(
     draft,

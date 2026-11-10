@@ -6,10 +6,16 @@
 
 Você envia o vídeo de uma entrevista real (Teams, Meet, Zoom) e o recrutador do narnia devolve:
 
-- a **transcrição** por pessoa, clicável (cada fala leva o vídeo ao ponto);
+- a **transcrição** por pessoa, clicável (cada fala leva o vídeo ao ponto), no idioma de cada trecho: a parte da
+  entrevista em inglês sai em inglês;
+- a **nota da entrevista** (0 a 100), com os pontos de 0 a 10 de cada critério: respostas completas (peso 40),
+  objetividade (20), clareza (20) e setup (20, a média de câmera, áudio e ruído do ambiente). O recrutador dá os pontos
+  do conteúdo citando os turnos; o código mede o setup. Critério que não deu para medir (o seu rosto em miniatura, por
+  exemplo) fica de fora, e os pesos se redistribuem; sem nenhuma fala sua identificada, não há nota geral;
 - o **veredito** e o que você falou e não deveria, com o trecho e o minuto;
 - as **respostas erradas ou incompletas**, com a correção técnica (e a certeza dela) e uma sugestão de resposta que
-  nunca inventa experiência: o que depende de um fato seu vem como `[completar: …]`;
+  usa os seus dados de carreira (experiências, conquistas, projetos, skills) e nunca inventa experiência: só o que não
+  está nos dados vem como `[completar: …]`;
 - o que funcionou, o **discurso** (ritmo, pausas, tempo de resposta, palavras de apoio) e a cordialidade;
 - **sorriso e expressão**, sempre como fato observado + hipótese, com um alerta de confiabilidade e a porcentagem do
   tempo em que o seu rosto foi detectável;
@@ -75,8 +81,9 @@ de rosto perde você boa parte do tempo e o sorriso não pode ser medido.
 
 ## A página da entrevista
 
-- **Quem é quem:** o nome vem da etiqueta da chamada (OCR), nunca do rosto. Confirme quem é você (o narnia sugere pelo
-  seu nome ou por quem mais fala) e corrija nomes.
+- **Quem é quem:** o nome vem da etiqueta da chamada (OCR em faixas ampliadas do quadro, para ler a letra miúda do
+  Teams), nunca do rosto. A etiqueta da sua miniatura vale mesmo com uma palavra só ("Ana"). Confirme quem é você (o
+  narnia sugere pelo seu nome ou por quem mais fala) e corrija nomes.
 - **Transcrição:** cada turno tem a pessoa; corrija quem falou quando a separação errar.
 - **Refazer o relatório:** depois de corrigir, gera uma versão nova do relatório, sem rodar o vídeo de novo.
 - **Analisar de novo:** roda a análise do vídeo outra vez, aproveitando as etapas que não mudaram. Use quando o vídeo
@@ -87,7 +94,8 @@ de rosto perde você boa parte do tempo e o sorriso não pode ser medido.
 ## O que sai do seu computador
 
 Tudo roda localmente: transcrição, vozes, rostos e quadros. Vão ao modelo, na sua assinatura do Claude, só a
-transcrição, as medições e até 40 quadros escolhidos (momentos de anotação, reações e uma referência por pessoa).
+transcrição, as medições, até 40 quadros escolhidos (momentos de anotação, reações e uma referência por pessoa) e os
+seus dados de carreira (sem o que você ocultou no perfil e sem remuneração).
 Os modelos baixam do Hugging Face no primeiro uso.
 
 ## Backup

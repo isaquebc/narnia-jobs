@@ -1,10 +1,14 @@
-import type {
-  InterviewReportDraft,
-  RecordingAnalysis,
-  RecordingReportContent,
-  Reliability,
+import {
+  INTERVIEW_SCORE_WEIGHTS,
+  type InterviewReportDraft,
+  type InterviewScore,
+  type InterviewSetupKey,
+  type RecordingAnalysis,
+  type RecordingReportContent,
+  type Reliability,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
+import { getCard } from "../profile/cards";
 import { recordingAnalysis } from "./analysis";
 
 /**
@@ -49,6 +53,72 @@ const pick = (o: unknown, keys: string[]) =>
         keys.filter((k) => k in (o as object)).map((k) => [k, (o as Record<string, unknown>)[k]]),
       )
     : null;
+
+const period = (start?: string | null, end?: string | null, current?: boolean) =>
+  [start ?? "?", current ? "atual" : (end ?? "?")].join(" – ");
+
+/**
+ * Dados de carreira da pessoa (os fatos verificados, sem o que ela ocultou no perfil e sem remuneração): o recrutador
+ * confere as respostas contra o histórico real e escreve a sugestão com fatos dela em vez de `[completar: …]`.
+ */
+export function buildCandidateBackground(repos: Repos, profileId: string) {
+  const hidden = new Set(
+    repos.emphasis
+      .list(profileId)
+      .filter((e) => e.mode === "hidden")
+      .map((e) => `${e.factKind}:${e.factId}`),
+  );
+  const visible = (kind: string, id: string) => !hidden.has(`${kind}:${id}`);
+  const achievements = repos.facts.achievements.list();
+  let card: string | null = null;
+  try {
+    card = getCard(repos, profileId).text;
+  } catch {
+    card = null;
+  }
+  return {
+    card,
+    experiences: repos.facts.experiences
+      .list()
+      .filter((e) => visible("experience", e.id))
+      .sort((a, b) => (b.startDate ?? "").localeCompare(a.startDate ?? ""))
+      .slice(0, 10)
+      .map((e) => ({
+        company: e.company,
+        title: e.title,
+        period: period(e.startDate, e.endDate, e.isCurrent),
+        summary: e.summary ?? null,
+        tech: e.tech ?? [],
+        achievements: achievements
+          .filter((a) => a.experienceId === e.id)
+          .slice(0, 8)
+          .map((a) => (a.metric ? `${a.text} (${a.metric})` : a.text)),
+      })),
+    projects: repos.facts.projects
+      .list()
+      .filter((p) => visible("project", p.id))
+      .slice(0, 12)
+      .map((p) => ({
+        name: p.name,
+        role: p.role ?? null,
+        description: p.description ?? null,
+        tech: p.tech ?? [],
+      })),
+    education: repos.facts.education.list().map((e) => ({
+      institution: e.institution,
+      course: e.course ?? null,
+      degree: e.degree ?? null,
+      period: period(e.startDate, e.endDate),
+      status: e.status ?? null,
+    })),
+    skills: repos.facts.skills
+      .list()
+      .filter((s) => visible("skill", s.id))
+      .slice(0, 60)
+      .map((s) => s.name),
+    languages: repos.facts.languages.list().map((l) => ({ name: l.name, level: l.level ?? null })),
+  };
+}
 
 /** Resumo para o modelo: entrevista, vaga e CV enviado, pessoas com medições, eventos, quadros e o histórico. */
 export function buildInterviewBrief(
@@ -104,6 +174,7 @@ export function buildInterviewBrief(
     profile: profile
       ? { targetTitle: profile.targetTitle, seniority: profile.seniority, area: profile.area }
       : null,
+    candidate: buildCandidateBackground(repos, rec.profileId),
     persons: a.persons.map((p) => {
       const m = p.measurements as Record<string, unknown>;
       return {
@@ -296,6 +367,138 @@ export function smileAlert(a: RecordingAnalysis): {
   };
 }
 
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const clamp10 = (n: number) => Math.max(0, Math.min(10, n));
+const SETUP_LABEL: Record<InterviewSetupKey, string> = {
+  camera: "câmera",
+  audio: "áudio",
+  noise: "ruído",
+};
+
+/**
+ * Câmera, áudio e ruído da pessoa candidata pelas medições (mesmo vídeo, mesma nota). A câmera só conta com o rosto
+ * detectável: na gravação da própria tela o seu rosto é uma miniatura, que não é o que quem entrevistou viu.
+ */
+export function setupScores(a: RecordingAnalysis): InterviewScore["setup"] {
+  const c = a.persons.find((p) => p.isCandidate);
+  const m = (c?.measurements ?? {}) as {
+    face?: {
+      reliability?: { level: string; face_px: number; detected_pct: number };
+      camera?: { flags?: string[] };
+    } | null;
+    levels?: { rms_dbfs?: number; clipping_ratio?: number; snr_db?: number } | null;
+  };
+  const out: InterviewScore["setup"] = [];
+  const face = m.face;
+  if (!face?.reliability || face.reliability.level === "poor") {
+    out.push({
+      key: "camera",
+      points: null,
+      reason:
+        "não medida: o seu rosto não ficou detectável na gravação (miniatura ou câmera fechada), e a miniatura não é o que quem entrevistou viu",
+    });
+  } else {
+    const PENALTY: Record<string, [number, string]> = {
+      small_face: [3, "rosto pequeno no quadro"],
+      dark: [3, "rosto escuro"],
+      overexposed: [2, "rosto estourado de luz"],
+      backlit: [2, "luz atrás de você"],
+      blurry: [2, "imagem sem foco"],
+    };
+    const flags = (face.camera?.flags ?? []).filter((f) => f in PENALTY);
+    const points = clamp10(10 - flags.reduce((s, f) => s + (PENALTY[f]?.[0] ?? 0), 0));
+    out.push({
+      key: "camera",
+      points,
+      reason: flags.length
+        ? flags.map((f) => PENALTY[f]?.[1]).join(", ")
+        : `rosto nítido e bem iluminado (${face.reliability.face_px} px)`,
+    });
+  }
+  const lv = m.levels;
+  if (typeof lv?.rms_dbfs !== "number") {
+    out.push({ key: "audio", points: null, reason: "não medido: sem falas suas identificadas" });
+  } else {
+    const rms = lv.rms_dbfs;
+    const off = rms < -30 ? -30 - rms : rms > -12 ? rms - -12 : 0;
+    const clip = lv.clipping_ratio ?? 0;
+    const clipLoss = clip > 0.01 ? 5 : clip > 0.001 ? 2 : 0;
+    const points = round1(clamp10(10 - Math.min(5, off / 2) - clipLoss));
+    const why = [
+      off
+        ? `volume ${rms < -30 ? "baixo" : "alto"} (${round1(rms)} dBFS)`
+        : `volume bom (${round1(rms)} dBFS)`,
+      ...(clipLoss ? ["som saturando em alguns trechos"] : []),
+    ];
+    out.push({ key: "audio", points, reason: why.join(", ") });
+  }
+  if (typeof lv?.snr_db !== "number") {
+    out.push({ key: "noise", points: null, reason: "não medido: sem falas suas identificadas" });
+  } else {
+    const points = round1(clamp10((lv.snr_db - 5) / 3));
+    out.push({
+      key: "noise",
+      points,
+      reason: `voz ${round1(lv.snr_db)} dB acima do fundo (a plataforma já filtra parte do ruído)`,
+    });
+  }
+  return out;
+}
+
+function interviewScore(
+  draft: InterviewReportDraft,
+  a: RecordingAnalysis,
+  candTurns: number[],
+  warn: (w: string) => void,
+): InterviewScore {
+  const exists = new Set(a.turns.map((t) => t.idx));
+  const setup = setupScores(a);
+  const measured = setup.filter((s) => s.points !== null).map((s) => s.points as number);
+  const content = (["completeness", "objectivity", "clarity"] as const).map((key) => {
+    const s = draft.scores?.[key];
+    if (!candTurns.length || !s)
+      return {
+        key,
+        points: null,
+        weight: INTERVIEW_SCORE_WEIGHTS[key],
+        reason: "não avaliado: nenhuma fala sua foi identificada na transcrição",
+        turns: [],
+      };
+    const bad = s.turns.filter((t) => !exists.has(t));
+    if (bad.length) warn(`nota (${key}): turnos inexistentes retirados: ${bad.join(", ")}`);
+    return {
+      key,
+      points: clamp10(Math.round(s.points)),
+      weight: INTERVIEW_SCORE_WEIGHTS[key],
+      reason: s.reason,
+      turns: s.turns.filter((t) => exists.has(t)),
+    };
+  });
+  const criteria: InterviewScore["criteria"] = [
+    ...content,
+    {
+      key: "setup",
+      points: measured.length
+        ? round1(measured.reduce((x, y) => x + y, 0) / measured.length)
+        : null,
+      weight: INTERVIEW_SCORE_WEIGHTS.setup,
+      reason: setup
+        .map((s) => `${SETUP_LABEL[s.key]}: ${s.points === null ? "não medido" : s.points}`)
+        .join(" · "),
+      turns: [],
+    },
+  ];
+  const scored = criteria.filter((c) => c.points !== null);
+  const overall =
+    content.some((c) => c.points !== null) && scored.length
+      ? Math.round(
+          (10 * scored.reduce((s, c) => s + c.weight * (c.points as number), 0)) /
+            scored.reduce((s, c) => s + c.weight, 0),
+        )
+      : null;
+  return { overall, criteria, setup };
+}
+
 export function checkInterviewReport(
   draft: InterviewReportDraft,
   a: RecordingAnalysis,
@@ -410,6 +613,7 @@ export function checkInterviewReport(
     },
     people: draft.people.map(keyOf).filter((p) => personKeys.has(p.person)),
     drills: draft.drills.slice(0, 3),
+    score: interviewScore(draft, a, candTurns, warn),
   };
   return { content: deepFixTimes(content, duration, warn), warnings };
 }

@@ -194,6 +194,11 @@ export type InterviewFramesOutput = z.infer<typeof InterviewFramesOutputSchema>;
 const Certainty = z.enum(["high", "medium", "low"]);
 /** Trecho literal de um turno do candidato (o código confere e acha o segundo exato pelas palavras). */
 const Quote = { turn: z.number().int(), quote: z.string() };
+const ModelScore = z.object({
+  points: z.number().int().min(0).max(10),
+  reason: z.string(),
+  turns: z.array(z.number().int()),
+});
 
 /**
  * Rascunho do relatório pelo modelo (§2.5, ordem aprovada pelo dono, F13-14). Tempos no texto livre vão como `[mm:ss]`
@@ -247,8 +252,48 @@ export const InterviewReportDraftSchema = z.object({
   ),
   drills: z.array(z.object({ title: z.string(), how: z.string() })),
   limitations: z.array(z.string()),
+  /** Pontos de 0 a 10 dos critérios de conteúdo, com os turnos que justificam (o setup é medido pelo código). */
+  scores: z.object({
+    completeness: ModelScore,
+    objectivity: ModelScore,
+    clarity: ModelScore,
+  }),
 });
 export type InterviewReportDraft = z.infer<typeof InterviewReportDraftSchema>;
+
+/** Pesos da nota da entrevista (decisão do dono, 2026-11-10): o setup é a média de câmera, áudio e ruído medidos. */
+export const INTERVIEW_SCORE_WEIGHTS = {
+  completeness: 40,
+  objectivity: 20,
+  clarity: 20,
+  setup: 20,
+} as const;
+export const InterviewScoreKeySchema = z.enum(["completeness", "objectivity", "clarity", "setup"]);
+export type InterviewScoreKey = z.infer<typeof InterviewScoreKeySchema>;
+export const InterviewSetupKeySchema = z.enum(["camera", "audio", "noise"]);
+export type InterviewSetupKey = z.infer<typeof InterviewSetupKeySchema>;
+
+/** Nota montada pelo código: `points` nulo = não medido (fica fora da média, com os pesos redistribuídos). */
+export const InterviewScoreSchema = z.object({
+  overall: z.number().int().min(0).max(100).nullable(),
+  criteria: z.array(
+    z.object({
+      key: InterviewScoreKeySchema,
+      points: z.number().min(0).max(10).nullable(),
+      weight: z.number(),
+      reason: z.string(),
+      turns: z.array(z.number().int()),
+    }),
+  ),
+  setup: z.array(
+    z.object({
+      key: InterviewSetupKeySchema,
+      points: z.number().min(0).max(10).nullable(),
+      reason: z.string(),
+    }),
+  ),
+});
+export type InterviewScore = z.infer<typeof InterviewScoreSchema>;
 
 /** Relatório guardado: o rascunho conferido por código, com o segundo de cada citação e o alerta do sorriso (F13-4). */
 export const RecordingReportContentSchema = InterviewReportDraftSchema.extend({
@@ -292,6 +337,9 @@ export const RecordingReportContentSchema = InterviewReportDraftSchema.extend({
   notes: z.array(
     z.object({ event: z.string(), t: z.number(), reading: NoteReadingSchema, reason: z.string() }),
   ),
+  // relatórios gravados antes da nota não têm estes campos
+  scores: InterviewReportDraftSchema.shape.scores.optional(),
+  score: InterviewScoreSchema.optional(),
 });
 export type RecordingReportContent = z.infer<typeof RecordingReportContentSchema>;
 

@@ -38,6 +38,24 @@ export function interviewReportChecks(p: EvalParams): EvalResult {
     | Array<{ questionTurn: number; answerTurns: number[] }>
     | undefined) ?? [])
     for (const t of [a.questionTurn, ...(a.answerTurns ?? [])]) if (!turns.has(t)) badTurns.push(t);
+  const scores = out.scores as
+    | Record<string, { points?: unknown; reason?: unknown; turns?: number[] }>
+    | undefined;
+  const ranges = ((p.reference as { scores?: Record<string, [number, number]> } | undefined)
+    ?.scores ?? {}) as Record<string, [number, number]>;
+  for (const key of ["completeness", "objectivity", "clarity"]) {
+    const s = scores?.[key];
+    const pts = s?.points;
+    if (typeof pts !== "number" || !Number.isInteger(pts) || pts < 0 || pts > 10) {
+      problems.push(`nota ${key} ausente ou fora de 0–10`);
+      continue;
+    }
+    if (!String(s?.reason ?? "").trim()) problems.push(`nota ${key} sem justificativa`);
+    for (const t of s?.turns ?? []) if (!turns.has(t)) badTurns.push(t);
+    const r = ranges[key];
+    if (r && (pts < r[0] || pts > r[1]))
+      problems.push(`nota ${key} = ${pts} (esperado ${r[0]}–${r[1]})`);
+  }
   if (turns.size && badTurns.length)
     problems.push(`turnos inexistentes: ${listShort(badTurns.map(String))}`);
   return problems.length

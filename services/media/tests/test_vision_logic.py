@@ -176,3 +176,53 @@ def test_nome_que_sobra_fica_disponivel_para_quem_nao_tem_rosto():
 
     names = assign_names(tracks, [lines, lines])
     assert leftover_names(names, [lines, lines]) == ["Alex Souza"]
+
+
+def test_nome_de_uma_palavra_na_miniatura_sobra_e_botoes_nao():
+    # Teams: etiqueta "Bruno" na miniatura (rosto pequeno demais para o detector); barra de botões no topo
+    from narnia_media.layout import leftover_names
+
+    tracks = track_faces([{"t": float(t), "faces": [face(600, 460, 394, 423)]} for t in range(30)], 1920, 904)
+    lines = [
+        {"text": "Renata Alves Pereira de Souza", "conf": 96, "bbox": [14, 872, 178, 14]},
+        {"text": "Bruno", "conf": 95, "bbox": [1682, 866, 40, 14]},
+        {"text": "Câmera", "conf": 95, "bbox": [1573, 38, 40, 12]},
+        {"text": "Pessoas", "conf": 92, "bbox": [1276, 38, 40, 12]},
+        {"text": "Ss", "conf": 90, "bbox": [700, 880, 14, 12]},
+        {"text": "Acmeworks", "conf": 90, "bbox": [1700, 70, 90, 20]},
+    ]
+    names = assign_names(tracks, [lines, lines])
+    assert list(names.values()) == ["Renata Alves Pereira de Souza"]
+    assert leftover_names(names, [lines, lines], height=904) == ["Bruno"]
+
+
+def test_lixo_do_ocr_nao_vira_nome():
+    from narnia_media.layout import clean_name
+
+    assert clean_name("Ss") is None
+    assert clean_name("Ana") == "Ana"
+    assert clean_name("Renata Alves Pereira de Souza") == "Renata Alves Pereira de Souza"
+
+
+def test_icone_do_microfone_lido_no_fim_da_etiqueta_sai_do_nome():
+    # Teams: o OCR lê o ícone do microfone ao lado do nome como "8", "&", "4" (quadro real, F13 §8)
+    from narnia_media.layout import clean_name
+
+    assert clean_name("Bruno 8") == "Bruno"
+    assert clean_name("Renata Alves Pereira de Souza &") == "Renata Alves Pereira de Souza"
+    assert clean_name("Renata Souza 4 |") == "Renata Souza"
+    assert clean_name("Ana Lu") == "Ana Lu"
+
+
+def test_ocr_em_faixas_cobre_o_quadro_e_volta_para_a_coordenada_do_quadro():
+    from narnia_media.backends import merge_band_lines, ocr_bands
+
+    bands = ocr_bands(904)
+    assert bands[0][0] == 0 and bands[-1][1] == 904
+    assert all(b[0] < a[1] for a, b in zip(bands, bands[1:]))  # sobrepostas: etiqueta na borda não se perde
+    lines = merge_band_lines([
+        (800, [{"text": "Bruno", "conf": 90, "bbox": [1682, 66, 40, 14]}]),
+        (850, [{"text": "Bruno", "conf": 95, "bbox": [1682, 16, 40, 14]}]),
+        (0, [{"text": "Câmera", "conf": 95, "bbox": [1573, 38, 40, 12]}]),
+    ])
+    assert sorted((x["text"], x["bbox"][1], x["conf"]) for x in lines) == [("Bruno", 866, 95), ("Câmera", 38, 95)]

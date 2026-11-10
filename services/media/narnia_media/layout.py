@@ -98,23 +98,53 @@ def _merge_split(raw: list[dict]) -> list[dict]:
     return raw
 
 
-def leftover_names(names: dict[str, str | None], samples: list[list[dict]]) -> list[str]:
+# botões e abas das plataformas (pt e en): uma palavra só, com inicial maiúscula, como um primeiro nome
+UI_WORDS = {
+    w.casefold()
+    for w in (
+        "Chat Pessoas People Levantar Raise Reagir React Reações Reactions Exibição View Mais More Câmera Camera "
+        "Microfone Microphone Mic Compartilhar Share Sair Leave Gravando Recording Participantes Participants Mudo Mute "
+        "Unmute Apresentar Present Legendas Captions Detalhes Details Ferramentas Tools Atividades Activities Host "
+        "Convidado Convidada Guest Você You Zoom Teams Meet Calendário Calendar Reunião Meeting Ativar Desativar "
+        "Silenciar Gravar Record Entrar Join Configurações Settings Ajuda Help Pausar Pause Fechar Close Bate-papo"
+    ).split()
+}
+
+
+def leftover_names(names: dict[str, str | None], samples: list[list[dict]], height: int | None = None) -> list[str]:
     """Nomes de etiqueta vistos em ≥ 2 amostras e que não ficaram com nenhum rosto (ex.: a miniatura pequena demais
-    para o detector): a ligação dá a quem tem voz e não tem rosto, quando sobra um de cada."""
+    para o detector): a ligação dá a quem tem voz e não tem rosto, quando sobra um de cada. Um nome de uma palavra só
+    ("Ana", comum na própria miniatura) conta se não for botão da plataforma e estiver abaixo da barra do topo."""
     taken = {n for n in names.values() if n}
     seen: Counter = Counter()
     for lines in samples:
-        found = {clean_name(x["text"]) for x in lines if x.get("conf", 0) >= 50}
-        seen.update(n for n in found if n and n not in taken and len(n.split()) >= 2)
+        found = set()
+        for x in lines:
+            n = clean_name(x["text"]) if x.get("conf", 0) >= 50 else None
+            if not n or n in taken:
+                continue
+            if len(n.split()) == 1:
+                cy = x["bbox"][1] + x["bbox"][3] / 2
+                if n.casefold() in UI_WORDS or height is None or cy < 0.12 * height:
+                    continue
+            found.add(n)
+        seen.update(found)
     return sorted(n for n, k in seen.items() if k >= min(2, len(samples)))
 
 
 def clean_name(text: str) -> str | None:
-    text = SUFFIX_RE.sub("", " ".join(text.split())).strip(" -|:")
+    words = " ".join(text.split()).split(" ")
+    # ícone do microfone ou do status lido no fim da etiqueta ("Ana 8", "Ana &"): palavra sem letra ou de 1 caractere
+    while len(words) > 1 and (len(words[-1]) == 1 or not any(c.isalpha() for c in words[-1])):
+        words.pop()
+    text = SUFFIX_RE.sub("", " ".join(words)).strip(" -|:")
     if not NAME_RE.match(text) or not 2 <= len(text) <= 60:
         return None
     # logotipos e botões costumam vir em maiúsculas ("ONE TEAM"); etiqueta de nome não
     if any(len(w) > 2 and w.isupper() for w in text.split()):
+        return None
+    # lixo do OCR ("Ss", "Bi"): todo nome tem uma palavra de 3 letras ou mais
+    if not any(sum(c.isalpha() for c in w) >= 3 for w in text.split()):
         return None
     return text
 

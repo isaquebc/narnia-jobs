@@ -209,6 +209,71 @@ function Report({ a, onSeek }: { a: RecordingAnalysis; onSeek: Seek }) {
   return (
     <Card role="region" aria-labelledby={titleId} className="flex flex-col gap-4">
       <CardTitle id={titleId}>{t("recordingPage.report")}</CardTitle>
+      {r.score ? (
+        <Section title={t("recordingPage.sections.score")}>
+          <p className="text-sm">
+            {r.score.overall === null ? (
+              t("recordingPage.score.none")
+            ) : (
+              <>
+                <span className="text-2xl font-semibold">{r.score.overall}</span>
+                <span className="text-muted-fg"> / 100</span>
+              </>
+            )}
+          </p>
+          <ul className="flex flex-col gap-2 text-sm">
+            {r.score.criteria.map((c) => {
+              const label = t(`recordingPage.score.${c.key}` as TKey);
+              return (
+                <li key={c.key} className="flex flex-col gap-1">
+                  <span className="flex flex-wrap items-baseline justify-between gap-2">
+                    <strong>
+                      {label} <span className="font-normal text-muted-fg">({c.weight}%)</span>
+                    </strong>
+                    <span>
+                      {c.points === null
+                        ? t("recordingPage.score.notMeasured")
+                        : t("recordingPage.score.points", {
+                            n: String(c.points).replace(".", ","),
+                          })}
+                    </span>
+                  </span>
+                  {c.points !== null ? (
+                    <Progress value={c.points * 10} label={`${label}: ${c.points}/10`} />
+                  ) : null}
+                  <span className="text-muted-fg">
+                    <T text={c.reason} />
+                    {c.turns.map((idx) => {
+                      const at = turn.get(idx)?.start;
+                      return at === undefined ? null : (
+                        <span key={idx}>
+                          {" "}
+                          <SeekButton at={at} onSeek={onSeek} />
+                        </span>
+                      );
+                    })}
+                  </span>
+                  {c.key === "setup" ? (
+                    <ul className="list-disc pl-5 text-muted-fg">
+                      {r.score?.setup.map((s) => (
+                        <li key={s.key}>
+                          {t(`recordingPage.score.${s.key}` as TKey)}:{" "}
+                          {s.points === null
+                            ? t("recordingPage.score.notMeasured")
+                            : t("recordingPage.score.points", {
+                                n: String(s.points).replace(".", ","),
+                              })}{" "}
+                          · {s.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      ) : null}
       <Section title={t("recordingPage.sections.verdict")}>
         <div className="flex items-center gap-2">
           <Badge

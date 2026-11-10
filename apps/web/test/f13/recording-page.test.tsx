@@ -174,6 +174,26 @@ const analysis = (over: Partial<RecordingAnalysis["recording"]> = {}): Recording
         { title: "Apoio", how: "Menos 'né'." },
       ],
       limitations: ["Rosto em miniatura."],
+      score: {
+        overall: 58,
+        criteria: [
+          { key: "completeness", points: 5, weight: 40, reason: "Errou os índices.", turns: [1] },
+          { key: "objectivity", points: 7, weight: 20, reason: "Direto.", turns: [] },
+          { key: "clarity", points: 6, weight: 20, reason: "Muitos 'né'.", turns: [] },
+          {
+            key: "setup",
+            points: 5,
+            weight: 20,
+            reason: "câmera: não medido · áudio: 10 · ruído: 0",
+            turns: [],
+          },
+        ],
+        setup: [
+          { key: "camera", points: null, reason: "não medida: rosto não detectável" },
+          { key: "audio", points: 10, reason: "volume bom (-21 dBFS)" },
+          { key: "noise", points: 0, reason: "voz 0 dB acima do fundo" },
+        ],
+      },
     },
   },
 });
@@ -206,6 +226,7 @@ describe("F13/M6 · página da entrevista", () => {
       .getAllByRole("heading", { level: 3 })
       .map((h) => h.textContent);
     expect(titles).toEqual([
+      "Nota da entrevista",
       "Veredito",
       "O que você falou e não deveria",
       "Respostas erradas ou incompletas",
@@ -226,6 +247,18 @@ describe("F13/M6 · página da entrevista", () => {
       "src",
       "/api/recordings/r1/frames/f01-001260.jpg",
     );
+  });
+
+  it("nota da entrevista: geral, pontos por critério com o peso, setup detalhado e não medido", async () => {
+    renderApp({ api: api() as never, initialUrl: "/entrevistas/r1" });
+    const report = await screen.findByRole("region", { name: "Relatório do recrutador" });
+    expect(within(report).getByText("58")).toBeInTheDocument();
+    expect(
+      within(report).getByRole("progressbar", { name: "Respostas completas: 5/10" }),
+    ).toHaveAttribute("aria-valuenow", "50");
+    expect(within(report).getByText("(40%)")).toBeInTheDocument();
+    expect(within(report).getByText(/Câmera: não medido/)).toBeInTheDocument();
+    expect(within(report).getByText(/Ruído do ambiente: 0\/10/)).toBeInTheDocument();
   });
 
   it("tempo no texto leva o vídeo ao trecho", async () => {

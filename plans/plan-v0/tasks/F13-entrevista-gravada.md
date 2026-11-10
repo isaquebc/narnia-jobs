@@ -196,6 +196,14 @@ Passos do M1, cada um com testes antes:
 - **R17 · e2e.** O e2e sobe o serviço `media` de verdade em modo falso (estágio `fake` da imagem, sem modelos) e um vídeo sintético de 60 s (`apps/e2e/fixtures/entrevista-sintetica.webm`).
 - **R18 · GPU (F13-10).** `./start.sh media on --gpu` grava `NARNIA_MEDIA_GPU=1` e passa `docker-compose.media-gpu.yml` (torch CUDA 12.8, reserva de GPU NVIDIA). Não testado numa máquina com GPU.
 
+### 6.1.4 Retorno do dono depois do primeiro uso (2026-11-10)
+
+- **R19 · Token colado depois.** A separação sem token grava `method: none`; a retomada pulava a etapa para sempre. Agora `diarize` roda de novo quando há token, e cada etapa roda de novo quando uma dependência (`DEPS` em `steps.py`) foi refeita depois dela (mtime). A página ganha "Analisar de novo" (com confirmação) e o alerta de vozes aproximadas leva às Configurações.
+- **R20 · Nomes da tela.** A etiqueta do Teams tem ~11 px: no quadro inteiro (2×) o Tesseract não lia (no teste real saiu "Ss"). OCR em faixas horizontais de 12% sobrepostas, cinza, 3× (~95% de confiança no quadro real); nome de uma palavra (a miniatura) vale se não for botão da plataforma e estiver abaixo da barra do topo; palavra de menos de 3 letras não é nome.
+- **R21 · Idioma por trecho.** `multilingual=True` no faster-whisper quando o idioma não é fixado: o trecho em inglês sai em inglês.
+- **R22 · Dados de carreira no relatório.** O resumo leva `candidate` (`buildCandidateBackground`: cartão, experiências com conquistas, projetos, formação, skills, idiomas; sem ocultos e sem remuneração). A sugestão usa esses fatos antes de `[completar]`.
+- **R23 · Nota da entrevista (decisão do dono).** Pesos: respostas completas 40, objetividade 20, clareza 20, setup 20 (média de câmera, áudio e ruído medidos pelo código). O modelo dá 0–10 com motivo e turnos nos três de conteúdo (`scores`); o código confere turnos, mede o setup (`setupScores`) e monta `score` (0–100). Critério sem medida fica fora e os pesos se redistribuem; câmera só com rosto detectável (miniatura da própria tela não é o que quem entrevistou viu); sem fala da pessoa candidata, conteúdo "não avaliado" e sem nota geral. Caso novo no gate: `usa-dados-de-carreira`.
+
 ### 6.2 Testes unitários (TDD)
 Duração sem cabeçalho; junção de palavras e turnos; retomada por etapa; alerta de confiabilidade; eventos relativos ao padrão da pessoa; detecção de sala de espera; checagem de citações e tempos (citação alterada, pessoa errada, tempo inexistente); backup sem `interviews/` e com o resto; apagar só o vídeo; token nunca em log.
 

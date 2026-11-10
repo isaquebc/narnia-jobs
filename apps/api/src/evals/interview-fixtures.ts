@@ -246,6 +246,48 @@ const NOFACE_BRIEF = {
   frames: [],
 };
 
+/** Dados de carreira fictícios (como `buildCandidateBackground` monta): fatos que respondem o que ficou vago. */
+const CAREER_BRIEF = {
+  ...TECH_BRIEF,
+  candidate: {
+    card: "Alex Souza · Desenvolvedor Backend sênior · 6 anos com Node.js e PostgreSQL em pagamentos.",
+    experiences: [
+      {
+        company: "Globex",
+        title: "Desenvolvedor Backend Sênior",
+        period: "2021-03 – atual",
+        summary: "APIs de pagamento e conciliação.",
+        tech: ["Node.js", "PostgreSQL", "Kafka", "Testcontainers"],
+        achievements: [
+          "Criou a busca de lojistas por nome com índice GIN e pg_trgm (de 2 s para 80 ms)",
+          "Montou os testes de integração com Testcontainers no CI (cobertura de 85% no serviço de cobrança)",
+          "Implantou revisão de código obrigatória com checklist de segurança",
+        ],
+      },
+      {
+        company: "Initech",
+        title: "Desenvolvedor Backend",
+        period: "2019-01 – 2021-02",
+        summary: "Integrações bancárias.",
+        tech: ["Node.js", "MySQL"],
+        achievements: ["Migrou 40 integrações para filas com reprocessamento"],
+      },
+    ],
+    projects: [],
+    education: [
+      {
+        institution: "Universidade Federal",
+        course: "Ciência da Computação",
+        degree: "bacharelado",
+        period: "2014 – 2018",
+        status: "completed",
+      },
+    ],
+    skills: ["Node.js", "PostgreSQL", "Kafka", "Testcontainers", "Docker"],
+    languages: [{ name: "Inglês", level: "advanced" }],
+  },
+};
+
 export const INTERVIEW_REPORT_CASES: Array<{
   id: string;
   description: string;
@@ -259,6 +301,7 @@ export const INTERVIEW_REPORT_CASES: Array<{
     input: { brief: TECH_BRIEF, transcript: transcript(TECH) },
     reference: {
       expected: ['"problem":"wrong"', "GIN", '"event":"e1"', '"event":"e2"', "[completar"],
+      scores: { completeness: [0, 6] },
     },
   },
   {
@@ -273,7 +316,21 @@ export const INTERVIEW_REPORT_CASES: Array<{
     description:
       "Respostas corretas e concretas sobre idempotência: veredito forte, nada de resposta errada inventada.",
     input: { brief: GOOD_BRIEF, transcript: transcript(GOOD) },
-    reference: { expected: ['"level":"strong"'], forbidden: ['"problem":"wrong"'] },
+    reference: {
+      expected: ['"level":"strong"'],
+      forbidden: ['"problem":"wrong"'],
+      scores: { completeness: [8, 10], objectivity: [7, 10], clarity: [7, 10] },
+    },
+  },
+  {
+    id: "usa-dados-de-carreira",
+    description:
+      "Mesma entrevista técnica, agora com os dados de carreira: a sugestão da resposta vaga sobre qualidade usa os testes com Testcontainers e a cobertura que estão nos dados (sem [completar] para isso), e a correção dos índices lembra que a pessoa já usou GIN com pg_trgm; nota de completude baixa.",
+    input: { brief: CAREER_BRIEF, transcript: transcript(TECH) },
+    reference: {
+      expected: ["Testcontainers", "pg_trgm"],
+      scores: { completeness: [0, 6] },
+    },
   },
 ];
 
