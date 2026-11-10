@@ -53,3 +53,22 @@ def test_retomada_pula_o_que_ja_foi_feito(media):
     run = wait_run(media, body["id"], timeout=90)
     assert run["state"] == "done"
     assert run["skipped"] == ["probe", "audio", "transcribe"]
+
+
+def test_token_salvo_depois_refaz_as_vozes_e_o_que_depende_delas(media):
+    run_steps(media, "a5", AUDIO, seconds=20)
+    media.call("PUT", "/token", {"token": "hf_ok_x"})
+    _, body = media.call("POST", "/runs", {"interview_id": "a5", "steps": AUDIO})
+    run = wait_run(media, body["id"], timeout=90)
+    assert run["state"] == "done", run
+    assert run["skipped"] == ["probe", "audio", "transcribe"]
+    assert run["results"]["diarize"]["method"] == "pyannote"
+    assert {t["speaker"] for t in run["results"]["turns"]["turns"]} == {"SPEAKER_00", "SPEAKER_01"}
+    assert set(run["results"]["voice"]["speakers"]) == {"SPEAKER_00", "SPEAKER_01"}
+
+
+def test_sem_token_de_novo_nao_refaz_nada(media):
+    run_steps(media, "a6", AUDIO, seconds=10)
+    _, body = media.call("POST", "/runs", {"interview_id": "a6", "steps": AUDIO})
+    run = wait_run(media, body["id"], timeout=90)
+    assert run["skipped"] == AUDIO

@@ -256,6 +256,21 @@ describe("F13/M6 · página da entrevista", () => {
     await waitFor(() => expect(a.regenerateRecordingReport).toHaveBeenCalledWith("r1"));
   });
 
+  it("vozes sem token: alerta leva às Configurações e 'Analisar de novo' roda a análise outra vez", async () => {
+    const a = api(analysis({ approximate: true }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderApp({ api: a as never, initialUrl: "/entrevistas/r1" });
+    expect(await screen.findByText(/faltou o token do Hugging Face/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Colar o token em Configurações" })).toHaveAttribute(
+      "href",
+      "/configuracoes",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Analisar de novo" }));
+    expect(confirm).toHaveBeenCalled();
+    await waitFor(() => expect(a.analyzeRecording).toHaveBeenCalledWith("r1"));
+    confirm.mockRestore();
+  });
+
   it("em análise: etapa e porcentagem", async () => {
     const a = analysis({ state: "analyzing", step: "transcribe", progress: 23 });
     renderApp({ api: api({ ...a, report: null }) as never, initialUrl: "/entrevistas/r1" });

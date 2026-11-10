@@ -549,6 +549,20 @@ export function RecordingPage({ id, startAt }: { id: string; startAt?: number | 
               {t("recordingPage.regenerate")}
             </Button>
           ) : null}
+          {rec.analyzedAt && rec.state !== "analyzing" && rec.hasVideo ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              title={t("recordingPage.reanalyzeHint")}
+              disabled={analyze.isPending}
+              onClick={() =>
+                window.confirm(t("recordingPage.reanalyzeConfirm")) && analyze.mutate()
+              }
+            >
+              {t("recordingPage.reanalyze")}
+            </Button>
+          ) : null}
           {!rec.analyzedAt &&
           (rec.state === "uploaded" || rec.state === "failed") &&
           rec.hasVideo ? (
@@ -580,7 +594,14 @@ export function RecordingPage({ id, startAt }: { id: string; startAt?: number | 
       ) : null}
       {rec.state === "failed" && rec.error ? <Alert tone="danger">{rec.error}</Alert> : null}
       {error ? <Alert tone="danger">{errorText(error)}</Alert> : null}
-      {rec.approximate ? <Alert tone="info">{t("recordingPage.approximate")}</Alert> : null}
+      {rec.approximate ? (
+        <Alert tone="warn">
+          {t("recordingPage.approximate")}{" "}
+          <NavLink to="/configuracoes" className="underline">
+            {t("recordingPage.approximateLink")}
+          </NavLink>
+        </Alert>
+      ) : null}
       {rec.hasVideo ? (
         // biome-ignore lint/a11y/useMediaCaption: gravação da pessoa; a transcrição clicável está abaixo
         <video

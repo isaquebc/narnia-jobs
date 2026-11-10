@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from .probe import StepError
-from .steps import STEPS, Ctx
+from .steps import STEPS, Ctx, outdated
 
 INTERVIEW_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 VIDEO_PREFIX = "video."
@@ -88,7 +88,7 @@ class Runner:
                 run["_index"] = i
                 run["step_progress"] = 0
                 out = work / f"{name}.json"
-                if out.is_file():
+                if not outdated(name, ctx):
                     run["results"][name] = json.loads(out.read_text())
                     run["skipped"].append(name)
                 else:

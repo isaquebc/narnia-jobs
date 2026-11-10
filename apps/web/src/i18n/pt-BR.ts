@@ -2206,7 +2206,13 @@ export const ptBR = {
     analyzing: "Analisando · {step} · {pct}%",
     waiting: "Enviada. A análise começa quando o serviço de vídeo estiver ligado.",
     approximate:
-      "Vozes separadas por aproximação (sem token do Hugging Face): confira quem falou cada turno.",
+      'As vozes não foram separadas: faltou o token do Hugging Face, e cada fala foi para o rosto que mais mexia a boca (se o seu rosto não foi detectado, as suas falas foram para quem entrevistou e o relatório não tem o que avaliar). Cole o token e use "Analisar de novo".',
+    approximateLink: "Colar o token em Configurações",
+    reanalyze: "Analisar de novo",
+    reanalyzeHint:
+      "Roda a análise do vídeo outra vez, aproveitando o que não mudou (com o token novo, refaz a separação das vozes).",
+    reanalyzeConfirm:
+      "Analisar de novo? Quem é quem e as correções de quem falou voltam ao que a análise encontrar, e sai um relatório novo.",
     steps: {
       probe: "Leitura do vídeo",
       audio: "Extração do áudio",

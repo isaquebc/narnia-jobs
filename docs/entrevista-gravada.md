@@ -79,6 +79,9 @@ de rosto perde você boa parte do tempo e o sorriso não pode ser medido.
   seu nome ou por quem mais fala) e corrija nomes.
 - **Transcrição:** cada turno tem a pessoa; corrija quem falou quando a separação errar.
 - **Refazer o relatório:** depois de corrigir, gera uma versão nova do relatório, sem rodar o vídeo de novo.
+- **Analisar de novo:** roda a análise do vídeo outra vez, aproveitando as etapas que não mudaram. Use quando o vídeo
+  foi analisado sem o token: com o token colado, a separação das vozes e o que depende dela são refeitos (a
+  transcrição e os rostos, não). Quem é quem e as correções de quem falou voltam ao que a análise encontrar.
 - **Apagar:** só o vídeo (a análise fica, sem reprodução nem refazer a parte visual) ou a entrevista inteira.
 
 ## O que sai do seu computador

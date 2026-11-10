@@ -225,6 +225,41 @@ def step_frames(ctx: Ctx) -> dict:
     return {"frames": frames}
 
 
+# de quais etapas cada uma lê o resultado; refazer uma refaz as que dependem dela (o arquivo da dependência fica mais
+# novo que o dela)
+DEPS: dict[str, list[str]] = {
+    "probe": [],
+    "audio": [],
+    "transcribe": ["audio"],
+    "diarize": ["audio"],
+    "turns": ["transcribe", "diarize"],
+    "voice": ["transcribe", "turns", "link"],
+    "levels": ["audio", "turns", "link"],
+    "faces": ["probe"],
+    "layout": ["faces", "turns"],
+    "link": ["layout", "turns"],
+    "events": ["layout", "link", "turns"],
+    "frames": ["layout", "events", "link"],
+}
+
+
+def outdated(name: str, ctx: Ctx) -> bool:
+    """A etapa precisa rodar: sem resultado, separação de vozes feita sem token que agora existe, ou uma dependência
+    refeita depois dela."""
+    out = ctx.work / f"{name}.json"
+    if not out.is_file():
+        return True
+    if name == "diarize" and tokens.has_token(ctx.models_dir):
+        if json.loads(out.read_text()).get("method") == "none":
+            return True
+    mtime = out.stat().st_mtime_ns
+    for dep in DEPS.get(name, []):
+        p = ctx.work / f"{dep}.json"
+        if p.is_file() and p.stat().st_mtime_ns > mtime:
+            return True
+    return False
+
+
 STEPS: dict[str, Callable[[Ctx], dict]] = {
     "probe": lambda ctx: probe(ctx.video),
     "audio": step_audio,
