@@ -102,6 +102,26 @@ export async function onTaskFailed(
   deps: WorkerDeps,
   queue = "ingest",
 ): Promise<void> {
+  // F13: análise ou relatório da entrevista que falhou de vez (ex.: o worker reiniciou várias vezes no meio): a
+  // entrevista sai de "analisando" e a página mostra "Tentar de novo" (o media retoma das etapas feitas)
+  if (data.type.startsWith("recording.")) {
+    const id = typeof data.payload.recordingId === "string" ? data.payload.recordingId : null;
+    const rec = id ? deps.repos.recordings.get(id) : null;
+    if (!id || rec?.state !== "analyzing") return;
+    const r = deps.repos.recordings.update(id, {
+      state: "failed",
+      step: null,
+      error: `A análise parou: ${error.message || String(error)}. Tente de novo; o que já foi feito é aproveitado.`,
+    });
+    await deps.publish({
+      type: "recording.updated",
+      recordingId: id,
+      state: r.state,
+      step: r.step,
+      progress: r.progress,
+    });
+    return;
+  }
   if (!data.type.startsWith("ingest.")) return;
   const id = typeof data.payload.runId === "string" ? data.payload.runId : null;
   if (!id) return;

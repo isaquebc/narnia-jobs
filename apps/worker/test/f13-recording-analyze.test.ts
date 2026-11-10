@@ -243,6 +243,27 @@ describe("F13/M4 · retomada depois de reiniciar o worker", () => {
   });
 });
 
+describe("F13/M4 · job que falhou de vez", async () => {
+  const { onTaskFailed } = await import("../src/tasks");
+  it("entrevista em análise vira failed com a mensagem e o convite para tentar de novo", async () => {
+    const h = harness();
+    h.repos.recordings.update(h.rec.id, { state: "analyzing", step: "transcribe", progress: 30 });
+    await onTaskFailed(
+      {
+        kind: "task",
+        type: RECORDING_TASKS.analyze,
+        key: h.rec.id,
+        payload: { recordingId: h.rec.id },
+      },
+      new Error("job stalled more than allowable limit"),
+      h.deps,
+      "media",
+    );
+    expect(h.repos.recordings.get(h.rec.id)).toMatchObject({ state: "failed", step: null });
+    expect(h.repos.recordings.get(h.rec.id)?.error).toMatch(/Tente de novo/);
+  });
+});
+
 describe("F13/M4 · barra de progresso pelo peso das etapas", async () => {
   const { weightedProgress, mediaSteps } = await import("../src/processors/recording-analyze");
   it("a transcrição pela metade já é perto de um quarto do todo; etapas rápidas quase não andam a barra", () => {

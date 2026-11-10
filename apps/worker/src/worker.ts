@@ -177,6 +177,9 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       {
         connection,
         prefix,
+        // F13: a análise leva até uma hora e retoma pelas etapas do media; um reinício do worker no meio não pode
+        // derrubar o job de vez (padrão da BullMQ: 1)
+        ...(name === "media" ? { maxStalledCount: 5 } : {}),
         // `media` fica em 1 (F13): o serviço processa uma execução por vez
         concurrency:
           opts.concurrency?.[name] ??
