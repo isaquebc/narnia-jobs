@@ -1,0 +1,1 @@
+# Dependências do serviço media (M1: só biblioteca padrão; M2/M3 acrescentam as etapas pesadas)

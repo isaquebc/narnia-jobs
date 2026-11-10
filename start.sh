@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # narnia-jobs · lançador para Linux/macOS. Só depende de Docker (com Compose v2).
-# Uso:             up | down [--purge] | login | doctor | logs | status | restore | extension | install-plugin | google
-# Desenvolvimento: dev | dev-down | test | lint | typecheck | build | shell | cli | test:sh | e2e | install | evals
+# Uso:             up | down [--purge] | login | doctor | logs | status | restore | extension | install-plugin | google | media
+# Desenvolvimento: dev | dev-down | test | lint | typecheck | build | shell | cli | test:sh | test:media | e2e | install | evals
 #                  promote (cópia .owner-src do mantenedor). Ajuda completa: ./start.sh help
 set -euo pipefail
 
@@ -147,6 +147,22 @@ prod_data_host_dir() { setting NARNIA_DATA_DIR ./data; }
 
 # prod_backup_host_dir -> pasta de backups montada em /backups na produção local
 prod_backup_host_dir() { setting NARNIA_BACKUP_HOST_DIR ./backups; }
+
+# --- F13 · serviço media opcional (análise de entrevista gravada; plans/plan-v0/tasks/F13 §6.1.1, R2) --------------
+
+# media_enabled -> 0 se o serviço media está ligado nesta instância (NARNIA_MEDIA=1 no ambiente ou no $ENV_FILE)
+media_enabled() { [[ "$(setting NARNIA_MEDIA 0)" == 1 ]]; }
+
+# media_profile_args -> "--profile media" quando ligado (vazio quando não), para os composes de dev e produção
+media_profile_args() { if media_enabled; then printf '%s\n' "--profile media"; fi; }
+
+# media_dirs DATA_DIR -> cria DATA_DIR/interviews antes do Docker (o media monta só essa pasta; senão nasce do root)
+media_dirs() { mkdir -p "$1/interviews"; }
+
+# ligado: os composes de dev e produção incluem o perfil (sobe, para e derruba junto com o resto)
+read -r -a MEDIA_ARGS <<<"$(media_profile_args)" || true
+DEV_COMPOSE+=("${MEDIA_ARGS[@]}")
+PROD_COMPOSE+=("${MEDIA_ARGS[@]}")
 
 # oauth_port -> porta do callback do OAuth do Google no host (a mesma dentro do container: o endereço de retorno é um só)
 oauth_port() { setting NARNIA_OAUTH_PORT 8089; }
@@ -396,6 +412,7 @@ cmd_up() {
   else
     check_host_dirs "$NARNIA_DATA_DIR" "$NARNIA_BACKUP_HOST_DIR"
     mkdir -p "$NARNIA_DATA_DIR" "$NARNIA_BACKUP_HOST_DIR"   # antes do Docker, para pertencerem ao usuário
+    ! media_enabled || media_dirs "$NARNIA_DATA_DIR"
     mkdir -p "$(dirname "$ENV_FILE")"
     port=$(choose_port "$ENV_FILE") || die "nenhuma porta livre entre ${NARNIA_PORT_START} e ${NARNIA_PORT_END}."
     write_env "$ENV_FILE" NARNIA_PORT "$port"
@@ -622,6 +639,52 @@ cmd_promote() {
   fi
 }
 
+# cmd_media on|off [--purge]|status -> liga ou desliga o serviço media da F13 nesta instância (R2). O app não liga
+# containers (o api roda sem acesso ao Docker): a tela de Configurações mostra este comando e, depois, pede o token.
+cmd_media() {
+  local sub=${1:-status} purge=${2:-} dev_on="" prod_on="" project volume
+  require_docker
+  [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]] && dev_on=1
+  stack_running && prod_on=1
+  case "$sub" in
+    on)
+      mkdir -p "$(dirname "$ENV_FILE")"
+      write_env "$ENV_FILE" NARNIA_MEDIA 1
+      media_dirs "$(dev_data_host_dir)"
+      media_dirs "$(prod_data_host_dir)"
+      info "serviço de análise de vídeo ligado (NARNIA_MEDIA=1 em $ENV_FILE)."
+      info "espaço: a imagem e os modelos ocupam cerca de 8 GB (os modelos baixam no primeiro uso)."
+      if [[ -n "$dev_on" ]]; then
+        "${DEV_COMPOSE[@]}" --profile app --profile media up -d --build media || die "não consegui subir o media (dev)."
+      fi
+      if [[ -n "$prod_on" ]]; then
+        export NARNIA_DATA_DIR; NARNIA_DATA_DIR=$(prod_data_host_dir)
+        "${PROD_COMPOSE[@]}" --profile media up -d --build media || die "não consegui subir o media."
+      fi
+      [[ -n "$dev_on$prod_on" ]] || info "ele sobe junto no próximo ./start.sh up (ou dev)."
+      info "próximo passo: Configurações › Análise de vídeo, para colar o token do Hugging Face." ;;
+    off)
+      write_env "$ENV_FILE" NARNIA_MEDIA 0
+      "${DEV_COMPOSE[@]}" --profile media rm -s -f media >/dev/null 2>&1 || true
+      "${PROD_COMPOSE[@]}" --profile media rm -s -f media >/dev/null 2>&1 || true
+      info "serviço de análise de vídeo desligado. Vídeos e análises continuam na pasta de dados."
+      if [[ "$purge" == --purge ]]; then
+        for project in "$(dev_project_name)" "$("${PROD_COMPOSE[@]}" config 2>/dev/null | sed -n 's/^name: //p' | head -n 1)"; do
+          [[ -n "$project" ]] || continue
+          volume="${project}_media-models"
+          docker volume rm "$volume" >/dev/null 2>&1 && info "modelos e token apagados (volume $volume)."
+        done
+      else
+        info "os modelos e o token continuam guardados; para apagar: ./start.sh media off --purge"
+      fi ;;
+    status)
+      if media_enabled; then info "análise de vídeo: ligada"; else info "análise de vídeo: desligada (./start.sh media on)"; fi
+      [[ -z "$dev_on" ]] || "${DEV_COMPOSE[@]}" --profile media ps media 2>/dev/null || true
+      [[ -z "$prod_on" ]] || "${PROD_COMPOSE[@]}" --profile media ps media 2>/dev/null || true ;;
+    *) die "uso: ./start.sh media on | off [--purge] | status" ;;
+  esac
+}
+
 # extension_build DIR -> gera a extensão do Chrome (F12-10) a partir do código em DIR (DIR/apps/extension/dist)
 extension_build() {
   (
@@ -664,6 +727,7 @@ Uso (produção, só Docker no host):
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
   promote [c]   atualiza a cópia .owner-src do código para um commit (padrão HEAD; fluxo do mantenedor, CONTRIBUTING.md)
   extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
+  media on|off [--purge]|status   liga ou desliga a análise de entrevista gravada (F13; serviço opcional)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
@@ -685,6 +749,7 @@ Desenvolvimento (tudo em containers):
   google status | google connect <client-id>   Google Calendar opcional das candidaturas (docs/google-calendar.md)
   cli <cmd>     roda a CLI narnia-jobs (doctor | login | install-plugin) no container de dev
   test:sh       testa start.sh (bats) e start.ps1 (Pester) em containers
+  test:media    testa o serviço media da F13 (pytest, vídeo sintético)
   e2e [args]    testes de ponta a ponta (Playwright em container, provider mock); --ui-only pula down/up, worker e porta
   install       instala dependências no volume node_modules
 USAGE
@@ -718,6 +783,7 @@ main() {
     evals) cmd_evals "$@" ;;
     promote) cmd_promote "$@" ;;
     extension) cmd_extension ;;
+    media) cmd_media "$@" ;;
     dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;
@@ -727,6 +793,7 @@ main() {
       "${DEV_COMPOSE[@]}" --profile app build >/dev/null || die "não consegui construir as imagens de dev."
       ensure_installed
       mkdir -p "$(dev_data_host_dir)" "$(dev_backup_host_dir)"   # antes do Docker: pertencem ao usuário
+      ! media_enabled || media_dirs "$(dev_data_host_dir)"
       [[ -z "$NARNIA_INSTANCE" ]] || info "instância: ${NARNIA_INSTANCE} (projeto ${NARNIA_DEV_PROJECT_NAME:-?}, dados $(dev_data_host_dir))"
       deliver_host_gh_token "${DEV_COMPOSE[@]}" dev
       printf '\n  modo dev (hot reload):  %s\n' "$(app_url "${NARNIA_DEV_PORT:-5173}" "${NARNIA_TOKEN:-dev-token}")"
@@ -762,6 +829,12 @@ main() {
       dev_run bats scripts/test
       docker run --rm -v "$PWD:/code:ro" -w /code -e NARNIA_PS_NO_MAIN=1 mcr.microsoft.com/powershell:7.4-ubuntu-22.04 \
         pwsh -NoProfile -Command "Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck | Out-Null; Invoke-Pester -Path scripts/test -Output Detailed -ErrorAction Stop" ;;
+    test:media)
+      # F13: serviço media (Python) com pytest e vídeo sintético, na imagem do próprio serviço
+      require_docker
+      docker build -q -f services/media/Dockerfile --target media-test -t narnia-jobs/media-test . >/dev/null \
+        || die "não consegui construir a imagem de teste do media."
+      docker run --rm narnia-jobs/media-test python -m pytest -q "$@" ;;
     help|-h|--help)
       usage ;;
     *)

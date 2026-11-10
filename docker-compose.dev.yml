@@ -56,7 +56,8 @@ services:
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # vaga por URL que precisa de navegador (vazio desliga)
-    networks: [default, browser]
+      - NARNIA_MEDIA_URL=${NARNIA_MEDIA_URL-http://media:8700}   # F13: serviço media (perfil opcional)
+    networks: [default, browser, media]
     depends_on: [redis]
 
   worker:
@@ -75,7 +76,8 @@ services:
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # F05: PDF do CV e da carta
-    networks: [default, browser]
+      - NARNIA_MEDIA_URL=${NARNIA_MEDIA_URL-http://media:8700}   # F13: serviço media (perfil opcional)
+    networks: [default, browser, media]
     depends_on: [redis]
 
   web:
@@ -95,6 +97,20 @@ services:
     profiles: ["app"]
     init: true
     networks: [browser]
+
+  # F13: serviço media (perfil `media`, além do `app`; ver docker-compose.yml)
+  media:
+    build:
+      context: .
+      dockerfile: services/media/Dockerfile
+      target: runtime
+    profiles: ["media"]
+    init: true
+    user: "${NARNIA_UID:-1000}:${NARNIA_GID:-1000}"
+    networks: [media]
+    volumes:
+      - ${NARNIA_DATA_MOUNT:-./data}/interviews:/interviews
+      - media-models:/models
 
   redis:
     image: redis:7-alpine
@@ -126,10 +142,12 @@ services:
 
 networks:
   browser:   # api e worker ↔ navegador; o navegador não enxerga redis nem web
+  media:     # F13: api e worker ↔ serviço media
 
 volumes:
   node_modules:
   pnpm-store:
   claude-auth:   # mesmo nome que no docker-compose.yml: o login vale para dev e produção
   phoenix-data:  # F04-15: dados do Phoenix da instância
+  media-models:  # F13: pesos dos modelos e token do Hugging Face
   gh-auth:       # F03-1: por projeto Docker (cada instância tem o seu); o lançador grava o token do gh do host

@@ -340,3 +340,28 @@ Describe "Set-HostUser (containers com o uid de quem chama)" {
     try { $env:NARNIA_UID = "4242"; Set-HostUser; $env:NARNIA_UID | Should -Be "4242" } finally { $env:NARNIA_UID = $old }
   }
 }
+
+Describe "F13 · serviço media opcional" {
+  BeforeEach { $script:SavedEnvFile = $script:EnvFile; Remove-Item env:NARNIA_MEDIA -ErrorAction SilentlyContinue }
+  AfterEach { $script:EnvFile = $script:SavedEnvFile; Remove-Item env:NARNIA_MEDIA -ErrorAction SilentlyContinue }
+  It "desligado sem NARNIA_MEDIA; ligado com NARNIA_MEDIA=1 no arquivo" {
+    $script:EnvFile = Join-Path $script:Tmp "media.env"
+    Write-Env $script:EnvFile "NARNIA_PORT" "3100"
+    Test-MediaEnabled | Should -BeFalse
+    Get-MediaProfileArgs | Should -BeNullOrEmpty
+    Write-Env $script:EnvFile "NARNIA_MEDIA" "1"
+    Test-MediaEnabled | Should -BeTrue
+    (Get-MediaProfileArgs) -join " " | Should -Be "--profile media"
+  }
+  It "o ambiente vence o arquivo" {
+    $script:EnvFile = Join-Path $script:Tmp "media2.env"
+    Write-Env $script:EnvFile "NARNIA_MEDIA" "0"
+    $env:NARNIA_MEDIA = "1"
+    Test-MediaEnabled | Should -BeTrue
+  }
+  It "cria <dados>/interviews" {
+    $d = Join-Path $script:Tmp "dados"
+    New-MediaDirs $d
+    Test-Path (Join-Path $d "interviews") | Should -BeTrue
+  }
+}

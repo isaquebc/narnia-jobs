@@ -68,7 +68,20 @@ Sem o `media` ativo, a tela explica como ativar e nada é enviado.
 
 Cada etapa grava seu JSON e é pulada ao retomar. GPU NVIDIA é opcional, por override do compose; sem ela, CPU.
 
-**Licenças a confirmar antes do M1:** MediaPipe (código e modelo), librosa, pesos do pyannote `community-1`, faster-whisper e pesos do Whisper. Só entra o que for compatível com distribuição em projeto MIT.
+**Licenças (confirmadas em 2026-11-09, fontes primárias):** todas compatíveis com o projeto MIT, que não redistribui pesos (o usuário constrói a imagem e os modelos baixam no primeiro uso).
+
+| Item | Licença | Observação |
+|---|---|---|
+| faster-whisper, CTranslate2 | MIT | |
+| Whisper `large-v3` e a conversão `Systran/faster-whisper-large-v3` | MIT (README da OpenAI e conversão); o card no HF diz Apache-2.0 | as duas permissivas |
+| pyannote.audio 4.x | MIT | |
+| `pyannote/speaker-diarization-community-1` | CC-BY-4.0, **gated** | atribuição na documentação; o usuário aceita os termos no HF com a própria conta (e concorda em receber e-mails da pyannote) |
+| librosa | ISC | |
+| MediaPipe e `face_landmarker.task` | Apache-2.0 (Face Mesh V2 e Blendshape V2 confirmados; BlazeFace provável) | os cards dizem que não serve para decisões críticas e não faz reconhecimento facial: coerente com F13-4 (observado + hipótese) e com nomes vindos do OCR, nunca do rosto |
+| Tesseract e `tessdata` | Apache-2.0 | |
+| FFmpeg do Debian | GPL v2+ | executado como processo, não linkado; a imagem é construída pelo usuário |
+
+Falta conferir as dependências transitivas (torch, onnxruntime) quando entrarem no M2/M3.
 
 ### 2.3 Confiabilidade (F13-4)
 Cada medição de rosto traz a porcentagem de tempo detectável e o tamanho do rosto. O feedback de sorriso **nunca é omitido**: quando a detecção é fraca, sai com alerta e a porcentagem. A cordialidade também é avaliada pela fala. Expressão é sempre fato observado + hipótese. O mínimo que dispara o alerta é calibrado no M3, considerando que modelos de rosto podem errar mais com barba, pouca luz e pele escura: o gabarito precisa cobrir essa diversidade.
@@ -144,6 +157,28 @@ Visual em aberto (F13-13). Telas necessárias: envio na etapa da candidatura e a
 - **M6** Página da entrevista, depois de F13-13.
 - **M7** README, tutorial, regra de uso em destaque, teste manual.
 
+### 6.1.1 Refinamento do M1 (2026-11-09, a partir do código)
+
+Decisões técnicas do refinamento (R = refinamento; contestáveis pelo dono a qualquer momento):
+
+- **R1 · `media` sem framework web.** Python 3.12, `http.server` da biblioteca padrão (`ThreadingHTTPServer`), JSON nas duas direções, testes com `pytest` num estágio `media-test` da própria imagem. Uma análise longa (20 min de transcrição) não cabe numa requisição: o worker cria a execução (`POST /runs`), o `media` roda numa thread, uma etapa por vez, e o worker consulta (`GET /runs/<id>`), com etapa atual, porcentagem e erro. Concorrência 1 no próprio serviço (`409 busy` se já há uma).
+- **R2 · Ativar é pelo lançador, não pela tela.** O api roda sem acesso ao Docker, então a tela não liga containers. `./start.sh media on|off|status` (e `start.ps1`) grava `NARNIA_MEDIA=1` no arquivo de ambiente da instância, constrói a imagem e sobe o perfil `media`; `up` e `dev` passam a incluir `--profile media` quando ligado. A tela de Configurações mostra o estado (desligado → o comando e o espaço necessário; ligado sem token → passo a passo do token; pronto) e a regra de uso.
+- **R3 · Rede e volumes.** Rede `media` só com api e worker (o api só usa `GET /health` e o token; quem processa é o worker). O `media` monta **só** `<dados>/interviews` (leitura e escrita: lê o vídeo e grava `interviews/<id>/work/<etapa>.json`, também fora do backup) e um volume `media-models` com os pesos e o token (`/models/hf_token`, 0600). Os quadros escolhidos são copiados pelo worker para `<dados>/interview-frames/<id>/`.
+- **R4 · Token.** `PUT /token` no `media` (pelo api), que grava o arquivo e devolve só `{configured: true}`; `GET /health` diz `{token: bool}`, nunca o valor. Validação do token contra o Hugging Face no próprio `media` ao gravar (aceite dos termos do `community-1` incluso), com mensagem acionável quando falha.
+- **R5 · Upload em partes.** `POST /api/recordings` cria a entrevista (`recorded_interview`, estado `uploading`) com nome, tamanho e tipo; `PUT /api/recordings/:id/video?offset=N` recebe partes de 8 MB (corpo cru, cabe no limite de 12 MB do nginx) e grava em `video.part`; `GET /api/recordings/:id/upload` diz quantos bytes já chegaram (retomada após fechar a aba ou cair a rede); a última parte renomeia para `video.<ext>` e pede a validação (`ffprobe`, etapa 1) ao `media`. Por isso a tabela `recorded_interview` vem já no M1 (as outras ficam no M4).
+- **R6 · Reprodução.** `GET /api/recordings/:id/video` com `Range` (206), autenticado pelo cookie do token, como o resto da SPA; no nginx, sem buffer nessa rota.
+- **R7 · Limites iniciais (F13-11, a medir).** 4 GB e 3 h por vídeo, ajustáveis em Configurações; o upload recusa antes de começar se o disco livre for menor que o tamanho + 2 GB.
+
+Passos do M1, cada um com testes antes:
+
+| Passo | Entrega | Testes |
+|---|---|---|
+| M1.1 | `services/media/` (servidor, `/health`, `/token`, `/runs` com a etapa `probe`), Dockerfile, perfil `media` nos composes | pytest: health sem token, token gravado 0600 e nunca devolvido, duração calculada pelos pacotes quando o cabeçalho não tem, `409 busy` |
+| M1.2 | cliente do `media` no `core` e `GET /api/media/status`, `PUT /api/media/token` | vitest: desligado, sem token, pronto, `media` fora do ar, token fora de log e resposta |
+| M1.3 | `start.sh media on\|off\|status` e `start.ps1` | bats e Pester |
+| M1.4 | migração `recorded_interview`, upload em partes, retomada, reprodução com `Range`, apagar | vitest da API |
+| M1.5 | tela de Configurações (ativar e token) e envio na etapa da candidatura e avulso, com progresso e retomada | e2e com `media` falso |
+
 ### 6.2 Testes unitários (TDD)
 Duração sem cabeçalho; junção de palavras e turnos; retomada por etapa; alerta de confiabilidade; eventos relativos ao padrão da pessoa; detecção de sala de espera; checagem de citações e tempos (citação alterada, pessoa errada, tempo inexistente); backup sem `interviews/` e com o resto; apagar só o vídeo; token nunca em log.
 
@@ -192,3 +227,14 @@ Uma gravação real do dono (54 min, Teams, 2 pessoas, H.264 + Opus, 1920×904, 
 | Recrutador (Sonnet, transcrição + medições + 18 quadros) | ~5 min, ~125 mil tokens; relatório aprovado pelo dono; nenhuma citação inventada, mas pequenas edições em trechos ditos literais |
 
 Tecnicamente, `faster-whisper` 1.2.1 com PyAV 19 quebra ao decodificar (`metadata_errors`): passar o áudio já em memória ou fixar a versão. MediaPipe 1.2.2 precisa de `libegl1` e `libgles2` na imagem. Não testados: entonação, OCR dos nomes, GPU.
+
+### M1 · execução (2026-11-09)
+| Passo | Estado | Testes (antes do código: sim) |
+|---|---|---|
+| M1.1 serviço `media` (`services/media/`), perfil `media` nos composes, `./start.sh test:media`, job `media` no CI | feito | 14 pytest (vídeo sintético, inclusive WebM sem duração no cabeçalho) |
+| M1.2 `MediaClient` (`packages/core/src/media/client.ts`), `GET /api/media/status`, `PUT`/`DELETE /api/media/token` | feito | 7 vitest no core, 5 no api (token fora de resposta e log) |
+| M1.3 `./start.sh media on\|off [--purge]\|status` e `start.ps1` | feito | 5 bats, 3 Pester |
+| M1.4 upload em partes, retomada, reprodução | a fazer | |
+| M1.5 telas | a fazer | |
+
+Prova na instância `claude`: `media on` construiu e subiu o serviço; estado `off` → `needs_token`; token falso recusado pelo Hugging Face; token real aceito (incluindo o acesso ao `community-1`), gravado 0600 e apagado em seguida; nenhum `hf_` em logs do api, do worker ou do `media`.

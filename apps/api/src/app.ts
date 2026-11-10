@@ -1,5 +1,10 @@
 import { join } from "node:path";
-import { defaultGhConfigDir, googleCalendarCallbackPort, type Repos } from "@narnia-jobs/core";
+import {
+  defaultGhConfigDir,
+  googleCalendarCallbackPort,
+  MediaClient,
+  type Repos,
+} from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
 import { nowUtc } from "@narnia-jobs/shared";
 import { Hono } from "hono";
@@ -40,6 +45,7 @@ import { ingestionsRoutes } from "./routes/ingestions";
 import { integrationsRoutes } from "./routes/integrations";
 import { jobApplicationsRoutes } from "./routes/job-applications";
 import { jobsRoutes } from "./routes/jobs";
+import { mediaRoutes } from "./routes/media";
 import { modelSettingsRoutes } from "./routes/model-settings";
 import { motivationsRoutes } from "./routes/motivations";
 import { notificationsRoutes } from "./routes/notifications";
@@ -83,6 +89,8 @@ export interface AppDeps {
   allowedHosts?: Set<string>;
   /** R6: busca por sentido; ausente = serviço padrão (modelo real; vetorizador de conceitos com o mock). */
   semantic?: SemanticSearchService;
+  /** F13: serviço media; ausente = do ambiente (`NARNIA_MEDIA_URL`). */
+  media?: MediaClient;
 }
 
 /** Monta a aplicação Hono (F01 §2.6). Tudo atrás do token de boot, exceto health e a rota de entrada. */
@@ -250,6 +258,7 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
+  app.route("/", mediaRoutes({ media: deps.media ?? MediaClient.fromEnv() }));
   app.route(
     "/",
     pluginStatusRoutes({

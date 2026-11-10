@@ -19,6 +19,7 @@ export * from "./posting";
 export * from "./profile";
 export * from "./profile-card";
 export * from "./profile-suggestion";
+export * from "./recording";
 export * from "./salary-reference";
 export * from "./usage-event";
 export * from "./user";

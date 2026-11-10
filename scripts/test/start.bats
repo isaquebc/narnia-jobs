@@ -648,3 +648,53 @@ fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma
   fi
   chmod 0755 "$TMP/ro"
 }
+
+# --- F13 · serviço media opcional (perfil `media`, ./start.sh media on|off|status) -----------------------------------
+
+@test "media_enabled: desligado sem NARNIA_MEDIA; ligado com NARNIA_MEDIA=1 no arquivo de ambiente" {
+  unset NARNIA_MEDIA
+  ENV_FILE="$TMP/.env"
+  printf 'NARNIA_PORT=3100\n' > "$ENV_FILE"
+  run media_enabled
+  [ "$status" -ne 0 ]
+  write_env "$ENV_FILE" NARNIA_MEDIA 1
+  run media_enabled
+  [ "$status" -eq 0 ]
+  write_env "$ENV_FILE" NARNIA_MEDIA 0
+  run media_enabled
+  [ "$status" -ne 0 ]
+}
+
+@test "media_enabled: o ambiente vence o arquivo" {
+  ENV_FILE="$TMP/.env"
+  printf 'NARNIA_MEDIA=0\n' > "$ENV_FILE"
+  NARNIA_MEDIA=1 run media_enabled
+  [ "$status" -eq 0 ]
+}
+
+@test "media_profile_args: --profile media só quando ligado" {
+  unset NARNIA_MEDIA
+  ENV_FILE="$TMP/.env"
+  : > "$ENV_FILE"
+  run media_profile_args
+  [ "$output" = "" ]
+  write_env "$ENV_FILE" NARNIA_MEDIA 1
+  run media_profile_args
+  [ "$output" = "--profile media" ]
+}
+
+@test "media_dirs: cria <dados>/interviews antes do Docker (senão nasce do root)" {
+  media_dirs "$TMP/dados"
+  [ -d "$TMP/dados/interviews" ]
+}
+
+@test "compose: media é opcional, com init, e monta só <dados>/interviews e os modelos" {
+  local f="$BATS_TEST_DIRNAME/../../docker-compose.yml"
+  docker_compose_service_has_init "$f" media
+  run awk '/^  media:/{s=1;next} s&&/^  [a-z]/{s=0} s' "$f"
+  [[ "$output" == *'profiles: ["media"]'* ]]
+  [[ "$output" == *'/interviews:/interviews'* ]]
+  [[ "$output" == *'media-models:/models'* ]]
+  [[ "$output" != *'/backups'* ]]
+  [[ "$output" != *':/data'* ]]
+}

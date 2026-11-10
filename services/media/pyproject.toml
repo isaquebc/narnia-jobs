@@ -1,0 +1,10 @@
+[project]
+name = "narnia-media"
+version = "0.1.0"
+description = "Serviço media do narnia-jobs (F13): análise local de entrevista gravada"
+license = "MIT"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]

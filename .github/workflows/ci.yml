@@ -73,6 +73,13 @@ jobs:
           docker run --rm -v "$PWD:/code:ro" -w /code -e NARNIA_PS_NO_MAIN=1 mcr.microsoft.com/powershell:7.4-ubuntu-22.04
           pwsh -NoProfile -Command "Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck | Out-Null; Invoke-Pester -Path scripts/test -Output Detailed -ErrorAction Stop"
 
+  media:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Serviço media da F13 (pytest com vídeo sintético)
+        run: ./start.sh test:media
+
   images:
     runs-on: ubuntu-latest
     steps:

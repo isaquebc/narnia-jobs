@@ -1,6 +1,6 @@
 # narnia-jobs · lançador para Windows (PowerShell 5.1+ / 7+). Só depende de Docker Desktop (Compose v2).
-# Produção:        up | down [--purge] | login | doctor | logs | status
-# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | e2e | install
+# Produção:        up | down [--purge] | login | doctor | logs | status | media
+# Desenvolvimento: dev | test | lint | typecheck | build | shell | cli | test:sh | test:media | e2e | install
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)] [string] $Command = "help",
@@ -99,6 +99,13 @@ function Get-Setting([string] $Key, [string] $Default) {
 }
 function Get-ProdDataHostDir { return Get-Setting "NARNIA_DATA_DIR" "./data" }
 function Get-ProdBackupHostDir { return Get-Setting "NARNIA_BACKUP_HOST_DIR" "./backups" }
+# --- F13 · serviço media opcional (análise de entrevista gravada; ver start.sh, cmd_media) ----------------------------
+function Test-MediaEnabled { return (Get-Setting "NARNIA_MEDIA" "0") -eq "1" }
+function Get-MediaProfileArgs { if (Test-MediaEnabled) { return @("--profile", "media") } else { return @() } }
+function New-MediaDirs([string] $DataDir) { New-Item -ItemType Directory -Force -Path (Join-Path $DataDir "interviews") *> $null }
+# ligado: os composes de dev e produção incluem o perfil (sobe, para e derruba junto com o resto)
+$script:DevCompose = @($script:DevCompose + (Get-MediaProfileArgs))
+$script:ProdCompose = @($script:ProdCompose + (Get-MediaProfileArgs))
 # porta do callback do OAuth do Google no host (a mesma dentro do container: o endereço de retorno é um só)
 function Get-OAuthPort { return Get-Setting "NARNIA_OAUTH_PORT" "8089" }
 function Get-DevDownArgs { return @($script:DevCompose + @("--profile", "app", "down", "--remove-orphans")) }
@@ -386,12 +393,52 @@ function Wait-Healthy([string] $Service, [int] $Seconds = 120) {
   return $false
 }
 
+# media on|off [--purge]|status (R2): o app não liga containers; a tela de Configurações mostra este comando
+function Invoke-Media([string[]] $Rest) {
+  Assert-Docker
+  $sub = if ($Rest -and $Rest.Count -gt 0) { $Rest[0] } else { "status" }
+  $devOn = [bool](& docker @script:DevCompose ps -q api 2>$null)
+  $prodOn = Test-StackRunning
+  switch ($sub) {
+    "on" {
+      $envDir = Split-Path -Parent $script:EnvFile; if ($envDir) { New-Item -ItemType Directory -Force -Path $envDir *> $null }
+      Write-Env $script:EnvFile "NARNIA_MEDIA" "1"
+      New-MediaDirs (Get-DevDataHostDir); New-MediaDirs (Get-ProdDataHostDir)
+      Info "serviço de análise de vídeo ligado (NARNIA_MEDIA=1 em $($script:EnvFile))."
+      Info "espaço: a imagem e os modelos ocupam cerca de 8 GB (os modelos baixam no primeiro uso)."
+      if ($devOn) { & docker @script:DevCompose --profile app --profile media up -d --build media; if ($LASTEXITCODE -ne 0) { Fail "não consegui subir o media (dev)." } }
+      if ($prodOn) { $env:NARNIA_DATA_DIR = Get-ProdDataHostDir; & docker @script:ProdCompose --profile media up -d --build media; if ($LASTEXITCODE -ne 0) { Fail "não consegui subir o media." } }
+      if (-not $devOn -and -not $prodOn) { Info "ele sobe junto no próximo .\start.ps1 up (ou dev)." }
+      Info "próximo passo: Configurações › Análise de vídeo, para colar o token do Hugging Face."
+    }
+    "off" {
+      Write-Env $script:EnvFile "NARNIA_MEDIA" "0"
+      & docker @script:DevCompose --profile media rm -s -f media *> $null
+      & docker @script:ProdCompose --profile media rm -s -f media *> $null
+      Info "serviço de análise de vídeo desligado. Vídeos e análises continuam na pasta de dados."
+      if ($Rest -contains "--purge") {
+        foreach ($c in @($script:DevCompose, $script:ProdCompose)) {
+          $name = ((& docker @c config 2>$null) | Select-String '^name: (.+)$' | Select-Object -First 1)
+          if ($name) { $vol = "$($name.Matches[0].Groups[1].Value)_media-models"; & docker volume rm $vol *> $null; if ($LASTEXITCODE -eq 0) { Info "modelos e token apagados (volume $vol)." } }
+        }
+      } else { Info "os modelos e o token continuam guardados; para apagar: .\start.ps1 media off --purge" }
+    }
+    "status" {
+      if (Test-MediaEnabled) { Info "análise de vídeo: ligada" } else { Info "análise de vídeo: desligada (.\start.ps1 media on)" }
+      if ($devOn) { & docker @script:DevCompose --profile media ps media }
+      if ($prodOn) { & docker @script:ProdCompose --profile media ps media }
+    }
+    default { Fail "uso: .\start.ps1 media on | off [--purge] | status" }
+  }
+}
+
 function Invoke-Up {
   Assert-Docker
   # as pastas que o compose monta, resolvidas uma vez (ambiente, .env, padrão) e exportadas: mesmo valor nos dois lados
   $dataDir = Get-ProdDataHostDir; $env:NARNIA_DATA_DIR = $dataDir; $env:NARNIA_BACKUP_HOST_DIR = Get-ProdBackupHostDir
   if ($null -eq $env:NARNIA_OAUTH_PORT) { $env:NARNIA_OAUTH_PORT = Get-OAuthPort }
   New-Item -ItemType Directory -Force -Path $dataDir, $env:NARNIA_BACKUP_HOST_DIR *> $null
+  if (Test-MediaEnabled) { New-MediaDirs $dataDir }
   if (Test-StackRunning) {
     $port = Get-EnvValue $script:EnvFile "NARNIA_PORT"
     Info "stack já no ar na porta $port; aplicando alterações"
@@ -456,6 +503,7 @@ Uso (produção, só Docker no host):
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
+  media on|off [--purge]|status   liga ou desliga a análise de entrevista gravada (F13; serviço opcional)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
   install-plugin [--prod]  instala o recrutador no Claude Code deste computador (MCP + plugin, modo B)
@@ -477,6 +525,7 @@ Desenvolvimento (tudo em containers):
   google status | google connect <client-id>   Google Calendar opcional das candidaturas (docs/google-calendar.md)
   cli <cmd>     roda a CLI narnia-jobs (doctor | login | install-plugin) no container de dev
   test:sh       testa start.sh (bats) e start.ps1 (Pester) em containers
+  test:media    testa o serviço media da F13 (pytest, vídeo sintético)
   e2e [args]    testes de ponta a ponta (Playwright em container, provider mock); --ui-only pula down/up e worker
   install       instala dependências no volume node_modules
 "@
@@ -515,6 +564,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "restore"   { Invoke-Restore }
     "promote"   { Invoke-Promote @Rest }
     "extension" { Invoke-Extension }
+    "media"     { Invoke-Media $Rest }
     "dev-down"  { Assert-Docker; $a = Get-DevDownArgs; & docker @a }
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }
@@ -525,6 +575,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       $devPort = if ($env:NARNIA_DEV_PORT) { $env:NARNIA_DEV_PORT } else { "5173" }
       $devToken = if ($env:NARNIA_TOKEN) { $env:NARNIA_TOKEN } else { "dev-token" }
       New-Item -ItemType Directory -Force -Path (Get-DevDataHostDir), (Get-DevBackupHostDir) *> $null
+      if (Test-MediaEnabled) { New-MediaDirs (Get-DevDataHostDir) }
       Send-HostGhToken $script:DevCompose "dev"
       Write-Host ""; Write-Host "  modo dev (hot reload):  $(Get-AppUrl $devPort $devToken)"
       if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $($script:EnvFile)." }
@@ -543,6 +594,13 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       Assert-Docker
       Invoke-Dev @("bats", "scripts/test")
       & docker run --rm -v "${PWD}:/code:ro" -w /code -e NARNIA_PS_NO_MAIN=1 mcr.microsoft.com/powershell:7.4-ubuntu-22.04 pwsh -NoProfile -Command "Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck | Out-Null; Invoke-Pester -Path scripts/test -Output Detailed -ErrorAction Stop"
+    }
+    "test:media" {
+      # F13: serviço media (Python) com pytest e vídeo sintético, na imagem do próprio serviço
+      Assert-Docker
+      & docker build -q -f services/media/Dockerfile --target media-test -t narnia-jobs/media-test . | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "não consegui construir a imagem de teste do media." }
+      & docker run --rm narnia-jobs/media-test python -m pytest -q @Rest
     }
     { $_ -in "help", "-h", "--help" } { Show-Usage }
     default     { Show-Usage; Fail "comando desconhecido: $Command" }

@@ -72,6 +72,7 @@ export * from "./ingest/tools";
 export * from "./job-applications";
 export * from "./jobs/concurrency";
 export * from "./jobs/tasks";
+export * from "./media/client";
 export * from "./models";
 export * from "./net/guard";
 export * from "./pdf";

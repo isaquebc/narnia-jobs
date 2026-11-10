@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   createRepos,
   enqueueTask,
+  MediaClient,
   migrate,
   openDatabase,
   type QueueJobState,
@@ -96,7 +97,13 @@ export interface TestApp {
 }
 
 export function makeTestApp(
-  opts: { provider?: MockProvider; token?: string; interruptTimeoutMs?: number } = {},
+  opts: {
+    provider?: MockProvider;
+    token?: string;
+    interruptTimeoutMs?: number;
+    /** F13: serviço media falso; padrão: desligado (sem URL). */
+    media?: MediaClient;
+  } = {},
 ): TestApp {
   const db = openDatabase(":memory:");
   migrate(db);
@@ -134,6 +141,7 @@ export function makeTestApp(
     token,
     ghConfigDir,
     sessions,
+    media: opts.media ?? new MediaClient(null),
   });
   appRef = app;
   const api = async (path: string, init: RequestInit = {}) =>

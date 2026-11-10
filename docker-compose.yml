@@ -63,7 +63,8 @@ services:
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 deixa só metadados nos rastros
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # vaga por URL que precisa de navegador (vazio desliga)
       - NARNIA_OAUTH_PORT=${NARNIA_OAUTH_PORT:-8089}   # porta do callback do Google (endereço de retorno e --callback-port)
-    networks: [default, browser]
+      - NARNIA_MEDIA_URL=${NARNIA_MEDIA_URL-http://media:8700}   # F13: serviço media (perfil opcional; fora do ar = desligado)
+    networks: [default, browser, media]
     ports:
       # callback OAuth do Google Calendar (F07): a mesma porta no host e no container, porque o endereço de retorno
       # (http://localhost:<porta>/callback) é um só; vazia (e2e) publica uma porta aleatória
@@ -94,7 +95,8 @@ services:
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT:-}
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # F05: PDF do CV e da carta
-    networks: [default, browser]
+      - NARNIA_MEDIA_URL=${NARNIA_MEDIA_URL-http://media:8700}   # F13: serviço media (perfil opcional)
+    networks: [default, browser, media]
     depends_on:
       redis:
         condition: service_healthy
@@ -116,6 +118,28 @@ services:
       test: ["CMD", "node", "-e", "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
+      retries: 6
+
+  # F13: análise de entrevista gravada (Python: ffmpeg, transcrição, vozes, rosto). Opcional: perfil `media`, ligado por
+  # `./start.sh media on`. Rede só com api e worker; monta só <dados>/interviews (vídeos, fora do backup) e os modelos.
+  media:
+    build:
+      context: .
+      dockerfile: services/media/Dockerfile
+      target: runtime
+    image: narnia-jobs/media
+    profiles: ["media"]
+    restart: unless-stopped
+    init: true
+    user: "${NARNIA_UID:-1000}:${NARNIA_GID:-1000}"
+    networks: [media]
+    volumes:
+      - ${NARNIA_DATA_DIR:-./data}/interviews:/interviews
+      - media-models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8700/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
       retries: 6
 
   redis:
@@ -157,9 +181,11 @@ services:
 
 networks:
   browser:   # api e worker ↔ navegador; o navegador não enxerga redis nem web
+  media:     # F13: api e worker ↔ serviço media; o media não enxerga redis nem web
 
 volumes:
   claude-auth:
   gh-auth:
   redis-data:
   phoenix-data:
+  media-models:   # F13: pesos dos modelos e token do Hugging Face (0600)
