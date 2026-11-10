@@ -25,6 +25,7 @@ import { cvGenerate } from "./processors/cv-generate";
 import { postingExtract } from "./processors/posting-extract";
 import { profileMotivations } from "./processors/profile-motivations";
 import { recordingAnalyze } from "./processors/recording-analyze";
+import { recordingReport } from "./processors/recording-report";
 import { templateValidate } from "./processors/template-validate";
 
 /**
@@ -68,6 +69,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [DOCUMENT_TASKS.render]: cvGenerate,
   [DOCUMENT_TASKS.validateTemplate]: templateValidate,
   [RECORDING_TASKS.analyze]: recordingAnalyze,
+  [RECORDING_TASKS.report]: recordingReport,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

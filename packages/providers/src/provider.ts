@@ -16,6 +16,8 @@ import type {
   ExtractFactsOutput,
   FactProposal,
   FormField,
+  InterviewFramesOutput,
+  InterviewReportDraft,
   PickFilesOutput,
   PlanUsage,
   PostingDuplicateOutput,
@@ -233,6 +235,19 @@ export interface CvReviewInput {
   model: string;
 }
 
+/** F13/M5: leitura dos quadros escolhidos (Haiku com a tool Read); os JPEG ficam em `dir`. */
+export interface InterviewFramesInput {
+  dir: string;
+  frames: Array<{ file: string; at: string; person: string; reason: string }>;
+  model: string;
+}
+/** F13/M5: relatório da entrevista (Sonnet, sem tools): resumo montado pelo código e transcrição numerada por turno. */
+export interface InterviewReportInput {
+  brief: Record<string, unknown>;
+  transcript: string;
+  model: string;
+}
+
 /** Avaliações no Phoenix (M1): chamada simples, sem tools, usada pela ponte da assinatura. */
 export interface CompleteInput {
   system: string;
@@ -298,6 +313,9 @@ export interface Provider {
   coverLetterGenerate(input: CvGenerateInput): Promise<ProviderResult<CoverLetterDraft>>;
   /** F05-13: revisão do PDF pelas imagens das páginas e pelo texto (Haiku). */
   cvReview(input: CvReviewInput): Promise<ProviderResult<CvReviewOutput>>;
+  /** F13/M5: quadros da entrevista (Haiku, tool Read) e relatório do recrutador (Sonnet). */
+  interviewFrames(input: InterviewFramesInput): Promise<ProviderResult<InterviewFramesOutput>>;
+  interviewReport(input: InterviewReportInput): Promise<ProviderResult<InterviewReportDraft>>;
   /**
    * F03 §2.4: diagnóstico do plano (assinatura e uso das janelas). Nunca gasta tokens; `null` quando o plano não se
    * aplica (API key, terceiros) ou não há dado.

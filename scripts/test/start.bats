@@ -684,7 +684,7 @@ fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma
 }
 
 @test "media_profile_args: --profile media só quando ligado" {
-  unset NARNIA_MEDIA
+  unset NARNIA_MEDIA NARNIA_MEDIA_GPU
   ENV_FILE="$TMP/.env"
   : > "$ENV_FILE"
   run media_profile_args
@@ -692,6 +692,18 @@ fake_agent() { # o agente vem da api (rota persona-card?format=agent); aqui, uma
   write_env "$ENV_FILE" NARNIA_MEDIA 1
   run media_profile_args
   [ "$output" = "--profile media" ]
+}
+
+@test "media_profile_args: com --gpu (F13-10) o override da GPU vem junto, e o compose valida" {
+  unset NARNIA_MEDIA NARNIA_MEDIA_GPU
+  ENV_FILE="$TMP/.env"
+  : > "$ENV_FILE"
+  write_env "$ENV_FILE" NARNIA_MEDIA 1
+  write_env "$ENV_FILE" NARNIA_MEDIA_GPU 1
+  run media_profile_args
+  [ "$output" = "-f docker-compose.media-gpu.yml --profile media" ]
+  grep -q "driver: nvidia" docker-compose.media-gpu.yml
+  grep -q "whl/cu128" docker-compose.media-gpu.yml
 }
 
 @test "media_dirs: cria <dados>/interviews antes do Docker (senão nasce do root)" {

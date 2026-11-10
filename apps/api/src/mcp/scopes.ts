@@ -29,6 +29,8 @@ const CAREER = [
   "analysis.",
   // F07/M6: candidaturas (listar, mover, etapa, nota, agenda); criar só pelo botão Aplicar
   "job_application.",
+  // F13/M5: entrevistas gravadas (só leitura: relatório e transcrição)
+  "recording.",
   // F05: CV e carta (gerar, ler, alterar) e botões sugeridos na mensagem
   "cv.",
   "application.",

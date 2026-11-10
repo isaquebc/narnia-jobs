@@ -23,6 +23,7 @@ import {
   PostingMergeOutputSchema,
 } from "./schemas/posting";
 import { ProfileMotivationsOutputSchema } from "./schemas/profile";
+import { InterviewFramesOutputSchema, InterviewReportDraftSchema } from "./schemas/recording";
 
 /**
  * JSON Schema para `outputFormat: { type: "json_schema", schema }` do Agent SDK.
@@ -77,4 +78,10 @@ export const CV_OUTPUT_JSON_SCHEMAS = {
   cvGenerate: toJsonSchema(CvDraftSchema),
   coverLetterGenerate: toJsonSchema(CoverLetterDraftSchema.required({ headline: true })),
   cvReview: toJsonSchema(CvReviewOutputSchema),
+} as const;
+
+/** Saídas da cadeia do recrutador sobre a entrevista gravada (F13/M5). */
+export const RECORDING_OUTPUT_JSON_SCHEMAS = {
+  interviewFrames: toJsonSchema(InterviewFramesOutputSchema),
+  interviewReport: toJsonSchema(InterviewReportDraftSchema),
 } as const;

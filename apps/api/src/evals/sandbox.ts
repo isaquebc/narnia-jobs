@@ -1,26 +1,35 @@
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import {
+  appendRecordingChunk,
   applyToPosting,
   assembleCv,
   buildCvBrief,
   buildCvHeader,
+  checkInterviewReport,
+  createRecording,
   createRepos,
   enqueueTask,
   type FixtureName,
+  importMediaResults,
   migrate,
   openDatabase,
+  patchRecordingPerson,
   type Repos,
+  recordingAnalysis,
+  recordingDir,
   type StageName,
   seedFixture,
   stageJobId,
   withSeededIds,
 } from "@narnia-jobs/core";
 import { MockProvider, type Provider } from "@narnia-jobs/providers";
+import type { InterviewReportDraft } from "@narnia-jobs/shared";
 import { createApp } from "../app";
 import { SessionManager } from "../chat/session-manager";
 import { EventBus } from "../events";
@@ -51,6 +60,8 @@ export interface EvalSandbox {
    * F07/M6: a candidatura da vaga da Globex, sem conversa ligada (cada caso abre a conversa da candidatura do zero).
    */
   jobApplication(): string;
+  /** F13/M5: a entrevista gravada analisada (fixture fictícia) na candidatura da Globex, sem conversa ligada. */
+  recording(): string;
   /** Erro do último turno da conversa (`chat.error`), para o runner não esperar o tempo do turno (2026-10-28). */
   turnError(sessionId: string): string | undefined;
   close(): Promise<void>;
@@ -151,6 +162,7 @@ export async function openEvalSandbox(o: {
   });
   handler = (req) => app.fetch(req);
   let closed = false;
+  let recordingId: string | undefined;
   return {
     baseUrl,
     token,
@@ -167,6 +179,11 @@ export async function openEvalSandbox(o: {
     jobApplication: () => {
       repos.jobApplications.setChatSession(postingCv.applicationId, null);
       return postingCv.applicationId;
+    },
+    recording: () => {
+      recordingId ??= seedRecording(repos, dir, postingCv.applicationId);
+      repos.recordings.setChatSession(recordingId, null);
+      return recordingId;
     },
     turnError: (sessionId) => turnErrors.get(sessionId),
     async close() {
@@ -308,6 +325,115 @@ function seedApplicationForm(repos: Repos, profileId: string, withPosting: boole
     },
   ]);
   return f.id;
+}
+
+/**
+ * F13/M5: entrevista gravada da candidatura da Globex, com a análise da fixture do modo falso do media (entrevista
+ * fictícia: Marina Duarte entrevista Alex Souza; índices B-tree e GIN invertidos, tangente, anotação) e um relatório
+ * conferido por código, como o worker deixa.
+ */
+function seedRecording(repos: Repos, dataDir: string, applicationId: string): string {
+  const rec = createRecording(
+    repos,
+    dataDir,
+    {
+      jobApplicationId: applicationId,
+      title: "Entrevista técnica",
+      fileName: "tecnica.webm",
+      size: 2,
+    },
+    { freeBytes: 1e12 },
+  );
+  appendRecordingChunk(repos, dataDir, rec.id, 0, new Uint8Array([1, 2]));
+  const fixture = fileURLToPath(
+    new URL("../../../../packages/core/test/fixtures/recording-work/", import.meta.url),
+  );
+  cpSync(fixture, join(recordingDir(dataDir, rec.id), "work"), { recursive: true });
+  const a = importMediaResults(repos, dataDir, rec.id);
+  const alex = a.persons.find((p) => p.name === "Alex Souza");
+  if (alex) patchRecordingPerson(repos, rec.id, alex.id, { isCandidate: true });
+  const fresh = recordingAnalysis(repos, rec.id);
+  const find = (s: string) => fresh.turns.find((t) => t.text.includes(s))?.idx ?? 0;
+  const wrong = find("B-tree é melhor");
+  const draft: InterviewReportDraft = {
+    verdict: {
+      level: "mixed",
+      summary:
+        "Conversa cordial, com uma resposta técnica errada sobre índices e uma resposta vaga sobre qualidade.",
+      points: ["A resposta sobre índices inverteu B-tree e GIN."],
+    },
+    shouldNotHaveSaid: [
+      {
+        turn: wrong,
+        quote: "o B-tree é melhor para busca de texto livre",
+        observed: "Inverteu os índices.",
+        interpretation: "Pesa numa vaga de PostgreSQL.",
+        better: "B-tree para igualdade e intervalo; GIN para texto e arrays.",
+      },
+    ],
+    answers: [
+      {
+        questionTurn: find("B-tree e quando"),
+        question: "Quando usar B-tree e GIN",
+        answerTurns: [wrong],
+        problem: "wrong",
+        missing:
+          "B-tree serve para igualdade, ordem e intervalos; GIN para busca de texto, arrays e jsonb.",
+        suggestion:
+          "Uso B-tree para igualdade e intervalos e GIN para texto e jsonb. [completar: um índice que você criou e o ganho]",
+        certainty: "high",
+      },
+      {
+        questionTurn: find("qualidade do código"),
+        question: "Como garante qualidade",
+        answerTurns: [find("testo bastante")],
+        problem: "incomplete",
+        missing: "Faltou dizer como: tipos de teste, revisão, CI.",
+        suggestion:
+          "Testes de unidade e integração no CI e revisão em par. [completar: cobertura ou incidente evitado]",
+        certainty: "medium",
+      },
+    ],
+    worked: [
+      {
+        turn: find("monólito ganhou"),
+        quote: "O monólito ganhou e o time concordou.",
+        why: "Decisão com dado.",
+      },
+    ],
+    discourse: { summary: "Ritmo bom; palavras de apoio frequentes (né, tipo assim).", points: [] },
+    smile: { observations: ["Pouca leitura do sorriso: o rosto aparece em miniatura."] },
+    reactions: [],
+    notes: fresh.events
+      .filter((e) => e.type === "note")
+      .map((e) => ({ event: e.key, reading: "indeterminate" as const, reason: "Um sinal só." })),
+    setup: { people: [], tips: ["Fixe a sua câmera ou deixe-a maior."] },
+    people: fresh.persons.map((p) => ({
+      person: p.key,
+      role: p.isCandidate ? "candidato" : "entrevistadora",
+      summary: "Ficha de teste.",
+      signals: [],
+    })),
+    drills: [
+      { title: "Índices do PostgreSQL", how: "Explique B-tree, GIN e GiST em 60 segundos." },
+      { title: "Resposta com exemplo", how: "Toda resposta de qualidade com um caso real." },
+      { title: "Menos palavras de apoio", how: "Grave 2 minutos e conte os 'né'." },
+    ],
+    limitations: ["Rosto da pessoa candidata em miniatura."],
+  };
+  const { content, warnings } = checkInterviewReport(
+    draft,
+    fresh,
+    repos.recordingAnalysis.turnWords(rec.id),
+  );
+  repos.recordingAnalysis.addReport(rec.id, {
+    content,
+    warnings,
+    model: "fixture",
+    usageEventId: null,
+  });
+  repos.recordings.update(rec.id, { state: "ready", step: null, progress: 100 });
+  return rec.id;
 }
 
 async function seedPostingCv(repos: Repos, profileId: string) {

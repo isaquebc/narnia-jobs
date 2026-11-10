@@ -38,6 +38,7 @@ import {
 } from "./checkpoint";
 import { searchRecallNow, writeRunReport } from "./cli-report";
 import { syncChatJudge, syncEvaluators } from "./eval-sync";
+import { INTERVIEW_FRAMES_CASES } from "./interview-fixtures";
 import { chatJudge, judgeFor } from "./judges";
 import { judgeLocally, type LocalEvaluation, recordLocalExperiment } from "./local-eval";
 import { PAIRWISE_NAME } from "./pairwise";
@@ -192,6 +193,7 @@ async function chat(
                 newApplication: (opts) => sandbox.newApplication(opts),
                 readyPostingCv: () => sandbox.readyPostingCv(),
                 jobApplication: () => sandbox.jobApplication(),
+                recording: () => sandbox.recording(),
                 savedPostings: () => savedPostingsText(sandbox.repos),
                 turnError: (id) => sandbox.turnError(id),
                 stopOnError,
@@ -753,11 +755,121 @@ async function cvReview(ctx: Ctx, gate?: BaselineGate): Promise<number> {
 }
 
 /**
+ * `evals interview-frames` (F13/M5): o leitor de quadros com as imagens de `evals/fixtures/interview-frames/` (desenhos,
+ * nunca pessoas reais), copiadas para uma pasta temporária como no app. Mesmo fluxo do `cv-review` (avaliadores,
+ * juiz, gate e pairwise).
+ */
+async function interviewFrames(ctx: Ctx, gate?: BaselineGate): Promise<number> {
+  const op = "interviewFrames" as const;
+  const name = STRUCTURED_PROMPTS[op].name;
+  const rows = datasetRows(op);
+  const model = STRUCTURED_PROMPTS[op].defaultModel;
+  const fixtures = fileURLToPath(
+    new URL("../../../../evals/fixtures/interview-frames/", import.meta.url),
+  );
+  const scores = new Map<string, number[]>();
+  let failed = 0;
+  let errors = 0;
+  const runs: Parameters<typeof recordLocalExperiment>[0]["runs"] = [];
+  const pairRuns: PairRun[] = [];
+  for (const [i, example] of INTERVIEW_FRAMES_CASES.entries()) {
+    const dir = mkdtempSync(join(tmpdir(), "narnia-interview-frames-"));
+    const startedAt = new Date().toISOString();
+    let output: unknown = null;
+    let error: string | undefined;
+    try {
+      copyFileSync(join(fixtures, example.image), join(dir, example.image));
+      output = (await ctx.provider.interviewFrames({ ...example.input, dir, model })).output;
+    } catch (e) {
+      error = (e as Error).message;
+      errors++;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const endedAt = new Date().toISOString();
+    const evaluations: LocalEvaluation[] = [];
+    const row = rows[i];
+    const evalCtx = {
+      input: row?.input,
+      output: { messages: [{ role: "assistant", content: JSON.stringify(output) }] },
+      reference: example.reference,
+      metadata: row?.metadata,
+    };
+    if (!error && row) {
+      for (const e of promptEvaluators(op))
+        evaluations.push({ name: e.name, kind: "CODE", ...e.run(evalCtx) });
+      evaluations.push({
+        kind: "LLM",
+        ...(await judgeLocally(ctx.provider, judgeFor(op), evalCtx)),
+      });
+    }
+    console.log(
+      `${error ? "✘" : "✔"} quadros da entrevista (${example.id})${error ? ` · erro: ${error}` : ""}`,
+    );
+    for (const ev of evaluations) {
+      console.log(`    ${mark(ev.score)} ${ev.name}: ${ev.explanation}`);
+      if (ev.score < 1) failed++;
+      scores.set(ev.name, [...(scores.get(ev.name) ?? []), ev.score]);
+    }
+    if (error) failed++;
+    runs.push({
+      exampleId: example.id,
+      output,
+      startedAt,
+      endedAt,
+      ...(error ? { error } : {}),
+      evaluations,
+    });
+    pairRuns.push({
+      exampleId: example.id,
+      ctx: { ...evalCtx, output: undefined },
+      output: evalCtx.output,
+      evaluations,
+      error,
+    });
+  }
+  gate?.record(
+    name,
+    Object.fromEntries([...scores].map(([k, v]) => [k, v.reduce((a, b) => a + b, 0) / v.length])),
+    { errors },
+  );
+  const version = promptCatalog().find((p) => p.name === name)?.hash;
+  if (gate && version) {
+    const cmp = await gate.pairwise(name, {
+      versionId: version,
+      commit: gitCommit(),
+      judge: judgeFor(op),
+      provider: ctx.provider,
+      runs: pairRuns,
+    });
+    for (const x of cmp.cases)
+      runs
+        .find((r) => r.exampleId === x.exampleId)
+        ?.evaluations.push({
+          name: PAIRWISE_NAME,
+          kind: "LLM",
+          label: x.outcome,
+          score: x.outcome === "ganhou" ? 1 : x.outcome === "empate" ? 0.5 : 0,
+          explanation: x.explanation,
+        });
+  }
+  if (ctx.phoenix) {
+    await syncEvaluators({ baseUrl: ctx.phoenix, customProviderId: ctx.customProviderId });
+    const exp = await recordLocalExperiment(
+      { dataset: name, name: EXP_NAME("quadros da entrevista"), runs },
+      { baseUrl: ctx.phoenix },
+    );
+    console.log(`Phoenix: experimento ${exp.experimentId} no dataset ${name}`);
+  }
+  return failed;
+}
+
+/**
  * `narnia-jobs evals chat|pdf [ids…] [--strict] [--gate] [--update-baseline]`. No chat, `--gate` compara cada caso com
  * a linha de base de `evals/baselines.json` (F06-14: a persona do recrutador é um prompt como os outros).
  */
 export async function runSandboxEvals(
-  kind: "chat" | "pdf" | "cv-review",
+  kind: "chat" | "pdf" | "cv-review" | "interview-frames",
   args: string[],
 ): Promise<number> {
   const strict = args.includes("--strict");
@@ -779,7 +891,9 @@ export async function runSandboxEvals(
           ? await chat(ctx, only, gate, cp)
           : kind === "pdf"
             ? await pdf(ctx)
-            : await cvReview(ctx, gate);
+            : kind === "interview-frames"
+              ? await interviewFrames(ctx, gate)
+              : await cvReview(ctx, gate);
     } catch (e) {
       const message = (e as Error).message;
       if (!cp || !(e instanceof EvalRunAborted || isUsageLimit(message))) throw e;

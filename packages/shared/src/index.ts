@@ -11,6 +11,7 @@ export * from "./mcp/ingest";
 export * from "./mcp/job-application";
 export * from "./mcp/posting";
 export * from "./mcp/profile";
+export * from "./mcp/recording";
 export * from "./motivations";
 export * from "./schemas";
 export * from "./telemetry";

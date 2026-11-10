@@ -1,7 +1,7 @@
 import { RECORDING_EXTENSIONS, type Recording, type RecordingState } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
-import { useApi, useTimezone } from "../../app/context";
+import { useEffect, useId, useState } from "react";
+import { useApi, useTimezone, useWs } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
@@ -10,7 +10,7 @@ import { Card, CardTitle } from "../../components/ui/card";
 import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { Progress } from "../../components/ui/progress";
-import { t } from "../../i18n";
+import { type TKey, t } from "../../i18n";
 import { formatBytes, formatDate } from "../../lib/format";
 import { errorText } from "./errors";
 import { cancelUpload, clearUpload, startUpload, type UploadState, useUploads } from "./uploads";
@@ -276,6 +276,20 @@ function RecordingItem({
         <p className="text-xs text-muted-fg">{t("recordings.videoRemoved")}</p>
       ) : null}
       {rec.error && rec.state === "failed" ? <Alert tone="danger">{rec.error}</Alert> : null}
+      {rec.state === "analyzing" ? (
+        <Progress
+          value={rec.progress}
+          label={t("recordingPage.analyzing", {
+            step: rec.step ? t(`recordingPage.steps.${rec.step}` as TKey) : "",
+            pct: rec.progress,
+          })}
+        />
+      ) : null}
+      {rec.state !== "uploading" ? (
+        <NavLink to={`/entrevistas/${rec.id}`} className="text-sm underline">
+          {t("recordingPage.open")}
+        </NavLink>
+      ) : null}
       {sending ? null : (
         <div className="flex flex-wrap gap-1">
           {rec.hasVideo ? (
@@ -312,8 +326,21 @@ function RecordingItem({
  * aba Entrevistas do perfil, avulsa. O envio vai em partes e continua ao trocar de página; se a aba fechar, retoma
  * escolhendo o mesmo arquivo. Reprodução com avanço pelo player; apagar só o vídeo ou a entrevista inteira (F13-2).
  */
+function useRecordingsEvents() {
+  const ws = useWs();
+  const qc = useQueryClient();
+  useEffect(() => {
+    ws.connect();
+    return ws.subscribe((e) => {
+      if (e.type === "recording.updated")
+        void qc.invalidateQueries({ queryKey: recordingKeys.all });
+    });
+  }, [ws, qc]);
+}
+
 export function RecordingsCard(owner: RecordingsOwner) {
   const api = useApi();
+  useRecordingsEvents();
   const titleId = useId();
   const uploads = useUploads();
   const app = "application" in owner ? owner.application : null;

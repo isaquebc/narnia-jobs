@@ -6,6 +6,7 @@ import {
   EXTRACTION_JSON_SCHEMAS,
   INGEST_OUTPUT_JSON_SCHEMAS,
   POSTING_OUTPUT_JSON_SCHEMAS,
+  RECORDING_OUTPUT_JSON_SCHEMAS,
   toJsonSchema,
 } from "@narnia-jobs/shared";
 import type {
@@ -20,6 +21,8 @@ import type {
   CvGenerateInput,
   CvReviewInput,
   ExtractFactsInput,
+  InterviewFramesInput,
+  InterviewReportInput,
   PickFilesInput,
   PostingDuplicateInput,
   PostingExtractInput,
@@ -262,6 +265,28 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     jsonSchema: CV_OUTPUT_JSON_SCHEMAS.cvReview,
     tools: ["Read"],
   }),
+  interviewFrames: spec("interviewFrames", {
+    name: "narnia-interview-frames",
+    description:
+      "F13/M5: o que se vê nos quadros escolhidos da entrevista gravada (tool Read), com a hipótese separada (modelo barato).",
+    file: FILE("interview-frames"),
+    userTemplate:
+      "Quadros desta entrevista (imagens nesta pasta; leia cada um com a ferramenta Read): {{frame_files}}\n\n<quadros>\n{{frames_json}}\n</quadros>",
+    defaultModel: "haiku",
+    jsonSchema: RECORDING_OUTPUT_JSON_SCHEMAS.interviewFrames,
+    tools: ["Read"],
+  }),
+  interviewReport: spec("interviewReport", {
+    name: "narnia-interview-report",
+    description:
+      "F13/M5: relatório de feedback da entrevista gravada (veredito, falas, respostas, discurso, sorriso, reações, anotações, câmera, fichas, treinos).",
+    file: FILE("interview-report"),
+    userTemplate:
+      "<entrevista>\n{{brief_json}}\n</entrevista>\n\n<transcricao>\n{{transcript}}\n</transcricao>",
+    defaultModel: "sonnet",
+    jsonSchema: RECORDING_OUTPUT_JSON_SCHEMAS.interviewReport,
+    tools: [],
+  }),
 };
 
 const basename = (p: string) => p.slice(p.lastIndexOf("/") + 1);
@@ -346,6 +371,14 @@ export const structuredPromptVars = {
   }),
   cvGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
   coverLetterGenerate: (i: CvGenerateInput) => ({ brief_json: JSON.stringify(i.brief, null, 1) }),
+  interviewFrames: (i: InterviewFramesInput) => ({
+    frame_files: i.frames.map((f) => f.file).join(", "),
+    frames_json: JSON.stringify(i.frames, null, 1),
+  }),
+  interviewReport: (i: InterviewReportInput) => ({
+    brief_json: JSON.stringify(i.brief, null, 1),
+    transcript: i.transcript,
+  }),
   cvReview: (i: CvReviewInput) => ({
     page_files: i.pageFiles.join(", ") || "(sem imagens: carta em texto)",
     brief_json: JSON.stringify(i.brief, null, 1),

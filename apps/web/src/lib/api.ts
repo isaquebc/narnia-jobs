@@ -85,8 +85,12 @@ import type {
   ProfileSuggestionResponseSchema,
   ProviderStatusResponse,
   Recording,
+  RecordingAnalysis,
   RecordingCreate,
   RecordingLimits,
+  RecordingPerson,
+  RecordingPersonPatch,
+  RecordingTurn,
   Repo,
   RepoAnalysis,
   RepoDigest,
@@ -844,6 +848,31 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     deleteRecording: (id: string) =>
       request<void>(`/api/recordings/${encodeURIComponent(id)}`, { method: "DELETE" }),
     recordingVideoUrl: (id: string) => `${base}/api/recordings/${encodeURIComponent(id)}/video`,
+    // F13/M4–M6: análise, correções, quadros, relatório e conversa
+    getRecording: (id: string) => request<Recording>(`/api/recordings/${encodeURIComponent(id)}`),
+    getRecordingAnalysis: (id: string) =>
+      request<RecordingAnalysis>(`/api/recordings/${encodeURIComponent(id)}/analysis`),
+    analyzeRecording: (id: string) =>
+      request<Recording>(`/api/recordings/${encodeURIComponent(id)}/analyze`, { method: "POST" }),
+    regenerateRecordingReport: (id: string) =>
+      request<Recording>(`/api/recordings/${encodeURIComponent(id)}/report`, { method: "POST" }),
+    patchRecordingPerson: (id: string, personId: string, patch: RecordingPersonPatch) =>
+      request<RecordingPerson>(
+        `/api/recordings/${encodeURIComponent(id)}/persons/${encodeURIComponent(personId)}`,
+        { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    patchRecordingTurn: (id: string, turnId: string, personId: string) =>
+      request<RecordingTurn>(
+        `/api/recordings/${encodeURIComponent(id)}/turns/${encodeURIComponent(turnId)}`,
+        { method: "PATCH", body: JSON.stringify({ personId }) },
+      ),
+    recordingFrameUrl: (id: string, file: string) =>
+      `${base}/api/recordings/${encodeURIComponent(id)}/frames/${encodeURIComponent(file)}`,
+    openRecordingChat: (id: string, message: string) =>
+      request<{ session: ChatSession }>(
+        `/api/recordings/${encodeURIComponent(id)}/chat`,
+        json({ message }),
+      ),
     getGoogleCalendarStatus: (refresh = false) =>
       request<{
         status: "connected" | "needs_auth" | "not_configured" | "error" | "unavailable";

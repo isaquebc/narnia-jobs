@@ -338,6 +338,24 @@ const JobApplicationPage = lazyRouteComponent(
   () => import("../features/job-applications/JobApplicationPage"),
   "JobApplicationPage",
 );
+// F13/M6 · página da entrevista gravada; `?t=` abre o vídeo no segundo (links do relatório e do chat)
+const LazyRecordingPage = lazyRouteComponent(
+  () => import("../features/recordings/RecordingPage"),
+  "RecordingPage",
+);
+const recordingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/entrevistas/$id",
+  validateSearch: (s: Record<string, unknown>) => {
+    const t = Number(s.t);
+    return { t: Number.isFinite(t) && t >= 0 ? t : undefined };
+  },
+  component: function RecordingRoute() {
+    const { id } = recordingRoute.useParams();
+    const { t } = recordingRoute.useSearch();
+    return <LazyRecordingPage key={id} id={id} startAt={t} />;
+  },
+});
 const jobApplicationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/candidaturas",
@@ -419,6 +437,7 @@ const routeTree = rootRoute.addChildren([
   postingRoute,
   jobApplicationsRoute,
   jobApplicationRoute,
+  recordingRoute,
   chatRoute,
   chatSessionRoute,
 ]);

@@ -7,9 +7,9 @@ import { login } from "../helpers/profiles";
 
 /**
  * F13/M1.5 · entrevista gravada: Configurações › Análise de vídeo e envio do vídeo (plans/plan-v0/tasks/F13 §6.3).
- * O e2e não sobe o serviço `media` (perfil opcional): o estado real é "desligada". Os estados ligada sem token e pronta
- * vêm de um `media` falso, com as respostas de `/api/media/*` interceptadas no navegador. O envio e a reprodução usam o
- * api de verdade (não dependem do `media`).
+ * O e2e sobe o serviço `media` em modo falso (sem modelos, entrevista sintética) e sem token: o estado real é "falta o
+ * token". "Desligada" e o fluxo do token (que consultaria o Hugging Face) vêm de respostas de `/api/media/*`
+ * interceptadas no navegador. O envio e a reprodução usam o api de verdade.
  */
 const MB = 1024 * 1024;
 /** 20 MB sintéticos: três partes de até 8 MB. O api não lê o conteúdo no envio (a validação é a 1ª etapa da análise). */
@@ -70,12 +70,24 @@ test("F13/E2E-01 Configurações › análise de vídeo › desligada mostra o c
   page,
 }) => {
   await freshStart("engineer");
+  await page.route("**/api/media/status", (r) =>
+    r.fulfill({
+      json: {
+        state: "off",
+        enableCommand: "./start.sh media on",
+        version: null,
+        busy: false,
+        steps: [],
+      },
+    }),
+  );
   await login(page, "/configuracoes");
   const card = page.getByRole("region", { name: "Análise de vídeo (opcional)" });
   await expect(card.getByText("Desligada", { exact: true })).toBeVisible();
   await expect(card.getByText("./start.sh media on")).toBeVisible();
   await expect(card.getByText(/Nada pode ser publicado/)).toBeVisible();
 
+  await page.unroute("**/api/media/status");
   await fakeMedia(page);
   await card.getByRole("button", { name: "Verificar de novo" }).click();
   await expect(card.getByText("Falta o token", { exact: true })).toBeVisible();
@@ -108,7 +120,7 @@ test("F13/E2E-02 candidatura › envio em partes na etapa, queda de rede no meio
 }) => {
   const { appId } = await applied(page);
   const card = page.getByRole("region", { name: "Entrevistas gravadas" });
-  await expect(card.getByText(/análise de vídeo está desligada/i)).toBeVisible();
+  await expect(card.getByText(/ainda não tem o token do Hugging Face/i)).toBeVisible();
 
   // a segunda parte cai uma vez (rede): o envio espera e tenta de novo sozinho
   let dropped = false;
@@ -126,7 +138,8 @@ test("F13/E2E-02 candidatura › envio em partes na etapa, queda de rede no meio
     .setInputFiles({ name: "final.webm", mimeType: "video/webm", buffer: VIDEO });
   await form.getByRole("button", { name: "Enviar vídeo" }).click();
   const item = card.getByRole("listitem", { name: "final.webm" });
-  await expect(item.getByText("Enviada, aguardando análise")).toBeVisible({ timeout: 60_000 });
+  // terminado o envio, a análise começa sozinha (o conteúdo aqui não é vídeo: ela falha, o que não importa aqui)
+  await expect(item.locator("video")).toHaveCount(1, { timeout: 60_000 });
   expect(dropped).toBe(true);
   await expect(item).toContainText("Técnica");
   const video = item.locator("video");
@@ -152,7 +165,7 @@ test("F13/E2E-02 candidatura › envio em partes na etapa, queda de rede no meio
   await stopped
     .getByLabel("Continuar o envio de rh.webm")
     .setInputFiles({ name: "rh.webm", mimeType: "video/webm", buffer: VIDEO });
-  await expect(stopped.getByText("Enviada, aguardando análise")).toBeVisible({ timeout: 60_000 });
+  await expect(stopped.locator("video")).toHaveCount(1, { timeout: 60_000 });
   const bytes = await page.request.get(`/api/recordings/${rec.id}/video`);
   expect((await bytes.body()).equals(VIDEO)).toBe(true);
 
@@ -179,10 +192,67 @@ test("F13/E2E-03 perfil › aba Entrevistas › envio avulso, sem candidatura", 
   });
   await form.getByRole("button", { name: "Enviar vídeo" }).click();
   const item = card.getByRole("listitem", { name: "Simulação com um amigo" });
-  await expect(item.getByText("Enviada, aguardando análise")).toBeVisible();
+  await expect(item.locator("video")).toHaveCount(1);
   const list = await api<{ recordings: Array<{ jobApplicationId: string | null }> }>(
     `/api/recordings?profileId=${ids.profileId}`,
   );
   expect(list.recordings).toHaveLength(1);
   expect(list.recordings[0]?.jobApplicationId).toBeNull();
+});
+
+test("F13/E2E-04 análise completa com o media falso › acompanhar, quem é quem, relatório, ir ao trecho, corrigir quem falou, refazer e conversar", async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await applied(page);
+  const card = page.getByRole("region", { name: "Entrevistas gravadas" });
+  const form = card.getByRole("form", { name: "Enviar entrevista" });
+  await form.getByLabel("Etapa").selectOption({ label: "Técnica" });
+  await form.getByLabel("Vídeo da entrevista").setInputFiles("fixtures/entrevista-sintetica.webm");
+  await form.getByRole("button", { name: "Enviar vídeo" }).click();
+  const item = card.getByRole("listitem", { name: "entrevista-sintetica.webm" });
+  await expect(item.getByRole("progressbar")).toBeVisible({ timeout: 60_000 });
+  await expect(item.getByText("Analisada")).toBeVisible({ timeout: 180_000 });
+  await item.getByRole("link", { name: "Abrir análise" }).click();
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "entrevista-sintetica.webm" }),
+  ).toBeVisible();
+  const people = page.getByRole("region", { name: "Quem é quem" });
+  await expect(people.getByText(/Marina Duarte/).first()).toBeVisible();
+  await expect(people.getByText(/Alex Souza/).first()).toBeVisible();
+  const mark = people.getByRole("button", { name: "Marcar Alex Souza como você" });
+  if (await mark.count()) await mark.click();
+  await expect(
+    people.getByRole("button", { name: "Marcar Marina Duarte como você" }),
+  ).toBeVisible();
+
+  const report = page.getByRole("region", { name: "Relatório do recrutador" });
+  await expect(report.getByRole("heading", { level: 3, name: "Veredito" })).toBeVisible();
+  await expect(report.getByText(/Alerta de confiabilidade/)).toBeVisible();
+  const seek = report.getByRole("button", { name: /^Ir para / }).first();
+  const label = (await seek.getAttribute("aria-label")) ?? "";
+  const [mm, ss] = label.replace("Ir para ", "").split(":").map(Number);
+  await seek.click();
+  await expect
+    .poll(() =>
+      page.locator("video").evaluate((v) => Math.round((v as HTMLVideoElement).currentTime)),
+    )
+    .toBe((mm ?? 0) * 60 + (ss ?? 0));
+
+  const transcript = page.getByRole("region", { name: "Transcrição" });
+  const who = transcript.getByLabel("Quem falou o turno 0");
+  const options = await who.locator("option").allTextContents();
+  const other = options.find((o) => o.includes("Alex Souza")) ?? options[1] ?? "";
+  await who.selectOption({ label: other });
+  await expect(transcript.getByText("corrigido").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Refazer o relatório" }).click();
+  await expect(page.getByText("Analisada").first()).toBeVisible({ timeout: 120_000 });
+
+  await page
+    .getByRole("textbox", { name: "Conversar sobre a entrevista" })
+    .fill("Como eu deveria ter respondido sobre índices?");
+  await page.getByRole("button", { name: "Abrir conversa" }).click();
+  await expect(page).toHaveURL(/\/chat\//);
 });

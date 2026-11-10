@@ -6,6 +6,8 @@ import {
   cvSourceTitles,
   type EvalParams,
   type EvalResult,
+  interviewFramesChecks,
+  interviewReportChecks,
   jsonSchema,
   language,
   letterWordCount,
@@ -255,6 +257,34 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
     coverage(0.75),
   ],
   cvReview: (op) => [schemaRule(op), coverage(1)],
+  interviewReport: (op) => [
+    schemaRule(op),
+    quotes(["transcript"]),
+    {
+      name: "entrega_da_entrevista",
+      description:
+        "F13/M5: uma leitura por anotação, três treinos, ficha de cada pessoa, perguntas e citações em turnos que existem.",
+      module: "interview",
+      fn: "interviewReportChecks",
+      config: null,
+      impl: interviewReportChecks as Rule["impl"],
+    },
+    lang(["summary", "observed", "why", "missing", "suggestion", "how"]),
+    coverage(0.8),
+  ],
+  interviewFrames: (op) => [
+    schemaRule(op),
+    {
+      name: "um_por_quadro",
+      description: "F13/M5: um item por quadro pedido, com o mesmo arquivo.",
+      module: "interview",
+      fn: "interviewFramesChecks",
+      config: null,
+      impl: interviewFramesChecks as Rule["impl"],
+    },
+    lang(["observed", "hypothesis"]),
+    coverage(1),
+  ],
   coverLetterGenerate: (op) => [
     schemaRule(op),
     cvIds,

@@ -33,6 +33,13 @@ COPY services/media/tests ./tests
 COPY services/media/pyproject.toml ./
 CMD ["python", "-m", "pytest", "-q"]
 
+# modo falso (F13 §6.4): sem modelos, entrevista sintética; usado no e2e
+FROM base AS fake
+ENV NARNIA_MEDIA_FAKE=1
+COPY services/media/narnia_media ./narnia_media
+EXPOSE 8700
+CMD ["python", "-m", "narnia_media"]
+
 FROM base AS runtime
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 COPY services/media/requirements-models.txt ./

@@ -49,6 +49,8 @@ const EvalCaseSchema = z.object({
       "application_chat_no_posting",
       // F07/M6: "Conversar sobre esta candidatura" (a candidatura da vaga do sandbox)
       "job_application_chat",
+      // F13/M5: "Conversar sobre a entrevista" (a entrevista gravada analisada do sandbox)
+      "recording_chat",
     ])
     .optional(),
   messages: z.array(z.string().min(1)).min(1),

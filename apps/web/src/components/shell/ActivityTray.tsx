@@ -36,6 +36,8 @@ const OTHER_STAGES = [
   "posting.extract",
   "cv.generate",
   "cv.render",
+  "recording.analyze",
+  "recording.report",
   "stalled",
 ];
 

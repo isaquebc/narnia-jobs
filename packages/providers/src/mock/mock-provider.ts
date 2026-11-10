@@ -16,6 +16,8 @@ import type {
   CvReviewOutput,
   Evidence,
   ExtractFactsOutput,
+  InterviewFramesOutput,
+  InterviewReportDraft,
   PickFilesOutput,
   PlanUsage,
   PostingDuplicateOutput,
@@ -43,6 +45,8 @@ import {
   type CvGenerateInput,
   type CvReviewInput,
   type ExtractFactsInput,
+  type InterviewFramesInput,
+  type InterviewReportInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
@@ -88,6 +92,8 @@ export type MockOperation =
   | "cvGenerate"
   | "coverLetterGenerate"
   | "cvReview"
+  | "interviewFrames"
+  | "interviewReport"
   | "complete"
   | "openChat";
 
@@ -1172,6 +1178,112 @@ export class MockProvider implements Provider {
       };
     }
     return this.result(out, input.pdfText, input.model);
+  }
+
+  /** F13/M5: descrição previsível de cada quadro (sem leitura). */
+  async interviewFrames(
+    input: InterviewFramesInput,
+  ): Promise<ProviderResult<InterviewFramesOutput>> {
+    await this.gate("interviewFrames");
+    const out: InterviewFramesOutput = {
+      frames: input.frames.map((f) => ({
+        file: f.file,
+        observed: `Simulação: ${f.person} de frente para a câmera em ${f.at}, cabeça um pouco baixa.`,
+        hypothesis: "Sem leitura possível.",
+      })),
+    };
+    return this.result(out, JSON.stringify(input.frames), input.model);
+  }
+
+  /**
+   * F13/M5: relatório previsível montado da própria transcrição (`[n] mm:ss–mm:ss Pk (nome, papel): texto`): cita trechos
+   * literais de turnos reais da pessoa candidata, para a checagem por código passar; uma leitura por anotação.
+   */
+  async interviewReport(
+    input: InterviewReportInput,
+  ): Promise<ProviderResult<InterviewReportDraft>> {
+    await this.gate("interviewReport");
+    const lines = input.transcript
+      .split("\n")
+      .map((l) => /^\[(\d+)\] (\S+) (P\d+) \(([^)]*)\): (.*)$/.exec(l))
+      .filter((m): m is RegExpExecArray => Boolean(m))
+      .map((m) => ({
+        turn: Number(m[1]),
+        at: m[2] ?? "",
+        person: m[3] ?? "",
+        role: m[4] ?? "",
+        text: m[5] ?? "",
+      }));
+    const cand = lines.filter((l) => /candidat/i.test(l.role));
+    const other = lines.filter((l) => !/candidat/i.test(l.role));
+    const quote = (t: string) => t.split(/\s+/).slice(0, 8).join(" ");
+    const first = cand[0];
+    const last = cand[cand.length - 1];
+    const question = other.find((l) => l.text.includes("?") && cand.some((c) => c.turn > l.turn));
+    const answer = question ? cand.find((c) => c.turn > question.turn) : undefined;
+    const brief = input.brief as {
+      persons?: Array<{ key: string }>;
+      events?: Array<{ key: string; type: string }>;
+    };
+    const draft: InterviewReportDraft = {
+      verdict: {
+        level: "mixed",
+        summary: "Simulação: conversa cordial, com uma resposta técnica a revisar.",
+        points: first ? [`Primeira fala da pessoa candidata em [${first.at.split("–")[0]}].`] : [],
+      },
+      shouldNotHaveSaid: first
+        ? [
+            {
+              turn: first.turn,
+              quote: quote(first.text),
+              observed: "Simulação.",
+              interpretation: "Simulação.",
+              better: "Simulação.",
+            },
+          ]
+        : [],
+      answers:
+        question && answer
+          ? [
+              {
+                questionTurn: question.turn,
+                question: question.text.slice(0, 120),
+                answerTurns: [answer.turn],
+                problem: "incomplete",
+                missing: "Simulação: faltou um exemplo concreto.",
+                suggestion: "Simulação: [completar: exemplo do seu projeto].",
+                certainty: "medium",
+              },
+            ]
+          : [],
+      worked: last
+        ? [{ turn: last.turn, quote: quote(last.text), why: "Simulação: pergunta boa no fim." }]
+        : [],
+      discourse: { summary: "Simulação: ritmo bom.", points: [] },
+      smile: { observations: ["Simulação: sem leitura do sorriso."] },
+      reactions: [],
+      notes: (brief.events ?? [])
+        .filter((e) => e.type === "note")
+        .map((e) => ({
+          event: e.key,
+          reading: "indeterminate" as const,
+          reason: "Simulação: um sinal só.",
+        })),
+      setup: { people: [], tips: ["Simulação: fixe a sua câmera."] },
+      people: (brief.persons ?? []).map((p) => ({
+        person: p.key,
+        role: "Simulação",
+        summary: "Simulação.",
+        signals: [],
+      })),
+      drills: [
+        { title: "Resposta em 90 segundos", how: "Simulação." },
+        { title: "Exemplo com número", how: "Simulação." },
+        { title: "Pergunta de volta", how: "Simulação." },
+      ],
+      limitations: ["Simulação: análise do mock."],
+    };
+    return this.result(draft, input.transcript, input.model);
   }
 
   async buildDigest(input: BuildDigestInput): Promise<ProviderResult<BuildDigestOutput>> {

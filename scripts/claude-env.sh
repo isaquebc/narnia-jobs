@@ -116,7 +116,7 @@ scripts/claude-env.sh <comando>  · ambiente de testes do Claude (instância iso
   evals [chat] [id…] [--strict]  conversas de referência (evals/chat) num banco temporário isolado; Phoenix :${NARNIA_PHOENIX_PORT:-6106}
   evals chat --gate|--update-baseline [--samples=N]  pairwise só nos casos com dependência mudada, N amostras (5) somadas; --noise mede o ruído por amostra (A contra A, 3); --feature=id,… não-inferioridade para casos novos
   evals … --update-baseline --owner-approved  grava apesar do gate, só com aprovação explícita do dono
-  evals prompts|pdf|cv-review|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, revisor do CV, ou tudo (mock = smoke; real só a pedido)
+  evals prompts|pdf|cv-review|interview-frames|all [--strict]  prompts no Phoenix pela ponte, leitura do PDF, revisor do CV, quadros da entrevista (F13), ou tudo (mock = smoke; real só a pedido)
   evals calibration [id…] [--strict]  calibração dos juízes: falsos positivos e negativos em respostas rotuladas (evals/calibration)
   evals search [--semantic] [--report=rótulo]  recall da busca de fatos (evals/search/recall.jsonl); --semantic junta a busca por sentido (R6)
   evals compare <a.json> <b.json>     compara dois relatórios de evals/reports (antes → depois)
@@ -143,7 +143,7 @@ main() {
       # prompts (Playground pela ponte) | chat | pdf (banco temporário isolado) | all; sem subcomando = chat
       wait_api
       case "${1:-}" in
-        prompts | chat | pdf | cv-review | calibration | search | compare | all) ;;
+        prompts | chat | pdf | cv-review | interview-frames | calibration | search | compare | all) ;;
         *) set -- chat "$@" ;;
       esac
       "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals "$@" ;;

@@ -23,6 +23,10 @@ export function chatCaseDeps(
   if (c.open === "application_chat" || c.open === "application_chat_no_posting")
     names.push("narnia-nota-candidatura-contexto", "narnia-skill-responder-candidatura");
   if (c.open === "document_feedback") names.push("narnia-nota-documento-feedback-contexto");
+  if (c.open === "recording_chat")
+    names.push("narnia-nota-entrevista-gravada-contexto", "narnia-skill-analisar-entrevista");
+  else if (tools.some((t) => t.startsWith("recording_")))
+    names.push("narnia-skill-analisar-entrevista");
   if (c.open === "job_application_chat")
     names.push("narnia-nota-acompanhamento-contexto", "narnia-skill-candidaturas");
   // F07/M6: a conversa que mexe numa candidatura segue a skill `candidaturas`

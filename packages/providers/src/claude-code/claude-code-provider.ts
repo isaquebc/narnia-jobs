@@ -35,6 +35,10 @@ import {
   type ExtractFactsOutput,
   ExtractFactsOutputSchema,
   INGEST_OUTPUT_JSON_SCHEMAS,
+  type InterviewFramesOutput,
+  InterviewFramesOutputSchema,
+  type InterviewReportDraft,
+  InterviewReportDraftSchema,
   messageAttrs,
   type PickFilesOutput,
   PickFilesOutputSchema,
@@ -48,6 +52,7 @@ import {
   PostingMergeOutputSchema,
   type ProfileMotivationsOutput,
   ProfileMotivationsOutputSchema,
+  RECORDING_OUTPUT_JSON_SCHEMAS,
   type ReadDocumentOutput,
   ReadDocumentOutputSchema,
   type SynthesizeRunOutput,
@@ -84,6 +89,8 @@ import {
   type CvGenerateInput,
   type CvReviewInput,
   type ExtractFactsInput,
+  type InterviewFramesInput,
+  type InterviewReportInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,
@@ -733,6 +740,41 @@ export class ClaudeCodeProvider implements Provider {
       },
       CvReviewOutputSchema,
       "cvReview",
+    );
+  }
+
+  /** F13/M5: o Haiku lê os quadros escolhidos (JPEG em `dir`) com a tool Read. */
+  async interviewFrames(
+    input: InterviewFramesInput,
+  ): Promise<ProviderResult<InterviewFramesOutput>> {
+    return this.run(
+      renderStructuredPrompt("interviewFrames", input),
+      {
+        model: input.model,
+        tools: ["Read"],
+        allowedTools: ["Read"],
+        maxTurns: input.frames.length + 3,
+        cwd: input.dir,
+        systemPrompt: PROMPTS.interviewFrames(),
+        outputFormat: {
+          type: "json_schema",
+          schema: RECORDING_OUTPUT_JSON_SCHEMAS.interviewFrames,
+        },
+      },
+      InterviewFramesOutputSchema,
+      "interviewFrames",
+    );
+  }
+
+  /** F13/M5: relatório da entrevista (Sonnet), sem tools. */
+  interviewReport(input: InterviewReportInput): Promise<ProviderResult<InterviewReportDraft>> {
+    return this.single(
+      renderStructuredPrompt("interviewReport", input),
+      input.model,
+      PROMPTS.interviewReport(),
+      RECORDING_OUTPUT_JSON_SCHEMAS.interviewReport,
+      InterviewReportDraftSchema,
+      "interviewReport",
     );
   }
 

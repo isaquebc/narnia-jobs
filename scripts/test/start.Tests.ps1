@@ -343,8 +343,8 @@ Describe "Set-HostUser (containers com o uid de quem chama)" {
 }
 
 Describe "F13 · serviço media opcional" {
-  BeforeEach { $script:SavedEnvFile = $script:EnvFile; Remove-Item env:NARNIA_MEDIA -ErrorAction SilentlyContinue }
-  AfterEach { $script:EnvFile = $script:SavedEnvFile; Remove-Item env:NARNIA_MEDIA -ErrorAction SilentlyContinue }
+  BeforeEach { $script:SavedEnvFile = $script:EnvFile; Remove-Item env:NARNIA_MEDIA, env:NARNIA_MEDIA_GPU -ErrorAction SilentlyContinue }
+  AfterEach { $script:EnvFile = $script:SavedEnvFile; Remove-Item env:NARNIA_MEDIA, env:NARNIA_MEDIA_GPU -ErrorAction SilentlyContinue }
   It "desligado sem NARNIA_MEDIA; ligado com NARNIA_MEDIA=1 no arquivo" {
     $script:EnvFile = Join-Path $script:Tmp "media.env"
     Write-Env $script:EnvFile "NARNIA_PORT" "3100"
@@ -359,6 +359,12 @@ Describe "F13 · serviço media opcional" {
     Write-Env $script:EnvFile "NARNIA_MEDIA" "0"
     $env:NARNIA_MEDIA = "1"
     Test-MediaEnabled | Should -BeTrue
+  }
+  It "com a GPU pedida (F13-10), o override do compose vem antes do perfil" {
+    $script:EnvFile = Join-Path $script:Tmp "media3.env"
+    Write-Env $script:EnvFile "NARNIA_MEDIA" "1"
+    Write-Env $script:EnvFile "NARNIA_MEDIA_GPU" "1"
+    (Get-MediaProfileArgs) -join " " | Should -Be "-f docker-compose.media-gpu.yml --profile media"
   }
   It "cria <dados>/interviews" {
     $d = Join-Path $script:Tmp "dados"

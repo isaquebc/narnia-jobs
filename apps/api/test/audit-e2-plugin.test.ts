@@ -8,6 +8,7 @@ import {
   JOB_APPLICATION_TOOLS,
   POSTING_TOOLS,
   PROFILE_TOOLS,
+  RECORDING_TOOLS,
 } from "@narnia-jobs/shared";
 import { describe, expect, it } from "vitest";
 import { publishedName } from "../src/mcp/scopes";
@@ -28,6 +29,7 @@ const PUBLISHED = new Set(
     ...Object.keys(CV_TOOLS),
     ...Object.keys(APPLICATION_TOOLS),
     ...Object.keys(JOB_APPLICATION_TOOLS),
+    ...Object.keys(RECORDING_TOOLS),
   ].map(publishedName),
 );
 const TOOL_REF = /`([a-z]+_[a-z_]+)`/g;

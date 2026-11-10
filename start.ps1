@@ -101,7 +101,10 @@ function Get-ProdDataHostDir { return Get-Setting "NARNIA_DATA_DIR" "./data" }
 function Get-ProdBackupHostDir { return Get-Setting "NARNIA_BACKUP_HOST_DIR" "./backups" }
 # --- F13 · serviço media opcional (análise de entrevista gravada; ver start.sh, cmd_media) ----------------------------
 function Test-MediaEnabled { return (Get-Setting "NARNIA_MEDIA" "0") -eq "1" }
-function Get-MediaProfileArgs { if (Test-MediaEnabled) { return @("--profile", "media") } else { return @() } }
+function Test-MediaGpu { return (Get-Setting "NARNIA_MEDIA_GPU" "0") -eq "1" }
+# F13-10: com a GPU pedida, o override do compose vem junto
+function Get-MediaGpuArgs { if (Test-MediaGpu) { return @("-f", "docker-compose.media-gpu.yml") } else { return @() } }
+function Get-MediaProfileArgs { if (Test-MediaEnabled) { return @((Get-MediaGpuArgs) + @("--profile", "media")) } else { return @() } }
 function New-MediaDirs([string] $DataDir) { New-Item -ItemType Directory -Force -Path (Join-Path $DataDir "interviews") *> $null }
 # ligado: os composes de dev e produção incluem o perfil (sobe, para e derruba junto com o resto)
 $script:DevCompose = @($script:DevCompose + (Get-MediaProfileArgs))
@@ -351,7 +354,7 @@ $script:E2eProject = if ($env:NARNIA_E2E_PROJECT) { $env:NARNIA_E2E_PROJECT } el
 $script:E2eCompose = @("compose", "-p", $script:E2eProject, "-f", "docker-compose.yml", "-f", "docker-compose.e2e.yml")
 
 function Invoke-E2e([string[]] $Args) { & docker @script:E2eCompose @Args; return $LASTEXITCODE }
-function Invoke-E2eUp { return (Invoke-E2e @("up", "-d", "--wait", "web", "api", "worker", "redis", "browser")) }  # browser: PDF do CV (F05)
+function Invoke-E2eUp { return (Invoke-E2e @("up", "-d", "--wait", "web", "api", "worker", "redis", "browser", "media")) }  # browser: PDF do CV (F05); media falso (F13)
 function Invoke-Play([string[]] $Args) {
   return (Invoke-E2e (@("--profile", "e2e", "run", "--rm", "--no-deps", "playwright", "./node_modules/.bin/playwright", "test") + $Args))
 }
@@ -365,6 +368,7 @@ function Invoke-E2eSuite {
   $uiOnly = $Rest -contains "--ui-only"
   $args = @($Rest | Where-Object { $_ -ne "--ui-only" })
   New-Item -ItemType Directory -Force -Path "./.e2e-data" *> $null
+  New-MediaDirs "./.e2e-data"   # F13: o media falso do e2e monta <dados>/interviews
   Info "e2e: construindo imagens e subindo a stack (projeto $($script:E2eProject), provider mock)…"
   if ((Invoke-E2e @("build")) -ne 0) { Fail "build das imagens falhou." }
   if ((Invoke-E2eUp) -ne 0) { Fail "a stack e2e não subiu." }
@@ -411,11 +415,14 @@ function Invoke-Media([string[]] $Rest) {
     "on" {
       $envDir = Split-Path -Parent $script:EnvFile; if ($envDir) { New-Item -ItemType Directory -Force -Path $envDir *> $null }
       Write-Env $script:EnvFile "NARNIA_MEDIA" "1"
+      Write-Env $script:EnvFile "NARNIA_MEDIA_GPU" $(if ($Rest -contains "--gpu" -or $Rest -contains "-Gpu") { "1" } else { "0" })
+      $gpu = @(Get-MediaGpuArgs)
+      if ($gpu.Count) { Info "GPU NVIDIA pedida: precisa do driver e do suporte a GPU do Docker (docs/entrevista-gravada.md)." }
       New-MediaDirs (Get-DevDataHostDir); New-MediaDirs (Get-ProdDataHostDir)
       Info "serviço de análise de vídeo ligado (NARNIA_MEDIA=1 em $($script:EnvFile))."
       Info "espaço: a imagem e os modelos ocupam cerca de 8 GB (os modelos baixam no primeiro uso)."
-      if ($devOn) { & docker @script:DevCompose --profile app --profile media up -d --build media; if ($LASTEXITCODE -ne 0) { Fail "não consegui subir o media (dev)." } }
-      if ($prodOn) { $env:NARNIA_DATA_DIR = Get-ProdDataHostDir; & docker @script:ProdCompose --profile media up -d --build media; if ($LASTEXITCODE -ne 0) { Fail "não consegui subir o media." } }
+      if ($devOn) { & docker @script:DevCompose @gpu --profile app --profile media up -d --build media; if ($LASTEXITCODE -ne 0) { Fail "não consegui subir o media (dev)." } }
+      if ($prodOn) { $env:NARNIA_DATA_DIR = Get-ProdDataHostDir; & docker @script:ProdCompose @gpu --profile media up -d --build media; if ($LASTEXITCODE -ne 0) { Fail "não consegui subir o media." } }
       if (-not $devOn -and -not $prodOn) { Info "ele sobe junto no próximo .\start.ps1 up (ou dev)." }
       Info "próximo passo: Configurações › Análise de vídeo, para colar o token do Hugging Face."
     }
@@ -436,7 +443,7 @@ function Invoke-Media([string[]] $Rest) {
       if ($devOn) { & docker @script:DevCompose --profile media ps media }
       if ($prodOn) { & docker @script:ProdCompose --profile media ps media }
     }
-    default { Fail "uso: .\start.ps1 media on | off [--purge] | status" }
+    default { Fail "uso: .\start.ps1 media on [--gpu] | off [--purge] | status" }
   }
 }
 
@@ -516,7 +523,7 @@ Uso (produção, só Docker no host):
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code
   install-plugin [--prod]  instala o recrutador no Claude Code deste computador (MCP + plugin, modo B)
   promote [c]   atualiza a cópia .owner-src do código para um commit (padrão HEAD; fluxo do mantenedor, CONTRIBUTING.md)
-  evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict] [--gate]
+  evals prompts|chat|pdf|cv-review|interview-frames|calibration|search|compare|all [nome…] [--strict] [--gate]
                 avaliações no Phoenix: prompts pela ponte; chat, pdf e cv-review num banco temporário isolado
                 (consome a assinatura; ver CONTRIBUTING.md)
   logs [svc]    acompanha os logs (api | worker | web | redis)
@@ -541,7 +548,7 @@ Desenvolvimento (tudo em containers):
 
 # avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
 function Invoke-Evals([string[]] $Rest) {
-  if (-not $Rest -or $Rest[0] -notin @("prompts", "chat", "pdf", "cv-review", "calibration", "search", "compare", "all")) { throw "uso: .\start.ps1 evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict]" }
+  if (-not $Rest -or $Rest[0] -notin @("prompts", "chat", "pdf", "cv-review", "interview-frames", "calibration", "search", "compare", "all")) { throw "uso: .\start.ps1 evals prompts|chat|pdf|cv-review|interview-frames|calibration|search|compare|all [nome…] [--strict]" }
   $devApi = & docker @script:DevCompose ps -q api 2>$null
   if ($devApi) { & docker @script:DevCompose exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals @Rest; return }
   if (Test-StackRunning) { Invoke-Prod (@("exec", "-T", "api", "narnia-jobs", "evals") + $Rest); return }

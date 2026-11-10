@@ -153,8 +153,14 @@ prod_backup_host_dir() { setting NARNIA_BACKUP_HOST_DIR ./backups; }
 # media_enabled -> 0 se o serviço media está ligado nesta instância (NARNIA_MEDIA=1 no ambiente ou no $ENV_FILE)
 media_enabled() { [[ "$(setting NARNIA_MEDIA 0)" == 1 ]]; }
 
-# media_profile_args -> "--profile media" quando ligado (vazio quando não), para os composes de dev e produção
-media_profile_args() { if media_enabled; then printf '%s\n' "--profile media"; fi; }
+media_gpu_enabled() { [[ "$(setting NARNIA_MEDIA_GPU 0)" == 1 ]]; }
+
+# media_gpu_args -> "-f docker-compose.media-gpu.yml" quando a GPU foi pedida (F13-10), senão vazio
+media_gpu_args() { if media_gpu_enabled; then printf '%s\n' "-f docker-compose.media-gpu.yml"; fi; }
+
+# media_profile_args -> "--profile media" quando ligado (vazio quando não), para os composes de dev e produção; com a GPU
+# pedida, o override do compose vem junto
+media_profile_args() { if media_enabled; then printf '%s\n' "$(media_gpu_args) --profile media" | sed 's/^ //'; fi; }
 
 # media_dirs DATA_DIR -> cria DATA_DIR/interviews antes do Docker (o media monta só essa pasta; senão nasce do root)
 media_dirs() { mkdir -p "$1/interviews"; }
@@ -501,7 +507,7 @@ e2e_env() {
 }
 
 e2e_up() {
-  "${E2E_COMPOSE[@]}" up -d --wait web api worker redis browser   # browser: PDF do CV (F05)
+  "${E2E_COMPOSE[@]}" up -d --wait web api worker redis browser media   # browser: PDF do CV (F05); media falso (F13)
 }
 
 # e2e_play ARGS… -> roda o Playwright no container (código de saída preservado)
@@ -569,6 +575,7 @@ cmd_e2e() {
     esac
   done
   mkdir -p "$E2E_DATA_DIR"
+  media_dirs "$E2E_DATA_DIR"   # F13: o media falso do e2e monta <dados>/interviews
   info "e2e: construindo imagens e subindo a stack (projeto ${E2E_PROJECT}, provider mock)…"
   "${E2E_COMPOSE[@]}" build
   e2e_up
@@ -662,16 +669,21 @@ cmd_media() {
     on)
       mkdir -p "$(dirname "$ENV_FILE")"
       write_env "$ENV_FILE" NARNIA_MEDIA 1
+      # F13-10: --gpu usa o override com a GPU NVIDIA; sem a opção, CPU
+      if [[ "$purge" == --gpu ]]; then write_env "$ENV_FILE" NARNIA_MEDIA_GPU 1; else write_env "$ENV_FILE" NARNIA_MEDIA_GPU 0; fi
+      local gpu=()
+      read -r -a gpu <<<"$(media_gpu_args)" || true
+      [[ ${#gpu[@]} -eq 0 ]] || info "GPU NVIDIA pedida: precisa do driver e do nvidia-container-toolkit (docs/entrevista-gravada.md)."
       media_dirs "$(dev_data_host_dir)"
       media_dirs "$(prod_data_host_dir)"
       info "serviço de análise de vídeo ligado (NARNIA_MEDIA=1 em $ENV_FILE)."
       info "espaço: a imagem e os modelos ocupam cerca de 8 GB (os modelos baixam no primeiro uso)."
       if [[ -n "$dev_on" ]]; then
-        "${DEV_COMPOSE[@]}" --profile app --profile media up -d --build media || die "não consegui subir o media (dev)."
+        "${DEV_COMPOSE[@]}" "${gpu[@]}" --profile app --profile media up -d --build media || die "não consegui subir o media (dev)."
       fi
       if [[ -n "$prod_on" ]]; then
         export NARNIA_DATA_DIR; NARNIA_DATA_DIR=$(prod_data_host_dir)
-        "${PROD_COMPOSE[@]}" --profile media up -d --build media || die "não consegui subir o media."
+        "${PROD_COMPOSE[@]}" "${gpu[@]}" --profile media up -d --build media || die "não consegui subir o media."
       fi
       [[ -n "$dev_on$prod_on" ]] || info "ele sobe junto no próximo ./start.sh up (ou dev)."
       info "próximo passo: Configurações › Análise de vídeo, para colar o token do Hugging Face." ;;
@@ -693,7 +705,7 @@ cmd_media() {
       if media_enabled; then info "análise de vídeo: ligada"; else info "análise de vídeo: desligada (./start.sh media on)"; fi
       [[ -z "$dev_on" ]] || "${DEV_COMPOSE[@]}" --profile media ps media 2>/dev/null || true
       [[ -z "$prod_on" ]] || "${PROD_COMPOSE[@]}" --profile media ps media 2>/dev/null || true ;;
-    *) die "uso: ./start.sh media on | off [--purge] | status" ;;
+    *) die "uso: ./start.sh media on [--gpu] | off [--purge] | status" ;;
   esac
 }
 
@@ -719,7 +731,7 @@ cmd_extension() {
 # avaliações no Phoenix (M5): roda os prompts estruturados sobre os datasets, pela ponte da assinatura
 cmd_evals() {
   require_docker
-  [[ ${1:-} =~ ^(prompts|chat|pdf|cv-review|calibration|search|compare|all)$ ]] || die "uso: ./start.sh evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict]"
+  [[ ${1:-} =~ ^(prompts|chat|pdf|cv-review|interview-frames|calibration|search|compare|all)$ ]] || die "uso: ./start.sh evals prompts|chat|pdf|cv-review|interview-frames|calibration|search|compare|all [nome…] [--strict]"
   if [[ -n "$("${DEV_COMPOSE[@]}" ps -q api 2>/dev/null)" ]]; then
     "${DEV_COMPOSE[@]}" exec -T api pnpm --filter @narnia-jobs/api exec tsx src/cli.ts evals "$@"
   elif stack_running; then
@@ -739,7 +751,7 @@ Uso (produção, só Docker no host):
   down --purge  para e remove os volumes (apaga o LOGIN da assinatura; a pasta de dados fica)
   promote [c]   atualiza a cópia .owner-src do código para um commit (padrão HEAD; fluxo do mantenedor, CONTRIBUTING.md)
   extension     gera a extensão do Chrome (apps/extension/dist) para carregar em chrome://extensions
-  media on|off [--purge]|status   liga ou desliga a análise de entrevista gravada (F13; serviço opcional)
+  media on [--gpu]|off [--purge]|status   liga ou desliga a análise de entrevista gravada (F13; serviço opcional)
   restore ARQ   restaura um backup de ./backups (para api/worker, guarda o banco atual, troca, sobe)
   login         login da assinatura dentro do container (uma vez)
   doctor        diagnóstico: login, Redis, pasta de dados, worker, MCP e plugin no Claude Code

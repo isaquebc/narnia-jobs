@@ -2,7 +2,7 @@
 
 Entregável 13 do plan-v0. O usuário envia o vídeo de uma entrevista real, e o recrutador devolve transcrição por pessoa, medições de voz, áudio, rosto, câmera e iluminação, leitura das reações e anotações de quem entrevistou, e feedback do discurso com minuto e trecho. Depende de F04 (`plugin/`, MCP, chat), F06 (vaga e análise), F07 (candidatura e etapas), do gate de prompts (F04-avaliacoes M7) e do padrão de tarefas da F05. Não depende da F08.
 
-Status: **plano aprovado pelo dono** (2026-11-09). Viabilidade medida em §8; nada implementado. Primeira a ser feita depois da F12 (decisão do dono, 2026-11-09), antes de F09, F08 e F10.
+Status: **implementada** (M1 a M7, 2026-11-10), plano aprovado pelo dono em 2026-11-09. Viabilidade e execução em §8. Primeira a ser feita depois da F12 (decisão do dono, 2026-11-09), antes de F09, F08 e F10.
 
 > **Regra de uso, em destaque no README e na documentação ao entregar (decisão do dono):** a análise existe só para a pessoa se desenvolver durante o processo seletivo. Nenhum vídeo, dado ou leitura pode ser publicado ou compartilhado. Cabe a quem usa respeitar a lei e as regras sobre a gravação e o consentimento dos presentes.
 
@@ -139,9 +139,9 @@ Telas do M1 no padrão das telas atuais (dono, 2026-11-10): cartão "Análise de
 | F13-8 | Anotações por fala e imagem; leitura como hipótese, indeterminada por padrão | Fechada (dono, 2026-11-09) |
 | F13-9 | Sem classificador até haver rótulos; usuário poderá marcar o que descobriu depois | Fechada (dono, 2026-11-09) |
 | F13-10 | Provedor GPU: override opcional do compose, documentado | Fechada (dono, 2026-11-09, plano aprovado) |
-| F13-11 | Limites de tamanho e duração do upload | Em aberto (medir no M1) |
-| F13-12 | Modelo de cada elo da cadeia | Em aberto (decidir no gate) |
-| F13-13 | Visual do relatório | Em aberto (conversa com o dono) |
+| F13-11 | Limites de tamanho e duração do upload: 4 GB e 3 h, ajustáveis em Configurações (R7) | Fechada (M1) |
+| F13-12 | Modelo de cada elo da cadeia: Haiku nos quadros (tool Read), Sonnet no relatório; cadeia em dois elos (R14) | Fechada no gate (2026-11-10) |
+| F13-13 | Visual do relatório: no padrão das telas atuais (dono, 2026-11-10: "pode seguir no padrão das telas atuais" e "pode seguir até o final"); outro visual fica para uma conversa própria se o dono quiser | Fechada (dono, 2026-11-10) |
 | F13-14 | Conteúdo e ordem do relatório (§2.5) mantidos como no teste do recrutador, que o dono aprovou; vira o caso de referência do gate (com fixture sintética, nunca a entrevista real) | Fechada (dono, 2026-11-09) |
 
 ---
@@ -187,6 +187,14 @@ Passos do M1, cada um com testes antes:
 - **R11 · Pessoa sem rosto.** Voz sem rosto detectado (miniatura de ~32 px) vira pessoa só com voz, marcada para confirmar; ganha o nome de uma etiqueta que sobrou só quando há exatamente um nome e uma voz assim.
 - **R12 · Candidato.** Pela etiqueta igual ao nome da pessoa usuária; sem isso, quem mais fala, marcado para confirmar na tela.
 - **R13 · Começo automático.** A última parte do envio enfileira a análise quando o `media` está no ar; desligado, a entrevista fica `uploaded` com o botão de analisar.
+
+### 6.1.3 Refinamento do M5 ao M7 (2026-11-10)
+
+- **R14 · Cadeia em dois elos.** Em vez de quatro, dois: o modelo barato descreve os quadros escolhidos (`narnia-interview-frames`, tool Read) e o Sonnet escreve o relatório inteiro (`narnia-interview-report`) com a transcrição numerada por turno, as medições, a vaga, o CV enviado e as entrevistas anteriores do processo. É o formato do teste do recrutador que o dono aprovou (uma chamada) e reduz o que passa pelo gate. Separar perguntas e respostas num elo próprio fica para quando um relatório longo pedir.
+- **R15 · Citação por turno.** O modelo cita `turn` + `quote`; o código acha o segundo exato pelas palavras com tempo, corrige a citação pelo texto real quando ela está ≥ 70 % igual, move para o turno certo da pessoa candidata ou remove, e retira `[mm:ss]` que não existem (avisos guardados no relatório). O alerta do sorriso (F13-4) é montado pelo código, nunca pelo modelo.
+- **R16 · Conversa.** "Conversar sobre a entrevista" abre uma conversa por entrevista (migração 0039), com a nota `entrevista-gravada-contexto.md` e a skill `analisar-entrevista`; tools só de leitura `recording.list`, `recording.get`, `recording.transcript`, com links `/entrevistas/<id>?t=<segundos>` (o juiz do chat passou a aceitar esse formato em G4).
+- **R17 · e2e.** O e2e sobe o serviço `media` de verdade em modo falso (estágio `fake` da imagem, sem modelos) e um vídeo sintético de 60 s (`apps/e2e/fixtures/entrevista-sintetica.webm`).
+- **R18 · GPU (F13-10).** `./start.sh media on --gpu` grava `NARNIA_MEDIA_GPU=1` e passa `docker-compose.media-gpu.yml` (torch CUDA 12.8, reserva de GPU NVIDIA). Não testado numa máquina com GPU.
 
 ### 6.2 Testes unitários (TDD)
 Duração sem cabeçalho; junção de palavras e turnos; retomada por etapa; alerta de confiabilidade; eventos relativos ao padrão da pessoa; detecção de sala de espera; checagem de citações e tempos (citação alterada, pessoa errada, tempo inexistente); backup sem `interviews/` e com o resto; apagar só o vídeo; token nunca em log.
@@ -256,5 +264,14 @@ Prova na instância `claude`: `media on` construiu e subiu o serviço; estado `o
 | M4 dados: migração 0038, `importMediaResults`, fila `media`, `recording.analyze`, rotas da análise e correções, quadros no backup (core, `start.sh`, `start.ps1`) | feito | 4 vitest no core, 3 no worker, 3 no api, 1 de backup, 1 bats |
 
 Prova com modelos reais na instância `claude`, num trecho de 3 min da gravação do dono (em `.claude-data`, fora do git): transcrição em ~75 s, separação de vozes em ~50 s, o resto em ~25 s. O sinal do ângulo confirmou que pitch negativo é cabeça baixa (-35° quando a entrevistadora anotava), o que virou anotação provável de 12 s. O rosto da miniatura não foi detectado (como no teste de viabilidade): a voz ficou numa pessoa sem rosto, para confirmar. Bugs achados e corrigidos: cache do numba sem permissão com o uid do usuário (`NUMBA_CACHE_DIR`), rosto partido ao baixar a cabeça (R10) e falsos nomes do OCR (logotipos em maiúsculas e palavras soltas).
+
+### M5 a M7 · execução (2026-11-10)
+| Passo | Estado | Testes (antes do código: sim) |
+|---|---|---|
+| M5 cadeia: prompts `interview-frames` (Haiku, Read) e `interview-report` (Sonnet), resumo e transcrição numerada, checagem por código, tarefa `recording.report`, leituras das anotações e fichas, tools MCP `recording.*`, skill `analisar-entrevista`, nota e conversa por entrevista | feito | 6 vitest no core (relatório), 2 no worker, 3 casos de cobertura MCP; gate real |
+| M6 página `/entrevistas/$id` (no padrão das telas atuais): vídeo, quem é quem, relatório na ordem aprovada, tempos clicáveis, quadros, transcrição com correção, refazer, conversar | feito | 4 vitest no web, e2e `F13/E2E-04` (fluxo completo com o media falso) |
+| M7 README (regra de uso em destaque, pt e en), `docs/entrevista-gravada.md` (ligar, token, GPU, privacidade, backup, limitações, créditos CC-BY), guia de uso, override de GPU com bats e Pester | feito | 1 bats, 1 Pester |
+
+Gate real (assinatura, F06-14), primeira aprovação de cada prompt novo: `narnia-interview-report` com os avaliadores por código em 100 % (citações literais, uma leitura por anotação, três treinos, fichas, cobertura) e o juiz em 50 % (dois "parcial" por detalhes: uma contagem de reações sem base, uma experiência sugerida na reescrita); foram três rodadas, cada uma corrigindo o prompt (ficha com o rótulo puro, resposta certa não vira "incompleta", nada de limitação genérica nem estimativa sem base). `narnia-interview-frames`: avaliadores em 100 %, juiz 75 % (no desenho, "cabeça baixa" não foi dita). Chat `entrevista-gravada-como-responder` (`--feature`): atende, com o juiz já aceitando o link `/entrevistas/…?t=`; calibração dos juízes rodada depois da mudança em G4 (os dois falsos negativos que apareceram são de G1 e D1, sem relação). Pendente: `evals chat --noise` (o juiz e os casos mudaram).
 
 Prova do M1.4 na instância `claude`: vídeo sintético (WebM sem duração no cabeçalho) enviado pela API, baixado idêntico, `Range` 206; o `media`, chamado da rede do worker, leu o arquivo pelo volume compartilhado e mediu 20,0 s pelos pacotes.

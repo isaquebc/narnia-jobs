@@ -110,6 +110,7 @@ function usage(): void {
   evals chat [id…] [--strict]       conversas de referência com o recrutador, num banco temporário isolado
   evals pdf [--strict]              leitura do PDF fictício (tool Read), num banco temporário isolado
   evals cv-review [--strict]        revisor do CV com as imagens das páginas (precisa do serviço browser)
+  evals interview-frames [--strict] leitor dos quadros da entrevista gravada (F13) com imagens desenhadas
   evals all [--strict]              tudo acima`);
 }
 
@@ -139,7 +140,13 @@ switch (cmd) {
       const { runPromptEvals } = await import("./evals/cli-prompts");
       code = await runPromptEvals(sub === "all" ? rest.filter((a) => a.startsWith("--")) : rest);
     }
-    if (sub === "chat" || sub === "pdf" || sub === "cv-review" || sub === "all") {
+    if (
+      sub === "chat" ||
+      sub === "pdf" ||
+      sub === "cv-review" ||
+      sub === "interview-frames" ||
+      sub === "all"
+    ) {
       const { runSandboxEvals } = await import("./evals/cli-evals");
       const flags = rest.filter((a) => a.startsWith("--"));
       if (sub === "all") {
@@ -148,6 +155,7 @@ switch (cmd) {
           await runSandboxEvals("chat", flags),
           await runSandboxEvals("pdf", flags),
           await runSandboxEvals("cv-review", flags),
+          await runSandboxEvals("interview-frames", flags),
         );
       } else code = await runSandboxEvals(sub, rest);
     }
@@ -166,12 +174,20 @@ switch (cmd) {
       code = runCompare(rest);
     }
     if (
-      !["prompts", "chat", "pdf", "cv-review", "calibration", "search", "compare", "all"].includes(
-        sub,
-      )
+      ![
+        "prompts",
+        "chat",
+        "pdf",
+        "cv-review",
+        "interview-frames",
+        "calibration",
+        "search",
+        "compare",
+        "all",
+      ].includes(sub)
     ) {
       console.log(
-        "narnia-jobs evals prompts|chat|pdf|cv-review|calibration|search|compare|all [nome…] [--strict]",
+        "narnia-jobs evals prompts|chat|pdf|cv-review|interview-frames|calibration|search|compare|all [nome…] [--strict]",
       );
       code = 2;
     }

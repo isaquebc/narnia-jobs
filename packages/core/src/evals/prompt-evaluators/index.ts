@@ -2,6 +2,7 @@
 export { answerChecks, locateKinds, locateRefs, roleplayChecks } from "./application-locate";
 export { checkVerdicts } from "./check-verdicts";
 export { cvFactIds, cvNoGapTerms, cvSourceTitles, letterWordCount } from "./cv-honesty";
+export { interviewFramesChecks, interviewReportChecks } from "./interview";
 export { jsonSchema } from "./json-schema";
 export { language } from "./language";
 export type { EvalParams, EvalResult } from "./lib";

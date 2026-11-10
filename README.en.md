@@ -12,12 +12,15 @@
 - **Résumé and cover letter.** A PDF of up to 2 pages in the posting's language, checked by automated rules and by a second model before it reaches you; three built-in templates plus your own.
 - **Applications.** A board by stage, a calendar with `.ics` files and, optionally, Google Calendar.
 - **Chrome extension.** Brings postings from any site and helps fill in application forms with answers drawn from your data.
+- **Recorded interview analysis (optional).** Upload the video of a real interview: a transcript per person, what you said and shouldn't have, wrong or incomplete answers with the correction, delivery, smile and expression (with a reliability warning), the interviewer's reactions and note-taking, camera and audio, and drills. Runs in a separate local service ([guide](docs/entrevista-gravada.md), in Portuguese).
+
+> **Usage rule for recorded interview analysis:** it exists only to help you improve during a hiring process. **No video, data or reading may be published or shared.** You are responsible for following the law and the rules on recording and on the consent of everyone in it.
 
 > **Language.** The user interface is in **Brazilian Portuguese only** (all strings live in one dictionary, `apps/web/src/i18n/pt-BR.ts`; translations are welcome). Résumés and cover letters are generated in the posting's language (Portuguese or English), and the recruiter answers in the language set in each profile's persona (Perfis › Recrutador › Idioma, for example `en-US`).
 
 ## Not there yet
 
-Voice interview practice, analysis of recorded interview videos, reading and sending e-mails automatically, recruiter messages and LinkedIn optimization, exporting and deleting your data from the UI, the full usage meter and a second AI provider (Codex) are planned ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md), in Portuguese). Importing the LinkedIn data export was postponed.
+Voice interview practice, reading and sending e-mails automatically, recruiter messages and LinkedIn optimization, exporting and deleting your data from the UI, the full usage meter and a second AI provider (Codex) are planned ([plans/plan-v0/tasks/README.md](plans/plan-v0/tasks/README.md), in Portuguese). Importing the LinkedIn data export was postponed.
 
 ## Before you start
 
@@ -75,6 +78,7 @@ Open that address in your browser and follow the first-run wizard. The full walk
 | The links in your résumé | one visit to each link (identified as a regular Chrome) | when the PDF is built, so no broken link is published |
 | GitHub API | queries about your repositories | when you import GitHub |
 | Hugging Face | a one-time 113 MB model download | when you turn on semantic search |
+| Hugging Face | the transcription and voice model downloads (a few GB) and your token check | when you turn on recorded interview analysis; the video never leaves your computer: only the transcript, the measurements and up to 40 frames go to Claude |
 | Google | calendar events | only if you connect Google Calendar |
 
 ## Updating
@@ -116,6 +120,7 @@ Remove the extension at `chrome://extensions`. Finally, delete the project folde
 | [Usage guide](docs/guia-de-uso.md) (Portuguese) | reference for every feature, settings, commands, data and backup |
 | [Résumé templates](docs/templates-de-cv.md) (Portuguese) | how to build your own template (`.zip`) |
 | [Google Calendar](docs/google-calendar.md) (Portuguese) | optional calendar connection for applications |
+| [Recorded interview](docs/entrevista-gravada.md) (Portuguese) | optional interview video analysis: setup, token, GPU, privacy, credits (includes `pyannote/speaker-diarization-community-1`, CC-BY-4.0) |
 | [First contribution](docs/en/contributing.md) | from fork to merged pull request, step by step |
 | [Contributing](CONTRIBUTING.md) | development setup, tests, prompt evaluations (Portuguese, with an English summary) |
 | [Security](SECURITY.md) | how to report a vulnerability and the threat model |

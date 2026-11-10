@@ -214,4 +214,6 @@ export function removeApplicationRecordingFiles(
   for (const r of repos.recordings.listByApplication(applicationId)) removeFiles(dataDir, r.id);
 }
 export * from "./analysis";
+export * from "./report";
 export * from "./tasks";
+export * from "./tools";

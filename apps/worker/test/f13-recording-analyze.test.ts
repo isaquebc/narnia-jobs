@@ -129,7 +129,7 @@ function harness(opts: Parameters<typeof fakeMedia>[1] = {}) {
       ctx,
       deps,
     );
-  return { repos, rec, run, runs, tasks, published, pcts };
+  return { repos, rec, run, runs, tasks, published, pcts, deps };
 }
 
 describe("F13/M4 · recording.analyze", () => {
@@ -162,5 +162,59 @@ describe("F13/M4 · recording.analyze", () => {
     const h = harness();
     h.repos.recordings.remove(h.rec.id);
     expect(await h.run()).toMatchObject({ skipped: "not_found" });
+  });
+});
+
+describe("F13/M5 · recording.report", () => {
+  it("lê os quadros, gera o relatório conferido, grava leituras das anotações e fichas; entrevista pronta", async () => {
+    const h = harness();
+    await h.run();
+    const r = await processTask(
+      {
+        kind: "task",
+        type: RECORDING_TASKS.report,
+        key: h.rec.id,
+        payload: { recordingId: h.rec.id },
+      },
+      { jobId: "task__recording.report__r", progress: async () => {} },
+      h.deps,
+    );
+    expect(r).toMatchObject({ recordingId: h.rec.id });
+    expect(h.repos.recordings.get(h.rec.id)).toMatchObject({
+      state: "ready",
+      step: null,
+      progress: 100,
+    });
+    const rep = h.repos.recordingAnalysis.latestReport(h.rec.id);
+    expect(rep?.version).toBe(1);
+    expect(rep?.content.shouldNotHaveSaid.length).toBeGreaterThan(0);
+    expect(rep?.content.smile.alert).toMatch(/% do tempo/);
+    expect(rep?.content.drills).toHaveLength(3);
+    const notes = h.repos.recordingAnalysis.events(h.rec.id).filter((e) => e.type === "note");
+    expect(notes.every((e) => e.reason)).toBe(true);
+    expect(h.repos.recordingAnalysis.persons(h.rec.id).every((p) => p.card)).toBe(true);
+    const usage = h.repos.db.prepare("select category from usage_event").all() as Array<{
+      category: string;
+    }>;
+    expect(usage.map((u) => u.category).sort()).toEqual(["recording.frames", "recording.report"]);
+  });
+
+  it("falha do modelo: entrevista em failed com a mensagem, a análise fica", async () => {
+    const h = harness();
+    await h.run();
+    (h.deps.provider as MockProvider).setMode({ errors: { interviewReport: "limite de uso" } });
+    await processTask(
+      {
+        kind: "task",
+        type: RECORDING_TASKS.report,
+        key: h.rec.id,
+        payload: { recordingId: h.rec.id },
+      },
+      { jobId: "task__recording.report__r", progress: async () => {} },
+      h.deps,
+    );
+    expect(h.repos.recordings.get(h.rec.id)).toMatchObject({ state: "failed" });
+    expect(h.repos.recordings.get(h.rec.id)?.error).toMatch(/limite de uso/);
+    expect(h.repos.recordingAnalysis.persons(h.rec.id)).toHaveLength(2);
   });
 });

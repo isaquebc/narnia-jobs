@@ -84,6 +84,8 @@ export {
   type CvGenerateInput,
   type CvReviewInput,
   type ExtractFactsInput,
+  type InterviewFramesInput,
+  type InterviewReportInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
   type PickFilesInput,

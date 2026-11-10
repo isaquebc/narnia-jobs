@@ -11,6 +11,8 @@ import type {
   CvGenerateInput,
   CvReviewInput,
   ExtractFactsInput,
+  InterviewFramesInput,
+  InterviewReportInput,
   PickFilesInput,
   PostingDuplicateInput,
   PostingExtractInput,
@@ -23,6 +25,7 @@ import type {
 import { STRUCTURED_PROMPTS, structuredPromptVars } from "@narnia-jobs/providers";
 import type { CvBrief, CvContent, FormField } from "@narnia-jobs/shared";
 import { CV_BRIEF_PT_TARGET_EN } from "./cv-brief-fixtures";
+import { INTERVIEW_FRAMES_CASES, INTERVIEW_REPORT_CASES } from "./interview-fixtures";
 
 /**
  * Datasets dos prompts estruturados (M3): exemplos fictícios, com as entradas tipadas como o provider as recebe; as
@@ -51,6 +54,8 @@ type Input<Op extends StructuredOperation> = Omit<
     cvGenerate: CvGenerateInput;
     coverLetterGenerate: CvGenerateInput;
     cvReview: CvReviewInput;
+    interviewFrames: InterviewFramesInput;
+    interviewReport: InterviewReportInput;
   }[Op],
   "model"
 >;
@@ -1782,6 +1787,12 @@ Requisitos:
     },
   ],
   ...CV_DATASETS,
+  // F13/M5: entrevistas fictícias; os quadros têm `dir` só na avaliação local (imagens em evals/fixtures)
+  interviewReport: INTERVIEW_REPORT_CASES,
+  interviewFrames: INTERVIEW_FRAMES_CASES.map(({ image: _image, ...c }) => ({
+    ...c,
+    input: { ...c.input, dir: "evals/fixtures/interview-frames" },
+  })),
 };
 
 /** Exemplo pronto para o Phoenix: `input` = variáveis do template, `output` = referência, `metadata`. */

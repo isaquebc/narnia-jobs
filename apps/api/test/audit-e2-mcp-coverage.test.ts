@@ -1,6 +1,17 @@
+import { cpSync } from "node:fs";
+import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { applyToPosting, type SeededIds, saveDigest, seedFixture } from "@narnia-jobs/core";
+import {
+  appendRecordingChunk,
+  applyToPosting,
+  createRecording,
+  importMediaResults,
+  recordingDir,
+  type SeededIds,
+  saveDigest,
+  seedFixture,
+} from "@narnia-jobs/core";
 import { MOCK_DIGEST } from "@narnia-jobs/providers";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeTestApp, simulateWorker, type TestApp, TOKEN, uploadFixture } from "./helpers";
@@ -38,6 +49,7 @@ interface Ctx {
   applicationId?: string;
   /** F07/M6: candidatura criada pelo Aplicar (CV pronto travado). */
   jobApplicationId?: string;
+  recordingId?: string;
 }
 
 /** Candidatura como o botão Aplicar deixa: CV da vaga pronto, travado. */
@@ -67,6 +79,34 @@ function jobApplication(c: Ctx): string {
     appliedOn: "2026-10-20",
   }).id;
   return c.jobApplicationId;
+}
+
+/** F13: entrevista gravada analisada (fixture fictícia do modo falso do media). */
+function recording(c: Ctx): string {
+  if (c.recordingId) return c.recordingId;
+  const t = c.t;
+  const rec = createRecording(
+    t.repos,
+    t.dataDir,
+    { profileId: c.ids.profileId, fileName: "call.webm", size: 2 },
+    { freeBytes: 1e12 },
+  );
+  appendRecordingChunk(t.repos, t.dataDir, rec.id, 0, new Uint8Array([1, 2]));
+  const fixture = join(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "packages",
+    "core",
+    "test",
+    "fixtures",
+    "recording-work",
+  );
+  cpSync(fixture, join(recordingDir(t.dataDir, rec.id), "work"), { recursive: true });
+  importMediaResults(t.repos, t.dataDir, rec.id);
+  c.recordingId = rec.id;
+  return rec.id;
 }
 
 /** Formulário como a extensão deixa (a captura e o leitor rodam fora daqui). */
@@ -414,6 +454,13 @@ const CASES: Record<string, Case> = {
   },
   self_declaration_save: { where: "career", args: () => ({ topic: "race", preferNotToSay: true }) },
   self_declaration_list: { where: "career", args: () => ({}) },
+  // F13/M5: entrevistas gravadas (só leitura)
+  recording_list: { where: "career", args: (c) => ({ profileId: c.ids.profileId }) },
+  recording_get: { where: "career", args: (c) => ({ id: recording(c) }) },
+  recording_transcript: {
+    where: "career",
+    args: (c) => ({ id: recording(c), fromTurn: 0, toTurn: 3 }),
+  },
   // F07/M6: candidaturas
   job_application_list: { where: "career", args: () => ({}) },
   job_application_get: { where: "career", args: (c) => ({ id: jobApplication(c) }) },

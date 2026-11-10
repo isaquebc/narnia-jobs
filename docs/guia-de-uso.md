@@ -69,6 +69,13 @@ Salvar uma vaga não é se candidatar: na página da vaga, **Aplicar** cria a ca
 - **Contatos**: com quem você falou, por LinkedIn, WhatsApp ou e-mail, quem indicou quem. Dá para editar um contato pela interface ou pedir ao recrutador ("o e-mail da Ana mudou").
 - **Conversar** sobre a candidatura com o recrutador, que conhece a vaga, a análise e as etapas.
 - **Encerrar candidatura** com o motivo, ou **Fui desclassificado(a)** colando o e-mail recebido (fica como nota, com a etapa em que parou). **Ver arquivadas** mostra as arquivadas.
+- **Entrevistas gravadas** (opcional): o vídeo de uma entrevista da candidatura, ligado à etapa, com a análise do recrutador. Veja abaixo.
+
+## Entrevista gravada (opcional)
+
+> **Regra de uso:** só para você se desenvolver durante o processo seletivo; nenhum vídeo, dado ou leitura pode ser publicado ou compartilhado.
+
+Ligue com `./start.sh media on` (Windows: `.\start.ps1 media on`; `--gpu` para GPU NVIDIA) e cole o token do Hugging Face em **Configurações › Análise de vídeo**. Envie o vídeo na candidatura (com a etapa) ou em **Perfis › o perfil › Entrevistas** (avulso). A análise roda sozinha em segundo plano; a página da entrevista traz o vídeo, quem é quem, o relatório do recrutador com os tempos clicáveis, os quadros, a transcrição (com correção de quem falou), **Refazer o relatório** e **Conversar sobre a entrevista**. Detalhes, privacidade e créditos em [docs/entrevista-gravada.md](entrevista-gravada.md).
 
 
 ## Extensão do Chrome (vagas e formulários de candidatura)
@@ -142,7 +149,7 @@ As avaliações dos prompts (datasets, juízes, gates) estão no [CONTRIBUTING](
 
 Tudo que é seu fica em `./data` (ou noutra pasta: veja "Mudar as pastas" abaixo): banco SQLite, currículos enviados, textos extraídos, documentos gerados e logs de uso. Essa pasta nunca entra no repositório (`.gitignore`). O login da assinatura fica no volume Docker `claude-auth`, e a fila no volume `redis-data`.
 
-**Backups automáticos** ficam em `./backups`, na raiz do projeto, **fora** de `./data` (ou noutra pasta, por exemplo um disco externo ou uma pasta sincronizada): uma cópia consistente do banco no primeiro boot de cada dia em que há dados e outra antes de cada migration, mais os uploads e os modelos de currículo enviados (`.zip`) copiados sem duplicar; os PDFs gerados não entram, porque o conteúdo fica no banco e eles podem ser montados de novo. Ficam no máximo 5 cópias no total (configurável em Configurações › Backups); ao bater o teto, a mais antiga sai. **Apagar `./data` apaga os seus dados, mas não os backups.** Se o banco for recriado vazio e houver backup, a aplicação avisa com uma notificação crítica que traz o comando de restauração.
+**Backups automáticos** ficam em `./backups`, na raiz do projeto, **fora** de `./data` (ou noutra pasta, por exemplo um disco externo ou uma pasta sincronizada): uma cópia consistente do banco no primeiro boot de cada dia em que há dados e outra antes de cada migration, mais os uploads, os modelos de currículo enviados (`.zip`), os anexos das candidaturas e os quadros das entrevistas gravadas copiados sem duplicar (o vídeo das entrevistas, em `<dados>/interviews`, fica de fora); os PDFs gerados não entram, porque o conteúdo fica no banco e eles podem ser montados de novo. Ficam no máximo 5 cópias no total (configurável em Configurações › Backups); ao bater o teto, a mais antiga sai. **Apagar `./data` apaga os seus dados, mas não os backups.** Se o banco for recriado vazio e houver backup, a aplicação avisa com uma notificação crítica que traz o comando de restauração.
 
 Para restaurar: `./start.sh restore backups/<arquivo>.sqlite` (para o api e o worker, guarda o banco atual em `backups/narnia-before-restore-…`, copia o escolhido e sobe os dois de novo). Backup manual continua valendo: copiar `./data` com os serviços parados (`./start.sh down`).
 
@@ -161,6 +168,7 @@ Para restaurar: `./start.sh restore backups/<arquivo>.sqlite` (para o api e o wo
 | `./start.sh install-plugin` | instala o recrutador no Claude Code deste computador (MCP + plugin) |
 | `./start.sh extension` | gera a extensão do Chrome em `apps/extension/dist` |
 | `./start.sh google status` · `google connect <client-id>` | Google Calendar opcional ([docs/google-calendar.md](google-calendar.md)) |
+| `./start.sh media on [--gpu]` · `media off [--purge]` · `media status` | análise de entrevista gravada, opcional ([docs/entrevista-gravada.md](entrevista-gravada.md)) |
 | `./start.sh help` | todos os comandos, inclusive os de desenvolvimento |
 | `./start.sh logs [api\|worker\|web\|redis\|browser]` | acompanha os logs |
 | `./start.sh status` | estado dos containers |

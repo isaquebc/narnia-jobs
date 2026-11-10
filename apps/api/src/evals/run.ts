@@ -21,6 +21,8 @@ export interface EvalRunOptions {
   readyPostingCv?: () => void;
   /** F07/M6: a candidatura do sandbox, para os casos abertos pela conversa da candidatura. */
   jobApplication?: () => string;
+  /** F13/M5: entrevista gravada analisada do sandbox. */
+  recording?: () => string;
   /** Vagas salvas (empresa e cargo, uma por linha): citar a empresa da vaga não é inventar (F12/M5). */
   savedPostings?: string | (() => string);
   /**
@@ -194,6 +196,20 @@ export async function runEvalCases(
         await timed(async () => {
           sessionId = (
             await call<{ session: { id: string } }>(`/api/job-applications/${jobAppId}/chat`, {
+              method: "POST",
+              body: JSON.stringify({ message: c.messages[0] }),
+            })
+          ).session.id;
+          await waitReplies(call, sessionId, 1, o.turnTimeoutMs ?? 180_000, o.turnError);
+        });
+        first = 1;
+      } else if (c.open === "recording_chat") {
+        // F13/M5: "Conversar sobre a entrevista" na página da entrevista gravada
+        if (!o.recording) throw new Error("sandbox sem entrevista gravada para a conversa");
+        const recId = o.recording();
+        await timed(async () => {
+          sessionId = (
+            await call<{ session: { id: string } }>(`/api/recordings/${recId}/chat`, {
               method: "POST",
               body: JSON.stringify({ message: c.messages[0] }),
             })

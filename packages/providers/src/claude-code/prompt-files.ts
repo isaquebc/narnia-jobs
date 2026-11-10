@@ -26,4 +26,6 @@ export const PROMPTS = {
   cvGenerate: () => loadPrompt("cv-generate"),
   coverLetterGenerate: () => loadPrompt("cover-letter-generate"),
   cvReview: () => loadPrompt("cv-review"),
+  interviewFrames: () => loadPrompt("interview-frames"),
+  interviewReport: () => loadPrompt("interview-report"),
 };

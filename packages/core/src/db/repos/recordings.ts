@@ -46,6 +46,8 @@ export interface RecordingsRepo {
     factsVersion: number | null;
   } | null;
   listByApplication(applicationId: string): Recording[];
+  chatSessionId(id: string): string | null;
+  setChatSession(id: string, sessionId: string | null): void;
   listByProfile(profileId: string): Recording[];
   update(id: string, patch: RecordingPatch, now?: Date): Recording;
   remove(id: string): void;
@@ -122,6 +124,16 @@ export function recordingsRepo(db: Db): RecordingsRepo {
         models: json<Record<string, unknown> | null>(r.models, null),
         factsVersion: r.facts_version === null ? null : Number(r.facts_version),
       };
+    },
+    chatSessionId(id) {
+      const r = row(id);
+      return r?.chat_session_id ? String(r.chat_session_id) : null;
+    },
+    setChatSession(id, sessionId) {
+      db.prepare("update recorded_interview set chat_session_id = ? where id = ?").run(
+        sessionId,
+        id,
+      );
     },
     listByApplication(applicationId) {
       return (

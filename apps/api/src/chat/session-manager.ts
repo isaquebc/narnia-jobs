@@ -74,6 +74,7 @@ export class SessionStateError extends Error {
       | "document_not_found"
       | "application_not_found"
       | "job_application_not_found"
+      | "recording_not_found"
       | "busy",
     message: string,
   ) {
@@ -439,6 +440,46 @@ export class SessionManager {
       posting_id: a.postingId,
       vaga: posting ? postingSessionTitle(posting) : "vaga",
       instrucoes: stripFrontmatter(readPluginFile("skills/candidaturas/SKILL.md")).trim(),
+      mensagem: message.trim(),
+    });
+    this.send(session.id, note, { display: message.trim(), asUser: true });
+    this.emitState(session.id, session.state, session.category);
+    return this.get(session.id);
+  }
+
+  /**
+   * Conversa sobre a entrevista gravada (F13/M5): uma por entrevista, aberta pela página dela com a nota e o
+   * procedimento da skill `analisar-entrevista`; categoria `job` quando a entrevista é de uma candidatura (ligada à
+   * vaga), `career` quando é avulsa. As próximas mensagens vão para a mesma conversa.
+   */
+  openRecordingChat(recordingId: string, message: string): ChatSession {
+    const rec = this.repos.recordings.get(recordingId);
+    if (!rec) throw new SessionStateError("recording_not_found", "Entrevista não encontrada.");
+    const currentId = this.repos.recordings.chatSessionId(rec.id);
+    const current = currentId ? this.repos.chatSessions.get(currentId) : null;
+    if (current && current.state !== "archived") {
+      this.send(current.id, message.trim());
+      return this.get(current.id);
+    }
+    const app = rec.jobApplicationId ? this.repos.jobApplications.get(rec.jobApplicationId) : null;
+    const posting = app ? this.repos.postings.get(app.postingId) : null;
+    const name = rec.title ?? rec.fileName;
+    const session = this.create({
+      category: app ? "job" : "career",
+      title: posting
+        ? `${postingSessionTitle(posting)} · Entrevista gravada`
+        : `Entrevista gravada · ${name}`,
+      profileId: rec.profileId,
+    });
+    if (app) this.repos.chatSessions.setPosting(session.id, app.postingId);
+    this.repos.recordings.setChatSession(rec.id, session.id);
+    const note = renderNote(readPluginFile("prompts/entrevista-gravada-contexto.md"), {
+      recording_id: rec.id,
+      titulo: name,
+      candidatura: app
+        ? `, da candidatura ${app.id} na vaga ${app.postingId}${posting ? ` ("${postingSessionTitle(posting)}")` : ""}`
+        : ", avulsa, sem candidatura",
+      instrucoes: stripFrontmatter(readPluginFile("skills/analisar-entrevista/SKILL.md")).trim(),
       mensagem: message.trim(),
     });
     this.send(session.id, note, { display: message.trim(), asUser: true });

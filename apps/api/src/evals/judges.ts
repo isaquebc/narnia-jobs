@@ -73,6 +73,13 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
     referencia: "reference",
     resposta: OUTPUT,
   },
+  interviewReport: {
+    entrevista: "input.brief_json",
+    transcricao: "input.transcript",
+    referencia: "reference",
+    resposta: OUTPUT,
+  },
+  interviewFrames: { quadros: "input.frames_json", referencia: "reference", resposta: OUTPUT },
 };
 
 export const JUDGE_SYSTEM =

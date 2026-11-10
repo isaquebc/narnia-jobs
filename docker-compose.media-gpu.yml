@@ -1,0 +1,19 @@
+# F13-10 · override opcional: serviço media com GPU NVIDIA (transcrição, vozes e rostos bem mais rápidos que na CPU).
+# Uso: ./start.sh media on --gpu (ou .\start.ps1 media on -Gpu), que grava NARNIA_MEDIA_GPU=1 e passa este arquivo
+# junto com os composes. Precisa do driver NVIDIA e do nvidia-container-toolkit no computador (Linux) ou do suporte a
+# GPU do Docker Desktop (Windows com WSL2). Sem GPU, o media roda na CPU, só mais devagar.
+services:
+  media:
+    build:
+      args:
+        # torch com CUDA 12.8 (traz as bibliotecas cuBLAS e cuDNN que o CTranslate2 do faster-whisper usa)
+        TORCH_INDEX: https://download.pytorch.org/whl/cu128
+    environment:
+      - NARNIA_MEDIA_GPU=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -177,53 +177,64 @@ export const RecordingFrameSchema = z.object({
 });
 export type RecordingFrame = z.infer<typeof RecordingFrameSchema>;
 
-/** Citação do relatório: trecho literal, turno e segundo no vídeo (conferidos por código, §2.5). */
-const Cite = { quote: z.string(), turn: z.number().int(), t: z.number() };
-const Certainty = z.enum(["high", "medium", "low"]);
+// ── F13/M5 · cadeia do recrutador ───────────────────────────────────────────────────────────────────────────────────
 
-/** Relatório (§2.5, ordem aprovada pelo dono, F13-14). Reescritas ficam separadas das citações. */
-export const RecordingReportContentSchema = z.object({
-  verdict: z.object({ level: z.enum(["strong", "mixed", "weak"]), summary: z.string() }),
-  shouldNotHaveSaid: z.array(
-    z.object({ ...Cite, why: z.string(), instead: z.string().nullable() }),
-  ),
-  answers: z.array(
+/** Leitura dos quadros (Haiku com a tool Read): só o que se vê, e a hipótese separada. Nunca identifica pessoas. */
+export const InterviewFramesOutputSchema = z.object({
+  frames: z.array(
     z.object({
-      question: z.string(),
-      questionTurn: z.number().int(),
-      ...Cite,
-      problem: z.enum(["wrong", "incomplete", "tangent", "unclear"]),
-      explanation: z.string(),
-      rewrite: z.string(),
-      certainty: Certainty,
-    }),
-  ),
-  worked: z.array(z.object({ ...Cite, why: z.string() })),
-  discourse: z.object({
-    summary: z.string(),
-    items: z.array(z.object({ point: z.string(), t: z.number().nullable() })),
-  }),
-  smile: z.object({ summary: z.string(), alert: z.string().nullable() }),
-  reactions: z.array(
-    z.object({
-      event: z.string(),
-      t: z.number(),
+      file: z.string(),
       observed: z.string(),
       hypothesis: z.string(),
     }),
   ),
-  notes: z.array(
+});
+export type InterviewFramesOutput = z.infer<typeof InterviewFramesOutputSchema>;
+
+const Certainty = z.enum(["high", "medium", "low"]);
+/** Trecho literal de um turno do candidato (o código confere e acha o segundo exato pelas palavras). */
+const Quote = { turn: z.number().int(), quote: z.string() };
+
+/**
+ * Rascunho do relatório pelo modelo (§2.5, ordem aprovada pelo dono, F13-14). Tempos no texto livre vão como `[mm:ss]`
+ * (a página vira link para o vídeo; o código confere que existem). Reescritas ficam em campos separados das citações.
+ */
+export const InterviewReportDraftSchema = z.object({
+  verdict: z.object({
+    level: z.enum(["strong", "mixed", "weak"]),
+    summary: z.string(),
+    points: z.array(z.string()),
+  }),
+  shouldNotHaveSaid: z.array(
+    z.object({ ...Quote, observed: z.string(), interpretation: z.string(), better: z.string() }),
+  ),
+  answers: z.array(
     z.object({
-      event: z.string(),
-      t: z.number(),
-      reading: NoteReadingSchema,
+      questionTurn: z.number().int(),
+      question: z.string(),
+      answerTurns: z.array(z.number().int()),
+      problem: z.enum(["wrong", "incomplete", "tangent", "unclear"]),
+      missing: z.string(),
+      suggestion: z.string(),
+      certainty: Certainty,
+    }),
+  ),
+  worked: z.array(z.object({ ...Quote, why: z.string() })),
+  discourse: z.object({ summary: z.string(), points: z.array(z.string()) }),
+  smile: z.object({ observations: z.array(z.string()) }),
+  reactions: z.array(
+    z.object({
+      event: z.string().nullable(),
+      person: z.string(),
+      observed: z.string(),
       hypothesis: z.string(),
     }),
   ),
+  notes: z.array(z.object({ event: z.string(), reading: NoteReadingSchema, reason: z.string() })),
   setup: z.object({
-    camera: z.string(),
-    lighting: z.string(),
-    audio: z.string(),
+    people: z.array(
+      z.object({ person: z.string(), camera: z.string(), lighting: z.string(), audio: z.string() }),
+    ),
     tips: z.array(z.string()),
   }),
   people: z.array(
@@ -236,6 +247,51 @@ export const RecordingReportContentSchema = z.object({
   ),
   drills: z.array(z.object({ title: z.string(), how: z.string() })),
   limitations: z.array(z.string()),
+});
+export type InterviewReportDraft = z.infer<typeof InterviewReportDraftSchema>;
+
+/** Relatório guardado: o rascunho conferido por código, com o segundo de cada citação e o alerta do sorriso (F13-4). */
+export const RecordingReportContentSchema = InterviewReportDraftSchema.extend({
+  shouldNotHaveSaid: z.array(
+    z.object({
+      ...Quote,
+      t: z.number(),
+      observed: z.string(),
+      interpretation: z.string(),
+      better: z.string(),
+    }),
+  ),
+  answers: z.array(
+    z.object({
+      questionTurn: z.number().int(),
+      question: z.string(),
+      answerTurns: z.array(z.number().int()),
+      t: z.number(),
+      problem: z.enum(["wrong", "incomplete", "tangent", "unclear"]),
+      missing: z.string(),
+      suggestion: z.string(),
+      certainty: Certainty,
+    }),
+  ),
+  worked: z.array(z.object({ ...Quote, t: z.number(), why: z.string() })),
+  smile: z.object({
+    observations: z.array(z.string()),
+    /** Montado pelo código com a % de detecção e o tamanho do rosto; nunca omitido quando a detecção é fraca. */
+    alert: z.string().nullable(),
+    reliability: ReliabilitySchema.nullable(),
+  }),
+  reactions: z.array(
+    z.object({
+      event: z.string().nullable(),
+      person: z.string(),
+      t: z.number().nullable(),
+      observed: z.string(),
+      hypothesis: z.string(),
+    }),
+  ),
+  notes: z.array(
+    z.object({ event: z.string(), t: z.number(), reading: NoteReadingSchema, reason: z.string() }),
+  ),
 });
 export type RecordingReportContent = z.infer<typeof RecordingReportContentSchema>;
 

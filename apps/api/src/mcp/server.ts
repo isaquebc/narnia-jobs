@@ -10,6 +10,7 @@ import {
   createJobApplicationTools,
   createPostingTools,
   createProfileTools,
+  createRecordingTools,
   friendlyError,
   friendlyText,
   type Repos,
@@ -33,6 +34,8 @@ import {
   POSTING_TOOLS,
   PROFILE_TOOL_JSON_SCHEMAS,
   PROFILE_TOOLS,
+  RECORDING_TOOL_JSON_SCHEMAS,
+  RECORDING_TOOLS,
   withSpan,
 } from "@narnia-jobs/shared";
 import { Hono } from "hono";
@@ -187,6 +190,12 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
         changed: (applicationId) =>
           deps.bus.emit({ type: "job_application.updated", applicationId }),
       }),
+    ),
+    // F13/M5: entrevistas gravadas (relatório e transcrição, só leitura)
+    ...entries(
+      RECORDING_TOOLS,
+      RECORDING_TOOL_JSON_SCHEMAS as unknown as SchemaMap,
+      createRecordingTools(deps.repos),
     ),
   ];
   return new Map(all.map((t) => [publishedName(t.name), t]));

@@ -21,6 +21,7 @@ const STATUS: Record<SessionStateError["code"], 404 | 409> = {
   document_not_found: 404,
   application_not_found: 404,
   job_application_not_found: 404,
+  recording_not_found: 404,
   busy: 409,
 };
 
@@ -220,6 +221,20 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
           { session: sessions.openJobApplicationChat(c.req.param("id"), message) },
           201,
         );
+      } catch (e) {
+        return sessionError(c, e);
+      }
+    },
+  );
+
+  // F13/M5: conversa sobre a entrevista gravada; a primeira mensagem cria, as próximas seguem nela
+  app.post(
+    "/api/recordings/:id/chat",
+    validate("json", z.object({ message: z.string().trim().min(1).max(4000) })),
+    (c) => {
+      try {
+        const { message } = c.req.valid("json");
+        return c.json({ session: sessions.openRecordingChat(c.req.param("id"), message) }, 201);
       } catch (e) {
         return sessionError(c, e);
       }
