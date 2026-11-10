@@ -1,0 +1,1957 @@
+{
+  "fps": 1,
+  "width": 160,
+  "height": 120,
+  "frames": [
+    {
+      "t": 0.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 124.2
+        }
+      ]
+    },
+    {
+      "t": 1.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.7
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.7
+        }
+      ]
+    },
+    {
+      "t": 2.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.3
+        }
+      ]
+    },
+    {
+      "t": 3.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.3
+        }
+      ]
+    },
+    {
+      "t": 4.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.9
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.9
+        }
+      ]
+    },
+    {
+      "t": 5.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.7
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.7
+        }
+      ]
+    },
+    {
+      "t": 6.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 124.2
+        }
+      ]
+    },
+    {
+      "t": 7.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.1
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 122.1
+        }
+      ]
+    },
+    {
+      "t": 8.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 124.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 124.2
+        }
+      ]
+    },
+    {
+      "t": 9.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.7
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.7
+        }
+      ]
+    },
+    {
+      "t": 10.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.9
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 122.9
+        }
+      ]
+    },
+    {
+      "t": 11.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 120.9
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 120.9
+        }
+      ]
+    },
+    {
+      "t": 12.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.1
+        }
+      ]
+    },
+    {
+      "t": 13.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.2
+        }
+      ]
+    },
+    {
+      "t": 14.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.4
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.4
+        }
+      ]
+    },
+    {
+      "t": 15.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.6
+        }
+      ]
+    },
+    {
+      "t": 16.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.7
+          },
+          "pose": { "yaw": 0.0, "pitch": -25.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.9
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 122.9
+        }
+      ]
+    },
+    {
+      "t": 17.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.7
+          },
+          "pose": { "yaw": 0.0, "pitch": -25.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.3
+        }
+      ]
+    },
+    {
+      "t": 18.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.7
+          },
+          "pose": { "yaw": 0.0, "pitch": -25.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.9
+        }
+      ]
+    },
+    {
+      "t": 19.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.7
+          },
+          "pose": { "yaw": 0.0, "pitch": -25.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.6
+        }
+      ]
+    },
+    {
+      "t": 20.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.7
+          },
+          "pose": { "yaw": 0.0, "pitch": -25.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.3
+        }
+      ]
+    },
+    {
+      "t": 21.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 121.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 121.6
+        }
+      ]
+    },
+    {
+      "t": 22.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.7
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.7
+        }
+      ]
+    },
+    {
+      "t": 23.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 123.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 123.2
+        }
+      ]
+    },
+    {
+      "t": 24.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.9
+        }
+      ]
+    },
+    {
+      "t": 25.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1909.7,
+          "frame_luma": 122.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.6,
+          "contrast": 38.2,
+          "sharpness": 1952.2,
+          "frame_luma": 122.3
+        }
+      ]
+    },
+    {
+      "t": 26.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.8,
+          "frame_luma": 123.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.2
+        }
+      ]
+    },
+    {
+      "t": 27.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 122.0
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 122.0
+        }
+      ]
+    },
+    {
+      "t": 28.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.8,
+          "frame_luma": 124.5
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 124.5
+        }
+      ]
+    },
+    {
+      "t": 29.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.8,
+          "frame_luma": 123.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.6
+        }
+      ]
+    },
+    {
+      "t": 30.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.8,
+          "frame_luma": 123.7
+        }
+      ]
+    },
+    {
+      "t": 31.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 121.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 121.2
+        }
+      ]
+    },
+    {
+      "t": 32.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.8,
+          "frame_luma": 122.8
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 122.8
+        }
+      ]
+    },
+    {
+      "t": 33.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.8,
+          "frame_luma": 122.8
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 122.8
+        }
+      ]
+    },
+    {
+      "t": 34.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 123.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.3
+        }
+      ]
+    },
+    {
+      "t": 35.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 123.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.2
+        }
+      ]
+    },
+    {
+      "t": 36.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 123.7
+        }
+      ]
+    },
+    {
+      "t": 37.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 121.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 121.6
+        }
+      ]
+    },
+    {
+      "t": 38.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.7,
+          "contrast": 66.6,
+          "sharpness": 1699.3,
+          "frame_luma": 123.8
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.9,
+          "contrast": 37.4,
+          "sharpness": 1893.6,
+          "frame_luma": 123.8
+        }
+      ]
+    },
+    {
+      "t": 39.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 123.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 123.2
+        }
+      ]
+    },
+    {
+      "t": 40.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 123.8
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 123.8
+        }
+      ]
+    },
+    {
+      "t": 41.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 121.7
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 121.7
+        }
+      ]
+    },
+    {
+      "t": 42.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 123.0
+        }
+      ]
+    },
+    {
+      "t": 43.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 122.1
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 122.1
+        }
+      ]
+    },
+    {
+      "t": 44.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 122.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 122.2
+        }
+      ]
+    },
+    {
+      "t": 45.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.65,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 122.5
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 122.5
+        }
+      ]
+    },
+    {
+      "t": 46.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.65,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.4,
+          "frame_luma": 123.8
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 123.8
+        }
+      ]
+    },
+    {
+      "t": 47.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.65,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 122.1
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 122.1
+        }
+      ]
+    },
+    {
+      "t": 48.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 123.8
+        }
+      ]
+    },
+    {
+      "t": 49.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 122.5
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 122.5
+        }
+      ]
+    },
+    {
+      "t": 50.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1902.9,
+          "frame_luma": 123.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.5,
+          "contrast": 38.4,
+          "sharpness": 1959.3,
+          "frame_luma": 123.3
+        }
+      ]
+    },
+    {
+      "t": 51.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.0,
+          "frame_luma": 121.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.4,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 121.6
+        }
+      ]
+    },
+    {
+      "t": 52.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.0,
+          "frame_luma": 123.7
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.7
+        }
+      ]
+    },
+    {
+      "t": 53.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.5,
+          "frame_luma": 123.2
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.2
+        }
+      ]
+    },
+    {
+      "t": 54.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.5,
+          "frame_luma": 122.9
+        }
+      ]
+    },
+    {
+      "t": 55.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.45,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.5,
+          "frame_luma": 122.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 122.3
+        }
+      ]
+    },
+    {
+      "t": 56.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.0,
+          "frame_luma": 123.3
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.3
+        }
+      ]
+    },
+    {
+      "t": 57.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.0,
+          "frame_luma": 122.0
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 122.0
+        }
+      ]
+    },
+    {
+      "t": 58.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.0,
+          "frame_luma": 124.5
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 124.5
+        }
+      ]
+    },
+    {
+      "t": 59.0,
+      "faces": [
+        {
+          "bbox": [40, 24, 48, 54],
+          "blend": {
+            "smile": 0.3,
+            "jawOpen": 0.05,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 93.1,
+          "contrast": 68.1,
+          "sharpness": 1903.0,
+          "frame_luma": 123.6
+        },
+        {
+          "bbox": [136, 6, 8, 9],
+          "blend": {
+            "smile": 0.05,
+            "jawOpen": 0.04,
+            "browUp": 0.1,
+            "browDown": 0.05,
+            "eyeLookDown": 0.1
+          },
+          "pose": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+          "luma": 216.7,
+          "contrast": 38.0,
+          "sharpness": 1930.3,
+          "frame_luma": 123.6
+        }
+      ]
+    }
+  ]
+}

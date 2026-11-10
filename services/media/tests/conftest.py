@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from narnia_media.backends import FakeBackends
 from narnia_media.server import make_server
 
 
@@ -58,7 +59,8 @@ def media(tmp_path):
         checked.append(token)
         return None if token.startswith("hf_ok") else "Token recusado pelo Hugging Face."
 
-    server = make_server("127.0.0.1", 0, interviews_dir=interviews, models_dir=models, validate_token=validate)
+    server = make_server("127.0.0.1", 0, interviews_dir=interviews, models_dir=models, validate_token=validate,
+                         backends=FakeBackends())
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     client = Client(f"http://127.0.0.1:{server.server_address[1]}")

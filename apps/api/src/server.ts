@@ -76,6 +76,7 @@ const queues = {
   ingest: new Queue<StageJobData>("ingest", queueOpts),
   ocr: new Queue<StageJobData>("ocr", queueOpts),
   extract: new Queue<StageJobData>("extract", queueOpts),
+  media: new Queue<StageJobData>("media", queueOpts),
 };
 const bus = new EventBus();
 const relay = startRedisRelay({ redisUrl, prefix, bus });

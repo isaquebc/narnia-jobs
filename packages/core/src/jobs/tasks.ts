@@ -1,7 +1,7 @@
 import type { Job } from "@narnia-jobs/shared";
 import { nowUtc } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
-import { DEFAULT_JOB_OPTIONS, type QueueName } from "../ingest/chain";
+import { DEFAULT_JOB_OPTIONS, type QueueName, type QueueRecord } from "../ingest/chain";
 
 /**
  * Jobs de tarefa, fora da cadeia de ingestão (F02 §2.9-1): `profile.analyze` em F02, geração de CV em F05, etc.
@@ -39,7 +39,7 @@ export interface TaskQueueLike {
 }
 
 export interface EnqueueTaskInput {
-  queues: Record<QueueName, TaskQueueLike>;
+  queues: QueueRecord<TaskQueueLike>;
   repos: Repos;
   queue: QueueName;
   type: string;
@@ -64,6 +64,7 @@ export async function enqueueTask(input: EnqueueTaskInput): Promise<EnqueueTaskR
     return { job: existing, enqueued: false };
   }
   const queue = input.queues[input.queue];
+  if (!queue) throw new Error(`fila ${input.queue} indisponível`);
   if (existing) {
     // auditoria F02 (1): com `removeOnFail: false` o job falho continua na fila com o mesmo id e o `add` seria ignorado
     const old = await queue.getJob?.(id);

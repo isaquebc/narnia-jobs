@@ -1,9 +1,15 @@
 import {
   appendRecordingChunk,
+  correctTurnPerson,
   createRecording,
+  type MediaClient,
+  patchRecordingPerson,
+  RECORDING_TASKS,
   RecordingError,
   type RecordingErrorCode,
   type Repos,
+  recordingAnalysis,
+  recordingFramePath,
   recordingLimits,
   recordingVideoPath,
   removeRecording,
@@ -11,13 +17,18 @@ import {
 } from "@narnia-jobs/core";
 import {
   RECORDING_CHUNK_BYTES,
+  type Recording,
   RecordingCreateSchema,
   RecordingLimitsSchema,
+  RecordingPersonPatchSchema,
+  RecordingTurnPatchSchema,
 } from "@narnia-jobs/shared";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { apiError } from "../errors";
+import type { EventBus } from "../events";
+import type { QueueAdapter } from "../queue";
 import { serveFile } from "../serve-file";
 import { validate } from "./validate";
 
@@ -36,8 +47,37 @@ const STATUS: Record<RecordingErrorCode, ContentfulStatusCode> = {
   not_uploading: 409,
 };
 
-export function recordingsRoutes(deps: { repos: Repos; dataDir: string }) {
+export function recordingsRoutes(deps: {
+  repos: Repos;
+  dataDir: string;
+  queue: QueueAdapter;
+  bus: EventBus;
+  media: MediaClient;
+}) {
   const { repos, dataDir } = deps;
+  const announce = (r: Recording) => {
+    deps.bus.emit({
+      type: "recording.updated",
+      recordingId: r.id,
+      state: r.state,
+      step: r.step,
+      progress: r.progress,
+    });
+    return r;
+  };
+  /** F13/M4: análise na fila `media` (uma por vez); o worker pede as etapas ao serviço. */
+  const enqueueAnalysis = async (rec: Recording) => {
+    await deps.queue.enqueueTask({
+      queue: "media",
+      type: RECORDING_TASKS.analyze,
+      key: `${rec.id}-${Date.now()}`,
+      payload: { recordingId: rec.id },
+      profileId: rec.profileId,
+    });
+    return announce(
+      repos.recordings.update(rec.id, { state: "analyzing", step: null, progress: 0, error: null }),
+    );
+  };
   const app = new Hono();
   const fail = (c: Context, e: unknown) => {
     if (e instanceof RecordingError)
@@ -87,11 +127,16 @@ export function recordingsRoutes(deps: { repos: Repos; dataDir: string }) {
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.byteLength > RECORDING_CHUNK_BYTES)
       return apiError(c, 413, "too_large", "Parte maior que 8 MB.");
+    let rec: Recording;
     try {
-      return c.json(appendRecordingChunk(repos, dataDir, c.req.param("id"), offset, bytes));
+      rec = appendRecordingChunk(repos, dataDir, c.req.param("id"), offset, bytes);
     } catch (e) {
       return fail(c, e);
     }
+    // última parte: com o media no ar, a análise começa sozinha; desligado, fica `uploaded` até ligar
+    if (rec.state === "uploaded" && (await deps.media.status()).state !== "off")
+      rec = await enqueueAnalysis(rec);
+    return c.json(rec);
   });
 
   app.get("/api/recordings/:id/video", (c) => {
@@ -103,6 +148,107 @@ export function recordingsRoutes(deps: { repos: Repos; dataDir: string }) {
       "content-disposition": "inline",
       "cache-control": "private, no-store",
     });
+  });
+
+  app.post("/api/recordings/:id/analyze", async (c) => {
+    const rec = repos.recordings.get(c.req.param("id"));
+    if (!rec) return notFound(c);
+    if (rec.state === "uploading" || rec.state === "analyzing")
+      return apiError(c, 409, "not_ready", "A entrevista ainda está sendo enviada ou analisada.");
+    if (!recordingVideoPath(dataDir, rec))
+      return apiError(c, 409, "no_video", "O vídeo foi apagado: não dá para analisar de novo.");
+    const status = await deps.media.status();
+    if (status.state === "off")
+      return apiError(
+        c,
+        409,
+        "media_off",
+        `A análise de vídeo está desligada. Ligue com ${status.enableCommand} no computador do narnia.`,
+      );
+    return c.json(await enqueueAnalysis(rec), 202);
+  });
+
+  app.get("/api/recordings/:id/analysis", (c) => {
+    try {
+      return c.json(recordingAnalysis(repos, c.req.param("id")));
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
+
+  app.patch(
+    "/api/recordings/:id/persons/:personId",
+    validate("json", RecordingPersonPatchSchema),
+    (c) => {
+      try {
+        return c.json(
+          patchRecordingPerson(
+            repos,
+            c.req.param("id"),
+            c.req.param("personId"),
+            c.req.valid("json"),
+          ),
+        );
+      } catch (e) {
+        return fail(c, e);
+      }
+    },
+  );
+
+  app.patch(
+    "/api/recordings/:id/turns/:turnId",
+    validate("json", RecordingTurnPatchSchema),
+    (c) => {
+      try {
+        return c.json(
+          correctTurnPerson(
+            repos,
+            c.req.param("id"),
+            c.req.param("turnId"),
+            c.req.valid("json").personId,
+          ),
+        );
+      } catch (e) {
+        return fail(c, e);
+      }
+    },
+  );
+
+  app.get("/api/recordings/:id/frames/:file", (c) => {
+    const path = recordingFramePath(dataDir, c.req.param("id"), c.req.param("file"));
+    if (!path) return apiError(c, 404, "not_found", "Quadro não encontrado.");
+    return serveFile(c, path, {
+      "content-type": "image/jpeg",
+      "cache-control": "private, max-age=3600",
+    });
+  });
+
+  /** Refazer o relatório (depois de corrigir pessoas ou turnos): só a cadeia do recrutador, sem o media. */
+  app.post("/api/recordings/:id/report", async (c) => {
+    const rec = repos.recordings.get(c.req.param("id"));
+    if (!rec) return notFound(c);
+    if (!rec.analyzedAt)
+      return apiError(c, 409, "not_ready", "A análise do vídeo ainda não terminou.");
+    if (rec.state === "analyzing")
+      return apiError(c, 409, "not_ready", "A análise está em andamento.");
+    await deps.queue.enqueueTask({
+      queue: "extract",
+      type: RECORDING_TASKS.report,
+      key: `${rec.id}-${Date.now()}`,
+      payload: { recordingId: rec.id },
+      profileId: rec.profileId,
+    });
+    return c.json(
+      announce(
+        repos.recordings.update(rec.id, {
+          state: "analyzing",
+          step: "report",
+          progress: 94,
+          error: null,
+        }),
+      ),
+      202,
+    );
   });
 
   app.delete("/api/recordings/:id/video", (c) => {

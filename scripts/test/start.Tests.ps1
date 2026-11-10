@@ -82,11 +82,12 @@ Describe "Get-AppUrl" {
 Describe "Instâncias (NARNIA_INSTANCE)" {
   It "instância claude: projetos, portas e dados próprios; ignora NARNIA_DATA_DIR do ambiente" {
     $script = Join-Path $PSScriptRoot "../../start.ps1"
-    $env:NARNIA_INSTANCE = "claude"; $env:NARNIA_DATA_DIR = "./data"
+    # NARNIA_MEDIA=0: o .env da instância pode estar com o media ligado (F13), o que acrescenta --profile media
+    $env:NARNIA_INSTANCE = "claude"; $env:NARNIA_DATA_DIR = "./data"; $env:NARNIA_MEDIA = "0"
     try {
       $out = pwsh -NoProfile -Command ". '$script'; '{0}|{1}|{2}|{3}|{4}' -f (`$script:DevCompose -join ' '), (`$script:ProdCompose -join ' '), `$script:EnvFile, `$script:PortStart, `$env:NARNIA_DATA_DIR"
     } finally {
-      Remove-Item env:NARNIA_INSTANCE, env:NARNIA_DATA_DIR, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME -ErrorAction SilentlyContinue
+      Remove-Item env:NARNIA_INSTANCE, env:NARNIA_DATA_DIR, env:NARNIA_DEV_PROJECT_NAME, env:NARNIA_PROD_PROJECT_NAME, env:NARNIA_MEDIA -ErrorAction SilentlyContinue
     }
     $out | Should -Be "compose -p narnia-claude -f docker-compose.dev.yml|compose -p narnia-claude-prod -f docker-compose.yml|.claude-data/.env|3250|./.claude-data/prod"
   }

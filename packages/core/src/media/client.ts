@@ -43,7 +43,8 @@ export interface MediaRun {
   state: "running" | "done" | "failed";
   step: string | null;
   progress: number;
-  results: Record<string, unknown>;
+  step_progress?: number;
+  results?: Record<string, unknown>;
   skipped: string[];
   error: { code: string; message: string; step: string | null } | null;
 }
@@ -142,11 +143,16 @@ export class MediaClient {
     await this.call("DELETE", "/token");
   }
 
-  async startRun(interviewId: string, steps: string[]): Promise<{ id: string }> {
-    return this.call("POST", "/runs", { interview_id: interviewId, steps });
+  async startRun(
+    interviewId: string,
+    steps: string[],
+    options: Record<string, unknown> = {},
+  ): Promise<{ id: string }> {
+    return this.call("POST", "/runs", { interview_id: interviewId, steps, options });
   }
 
-  async getRun(id: string): Promise<MediaRun> {
-    return this.call("GET", `/runs/${encodeURIComponent(id)}`);
+  /** `brief`: sem os resultados (o worker lê os JSON da pasta compartilhada). */
+  async getRun(id: string, opts: { brief?: boolean } = {}): Promise<MediaRun> {
+    return this.call("GET", `/runs/${encodeURIComponent(id)}${opts.brief ? "?brief=1" : ""}`);
   }
 }

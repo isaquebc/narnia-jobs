@@ -69,6 +69,13 @@ export const RecordingSchema = z.object({
   hasVideo: z.boolean(),
   durationS: z.number().nullable(),
   error: z.string().nullable(),
+  /** Análise (M4): etapa atual e porcentagem do todo; `approximate` = vozes separadas pela boca (sem token). */
+  step: z.string().nullable(),
+  progress: z.number().int(),
+  language: z.string().nullable(),
+  meetingStartS: z.number().nullable(),
+  approximate: z.boolean(),
+  analyzedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -85,3 +92,180 @@ export const RecordingCreateSchema = z.object({
   mime: z.string().max(100).default("application/octet-stream"),
 });
 export type RecordingCreate = z.input<typeof RecordingCreateSchema>;
+
+// ── F13/M4 · análise ────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Etapas do serviço media, na ordem (§2.2). Com imagem, voz e áudio rodam depois da ligação voz–rosto (por pessoa). */
+export const MEDIA_BASE_STEPS = ["probe", "audio", "transcribe", "diarize", "turns"] as const;
+export const MEDIA_VIDEO_STEPS = [
+  "faces",
+  "layout",
+  "link",
+  "voice",
+  "levels",
+  "events",
+  "frames",
+] as const;
+export const MEDIA_AUDIO_ONLY_STEPS = ["voice", "levels"] as const;
+/** Todas as etapas visíveis na tela, na ordem: as do media, importar e a cadeia do recrutador (M5). */
+export const RECORDING_STEPS = [
+  ...MEDIA_BASE_STEPS,
+  ...MEDIA_VIDEO_STEPS,
+  "import",
+  "report",
+] as const;
+export type RecordingStep = (typeof RECORDING_STEPS)[number];
+
+export const ReliabilitySchema = z.object({
+  detectedPct: z.number(),
+  facePx: z.number(),
+  level: z.enum(["good", "weak", "poor"]),
+});
+export type Reliability = z.infer<typeof ReliabilitySchema>;
+
+export const RecordingPersonSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  name: z.string().nullable(),
+  nameSource: z.enum(["ocr", "user"]).nullable(),
+  isCandidate: z.boolean(),
+  candidateSource: z.enum(["name", "talk", "user"]).nullable(),
+  contactId: z.string().nullable(),
+  speaker: z.string().nullable(),
+  track: z.string().nullable(),
+  ambiguous: z.boolean(),
+  /** Voz, áudio, rosto e câmera, com a confiabilidade (F13-4). */
+  measurements: z.record(z.string(), z.unknown()),
+  card: z.record(z.string(), z.unknown()).nullable(),
+});
+export type RecordingPerson = z.infer<typeof RecordingPersonSchema>;
+
+export const RecordingTurnSchema = z.object({
+  id: z.string(),
+  idx: z.number().int(),
+  personId: z.string().nullable(),
+  start: z.number(),
+  end: z.number(),
+  text: z.string(),
+  corrected: z.boolean(),
+});
+export type RecordingTurn = z.infer<typeof RecordingTurnSchema>;
+
+export const NoteReadingSchema = z.enum(["favorable", "unfavorable", "indeterminate"]);
+export const RecordingEventSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  personId: z.string().nullable(),
+  t: z.number(),
+  durationS: z.number().nullable(),
+  type: z.enum(["note", "smile", "brow_raise", "frown"]),
+  level: z.enum(["confirmed", "probable"]).nullable(),
+  reading: NoteReadingSchema.nullable(),
+  reason: z.string().nullable(),
+  turnIdx: z.number().int().nullable(),
+  frame: z.string().nullable(),
+  data: z.record(z.string(), z.unknown()),
+});
+export type RecordingEvent = z.infer<typeof RecordingEventSchema>;
+
+export const RecordingFrameSchema = z.object({
+  t: z.number(),
+  file: z.string(),
+  reason: z.enum(["event", "reference"]),
+  personId: z.string().nullable(),
+  events: z.array(z.string()),
+});
+export type RecordingFrame = z.infer<typeof RecordingFrameSchema>;
+
+/** Citação do relatório: trecho literal, turno e segundo no vídeo (conferidos por código, §2.5). */
+const Cite = { quote: z.string(), turn: z.number().int(), t: z.number() };
+const Certainty = z.enum(["high", "medium", "low"]);
+
+/** Relatório (§2.5, ordem aprovada pelo dono, F13-14). Reescritas ficam separadas das citações. */
+export const RecordingReportContentSchema = z.object({
+  verdict: z.object({ level: z.enum(["strong", "mixed", "weak"]), summary: z.string() }),
+  shouldNotHaveSaid: z.array(
+    z.object({ ...Cite, why: z.string(), instead: z.string().nullable() }),
+  ),
+  answers: z.array(
+    z.object({
+      question: z.string(),
+      questionTurn: z.number().int(),
+      ...Cite,
+      problem: z.enum(["wrong", "incomplete", "tangent", "unclear"]),
+      explanation: z.string(),
+      rewrite: z.string(),
+      certainty: Certainty,
+    }),
+  ),
+  worked: z.array(z.object({ ...Cite, why: z.string() })),
+  discourse: z.object({
+    summary: z.string(),
+    items: z.array(z.object({ point: z.string(), t: z.number().nullable() })),
+  }),
+  smile: z.object({ summary: z.string(), alert: z.string().nullable() }),
+  reactions: z.array(
+    z.object({
+      event: z.string(),
+      t: z.number(),
+      observed: z.string(),
+      hypothesis: z.string(),
+    }),
+  ),
+  notes: z.array(
+    z.object({
+      event: z.string(),
+      t: z.number(),
+      reading: NoteReadingSchema,
+      hypothesis: z.string(),
+    }),
+  ),
+  setup: z.object({
+    camera: z.string(),
+    lighting: z.string(),
+    audio: z.string(),
+    tips: z.array(z.string()),
+  }),
+  people: z.array(
+    z.object({
+      person: z.string(),
+      role: z.string(),
+      summary: z.string(),
+      signals: z.array(z.string()),
+    }),
+  ),
+  drills: z.array(z.object({ title: z.string(), how: z.string() })),
+  limitations: z.array(z.string()),
+});
+export type RecordingReportContent = z.infer<typeof RecordingReportContentSchema>;
+
+export const RecordingReportSchema = z.object({
+  id: z.string(),
+  version: z.number().int(),
+  content: RecordingReportContentSchema,
+  warnings: z.array(z.string()),
+  model: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type RecordingReport = z.infer<typeof RecordingReportSchema>;
+
+export const RecordingAnalysisSchema = z.object({
+  recording: RecordingSchema,
+  persons: z.array(RecordingPersonSchema),
+  turns: z.array(RecordingTurnSchema),
+  events: z.array(RecordingEventSchema),
+  frames: z.array(RecordingFrameSchema),
+  measurements: z.record(z.string(), z.unknown()).nullable(),
+  report: RecordingReportSchema.nullable(),
+});
+export type RecordingAnalysis = z.infer<typeof RecordingAnalysisSchema>;
+
+export const RecordingPersonPatchSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  isCandidate: z.boolean().optional(),
+  contactId: z.string().min(1).nullable().optional(),
+});
+export type RecordingPersonPatch = z.infer<typeof RecordingPersonPatchSchema>;
+
+export const RecordingTurnPatchSchema = z.object({ personId: z.string().min(1) });
+export type RecordingTurnPatch = z.infer<typeof RecordingTurnPatchSchema>;

@@ -120,6 +120,21 @@ export function backupJobApplicationFiles(dataDir: string, dir: string): number 
   return copyMissing(dataDir, dir, "job-applications");
 }
 
+/**
+ * Quadros escolhidos das entrevistas gravadas (F13-2): `interview-frames/<id>/*.jpg`. O vídeo (`interviews/`) fica
+ * fora do backup de propósito: é grande e a pessoa escolhe apagar.
+ */
+export function backupInterviewFrames(dataDir: string, dir: string): number {
+  const src = join(dataDir, "interview-frames");
+  if (!existsSync(src)) return 0;
+  let copied = 0;
+  for (const id of readdirSync(src)) {
+    if (statSync(join(src, id)).isDirectory())
+      copied += copyMissing(src, join(dir, "interview-frames"), id);
+  }
+  return copied;
+}
+
 function copyMissing(
   dataDir: string,
   dir: string,
@@ -162,7 +177,8 @@ export function backupOnBoot(input: {
     const uploadsCopied =
       backupUploads(dataDir, backupDir) +
       backupTemplates(dataDir, backupDir) +
-      backupJobApplicationFiles(dataDir, backupDir);
+      backupJobApplicationFiles(dataDir, backupDir) +
+      backupInterviewFrames(dataDir, backupDir);
     const today = `narnia-boot-${now.toISOString().slice(0, 10)}`;
     if (listBackups(backupDir).some((b) => b.file.startsWith(today)))
       return { created: null, skipped: "already_today", uploadsCopied };

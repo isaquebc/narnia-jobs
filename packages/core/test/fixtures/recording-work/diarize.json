@@ -1,0 +1,19 @@
+{
+  "method": "pyannote",
+  "turns": [
+    { "speaker": "SPEAKER_00", "start": 3.0, "end": 6.529 },
+    { "speaker": "SPEAKER_01", "start": 7.161, "end": 10.69 },
+    { "speaker": "SPEAKER_00", "start": 11.322, "end": 14.431 },
+    { "speaker": "SPEAKER_01", "start": 15.062, "end": 19.221999999999998 },
+    { "speaker": "SPEAKER_00", "start": 19.853, "end": 21.492 },
+    { "speaker": "SPEAKER_00", "start": 22.124, "end": 25.233 },
+    { "speaker": "SPEAKER_01", "start": 25.864, "end": 32.754000000000005 },
+    { "speaker": "SPEAKER_00", "start": 33.386, "end": 35.235 },
+    { "speaker": "SPEAKER_01", "start": 35.866, "end": 40.236000000000004 },
+    { "speaker": "SPEAKER_00", "start": 40.867, "end": 42.926 },
+    { "speaker": "SPEAKER_01", "start": 43.558, "end": 44.566 },
+    { "speaker": "SPEAKER_00", "start": 45.198, "end": 46.837 },
+    { "speaker": "SPEAKER_01", "start": 47.468, "end": 51.208000000000006 },
+    { "speaker": "SPEAKER_00", "start": 51.839, "end": 55.368 }
+  ]
+}

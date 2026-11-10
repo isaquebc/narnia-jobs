@@ -43,9 +43,12 @@ const BULL_STATE: Record<string, QueueJobState> = {
   failed: "failed",
 };
 
-type Queues = Record<"ingest" | "ocr" | "extract", Queue<StageJobData>>;
+type Queues = Record<"ingest" | "ocr" | "extract" | "media", Queue<StageJobData>>;
 /** As mesmas filas aceitam dados de tarefa (F02 §2.9-1); o tipo genérico da BullMQ é só anotação. */
-type TaskQueues = Record<"ingest" | "ocr" | "extract", { add: Queue<TaskJobData>["add"] }>;
+type TaskQueues = Record<
+  "ingest" | "ocr" | "extract" | "media",
+  { add: Queue<TaskJobData>["add"] }
+>;
 
 export class BullQueueAdapter implements QueueAdapter {
   constructor(

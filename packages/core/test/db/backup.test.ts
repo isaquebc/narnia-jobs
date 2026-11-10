@@ -244,3 +244,28 @@ describe("F07/M3 · backup dos anexos das candidaturas", async () => {
     }
   });
 });
+
+describe("F13/M4 · backup dos quadros das entrevistas, nunca do vídeo", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { backupInterviewFrames } = await import("../../src/db/backup");
+
+  it("copia interview-frames/<id>/ e deixa interviews/ (vídeo) de fora", () => {
+    const data = mkdtempSync(join(tmpdir(), "narnia-frames-data-"));
+    const bk = mkdtempSync(join(tmpdir(), "narnia-frames-bk-"));
+    try {
+      mkdirSync(join(data, "interview-frames/r1"), { recursive: true });
+      writeFileSync(join(data, "interview-frames/r1/f01-000100.jpg"), "jpg");
+      mkdirSync(join(data, "interviews/r1"), { recursive: true });
+      writeFileSync(join(data, "interviews/r1/video.mp4"), "video");
+      expect(backupInterviewFrames(data, bk)).toBe(1);
+      expect(existsSync(join(bk, "interview-frames/r1/f01-000100.jpg"))).toBe(true);
+      expect(existsSync(join(bk, "interviews"))).toBe(false);
+      expect(backupInterviewFrames(data, bk)).toBe(0);
+    } finally {
+      rmSync(data, { recursive: true, force: true });
+      rmSync(bk, { recursive: true, force: true });
+    }
+  });
+});

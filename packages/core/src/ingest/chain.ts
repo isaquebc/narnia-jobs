@@ -6,7 +6,9 @@ import type { Repos } from "../db";
  * Cadeia de jobs da ingestão (F01 §2.5). Cada etapa é um job BullMQ com id determinístico `(run, etapa)`;
  * a tabela `job` é o espelho durável. O plano depende do tipo de arquivo e das opções (OCR, leitura pelo modelo).
  */
-export type QueueName = "ingest" | "ocr" | "extract";
+export type QueueName = "ingest" | "ocr" | "extract" | "media";
+/** Filas por nome; `media` (F13) é opcional para quem não roda a análise de vídeo (testes, sandbox das avaliações). */
+export type QueueRecord<Q> = Record<Exclude<QueueName, "media">, Q> & Partial<Record<"media", Q>>;
 
 export type StageName =
   | "ingest.read_text"
@@ -78,7 +80,7 @@ export interface QueueLike {
 }
 
 export interface EnqueueStageInput {
-  queues: Record<QueueName, QueueLike>;
+  queues: QueueRecord<QueueLike>;
   repos: Repos;
   runId: string;
   stage: StageName;
@@ -102,6 +104,8 @@ export async function enqueueStage(input: EnqueueStageInput): Promise<Job> {
     stage: input.stage,
     at,
   });
-  await input.queues[queue].add(input.stage, data, { jobId: id });
+  const q = input.queues[queue];
+  if (!q) throw new Error(`fila ${queue} indisponível`);
+  await q.add(input.stage, data, { jobId: id });
   return job;
 }

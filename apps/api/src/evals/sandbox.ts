@@ -74,7 +74,7 @@ class SandboxQueue implements QueueAdapter {
   async enqueueTask(req: EnqueueTaskRequest) {
     const idle = { add: async () => {} };
     return enqueueTask({
-      queues: { ingest: idle, ocr: idle, extract: idle },
+      queues: { ingest: idle, ocr: idle, extract: idle, media: idle },
       repos: this.repos,
       ...req,
     });

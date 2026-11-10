@@ -1,0 +1,35 @@
+{
+  "speakers": {
+    "P1": {
+      "turns": 7,
+      "talk_s": 19.7,
+      "words": 91,
+      "wpm": 277.2,
+      "longest_turn_s": 5.2,
+      "pauses": 1,
+      "long_pauses": 0,
+      "fillers": {},
+      "fillers_per_min": 0.0,
+      "pitch_median_hz": 440.3,
+      "pitch_spread_semitones": 0.0,
+      "response_latency_median_s": 0.83,
+      "low_confidence_words": 0
+    },
+    "P2": {
+      "turns": 6,
+      "talk_s": 22.5,
+      "words": 108,
+      "wpm": 288.0,
+      "longest_turn_s": 6.7,
+      "pauses": 0,
+      "long_pauses": 0,
+      "fillers": { "tipo assim": 1, "basicamente": 1, "né": 2, "hum": 1 },
+      "fillers_per_min": 13.34,
+      "pitch_median_hz": 440.3,
+      "pitch_spread_semitones": 0.0,
+      "response_latency_median_s": 0.83,
+      "low_confidence_words": 0
+    }
+  },
+  "talk_share": { "P1": 0.467, "P2": 0.533 }
+}

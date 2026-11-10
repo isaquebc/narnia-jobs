@@ -1,5 +1,5 @@
 /** Filas BullMQ de F01 (§2.5). A conexão e a classe Queue são injetáveis para testes sem Redis. */
-export const QUEUE_NAMES = ["ingest", "ocr", "extract"] as const;
+export const QUEUE_NAMES = ["ingest", "ocr", "extract", "media"] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
 export interface QueueLike {

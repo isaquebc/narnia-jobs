@@ -1,0 +1,44 @@
+{
+  "frames": [
+    {
+      "t": 19.85,
+      "reason": "event",
+      "events": ["e2"],
+      "track": "T1",
+      "file": "f01-000198.jpg",
+      "person": "P1"
+    },
+    {
+      "t": 16.0,
+      "reason": "event",
+      "events": ["e1"],
+      "track": "T1",
+      "file": "f02-000160.jpg",
+      "person": "P1"
+    },
+    {
+      "t": 46.0,
+      "reason": "event",
+      "events": ["e3"],
+      "track": "T1",
+      "file": "f03-000460.jpg",
+      "person": "P1"
+    },
+    {
+      "t": 30.0,
+      "reason": "reference",
+      "events": [],
+      "track": "T1",
+      "file": "f04-000300.jpg",
+      "person": "P1"
+    },
+    {
+      "t": 31.0,
+      "reason": "reference",
+      "events": [],
+      "track": "T2",
+      "file": "f05-000310.jpg",
+      "person": "P2"
+    }
+  ]
+}

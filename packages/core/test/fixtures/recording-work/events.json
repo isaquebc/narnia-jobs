@@ -1,0 +1,76 @@
+{
+  "events": [
+    {
+      "type": "note",
+      "level": "probable",
+      "t": 16.0,
+      "duration_s": 5.0,
+      "track": "T1",
+      "speaker": null,
+      "turn": 3,
+      "cue": "head_down",
+      "reading": "indeterminate",
+      "id": "e1",
+      "person": "P1"
+    },
+    {
+      "type": "note",
+      "level": "confirmed",
+      "t": 19.853,
+      "duration_s": 5.2,
+      "track": "T1",
+      "speaker": "P1",
+      "turn": 4,
+      "cue": "speech",
+      "evidence": "Entendi. Deixa eu anotar isso aqui rapidinho. Me conta de uma situação em que você discordou do time e como resolveu.",
+      "reading": "indeterminate",
+      "id": "e2",
+      "person": "P1"
+    },
+    {
+      "type": "frown",
+      "level": null,
+      "t": 45.0,
+      "duration_s": 3.0,
+      "track": "T1",
+      "speaker": null,
+      "intensity": 0.6,
+      "after_turn": 9,
+      "reading": null,
+      "id": "e3",
+      "person": "P1"
+    }
+  ],
+  "persons": {
+    "P1": {
+      "reliability": { "detected_pct": 100.0, "face_px": 54, "level": "weak" },
+      "smile_ratio": 0.0,
+      "smile_mean": 0.3,
+      "gaze_down_ratio": 0.085,
+      "head_yaw_abs_median": 0.0,
+      "camera": {
+        "face_px": 54,
+        "face_luma": 93.1,
+        "frame_luma": 122.9,
+        "contrast": 68.1,
+        "sharpness": 1903.4,
+        "flags": ["small_face"]
+      }
+    },
+    "P2": {
+      "reliability": { "detected_pct": 84.7, "face_px": 9, "level": "poor" },
+      "smile_ratio": 0.0,
+      "smile_mean": 0.05,
+      "gaze_down_ratio": 0.0,
+      "head_yaw_abs_median": 0.0,
+      "camera": {
+        "face_px": 9,
+        "face_luma": 216.6,
+        "frame_luma": 122.9,
+        "contrast": 38.2,
+        "sharpness": 1952.2,
+        "flags": ["small_face", "overexposed"]
+      }
+    }
+  }
+}

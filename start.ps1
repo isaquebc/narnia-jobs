@@ -137,6 +137,14 @@ function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [
     $dst = Join-Path $DataDir $sub; New-Item -ItemType Directory -Force -Path $dst | Out-Null
     foreach ($f in Get-ChildItem -File $src) { if (-not (Test-Path (Join-Path $dst $f.Name))) { Copy-Item $f.FullName $dst } }
   }
+  # F13: quadros das entrevistas, uma pasta por entrevista (o vídeo nunca entra no backup)
+  $frames = Join-Path $BackupDir "interview-frames"
+  if (Test-Path $frames) {
+    foreach ($d in Get-ChildItem -Directory $frames) {
+      $dst = Join-Path (Join-Path $DataDir "interview-frames") $d.Name; New-Item -ItemType Directory -Force -Path $dst | Out-Null
+      foreach ($f in Get-ChildItem -File $d.FullName) { if (-not (Test-Path (Join-Path $dst $f.Name))) { Copy-Item $f.FullName $dst } }
+    }
+  }
 }
 
 # Leva a instância do dono (.owner-src) para um commit verde (padrão HEAD); só o dono roda

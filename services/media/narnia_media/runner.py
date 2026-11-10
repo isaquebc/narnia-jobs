@@ -5,10 +5,10 @@ import re
 import threading
 import traceback
 import uuid
-from collections.abc import Callable
 from pathlib import Path
 
-from .probe import StepError, probe
+from .probe import StepError
+from .steps import STEPS, Ctx
 
 INTERVIEW_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 VIDEO_PREFIX = "video."
@@ -24,13 +24,6 @@ def find_video(folder: Path) -> Path | None:
     return None
 
 
-StepFn = Callable[[Path, Path, dict], dict]
-
-STEPS: dict[str, StepFn] = {
-    "probe": lambda video, work, results: probe(video),
-}
-
-
 class Busy(Exception):
     def __init__(self, run_id: str):
         super().__init__(run_id)
@@ -38,8 +31,10 @@ class Busy(Exception):
 
 
 class Runner:
-    def __init__(self, interviews_dir: Path):
+    def __init__(self, interviews_dir: Path, models_dir: Path | None = None, backends: object = None):
         self.interviews_dir = interviews_dir
+        self.models_dir = models_dir or interviews_dir
+        self.backends = backends
         self.runs: dict[str, dict] = {}
         self.current: str | None = None
         self.lock = threading.Lock()
@@ -49,7 +44,7 @@ class Runner:
     def busy(self) -> bool:
         return self.current is not None
 
-    def start(self, interview_id: str, steps: list[str]) -> dict:
+    def start(self, interview_id: str, steps: list[str], options: dict | None = None) -> dict:
         with self.lock:
             if self.current:
                 raise Busy(self.current)
@@ -57,9 +52,11 @@ class Runner:
                 "id": uuid.uuid4().hex,
                 "interview_id": interview_id,
                 "steps": steps,
+                "options": options or {},
                 "state": "running",
                 "step": None,
                 "progress": 0,
+                "step_progress": 0,
                 "results": {},
                 "skipped": [],
                 "error": None,
@@ -78,19 +75,30 @@ class Runner:
             if video is None:
                 raise StepError("no_video", "O vídeo da entrevista não está mais na pasta.")
             work.mkdir(exist_ok=True)
+            total = len(run["steps"])
+
+            def report(fraction: float) -> None:
+                run["step_progress"] = round(100 * max(0.0, min(1.0, fraction)))
+                run["progress"] = round(100 * (run["_index"] + max(0.0, min(1.0, fraction))) / total)
+
+            ctx = Ctx(video=video, work=work, models_dir=self.models_dir, backends=self.backends,
+                      options=run["options"], results=run["results"], report=report)
             for i, name in enumerate(run["steps"]):
                 run["step"] = name
+                run["_index"] = i
+                run["step_progress"] = 0
                 out = work / f"{name}.json"
                 if out.is_file():
                     run["results"][name] = json.loads(out.read_text())
                     run["skipped"].append(name)
                 else:
-                    result = STEPS[name](video, work, run["results"])
+                    result = STEPS[name](ctx)
                     tmp = out.with_suffix(".tmp")
                     tmp.write_text(json.dumps(result, ensure_ascii=False))
                     tmp.replace(out)
                     run["results"][name] = result
-                run["progress"] = round(100 * (i + 1) / len(run["steps"]))
+                run["progress"] = round(100 * (i + 1) / total)
+                run["step_progress"] = 100
             run["state"] = "done"
         except StepError as err:
             run["state"] = "failed"

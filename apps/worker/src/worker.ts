@@ -177,7 +177,11 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       {
         connection,
         prefix,
-        concurrency: opts.concurrency?.[name] ?? resolveConcurrency(repos.settings)[name],
+        // `media` fica em 1 (F13): o serviço processa uma execução por vez
+        concurrency:
+          opts.concurrency?.[name] ??
+          (resolveConcurrency(repos.settings) as Record<string, number>)[name] ??
+          1,
       },
     );
     const ev = { repos, publish };

@@ -259,8 +259,18 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
-  app.route("/", mediaRoutes({ media: deps.media ?? MediaClient.fromEnv() }));
-  app.route("/", recordingsRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
+  const media = deps.media ?? MediaClient.fromEnv();
+  app.route("/", mediaRoutes({ media }));
+  app.route(
+    "/",
+    recordingsRoutes({
+      repos: deps.repos,
+      dataDir: deps.dataDir,
+      queue: deps.queue,
+      bus: deps.bus,
+      media,
+    }),
+  );
   app.route(
     "/",
     pluginStatusRoutes({

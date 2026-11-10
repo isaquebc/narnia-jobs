@@ -990,6 +990,15 @@ export const PostingUpdatedEventSchema = z.object({
   postingId: IdSchema,
 });
 
+/** Entrevista gravada mudou de estado ou de etapa da análise (F13/M4): a web atualiza a lista e a página. */
+export const RecordingUpdatedEventSchema = z.object({
+  type: z.literal("recording.updated"),
+  recordingId: IdSchema,
+  state: z.string(),
+  step: z.string().nullable(),
+  progress: z.number().min(0).max(100),
+});
+
 /** Formulário de candidatura com as perguntas organizadas ou com erro (F12/M3): a janela recarrega. */
 export const ApplicationUpdatedEventSchema = z.object({
   type: z.literal("application.updated"),
@@ -1046,6 +1055,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   ApplicationUpdatedEventSchema,
   ProfileMotivationsUpdatedEventSchema,
   JobApplicationUpdatedEventSchema,
+  RecordingUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

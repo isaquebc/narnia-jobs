@@ -213,3 +213,5 @@ export function removeApplicationRecordingFiles(
 ): void {
   for (const r of repos.recordings.listByApplication(applicationId)) removeFiles(dataDir, r.id);
 }
+export * from "./analysis";
+export * from "./tasks";

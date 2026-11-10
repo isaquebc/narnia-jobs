@@ -3,6 +3,7 @@
 
 setup() {
   export NARNIA_CLAUDE_ENV_NO_MAIN=1
+  export NARNIA_MEDIA=0 # o .env da instância pode estar com o media ligado (F13): os composes ganhariam o perfil
   source "$BATS_TEST_DIRNAME/../claude-env.sh"
 }
 

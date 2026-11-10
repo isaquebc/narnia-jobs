@@ -133,7 +133,8 @@ occupy_port() { # ocupa a porta $1 com um servidor TCP em Node (aceita várias c
 }
 
 @test "instância claude: projetos, portas, dados e .env próprios" {
-  run env NARNIA_INSTANCE=claude bash -c 'source ./start.sh; printf "%s|%s|%s|%s|%s|%s|%s|%s\n" "${DEV_COMPOSE[*]}" "${PROD_COMPOSE[*]}" "$ENV_FILE" "$NARNIA_PORT_START" "$NARNIA_DEV_PORT" "$NARNIA_DEV_API_PORT" "$NARNIA_DEV_DATA_DIR" "$NARNIA_DATA_DIR"'
+  # NARNIA_MEDIA=0: o .env da instância pode estar com o media ligado (F13), o que acrescenta --profile media
+  run env NARNIA_INSTANCE=claude NARNIA_MEDIA=0 bash -c 'source ./start.sh; printf "%s|%s|%s|%s|%s|%s|%s|%s\n" "${DEV_COMPOSE[*]}" "${PROD_COMPOSE[*]}" "$ENV_FILE" "$NARNIA_PORT_START" "$NARNIA_DEV_PORT" "$NARNIA_DEV_API_PORT" "$NARNIA_DEV_DATA_DIR" "$NARNIA_DATA_DIR"'
   [ "$status" -eq 0 ]
   IFS='|' read -r dev prod envf start webp apip devdata proddata <<<"$output"
   [[ "$dev" == "docker compose -p narnia-claude -f docker-compose.dev.yml" ]]
@@ -279,6 +280,16 @@ fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
   restore_files "$TMP/data" "$TMP/b" "$TMP/b/narnia-boot-x.sqlite" STAMP
   [[ "$(cat "$TMP/data/job-applications/a1")" == "email" ]]
   [[ "$(cat "$TMP/data/job-applications/a2")" == "video-atual" ]]
+}
+
+@test "restore_files devolve os quadros das entrevistas (F13), por pasta, sem sobrescrever" {
+  mkdir -p "$TMP/b/interview-frames/r1" "$TMP/data/interview-frames/r1"
+  printf 'backup' > "$TMP/b/narnia-boot-x.sqlite"
+  printf 'q1' > "$TMP/b/interview-frames/r1/f01.jpg"; printf 'q2-backup' > "$TMP/b/interview-frames/r1/f02.jpg"
+  printf 'q2-atual' > "$TMP/data/interview-frames/r1/f02.jpg"
+  restore_files "$TMP/data" "$TMP/b" "$TMP/b/narnia-boot-x.sqlite" STAMP
+  [[ "$(cat "$TMP/data/interview-frames/r1/f01.jpg")" == "q1" ]]
+  [[ "$(cat "$TMP/data/interview-frames/r1/f02.jpg")" == "q2-atual" ]]
 }
 
 # --- regressão 2026-10-10: instância do dono subiu com imagem antiga (sem gh) e volume gh-auth com dono root ---------

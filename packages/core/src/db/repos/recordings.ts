@@ -1,6 +1,6 @@
-import type { Recording, RecordingState } from "@narnia-jobs/shared";
+import type { Recording, RecordingFrame, RecordingState } from "@narnia-jobs/shared";
 import type { Db } from "../open";
-import type { Row } from "../sql";
+import { json, type Row } from "../sql";
 
 /** Entrevistas gravadas (F13/M1, migração 0037). Arquivos e regras ficam em `core/src/recordings`. */
 export interface RecordingInsert {
@@ -21,6 +21,16 @@ export interface RecordingPatch {
   hasVideo?: boolean;
   durationS?: number | null;
   error?: string | null;
+  step?: string | null;
+  progress?: number;
+  language?: string | null;
+  meetingStartS?: number | null;
+  approximate?: boolean;
+  models?: Record<string, unknown> | null;
+  measurements?: Record<string, unknown> | null;
+  frames?: RecordingFrame[] | null;
+  factsVersion?: number | null;
+  analyzedAt?: string | null;
 }
 
 export interface RecordingsRepo {
@@ -28,6 +38,13 @@ export interface RecordingsRepo {
   get(id: string): Recording | null;
   /** Extensão do arquivo final (`video.<ext>`), fora do contrato público. */
   ext(id: string): string | null;
+  /** Medições gerais e quadros escolhidos (JSON da análise). */
+  extras(id: string): {
+    measurements: Record<string, unknown> | null;
+    frames: RecordingFrame[];
+    models: Record<string, unknown> | null;
+    factsVersion: number | null;
+  } | null;
   listByApplication(applicationId: string): Recording[];
   listByProfile(profileId: string): Recording[];
   update(id: string, patch: RecordingPatch, now?: Date): Recording;
@@ -48,6 +65,15 @@ const map = (r: Row): Recording => ({
   hasVideo: Number(r.has_video) === 1,
   durationS: r.duration_s === null ? null : Number(r.duration_s),
   error: r.error === null ? null : String(r.error),
+  step: r.step === null || r.step === undefined ? null : String(r.step),
+  progress: Number(r.progress ?? 0),
+  language: r.language === null || r.language === undefined ? null : String(r.language),
+  meetingStartS:
+    r.meeting_start_s === null || r.meeting_start_s === undefined
+      ? null
+      : Number(r.meeting_start_s),
+  approximate: Number(r.approximate ?? 0) === 1,
+  analyzedAt: r.analyzed_at === null || r.analyzed_at === undefined ? null : String(r.analyzed_at),
   createdAt: String(r.created_at),
   updatedAt: String(r.updated_at),
 });
@@ -87,6 +113,16 @@ export function recordingsRepo(db: Db): RecordingsRepo {
       const r = row(id);
       return r ? String(r.ext) : null;
     },
+    extras(id) {
+      const r = row(id);
+      if (!r) return null;
+      return {
+        measurements: json<Record<string, unknown> | null>(r.measurements, null),
+        frames: json<RecordingFrame[]>(r.frames, []),
+        models: json<Record<string, unknown> | null>(r.models, null),
+        factsVersion: r.facts_version === null ? null : Number(r.facts_version),
+      };
+    },
     listByApplication(applicationId) {
       return (
         db
@@ -117,6 +153,22 @@ export function recordingsRepo(db: Db): RecordingsRepo {
       if (patch.hasVideo !== undefined) put("has_video", patch.hasVideo ? 1 : 0);
       if (patch.durationS !== undefined) put("duration_s", patch.durationS);
       if (patch.error !== undefined) put("error", patch.error);
+      if (patch.step !== undefined) put("step", patch.step);
+      if (patch.progress !== undefined) put("progress", Math.round(patch.progress));
+      if (patch.language !== undefined) put("language", patch.language);
+      if (patch.meetingStartS !== undefined) put("meeting_start_s", patch.meetingStartS);
+      if (patch.approximate !== undefined) put("approximate", patch.approximate ? 1 : 0);
+      if (patch.models !== undefined)
+        put("models", patch.models === null ? null : JSON.stringify(patch.models));
+      if (patch.measurements !== undefined)
+        put(
+          "measurements",
+          patch.measurements === null ? null : JSON.stringify(patch.measurements),
+        );
+      if (patch.frames !== undefined)
+        put("frames", patch.frames === null ? null : JSON.stringify(patch.frames));
+      if (patch.factsVersion !== undefined) put("facts_version", patch.factsVersion);
+      if (patch.analyzedAt !== undefined) put("analyzed_at", patch.analyzedAt);
       put("updated_at", now.toISOString());
       db.prepare(`update recorded_interview set ${sets.join(", ")} where id = ?`).run(...args, id);
       const r = get(id);

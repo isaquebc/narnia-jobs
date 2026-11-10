@@ -1,0 +1,8 @@
+{
+  "duration": 60.001,
+  "duration_source": "packets",
+  "container": "matroska,webm",
+  "size": 1109353,
+  "video": { "codec": "vp8", "width": 160, "height": 120, "fps": 10.0 },
+  "audio": { "codec": "opus", "sample_rate": 48000, "channels": 1 }
+}

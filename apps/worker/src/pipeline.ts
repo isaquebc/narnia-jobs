@@ -4,6 +4,7 @@ import {
   type GhClient,
   type IngestionRunRecord,
   localeFromLanguage,
+  type MediaClient,
   nextStage,
   planStages,
   type Recognizer,
@@ -49,6 +50,9 @@ export interface WorkerDeps {
   ghCloneTree?: () => ((fullName: string) => Promise<TreeEntry[]>) | null;
   /** F05: navegador do PDF e checagens (padrão: `NARNIA_BROWSER_WS`); injetável nos testes. */
   documents?: DocumentDeps;
+  /** F13: cliente do serviço media (padrão: `NARNIA_MEDIA_URL`) e intervalo da consulta do progresso. */
+  media?: MediaClient;
+  recordingPollMs?: number;
 }
 
 export interface StageContext {

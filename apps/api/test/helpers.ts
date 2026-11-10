@@ -50,7 +50,7 @@ export class FakeQueueAdapter implements QueueAdapter {
     this.tasks.push(req);
     const fake = { add: async () => {} };
     return enqueueTask({
-      queues: { ingest: fake, ocr: fake, extract: fake },
+      queues: { ingest: fake, ocr: fake, extract: fake, media: fake },
       repos: this.repos,
       ...req,
     });

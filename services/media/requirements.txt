@@ -1,1 +1,3 @@
-# Dependências do serviço media (M1: só biblioteca padrão; M2/M3 acrescentam as etapas pesadas)
+# F13/M2: medições de áudio e voz (ISC/BSD); os modelos pesados ficam em requirements-models.txt (só no runtime)
+numpy==2.2.6
+librosa==0.11.0

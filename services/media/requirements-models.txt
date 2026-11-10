@@ -1,0 +1,8 @@
+# F13 · modelos do runtime (licenças em plans/plan-v0/tasks/F13-entrevista-gravada.md §2.2). torch vem do índice CPU
+# (BSD-3); com GPU, o override do compose troca o índice. Fora da imagem de testes: os testes usam o modo falso.
+torch==2.8.0
+torchaudio==2.8.0
+torchcodec==0.7.0
+faster-whisper==1.2.1
+pyannote.audio==4.0.7
+mediapipe==1.2.2

@@ -104,7 +104,7 @@ describe("F13/M1.2 · MediaClient", () => {
       ),
     );
     expect(await c.startRun("abc", ["probe"])).toEqual({ id: "r1" });
-    expect(calls[0]?.body).toEqual({ interview_id: "abc", steps: ["probe"] });
+    expect(calls[0]?.body).toEqual({ interview_id: "abc", steps: ["probe"], options: {} });
     expect(await c.getRun("r1")).toMatchObject({ state: "running", step: "probe" });
     const busy = new MediaClient(
       "http://media:8700",

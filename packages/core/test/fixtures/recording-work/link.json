@@ -1,0 +1,24 @@
+{
+  "approximate": false,
+  "persons": [
+    {
+      "id": "P1",
+      "track": "T1",
+      "speaker": "SPEAKER_00",
+      "name": "Marina Duarte",
+      "name_source": "ocr",
+      "confidence": 0.565,
+      "ambiguous": false
+    },
+    {
+      "id": "P2",
+      "track": "T2",
+      "speaker": "SPEAKER_01",
+      "name": "Alex Souza",
+      "name_source": "ocr",
+      "confidence": 0.544,
+      "ambiguous": false
+    }
+  ],
+  "turn_persons": ["P1", "P2", "P1", "P2", "P1", "P2", "P1", "P2", "P1", "P2", "P1", "P2", "P1"]
+}

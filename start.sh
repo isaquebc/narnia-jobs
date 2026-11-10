@@ -183,7 +183,8 @@ resolve_backup_file() {
 # restore_files DATA_DIR BACKUP_DIR FILE STAMP -> guarda o banco atual (e o WAL) como narnia-before-restore-STAMP,
 # põe o backup no lugar, apaga WAL/SHM do banco antigo (seriam reaplicados sobre o restaurado) e devolve os uploads e
 # os templates de CV enviados (F05) e os anexos das candidaturas (F07) que faltam. Só mexe em DATA_DIR/narnia.sqlite*,
-# DATA_DIR/uploads, DATA_DIR/templates, DATA_DIR/job-applications e no próprio arquivo de "antes".
+# DATA_DIR/uploads, DATA_DIR/templates, DATA_DIR/job-applications, DATA_DIR/interview-frames e no próprio arquivo de
+# "antes".
 restore_files() {
   local data=$1 bdir=$2 file=$3 stamp=$4 db=$1/narnia.sqlite
   mkdir -p "$data" "$bdir"
@@ -198,6 +199,17 @@ restore_files() {
     [[ -d "$bdir/$sub" ]] || continue
     mkdir -p "$data/$sub"
     for f in "$bdir/$sub"/*; do
+      [[ -f "$f" ]] || continue
+      [[ -e "$data/$sub/$(basename "$f")" ]] || cp -p "$f" "$data/$sub/"
+    done
+  done
+  # F13: quadros das entrevistas, uma pasta por entrevista (o vídeo nunca entra no backup)
+  local d
+  for d in "$bdir/interview-frames"/*/; do
+    [[ -d "$d" ]] || continue
+    sub="interview-frames/$(basename "$d")"
+    mkdir -p "$data/$sub"
+    for f in "$d"*; do
       [[ -f "$f" ]] || continue
       [[ -e "$data/$sub/$(basename "$f")" ]] || cp -p "$f" "$data/$sub/"
     done

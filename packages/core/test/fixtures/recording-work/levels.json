@@ -1,0 +1,8 @@
+{
+  "noise_floor_dbfs": -21.1,
+  "speakers": {
+    "P1": { "rms_dbfs": -21.1, "peak_dbfs": -18.0, "clipping_ratio": 0.0, "snr_db": 0.0 },
+    "P2": { "rms_dbfs": -21.1, "peak_dbfs": -18.0, "clipping_ratio": 0.0, "snr_db": 0.0 }
+  },
+  "integrated_lufs": -21.7
+}

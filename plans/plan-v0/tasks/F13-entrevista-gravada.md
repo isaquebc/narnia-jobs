@@ -81,7 +81,7 @@ Cada etapa grava seu JSON e é pulada ao retomar. GPU NVIDIA é opcional, por ov
 | Tesseract e `tessdata` | Apache-2.0 | |
 | FFmpeg do Debian | GPL v2+ | executado como processo, não linkado; a imagem é construída pelo usuário |
 
-Falta conferir as dependências transitivas (torch, onnxruntime) quando entrarem no M2/M3.
+Dependências transitivas conferidas no M2/M3 (2026-11-10): torch, torchaudio, torchcodec (BSD-3), onnxruntime e CTranslate2 (MIT), PyAV (BSD-3, com as bibliotecas do FFmpeg em LGPL), lightning e OpenCV (Apache-2.0), matplotlib (licença própria, permissiva), sounddevice e asteroid-filterbanks (MIT). Nenhuma copyleft linkada.
 
 ### 2.3 Confiabilidade (F13-4)
 Cada medição de rosto traz a porcentagem de tempo detectável e o tamanho do rosto. O feedback de sorriso **nunca é omitido**: quando a detecção é fraca, sai com alerta e a porcentagem. A cordialidade também é avaliada pela fala. Expressão é sempre fato observado + hipótese. O mínimo que dispara o alerta é calibrado no M3, considerando que modelos de rosto podem errar mais com barba, pouca luz e pele escura: o gabarito precisa cobrir essa diversidade.
@@ -179,6 +179,15 @@ Passos do M1, cada um com testes antes:
 | M1.4 | migração `recorded_interview`, upload em partes, retomada, reprodução com `Range`, apagar | vitest da API |
 | M1.5 | tela de Configurações (ativar e token) e envio na etapa da candidatura e avulso, com progresso e retomada | e2e com `media` falso |
 
+### 6.1.2 Refinamento do M2 ao M4 (2026-11-10, a partir do teste com modelos reais)
+
+- **R8 · Ordem das etapas.** Com imagem: `probe, audio, transcribe, diarize, turns, faces, layout, link, voice, levels, events, frames`; voz e áudio rodam depois da ligação voz–rosto, então as medições já saem por pessoa (inclusive na aproximação sem token). Só áudio: `probe, audio, transcribe, diarize, turns, voice, levels`.
+- **R9 · Modo falso.** `NARNIA_MEDIA_FAKE=1` troca os modelos por uma entrevista sintética (`fake_script.py`, fictícia) com resposta errada, tangente, anotação dita, palavras de apoio e miniatura pequena. Serve aos testes, à fixture do core (`packages/core/test/fixtures/recording-work/`) e ao e2e.
+- **R10 · Rosto partido.** Cabeça baixa desloca a caixa do rosto; grupos que se sobrepõem na tela e nunca aparecem juntos são a mesma pessoa.
+- **R11 · Pessoa sem rosto.** Voz sem rosto detectado (miniatura de ~32 px) vira pessoa só com voz, marcada para confirmar; ganha o nome de uma etiqueta que sobrou só quando há exatamente um nome e uma voz assim.
+- **R12 · Candidato.** Pela etiqueta igual ao nome da pessoa usuária; sem isso, quem mais fala, marcado para confirmar na tela.
+- **R13 · Começo automático.** A última parte do envio enfileira a análise quando o `media` está no ar; desligado, a entrevista fica `uploaded` com o botão de analisar.
+
 ### 6.2 Testes unitários (TDD)
 Duração sem cabeçalho; junção de palavras e turnos; retomada por etapa; alerta de confiabilidade; eventos relativos ao padrão da pessoa; detecção de sala de espera; checagem de citações e tempos (citação alterada, pessoa errada, tempo inexistente); backup sem `interviews/` e com o resto; apagar só o vídeo; token nunca em log.
 
@@ -238,5 +247,14 @@ Tecnicamente, `faster-whisper` 1.2.1 com PyAV 19 quebra ao decodificar (`metadat
 | M1.5 telas: Configurações › Análise de vídeo (estado, comando, passo a passo e token, regra de uso, limites em `GET/PUT /api/settings/recordings`); cartão "Entrevistas gravadas" na candidatura (etapa) e na aba Entrevistas do perfil (avulso): partes de 8 MB, nova tentativa após queda de rede, envio que continua ao trocar de página, retomada escolhendo o mesmo arquivo, reprodução, apagar só o vídeo ou tudo | feito | 1 vitest no api, 16 no web, 3 e2e (`f13-01`, com `media` falso por interceptação de `/api/media/*`) |
 
 Prova na instância `claude`: `media on` construiu e subiu o serviço; estado `off` → `needs_token`; token falso recusado pelo Hugging Face; token real aceito (incluindo o acesso ao `community-1`), gravado 0600 e apagado em seguida; nenhum `hf_` em logs do api, do worker ou do `media`.
+
+### M2 a M4 · execução (2026-11-10)
+| Passo | Estado | Testes (antes do código: sim) |
+|---|---|---|
+| M2 áudio: `audio`, `transcribe` (faster-whisper, áudio em memória), `diarize` (pyannote 4.0.7; a 4.0.1 não carregava o modelo com torch 2.8), `turns`, `voice` (yin do librosa), `levels` | feito | 7 pytest de lógica, 4 do serviço |
+| M3 visão: `faces` (MediaPipe 1.2.2, 1 quadro/s, luz e nitidez do recorte), `layout` (posição + OCR do Tesseract), `link` (boca × turnos), `events`, `frames` | feito | 11 pytest de lógica, 2 do serviço |
+| M4 dados: migração 0038, `importMediaResults`, fila `media`, `recording.analyze`, rotas da análise e correções, quadros no backup (core, `start.sh`, `start.ps1`) | feito | 4 vitest no core, 3 no worker, 3 no api, 1 de backup, 1 bats |
+
+Prova com modelos reais na instância `claude`, num trecho de 3 min da gravação do dono (em `.claude-data`, fora do git): transcrição em ~75 s, separação de vozes em ~50 s, o resto em ~25 s. O sinal do ângulo confirmou que pitch negativo é cabeça baixa (-35° quando a entrevistadora anotava), o que virou anotação provável de 12 s. O rosto da miniatura não foi detectado (como no teste de viabilidade): a voz ficou numa pessoa sem rosto, para confirmar. Bugs achados e corrigidos: cache do numba sem permissão com o uid do usuário (`NUMBA_CACHE_DIR`), rosto partido ao baixar a cabeça (R10) e falsos nomes do OCR (logotipos em maiúsculas e palavras soltas).
 
 Prova do M1.4 na instância `claude`: vídeo sintético (WebM sem duração no cabeçalho) enviado pela API, baixado idêntico, `Range` 206; o `media`, chamado da rede do worker, leu o arquivo pelo volume compartilhado e mediu 20,0 s pelos pacotes.
