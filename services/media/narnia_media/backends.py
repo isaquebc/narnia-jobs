@@ -224,7 +224,8 @@ class FakeBackends:
     def transcribe(self, wav: np.ndarray, sr: int, language: str | None, progress: Progress) -> dict:
         progress(1.0)
         words = [w for t in fake_script.timeline(len(wav) / sr) for w in t["words"]]
-        return {"model": "fake", "device": "cpu", "language": "pt", "language_probability": 1.0, "words": words}
+        return {"model": "fake", "device": "cpu", "language": "pt", "language_probability": 1.0,
+                "multilingual": language is None, "words": words}
 
     def diarize(self, wav: np.ndarray, sr: int, token: str, progress: Progress) -> list[dict]:
         progress(1.0)

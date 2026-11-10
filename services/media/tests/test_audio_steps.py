@@ -67,6 +67,20 @@ def test_token_salvo_depois_refaz_as_vozes_e_o_que_depende_delas(media):
     assert set(run["results"]["voice"]["speakers"]) == {"SPEAKER_00", "SPEAKER_01"}
 
 
+def test_transcricao_antiga_sem_idioma_por_trecho_e_refeita(media):
+    import json
+
+    run_steps(media, "a7", AUDIO, seconds=10)
+    p = media.interviews / "a7" / "work" / "transcribe.json"
+    old = json.loads(p.read_text())
+    old.pop("multilingual", None)  # gravada antes do idioma por trecho
+    p.write_text(json.dumps(old))
+    _, body = media.call("POST", "/runs", {"interview_id": "a7", "steps": AUDIO})
+    run = wait_run(media, body["id"], timeout=90)
+    assert run["skipped"] == ["probe", "audio", "diarize"]  # vozes não dependem da transcrição
+    assert run["results"]["transcribe"]["multilingual"] is True
+
+
 def test_sem_token_de_novo_nao_refaz_nada(media):
     run_steps(media, "a6", AUDIO, seconds=10)
     _, body = media.call("POST", "/runs", {"interview_id": "a6", "steps": AUDIO})

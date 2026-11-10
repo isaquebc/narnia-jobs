@@ -252,6 +252,10 @@ def outdated(name: str, ctx: Ctx) -> bool:
     if name == "diarize" and tokens.has_token(ctx.models_dir):
         if json.loads(out.read_text()).get("method") == "none":
             return True
+    # transcrição de antes do idioma por trecho: o trecho em inglês tinha saído "em português"
+    if name == "transcribe" and not ctx.options.get("language"):
+        if "multilingual" not in json.loads(out.read_text()):
+            return True
     mtime = out.stat().st_mtime_ns
     for dep in DEPS.get(name, []):
         p = ctx.work / f"{dep}.json"
