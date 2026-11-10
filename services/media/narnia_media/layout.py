@@ -143,6 +143,9 @@ def clean_name(text: str) -> str | None:
     # logotipos e botões costumam vir em maiúsculas ("ONE TEAM"); etiqueta de nome não
     if any(len(w) > 2 and w.isupper() for w in text.split()):
         return None
+    # botões e abas da plataforma, sozinhos ou lidos juntos ("Levantar Reagir")
+    if any(w.casefold() in UI_WORDS for w in text.split()):
+        return None
     # lixo do OCR ("Ss", "Bi"): todo nome tem uma palavra de 3 letras ou mais
     if not any(sum(c.isalpha() for c in w) >= 3 for w in text.split()):
         return None
@@ -150,13 +153,19 @@ def clean_name(text: str) -> str | None:
 
 
 def assign_names(tracks: list[dict], samples: list[list[dict]]) -> dict[str, str | None]:
-    names: dict[str, str | None] = {}
+    """Nome de cada rosto: a etiqueta mais perto abaixo dele entre as que **se repetem** em 2 amostras ou mais (a
+    etiqueta da chamada é fixa; o lixo do OCR, lido no fundo do vídeo, muda de quadro para quadro). Repetir é só
+    filtro: um nome longo às vezes sai em menos amostras que o da miniatura e não pode perder por isso. Cada nome vai
+    para um rosto só, começando pelo par mais perto."""
+    need = min(2, len(samples))
+    pairs = []
     for tr in tracks:
         x, y, w, h = tr["bbox"]
         cx, cy = x + w / 2, y + h / 2
-        votes: Counter = Counter()
+        seen: Counter = Counter()
+        dist: dict[str, float] = {}
         for lines in samples:
-            best, best_d = None, None
+            here: dict[str, float] = {}
             for line in lines:
                 name = clean_name(line["text"])
                 if not name or line.get("conf", 0) < 50:
@@ -166,9 +175,15 @@ def assign_names(tracks: list[dict], samples: list[list[dict]]) -> dict[str, str
                 if dy <= 0 or dy > 4 * h + 40 or abs(dx) > 4 * w + 40:
                     continue
                 d = (dx / max(w, 1)) ** 2 + (dy / max(h, 1)) ** 2
-                if best_d is None or d < best_d:
-                    best, best_d = name, d
-            if best:
-                votes[best] += 1
-        names[tr["id"]] = votes.most_common(1)[0][0] if votes else None
+                here[name] = min(d, here.get(name, d))
+            for name, d in here.items():
+                seen[name] += 1
+                dist[name] = min(d, dist.get(name, d))
+        pairs += [(dist[n], -k, tr["id"], n) for n, k in seen.items() if k >= need]
+    names: dict[str, str | None] = {tr["id"]: None for tr in tracks}
+    used: set[str] = set()
+    for _, _, tid, name in sorted(pairs):
+        if names[tid] is None and name not in used:
+            names[tid] = name
+            used.add(name)
     return names

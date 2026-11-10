@@ -246,7 +246,8 @@ DEPS: dict[str, list[str]] = {
 # versão do código de cada etapa, gravada no resultado (`_v`; sem a chave = 1). Mudou o que a etapa produz: suba o
 # número, e o "Analisar de novo" refaz a etapa (e as que dependem dela) em vez de reaproveitar o resultado antigo.
 STEP_VERSION: dict[str, int] = {
-    "layout": 2,  # OCR em faixas, nome de uma palavra, ícone do microfone (R20)
+    "layout": 6,  # 2: OCR em faixas, nome de uma palavra, ícone do microfone (R20); 3: top-hat para o Meet (R25);
+    # 4–5: só nome que se repete nas amostras; entre eles, o mais perto do rosto (R25); 6: botões em qualquer palavra
 }
 
 

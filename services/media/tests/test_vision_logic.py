@@ -226,3 +226,56 @@ def test_ocr_em_faixas_cobre_o_quadro_e_volta_para_a_coordenada_do_quadro():
         (0, [{"text": "Câmera", "conf": 95, "bbox": [1573, 38, 40, 12]}]),
     ])
     assert sorted((x["text"], x["bbox"][1], x["conf"]) for x in lines) == [("Bruno", 866, 95), ("Câmera", 38, 95)]
+
+
+def test_duas_leituras_no_mesmo_lugar_fica_a_de_maior_confianca():
+    # Meet: a leitura em cinza e a com top-hat leem a mesma etiqueta; "Narta" (86) perde para "Marta" (96)
+    from narnia_media.backends import merge_band_lines
+
+    lines = merge_band_lines([
+        (620, [{"text": "Narta Pedrosa", "conf": 86, "bbox": [259, 33, 92, 14]}]),
+        (620, [{"text": "Marta Pedrosa", "conf": 96, "bbox": [260, 32, 93, 15]}]),
+    ])
+    assert [x["text"] for x in lines] == ["Marta Pedrosa"]
+
+
+def test_nome_que_se_repete_nas_amostras_vence_o_lixo_mais_perto_do_rosto():
+    # Meet (quadro real, F13 §8): a etiqueta fica no canto do quadro, longe do rosto; o OCR acha "palavras" nas plantas
+    # do fundo, mais perto do rosto, mas cada uma numa amostra só. A etiqueta aparece em todas.
+    from narnia_media.layout import leftover_names
+
+    tracks = track_faces([{"t": float(t), "faces": [face(765, 241, 234, 273)]} for t in range(30)], 1716, 774)
+    label = {"text": "Renata Pedrosa", "conf": 96, "bbox": [261, 654, 91, 13]}
+    thumb = {"text": "Bruno Costa", "conf": 84, "bbox": [1459, 644, 78, 16]}
+    samples = [
+        [{"text": "Waa", "conf": 53, "bbox": [1224, 577, 29, 11]}, label, thumb],
+        [{"text": "Vig", "conf": 89, "bbox": [1192, 476, 24, 16]}, label],
+        [{"text": "Mai", "conf": 50, "bbox": [460, 487, 28, 12]}, label, thumb],
+        [label, thumb],
+    ]
+    names = assign_names(tracks, samples)
+    assert list(names.values()) == ["Renata Pedrosa"]
+    assert leftover_names(names, samples, height=774) == ["Bruno Costa"]
+
+
+def test_nome_longo_lido_em_menos_amostras_nao_perde_para_o_da_miniatura():
+    # Teams (quadro real): o nome longo do destaque sai em 3 de 6 amostras; o da miniatura, em todas
+    tracks = track_faces([{"t": float(t), "faces": [face(600, 460, 394, 423)]} for t in range(30)], 1920, 904)
+    big = {"text": "Renata Alves Pereira de Souza", "conf": 96, "bbox": [14, 872, 178, 14]}
+    thumb = {"text": "Bruno", "conf": 95, "bbox": [1682, 866, 40, 14]}
+    samples = [[big, thumb], [big, thumb], [big, thumb], [thumb], [thumb], [thumb]]
+    assert list(assign_names(tracks, samples).values()) == ["Renata Alves Pereira de Souza"]
+
+
+def test_botoes_da_barra_lidos_juntos_nao_viram_nome():
+    # Teams com top-hat: a barra do topo sai como "Levantar Reagir", "Pessoas Levantar" (duas palavras)
+    from narnia_media.layout import clean_name, leftover_names
+
+    assert clean_name("Levantar Reagir") is None
+    assert clean_name("Pessoas Levantar") is None
+    lines = [
+        {"text": "Levantar Reagir", "conf": 90, "bbox": [1330, 38, 80, 12]},
+        {"text": "Pessoas Levantar", "conf": 90, "bbox": [1276, 38, 90, 12]},
+        {"text": "Bruno", "conf": 95, "bbox": [1682, 866, 40, 14]},
+    ]
+    assert leftover_names({"T1": None}, [lines, lines], height=904) == ["Bruno"]

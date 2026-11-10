@@ -150,17 +150,29 @@ class RealBackends:
 
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
-        def band(span: tuple[int, int]) -> tuple[int, list[dict]]:
-            big = cv2.resize(gray[span[0] : span[1]], None, fx=OCR_SCALE, fy=OCR_SCALE, interpolation=cv2.INTER_CUBIC)
-            ok, png = cv2.imencode(".png", big)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+
+        def variants(big: np.ndarray) -> list[np.ndarray]:
+            # cinza: texto claro em caixa escura (Teams). Top-hat: só os traços claros e finos, invertidos, para texto
+            # branco sem caixa em fundo claro (Meet, etiqueta sobre a parede do vídeo; teste com gravação real, F13 §8)
+            top = cv2.morphologyEx(big, cv2.MORPH_TOPHAT, kernel)
+            return [big, 255 - cv2.normalize(top, None, 0, 255, cv2.NORM_MINMAX)]
+
+        def read(job: tuple[int, np.ndarray]) -> tuple[int, list[dict]]:
+            y0, im = job
+            ok, png = cv2.imencode(".png", im)
             if not ok:
-                return span[0], []
+                return y0, []
             res = subprocess.run(["tesseract", "stdin", "stdout", "-l", "por+eng", "--psm", "11", "tsv"],
                                  input=png.tobytes(), capture_output=True, env={**os.environ, "OMP_THREAD_LIMIT": "1"})
-            return span[0], parse_tsv(res.stdout.decode("utf-8", "replace"), scale=OCR_SCALE)
+            return y0, parse_tsv(res.stdout.decode("utf-8", "replace"), scale=OCR_SCALE)
 
+        jobs = []
+        for y0, y1 in ocr_bands(gray.shape[0]):
+            big = cv2.resize(gray[y0:y1], None, fx=OCR_SCALE, fy=OCR_SCALE, interpolation=cv2.INTER_CUBIC)
+            jobs += [(y0, im) for im in variants(big)]
         with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
-            return merge_band_lines(list(pool.map(band, ocr_bands(gray.shape[0]))))
+            return merge_band_lines(list(pool.map(read, jobs)))
 
 
 OCR_SCALE = 3
@@ -181,17 +193,27 @@ def ocr_bands(height: int, frac: float = 0.12) -> list[tuple[int, int]]:
 
 
 def merge_band_lines(bands: list[tuple[int, list[dict]]]) -> list[dict]:
-    """Volta cada linha para a coordenada do quadro e junta a mesma linha lida em duas faixas (fica a de maior
-    confiança)."""
-    best: dict[tuple, dict] = {}
+    """Volta cada linha para a coordenada do quadro e junta o mesmo lugar lido duas vezes (duas faixas ou duas
+    leituras da mesma faixa): fica a de maior confiança, mesmo com texto diferente ("Narta" × "Marta")."""
+    out: list[dict] = []
     for y0, lines in bands:
         for line in lines:
             x, y, w, h = line["bbox"]
             moved = {**line, "bbox": [x, y + y0, w, h]}
-            key = (line["text"], round(x / 20), round((y + y0) / 20))
-            if key not in best or moved["conf"] > best[key]["conf"]:
-                best[key] = moved
-    return list(best.values())
+            same = next((i for i, o in enumerate(out) if _overlap(o["bbox"], moved["bbox"]) > 0.5), None)
+            if same is None:
+                out.append(moved)
+            elif moved["conf"] > out[same]["conf"]:
+                out[same] = moved
+    return out
+
+
+def _overlap(a: list, b: list) -> float:
+    """Interseção sobre a menor das duas caixas."""
+    ix = max(0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
+    small = min(a[2] * a[3], b[2] * b[3]) or 1
+    return ix * iy / small
 
 
 def parse_tsv(tsv: str, scale: float = 1.0) -> list[dict]:
