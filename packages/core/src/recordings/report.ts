@@ -376,8 +376,8 @@ const SETUP_LABEL: Record<InterviewSetupKey, string> = {
 };
 
 /**
- * Câmera, áudio e ruído da pessoa candidata pelas medições (mesmo vídeo, mesma nota). A câmera só conta com o rosto
- * detectável: na gravação da própria tela o seu rosto é uma miniatura, que não é o que quem entrevistou viu.
+ * Câmera, áudio e ruído da pessoa candidata pelas medições (mesmo vídeo, mesma nota). Rosto ou voz não reconhecidos
+ * valem 0 e entram na média (decisão do dono, 2026-11-10: bom setup e luz são requisito para ir bem).
  */
 export function setupScores(a: RecordingAnalysis): InterviewScore["setup"] {
   const c = a.persons.find((p) => p.isCandidate);
@@ -391,11 +391,12 @@ export function setupScores(a: RecordingAnalysis): InterviewScore["setup"] {
   const out: InterviewScore["setup"] = [];
   const face = m.face;
   if (!face?.reliability || face.reliability.level === "poor") {
+    // decisão do dono (2026-11-10): bom setup e boa luz são requisito; rosto não reconhecido vale 0, não fica de fora
     out.push({
       key: "camera",
-      points: null,
+      points: 0,
       reason:
-        "não medida: o seu rosto não ficou detectável na gravação (miniatura ou câmera fechada), e a miniatura não é o que quem entrevistou viu",
+        "o seu rosto não foi reconhecido na gravação (câmera fechada, longe, escura ou em miniatura): deixe a câmera ligada, com o rosto grande no quadro e luz de frente",
     });
   } else {
     const PENALTY: Record<string, [number, string]> = {
@@ -417,7 +418,7 @@ export function setupScores(a: RecordingAnalysis): InterviewScore["setup"] {
   }
   const lv = m.levels;
   if (typeof lv?.rms_dbfs !== "number") {
-    out.push({ key: "audio", points: null, reason: "não medido: sem falas suas identificadas" });
+    out.push({ key: "audio", points: 0, reason: "a sua voz não foi reconhecida na gravação" });
   } else {
     const rms = lv.rms_dbfs;
     const off = rms < -30 ? -30 - rms : rms > -12 ? rms - -12 : 0;
@@ -433,7 +434,7 @@ export function setupScores(a: RecordingAnalysis): InterviewScore["setup"] {
     out.push({ key: "audio", points, reason: why.join(", ") });
   }
   if (typeof lv?.snr_db !== "number") {
-    out.push({ key: "noise", points: null, reason: "não medido: sem falas suas identificadas" });
+    out.push({ key: "noise", points: 0, reason: "a sua voz não foi reconhecida na gravação" });
   } else {
     const points = round1(clamp10((lv.snr_db - 5) / 3));
     out.push({

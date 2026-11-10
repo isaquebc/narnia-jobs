@@ -10,8 +10,10 @@ Você envia o vídeo de uma entrevista real (Teams, Meet, Zoom) e o recrutador d
   entrevista em inglês sai em inglês;
 - a **nota da entrevista** (0 a 100), com os pontos de 0 a 10 de cada critério: respostas completas (peso 40),
   objetividade (20), clareza (20) e setup (20, a média de câmera, áudio e ruído do ambiente). O recrutador dá os pontos
-  do conteúdo citando os turnos; o código mede o setup. Critério que não deu para medir (o seu rosto em miniatura, por
-  exemplo) fica de fora, e os pesos se redistribuem; sem nenhuma fala sua identificada, não há nota geral;
+  do conteúdo citando os turnos; o código mede o setup. Bom setup e boa luz são requisito: rosto não reconhecido na
+  gravação (câmera fechada, longe, escura ou em miniatura) dá 0 na câmera, e voz não reconhecida dá 0 no áudio e no
+  ruído, contando na média. Sem nenhuma fala sua identificada, o conteúdo não é avaliado e não há nota geral (corrija
+  quem é quem e refaça o relatório);
 - o **veredito** e o que você falou e não deveria, com o trecho e o minuto;
 - as **respostas erradas ou incompletas**, com a correção técnica (e a certeza dela) e uma sugestão de resposta que
   usa os seus dados de carreira (experiências, conquistas, projetos, skills) e nunca inventa experiência: só o que não
@@ -77,7 +79,7 @@ Análise de vídeo). Com o serviço ligado, a análise começa sozinha quando o 
 e na página da entrevista, etapa por etapa, e você pode sair e voltar.
 
 **Dica para as próximas gravações:** fixe a sua câmera ou deixe-a maior. Em miniatura (rosto com ~30 px), o detector
-de rosto perde você boa parte do tempo e o sorriso não pode ser medido.
+de rosto perde você boa parte do tempo, o sorriso não pode ser medido e a câmera fica com 0 na nota.
 
 ## A página da entrevista
 

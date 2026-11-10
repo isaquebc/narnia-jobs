@@ -67,7 +67,7 @@ const empty = (): InterviewReportDraft => ({
 });
 
 describe("F13 · nota da entrevista", () => {
-  it("pesos 40/20/20/20; setup pela média do que foi medido; câmera sem rosto detectável fica fora", () => {
+  it("pesos 40/20/20/20; setup pela média; rosto não reconhecido zera a câmera e conta na média (decisão do dono)", () => {
     const { a } = setup();
     const { content } = checkInterviewReport(empty(), a);
     const s = content.score;
@@ -76,15 +76,32 @@ describe("F13 · nota da entrevista", () => {
       ["completeness", 40, 8],
       ["objectivity", 20, 6],
       ["clarity", 20, 7],
-      ["setup", 20, 5],
+      ["setup", 20, 3.3],
     ]);
     expect(s.setup.map((x) => [x.key, x.points])).toEqual([
-      ["camera", null],
+      ["camera", 0],
       ["audio", 10],
       ["noise", 0],
     ]);
-    expect(s.setup[0]?.reason).toMatch(/não medid/);
-    expect(s.overall).toBe(68);
+    expect(s.setup[0]?.reason).toMatch(/não foi reconhecido/);
+    expect(s.overall).toBe(65);
+  });
+
+  it("sem a voz da pessoa candidata medida, áudio e ruído também ficam com 0", () => {
+    const { a } = setup();
+    const noLevels = {
+      ...a,
+      persons: a.persons.map((p) =>
+        p.isCandidate ? { ...p, measurements: { ...p.measurements, levels: null } } : p,
+      ),
+    };
+    const s = checkInterviewReport(empty(), noLevels).content.score;
+    expect(s?.setup.map((x) => [x.key, x.points])).toEqual([
+      ["camera", 0],
+      ["audio", 0],
+      ["noise", 0],
+    ]);
+    expect(s?.criteria.find((c) => c.key === "setup")?.points).toBe(0);
   });
 
   it("turnos que não existem saem da justificativa; sem falas da pessoa candidata, o conteúdo não é avaliado", () => {

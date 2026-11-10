@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from .probe import StepError
-from .steps import STEPS, Ctx, outdated
+from .steps import STEP_VERSION, STEPS, Ctx, outdated
 
 INTERVIEW_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 VIDEO_PREFIX = "video."
@@ -92,7 +92,7 @@ class Runner:
                     run["results"][name] = json.loads(out.read_text())
                     run["skipped"].append(name)
                 else:
-                    result = STEPS[name](ctx)
+                    result = {**STEPS[name](ctx), "_v": STEP_VERSION.get(name, 1)}
                     tmp = out.with_suffix(".tmp")
                     tmp.write_text(json.dumps(result, ensure_ascii=False))
                     tmp.replace(out)

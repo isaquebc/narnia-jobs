@@ -243,11 +243,20 @@ DEPS: dict[str, list[str]] = {
 }
 
 
+# versão do código de cada etapa, gravada no resultado (`_v`; sem a chave = 1). Mudou o que a etapa produz: suba o
+# número, e o "Analisar de novo" refaz a etapa (e as que dependem dela) em vez de reaproveitar o resultado antigo.
+STEP_VERSION: dict[str, int] = {
+    "layout": 2,  # OCR em faixas, nome de uma palavra, ícone do microfone (R20)
+}
+
+
 def outdated(name: str, ctx: Ctx) -> bool:
-    """A etapa precisa rodar: sem resultado, separação de vozes feita sem token que agora existe, ou uma dependência
-    refeita depois dela."""
+    """A etapa precisa rodar: sem resultado, código da etapa mais novo que o resultado, separação de vozes feita sem
+    token que agora existe, ou uma dependência refeita depois dela."""
     out = ctx.work / f"{name}.json"
     if not out.is_file():
+        return True
+    if json.loads(out.read_text()).get("_v", 1) != STEP_VERSION.get(name, 1):
         return True
     if name == "diarize" and tokens.has_token(ctx.models_dir):
         if json.loads(out.read_text()).get("method") == "none":

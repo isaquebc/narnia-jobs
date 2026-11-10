@@ -35,7 +35,7 @@ def test_audio_completo_com_token(media):
 
 def test_sem_token_turnos_sem_falante(media):
     run = run_steps(media, "a2", AUDIO, seconds=20)
-    assert run["results"]["diarize"] == {"method": "none", "turns": []}
+    assert run["results"]["diarize"] == {"method": "none", "turns": [], "_v": 1}
     assert {t["speaker"] for t in run["results"]["turns"]["turns"]} == {None}
 
 
@@ -79,6 +79,18 @@ def test_transcricao_antiga_sem_idioma_por_trecho_e_refeita(media):
     run = wait_run(media, body["id"], timeout=90)
     assert run["skipped"] == ["probe", "audio", "diarize"]  # vozes não dependem da transcrição
     assert run["results"]["transcribe"]["multilingual"] is True
+
+
+def test_etapa_cujo_codigo_mudou_e_refeita(media, monkeypatch):
+    # o resultado guarda a versão da etapa; código novo (versão maior) refaz a etapa e o que depende dela
+    from narnia_media import steps
+
+    run_steps(media, "a8", AUDIO, seconds=10)
+    monkeypatch.setitem(steps.STEP_VERSION, "turns", steps.STEP_VERSION.get("turns", 1) + 1)
+    _, body = media.call("POST", "/runs", {"interview_id": "a8", "steps": AUDIO})
+    run = wait_run(media, body["id"], timeout=90)
+    assert run["skipped"] == ["probe", "audio", "transcribe", "diarize"]
+    assert run["results"]["turns"]["_v"] == steps.STEP_VERSION["turns"]
 
 
 def test_sem_token_de_novo_nao_refaz_nada(media):
