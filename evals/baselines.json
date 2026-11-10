@@ -249,24 +249,26 @@
   },
   "narnia-interview-frames": {
     "scores": {
-      "json_schema": 1,
-      "um_por_quadro": 1,
-      "idioma": 1,
       "cobertura_da_referencia": 1,
-      "padrao_de_entrega": 0.75
+      "idioma": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 0.75,
+      "um_por_quadro": 1
     },
     "updatedAt": "2026-11-10T13:02:00.000Z"
   },
   "narnia-interview-report": {
     "scores": {
-      "json_schema": 1,
       "citacoes_literais": 1,
-      "idioma": 1,
-      "entrega_da_entrevista": 1,
       "cobertura_da_referencia": 1,
-      "padrao_de_entrega": 0.5
+      "entrega_da_entrevista": 1,
+      "idioma": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 0.575
     },
-    "updatedAt": "2026-11-10T12:58:00.000Z"
+    "versionId": "e20a4950d16b7fd79a362c414bc86b9a72dd84ee993e2202e70f1b103660fbbe",
+    "commit": "8b414db",
+    "updatedAt": "2026-11-10T18:48:14.865Z"
   },
   "narnia-posting-duplicate": {
     "scores": {
