@@ -1,5 +1,4 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { Readable } from "node:stream";
+import { existsSync } from "node:fs";
 import {
   addJobApplicationEntry,
   addJobApplicationEvent,
@@ -39,6 +38,7 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
+import { serveFile } from "../serve-file";
 import { validate } from "./validate";
 
 const ERROR_STATUS: Record<JobApplicationError["code"], ContentfulStatusCode> = {
@@ -63,15 +63,6 @@ const ERROR_STATUS: Record<JobApplicationError["code"], ContentfulStatusCode> = 
  */
 const INLINE =
   /^(image\/(png|jpeg|gif|webp|avif)|application\/pdf|video\/(mp4|webm|ogg|quicktime)|audio\/[\w.+-]+|text\/plain)$/;
-
-/** `bytes=a-b` → intervalo dentro do arquivo; null se ausente ou inválido (serve o arquivo inteiro). */
-function rangeOf(header: string | undefined, size: number): { start: number; end: number } | null {
-  const m = header ? /^bytes=(\d*)-(\d*)$/.exec(header) : null;
-  if (!m || (!m[1] && !m[2])) return null;
-  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
-  const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
-  return start <= end && start < size ? { start, end } : null;
-}
 
 /** Arquiva as candidaturas sem atividade há 40 dias (F07 §0-6); no boot e uma vez por dia. Devolve quantas. */
 export function archiveJobApplicationsNow(
@@ -289,24 +280,11 @@ export function jobApplicationsRoutes(deps: {
     if (!a || a.applicationId !== c.req.param("id") || !path || !existsSync(path))
       return apiError(c, 404, "not_found", "Anexo não encontrado");
     const inline = INLINE.test(a.mime);
-    const size = statSync(path).size;
-    const range = rangeOf(c.req.header("range"), size);
-    const headers: Record<string, string> = {
+    return serveFile(c, path, {
       "content-type": inline ? a.mime : "application/octet-stream",
       "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(a.fileName)}`,
-      "accept-ranges": "bytes",
       "cache-control": "private, max-age=31536000, immutable",
-      "x-content-type-options": "nosniff",
-    };
-    const stream = (start: number, end: number) =>
-      Readable.toWeb(createReadStream(path, { start, end })) as ReadableStream;
-    if (range) {
-      headers["content-range"] = `bytes ${range.start}-${range.end}/${size}`;
-      headers["content-length"] = String(range.end - range.start + 1);
-      return c.body(stream(range.start, range.end), 206, headers);
-    }
-    headers["content-length"] = String(size);
-    return c.body(stream(0, Math.max(0, size - 1)), 200, headers);
+    });
   });
 
   // F07/M5: agenda da candidatura

@@ -96,6 +96,7 @@ export * from "./profile/relevance";
 export * from "./profile/suggest";
 export * from "./profile/summary";
 export * from "./profile/tools";
+export * from "./recordings";
 export * from "./salary";
 export * from "./search/embedder";
 export * from "./search/semantic";

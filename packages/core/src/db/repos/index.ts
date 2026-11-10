@@ -58,6 +58,7 @@ import { type ProfileMotivationsRepo, profileMotivationsRepo } from "./profile-m
 import { type ProfilesRepo, profilesRepo } from "./profiles";
 import { type ProposalsRepo, proposalsRepo } from "./proposals";
 import { type ReadingsRepo, readingsRepo } from "./readings";
+import { type RecordingsRepo, recordingsRepo } from "./recordings";
 import { type RelevanceRepo, relevanceRepo } from "./relevance";
 import { type SalaryReferencesRepo, salaryReferencesRepo } from "./salary-references";
 import { type SelfDeclarationsRepo, selfDeclarationsRepo } from "./self-declarations";
@@ -118,6 +119,8 @@ export interface Repos {
   jobApplications: JobApplicationsRepo;
   jobApplicationEntries: JobApplicationEntriesRepo;
   jobApplicationEvents: JobApplicationEventsRepo;
+  // F13
+  recordings: RecordingsRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -187,6 +190,7 @@ export function createRepos(db: Db): Repos {
     jobApplications: jobApplicationsRepo(db),
     jobApplicationEntries: jobApplicationEntriesRepo(db),
     jobApplicationEvents: jobApplicationEventsRepo(db),
+    recordings: recordingsRepo(db),
   };
 }
 

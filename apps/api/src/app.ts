@@ -55,6 +55,7 @@ import { pluginStatusRoutes } from "./routes/plugin-status";
 import { postingsRoutes } from "./routes/postings";
 import { profilesRoutes } from "./routes/profiles";
 import { providerRoutes } from "./routes/provider";
+import { recordingsRoutes } from "./routes/recordings";
 import { reposRoutes } from "./routes/repos";
 import { salaryReferenceRoutes } from "./routes/salary-reference";
 import { semanticSearchRoutes } from "./routes/semantic-search";
@@ -259,6 +260,7 @@ export function createApp(deps: AppDeps) {
   );
   app.route("/", modelSettingsRoutes({ repos: deps.repos }));
   app.route("/", mediaRoutes({ media: deps.media ?? MediaClient.fromEnv() }));
+  app.route("/", recordingsRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
   app.route(
     "/",
     pluginStatusRoutes({

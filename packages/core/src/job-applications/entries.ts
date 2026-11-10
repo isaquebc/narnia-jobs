@@ -8,6 +8,7 @@ import {
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { newId } from "../ids";
+import { removeApplicationRecordingFiles } from "../recordings";
 import { JobApplicationError, notAfterToday } from "./index";
 
 /**
@@ -128,9 +129,12 @@ export function removeJobApplicationEntry(
   repos.jobApplications.touch(applicationId, now);
 }
 
-/** Apaga a candidatura com as notas e os arquivos dela (a vaga e os documentos ficam). */
+/**
+ * Apaga a candidatura com as notas, os arquivos e as entrevistas gravadas dela (F13; a vaga e os documentos ficam).
+ */
 export function removeJobApplication(repos: Repos, dataDir: string, applicationId: string): void {
   const ids = repos.jobApplicationEntries.attachmentIds(applicationId);
+  removeApplicationRecordingFiles(repos, dataDir, applicationId);
   repos.jobApplications.remove(applicationId);
   unlink(dataDir, ids);
 }
