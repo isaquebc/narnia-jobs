@@ -96,12 +96,26 @@ export const recordingAnalyze: TaskHandler = async (data, ctx, deps) => {
         run = await media.startRun(id, steps);
       } catch (e) {
         if (e instanceof MediaError && e.code === "busy") {
+          // o worker reiniciou no meio: a execução anterior desta entrevista segue no media; acompanha ela (a barra
+          // anda) e depois pede de novo, e o media pula o que já fez
+          const other = typeof e.details?.runId === "string" ? e.details.runId : null;
+          if (other && (await follow(other, steps, span, true))) continue;
           await sleep(pollMs >= 1000 ? BUSY_WAIT_MS : pollMs);
           continue;
         }
         throw e;
       }
     }
+    await follow(run.id, steps, span, false);
+  };
+
+  /** Acompanha uma execução até o fim; `foreign`: só se for desta entrevista (devolve false se não for). */
+  const follow = async (
+    runId: string,
+    steps: string[],
+    span: [number, number],
+    foreign: boolean,
+  ): Promise<boolean> => {
     let errors = 0;
     let last = "";
     for (;;) {
@@ -109,19 +123,23 @@ export const recordingAnalyze: TaskHandler = async (data, ctx, deps) => {
       if (!repos.recordings.get(id)) throw new Error("apagada");
       let state: Awaited<ReturnType<MediaClient["getRun"]>>;
       try {
-        state = await media.getRun(run.id, { brief: true });
+        state = await media.getRun(runId, { brief: true });
         errors = 0;
+        if (foreign && state.interview_id !== id) return false;
       } catch (e) {
         if (e instanceof MediaError && e.code === "media_off" && ++errors < MAX_NETWORK_ERRORS)
           continue;
         throw e;
       }
-      if (state.state === "failed")
+      if (state.state === "failed") {
+        if (foreign) return true; // a anterior falhou: a nova tentativa mostra o erro dela
         throw new Error(state.error?.message ?? "O serviço de análise de vídeo falhou.");
+      }
+      // execução anterior: a barra segue as etapas dela, no trecho do media inteiro
+      const own = foreign && state.steps?.length ? state.steps : steps;
+      if (foreign) span = [1, MEDIA_SHARE];
       const frac =
-        state.state === "done"
-          ? 100
-          : weightedProgress(steps, state.step, state.step_progress ?? 0);
+        state.state === "done" ? 100 : weightedProgress(own, state.step, state.step_progress ?? 0);
       const pct = Math.round(span[0] + ((span[1] - span[0]) * frac) / 100);
       const key = `${state.step}:${pct}`;
       if (key !== last) {
@@ -129,7 +147,7 @@ export const recordingAnalyze: TaskHandler = async (data, ctx, deps) => {
         await set({ step: state.step ?? steps[steps.length - 1] ?? null, progress: pct });
         await ctx.progress(pct, state.step ?? undefined);
       }
-      if (state.state === "done") return;
+      if (state.state === "done") return true;
     }
   };
 

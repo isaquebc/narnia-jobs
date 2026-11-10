@@ -40,15 +40,25 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-function fakeMedia(dataDir: string, opts: { busyOnce?: boolean; fail?: string } = {}) {
+function fakeMedia(
+  dataDir: string,
+  opts: { busyOnce?: boolean; fail?: string; busyRun?: string } = {},
+) {
   let busy = opts.busyOnce ?? false;
   const runs: Array<{ steps: string[] }> = [];
   const polls: Record<string, number> = {};
+  let interview = "";
   const media = {
     startRun: async (interviewId: string, steps: string[]) => {
+      interview = interviewId;
       if (busy) {
         busy = false;
-        throw new MediaError("busy", 409, "Já há uma análise em andamento.");
+        throw new MediaError(
+          "busy",
+          409,
+          "Já há uma análise em andamento.",
+          opts.busyRun ? { runId: opts.busyRun } : undefined,
+        );
       }
       runs.push({ steps });
       cpSync(FIXTURE, join(recordingDir(dataDir, interviewId), "work"), { recursive: true });
@@ -59,7 +69,8 @@ function fakeMedia(dataDir: string, opts: { busyOnce?: boolean; fail?: string } 
       const done = polls[id] > 1;
       return {
         id,
-        interview_id: "x",
+        interview_id: interview,
+        ...(id === opts.busyRun ? { steps: ["probe", "audio", "transcribe", "diarize"] } : {}),
         state: opts.fail ? "failed" : done ? "done" : "running",
         step: done ? null : "transcribe",
         progress: done ? 100 : 40,
@@ -216,6 +227,19 @@ describe("F13/M5 · recording.report", () => {
     expect(h.repos.recordings.get(h.rec.id)).toMatchObject({ state: "failed" });
     expect(h.repos.recordings.get(h.rec.id)?.error).toMatch(/limite de uso/);
     expect(h.repos.recordingAnalysis.persons(h.rec.id)).toHaveLength(2);
+  });
+});
+
+describe("F13/M4 · retomada depois de reiniciar o worker", () => {
+  it("media ocupado com a execução anterior: acompanha o andamento dela e depois pede o que falta", async () => {
+    const h = harness({ busyOnce: true, busyRun: "anterior" });
+    await h.run();
+    const steps = h.published
+      .filter((e) => e.type === "recording.updated")
+      .map((e) => (e.type === "recording.updated" ? e.step : null));
+    expect(steps).toContain("transcribe");
+    expect(steps.indexOf("transcribe")).toBeLessThan(steps.indexOf("import"));
+    expect(h.repos.recordings.get(h.rec.id)?.step).toBe("report");
   });
 });
 

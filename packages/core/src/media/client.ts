@@ -42,6 +42,8 @@ export interface MediaRun {
   interview_id: string;
   state: "running" | "done" | "failed";
   step: string | null;
+  /** Etapas pedidas nesta execução (o worker que reinicia acompanha a execução anterior por elas). */
+  steps?: string[];
   progress: number;
   step_progress?: number;
   results?: Record<string, unknown>;
