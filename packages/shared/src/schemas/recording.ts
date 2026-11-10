@@ -48,6 +48,13 @@ export const RECORDING_DEFAULT_LIMITS = { maxBytes: 4 * 1024 ** 3, maxSeconds: 3
 /** Folga de disco exigida além do tamanho do vídeo (áudio extraído, quadros e trabalho do media). */
 export const RECORDING_DISK_MARGIN_BYTES = 2 * 1024 ** 3;
 
+/** Configurações › Análise de vídeo: limites do envio (F13-11). */
+export const RecordingLimitsSchema = z.object({
+  maxBytes: z.number().int().positive(),
+  maxSeconds: z.number().int().positive(),
+});
+export type RecordingLimits = z.infer<typeof RecordingLimitsSchema>;
+
 export const RecordingSchema = z.object({
   id: z.string(),
   profileId: z.string(),

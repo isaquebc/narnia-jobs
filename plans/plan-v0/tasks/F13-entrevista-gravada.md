@@ -121,7 +121,7 @@ Nome diferente de `interview_session`, que é da entrevista simulada (F08). Toke
 
 ## 4 · Layouts deste entregável
 
-Visual em aberto (F13-13). Telas necessárias: envio na etapa da candidatura e avulso; ativar o `media`, com o passo a passo do token e a regra de uso; progresso por etapa; confirmação de quem é quem; página da entrevista. A tela de envio traz a dica de fixar a própria câmera ou gravá-la em tamanho maior.
+Telas do M1 no padrão das telas atuais (dono, 2026-11-10): cartão "Análise de vídeo (opcional)" em Configurações; cartão "Entrevistas gravadas" na página da candidatura (com a etapa) e na aba "Entrevistas" do perfil (envio avulso). Visual do relatório em aberto (F13-13). Telas necessárias: envio na etapa da candidatura e avulso; ativar o `media`, com o passo a passo do token e a regra de uso; progresso por etapa; confirmação de quem é quem; página da entrevista. A tela de envio traz a dica de fixar a própria câmera ou gravá-la em tamanho maior.
 
 ---
 
@@ -235,7 +235,7 @@ Tecnicamente, `faster-whisper` 1.2.1 com PyAV 19 quebra ao decodificar (`metadat
 | M1.2 `MediaClient` (`packages/core/src/media/client.ts`), `GET /api/media/status`, `PUT`/`DELETE /api/media/token` | feito | 7 vitest no core, 5 no api (token fora de resposta e log) |
 | M1.3 `./start.sh media on\|off [--purge]\|status` e `start.ps1` | feito | 5 bats, 3 Pester |
 | M1.4 migração 0037 `recorded_interview`, `core/src/recordings`, `POST/GET/DELETE /api/recordings…`, `PUT …/video?offset=N`, `GET …/video` com `Range` (helper `serve-file.ts`, também usado pelos anexos da F07), nginx sem buffer | feito | 9 vitest no core, 4 no api |
-| M1.5 telas | a fazer | |
+| M1.5 telas: Configurações › Análise de vídeo (estado, comando, passo a passo e token, regra de uso, limites em `GET/PUT /api/settings/recordings`); cartão "Entrevistas gravadas" na candidatura (etapa) e na aba Entrevistas do perfil (avulso): partes de 8 MB, nova tentativa após queda de rede, envio que continua ao trocar de página, retomada escolhendo o mesmo arquivo, reprodução, apagar só o vídeo ou tudo | feito | 1 vitest no api, 16 no web, 3 e2e (`f13-01`, com `media` falso por interceptação de `/api/media/*`) |
 
 Prova na instância `claude`: `media on` construiu e subiu o serviço; estado `off` → `needs_token`; token falso recusado pelo Hugging Face; token real aceito (incluindo o acesso ao `community-1`), gravado 0600 e apagado em seguida; nenhum `hf_` em logs do api, do worker ou do `media`.
 

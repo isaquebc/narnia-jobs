@@ -194,6 +194,19 @@ const profileCvRoute = createRoute({
     ) : null;
   },
 });
+// F13 · Perfil › Entrevistas: envio avulso (sem candidatura) e todas as entrevistas gravadas do perfil
+const LazyRecordingsCard = lazyRouteComponent(
+  () => import("../features/recordings/RecordingsCard"),
+  "RecordingsCard",
+);
+const profileRecordingsRoute = createRoute({
+  getParentRoute: () => profileRoute,
+  path: "/entrevistas",
+  component: function RecordingsTab() {
+    const { id } = profileRoute.useParams();
+    return <LazyRecordingsCard profileId={id} />;
+  },
+});
 const profileCardRoute = createRoute({
   getParentRoute: () => profileRoute,
   path: "/cartao",
@@ -390,6 +403,7 @@ const routeTree = rootRoute.addChildren([
     profilePersonaRoute,
     profileCardRoute,
     profileCvRoute,
+    profileRecordingsRoute,
   ]),
   ingestionRoute,
   runRoute,

@@ -2,6 +2,16 @@ import { profile } from "../components/profile-fixture";
 
 /** API mínima do shell (seletor de perfil, provider, bandeja) para testes de rota da F03. */
 export const shellApi = {
+  // F13: análise de vídeo desligada e nenhuma entrevista gravada por padrão
+  getMediaStatus: async () => ({
+    state: "off" as const,
+    enableCommand: "./start.sh media on",
+    version: null,
+    busy: false,
+    steps: [],
+  }),
+  getRecordingSettings: async () => ({ maxBytes: 4 * 1024 ** 3, maxSeconds: 3 * 3600 }),
+  listRecordings: async () => ({ recordings: [] }),
   // F04-fix-fundamentacao: termos aprendidos pela busca (Configurações)
   listFactAliases: async () => ({ aliases: [] }),
   getSemanticSearch: async () => ({

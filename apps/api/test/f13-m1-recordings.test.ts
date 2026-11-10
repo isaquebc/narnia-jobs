@@ -109,4 +109,23 @@ describe("F13/M1.4 · /api/recordings", () => {
     expect((await api(`/api/recordings/${rec.id}`, { method: "DELETE" })).status).toBe(204);
     expect((await api(`/api/recordings/${rec.id}`)).status).toBe(404);
   });
+
+  it("limites do envio: padrão, ajustar e recusar valores inválidos (F13-11)", async () => {
+    t = makeTestApp();
+    const api = (t as TestApp).api;
+    expect(await read(api("/api/settings/recordings"))).toEqual({
+      maxBytes: 4 * 1024 ** 3,
+      maxSeconds: 3 * 3600,
+    });
+    const put = await api(
+      "/api/settings/recordings",
+      json({ maxBytes: 6 * 1024 ** 3, maxSeconds: 2 * 3600 }, "PUT"),
+    );
+    expect(put.status).toBe(200);
+    expect(await read(put)).toEqual({ maxBytes: 6 * 1024 ** 3, maxSeconds: 2 * 3600 });
+    expect(await read(api("/api/settings/recordings"))).toMatchObject({ maxBytes: 6 * 1024 ** 3 });
+    expect(
+      (await api("/api/settings/recordings", json({ maxBytes: 0, maxSeconds: 60 }, "PUT"))).status,
+    ).toBe(400);
+  });
 });

@@ -14,6 +14,7 @@ import type { IngestSettings } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { GithubConnectCard } from "../ingestion/github/GithubConnectCard";
 import { bytesLabel } from "../ingestion/units";
+import { VideoAnalysisSection } from "../recordings/VideoAnalysisSection";
 import { ChatSettingsSection } from "./ChatSettingsSection";
 import { CvTemplatesSection } from "./CvTemplatesSection";
 import { EvalsSettingsSection } from "./EvalsSettingsSection";
@@ -218,6 +219,7 @@ export function SettingsPage() {
       <PluginSettingsSection />
       <ExtensionSettingsSection />
       <GoogleCalendarSection />
+      <VideoAnalysisSection />
       <EvalsSettingsSection />
       {form ? (
         <Card className="flex flex-col gap-4">

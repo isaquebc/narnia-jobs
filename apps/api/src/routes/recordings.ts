@@ -4,11 +4,16 @@ import {
   RecordingError,
   type RecordingErrorCode,
   type Repos,
+  recordingLimits,
   recordingVideoPath,
   removeRecording,
   removeRecordingVideo,
 } from "@narnia-jobs/core";
-import { RECORDING_CHUNK_BYTES, RecordingCreateSchema } from "@narnia-jobs/shared";
+import {
+  RECORDING_CHUNK_BYTES,
+  RecordingCreateSchema,
+  RecordingLimitsSchema,
+} from "@narnia-jobs/shared";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -40,6 +45,13 @@ export function recordingsRoutes(deps: { repos: Repos; dataDir: string }) {
     throw e;
   };
   const notFound = (c: Context) => apiError(c, 404, "not_found", "Entrevista não encontrada.");
+
+  // limites do envio (F13-11), em Configurações › Análise de vídeo
+  app.get("/api/settings/recordings", (c) => c.json(recordingLimits(repos)));
+  app.put("/api/settings/recordings", validate("json", RecordingLimitsSchema), (c) => {
+    repos.settings.set("recordings.limits", c.req.valid("json"));
+    return c.json(recordingLimits(repos));
+  });
 
   app.post("/api/recordings", validate("json", RecordingCreateSchema), (c) => {
     try {

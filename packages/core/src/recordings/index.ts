@@ -7,6 +7,7 @@ import {
   RECORDING_EXTENSIONS,
   type Recording,
   type RecordingCreate,
+  type RecordingLimits,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { newId } from "../ids";
@@ -44,11 +45,6 @@ export class RecordingError extends Error {
     this.code = code;
     if (details) this.details = details;
   }
-}
-
-export interface RecordingLimits {
-  maxBytes: number;
-  maxSeconds: number;
 }
 
 /** Limites do envio (F13-11): `settings.recordings.limits` sobre os padrões. */

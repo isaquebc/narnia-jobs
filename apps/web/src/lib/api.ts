@@ -60,6 +60,7 @@ import type {
   JobApplicationStagesPut,
   JobApplicationSummary,
   JobApplicationUpcoming,
+  MediaStatus,
   MotivationStatus,
   NotificationsListResponse,
   OnboardingState,
@@ -83,6 +84,9 @@ import type {
   ProfilePatchRequest,
   ProfileSuggestionResponseSchema,
   ProviderStatusResponse,
+  Recording,
+  RecordingCreate,
+  RecordingLimits,
   Repo,
   RepoAnalysis,
   RepoDigest,
@@ -812,6 +816,34 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     getJobApplicationUpcoming: (hours = 24) =>
       request<JobApplicationUpcoming>(`/api/job-applications/upcoming?hours=${hours}`),
     getJobApplicationFunnel: () => request<JobApplicationFunnel>("/api/job-applications/funnel"),
+    // F13 · Configurações › Análise de vídeo (serviço media e token do Hugging Face) e entrevistas gravadas
+    getMediaStatus: () => request<MediaStatus>("/api/media/status"),
+    putMediaToken: (token: string) =>
+      request<MediaStatus>("/api/media/token", { method: "PUT", body: JSON.stringify({ token }) }),
+    deleteMediaToken: () => request<MediaStatus>("/api/media/token", { method: "DELETE" }),
+    getRecordingSettings: () => request<RecordingLimits>("/api/settings/recordings"),
+    putRecordingSettings: (body: RecordingLimits) =>
+      request<RecordingLimits>("/api/settings/recordings", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    listRecordings: (by: { jobApplicationId: string } | { profileId: string }) =>
+      request<{ recordings: Recording[] }>(
+        `/api/recordings?${new URLSearchParams(by as Record<string, string>).toString()}`,
+      ),
+    createRecording: (input: RecordingCreate) => request<Recording>("/api/recordings", json(input)),
+    /** Uma parte do vídeo (até 8 MB), a partir de `offset`; a resposta diz quantos bytes já chegaram. */
+    putRecordingChunk: (id: string, offset: number, chunk: Blob) =>
+      request<Recording>(`/api/recordings/${encodeURIComponent(id)}/video?offset=${offset}`, {
+        method: "PUT",
+        headers: { "content-type": "application/octet-stream" },
+        body: chunk,
+      }),
+    deleteRecordingVideo: (id: string) =>
+      request<Recording>(`/api/recordings/${encodeURIComponent(id)}/video`, { method: "DELETE" }),
+    deleteRecording: (id: string) =>
+      request<void>(`/api/recordings/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    recordingVideoUrl: (id: string) => `${base}/api/recordings/${encodeURIComponent(id)}/video`,
     getGoogleCalendarStatus: (refresh = false) =>
       request<{
         status: "connected" | "needs_auth" | "not_configured" | "error" | "unavailable";

@@ -11,6 +11,7 @@ import { Menu } from "../../components/ui/menu";
 import { jobApplicationKeys, useJobApplication } from "../../hooks/useJobApplications";
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
+import { RecordingsCard } from "../recordings/RecordingsCard";
 import { AgendaCard } from "./AgendaCard";
 import { ChatAboutCard } from "./ChatAboutCard";
 import { ContactChainCard } from "./ContactChainCard";
@@ -160,6 +161,7 @@ export function JobApplicationPage({ id }: { id: string }) {
       <StagesEditor application={a} />
       <AgendaCard application={a} />
       <ContactChainCard postingId={a.postingId} />
+      <RecordingsCard application={a} />
       <EntriesCard appId={a.id} />
       {dialog}
     </div>
