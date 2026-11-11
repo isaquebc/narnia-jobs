@@ -33,6 +33,7 @@
     "playwright-core": "1.58.0",
     "sanitize-html": "2.18.1",
     "tesseract.js": "7.0.0",
+    "tldts": "7.4.19",
     "unpdf": "1.8.1",
     "uuid": "14.0.2",
     "zod": "4.6.5"

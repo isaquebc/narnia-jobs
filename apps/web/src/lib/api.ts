@@ -61,6 +61,7 @@ import type {
   JobApplicationStagesPut,
   JobApplicationSummary,
   JobApplicationUpcoming,
+  MailSendersView,
   MailSettingsView,
   MediaStatus,
   MotivationStatus,
@@ -907,6 +908,21 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     disconnectGmail: () =>
       request<GmailStatusView>("/api/integrations/gmail", { method: "DELETE" }),
     getMailSettings: () => request<MailSettingsView>("/api/mail/settings"),
+    listMailSenders: () => request<MailSendersView>("/api/mail/senders"),
+    putMailSender: (body: { value: string; override: "trusted" | "blocked" }) =>
+      request<MailSendersView & { quarantined: number }>("/api/mail/senders", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    deleteMailSender: (value: string) =>
+      request<MailSendersView>(`/api/mail/senders/${encodeURIComponent(value)}`, {
+        method: "DELETE",
+      }),
+    reprocessMailSender: (value: string) =>
+      request<{ reprocessed: number }>(
+        `/api/mail/senders/${encodeURIComponent(value)}/reprocess`,
+        json({}),
+      ),
     putMailSettings: (since: string) =>
       request<MailSettingsView>("/api/mail/settings", {
         method: "PUT",

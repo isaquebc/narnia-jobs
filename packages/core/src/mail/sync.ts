@@ -103,6 +103,8 @@ export interface MailCursor {
   at: string;
 }
 export const MAIL_CURSOR_KEY = "mail.cursor";
+/** E-mails pedidos pela extensão ("processar este e-mail agora"): baixados antes da busca, fora dela. */
+export const MAIL_FORCE_KEY = "mail.forceIds";
 export const MAIL_FAILURES_KEY = "mail.fetchFailures";
 /** Fatia da busca: a janela é percorrida do mais antigo para o mais novo, uma semana por vez (§2.2). */
 const SLICE_MS = 7 * 86_400_000;
@@ -177,7 +179,121 @@ export async function syncMail(input: {
     throw e;
   };
 
+  // pedidos da extensão primeiro, mesmo fora da busca e da janela
+  const forced = (repos.settings.get<string[]>(MAIL_FORCE_KEY) ?? []).filter(
+    (id) => !repos.mail.byGmailId(id),
+  );
+
+  const download = async (gmailId: string): Promise<"ok" | "gone" | "failed"> => {
+    try {
+      const m = await source.getRaw(gmailId);
+      const rel = mailRawPath(gmailId);
+      writeRaw(join(input.dataDir, rel), m.raw);
+      const h = await parseMailHeaders(headerPart(m.raw));
+      const receivedAt = new Date(m.internalDate);
+      if (Number.isNaN(receivedAt.getTime())) throw new Error("data do e-mail inválida");
+      repos.mail.insert(
+        {
+          gmailId,
+          threadId: m.threadId,
+          ...h,
+          receivedAt: receivedAt.toISOString(),
+          size: m.raw.length,
+          labels: m.labelIds,
+          rawPath: rel,
+        },
+        new Date().toISOString(),
+      );
+      delete failures[gmailId];
+      fetched++;
+      ctx.item({
+        kind: "mail",
+        refId: gmailId,
+        label: h.subject ?? "(sem assunto)",
+        action: "baixado",
+        detail: h.fromAddr,
+      });
+      return "ok";
+    } catch (e) {
+      // 404: apagado entre a busca e o download; 400: id que o Gmail não aceita (pedido da extensão)
+      if (e instanceof GmailApiError && (e.status === 404 || e.status === 400)) {
+        ctx.log("info", `${gmailId} não existe mais no Gmail (${e.status}); pulado`);
+        return "gone";
+      }
+      if (isAuthRefusal(e) || e instanceof GmailApiError || e instanceof MailAuthError)
+        await fail(e);
+      errors++;
+      const n = (failures[gmailId] ?? 0) + 1;
+      failures[gmailId] = n;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (n >= MAX_ATTEMPTS) {
+        const { record } = repos.mail.insert(
+          {
+            gmailId,
+            threadId: null,
+            fromAddr: null,
+            fromName: null,
+            replyTo: null,
+            subject: null,
+            receivedAt: new Date(nowMs).toISOString(),
+            size: 0,
+            labels: [],
+            rawPath: mailRawPath(gmailId),
+          },
+          new Date().toISOString(),
+        );
+        repos.mail.setStatus(record.id, "error", new Date().toISOString(), { error: msg });
+        delete failures[gmailId];
+        ctx.log("error", `${gmailId} falhou ${n} vezes e fica como erro: ${msg}`);
+        ctx.item({
+          kind: "mail",
+          refId: gmailId,
+          label: gmailId,
+          action: "falhou",
+          result: "error",
+          detail: msg,
+        });
+        return "gone";
+      }
+      ctx.log("warn", `Falha ao baixar ${gmailId} (tentativa ${n} de ${MAX_ATTEMPTS}): ${msg}`);
+      ctx.item({
+        kind: "mail",
+        refId: gmailId,
+        label: gmailId,
+        action: "falhou",
+        result: "error",
+        detail: msg,
+      });
+      return "failed";
+    }
+  };
+
   try {
+    const forcedLeft: string[] = [];
+    for (const id of forced) {
+      if (budget <= 0) {
+        forcedLeft.push(id);
+        continue;
+      }
+      budget--;
+      if ((await download(id)) === "failed") forcedLeft.push(id);
+    }
+    // revisão do M3: o api pode ter acrescentado ids durante a rodada; tira só os tratados aqui
+    if (forced.length) {
+      const handled = new Set(forced.filter((id) => !forcedLeft.includes(id)));
+      repos.db.exec("begin immediate");
+      try {
+        const now = repos.settings.get<string[]>(MAIL_FORCE_KEY) ?? [];
+        repos.settings.set(
+          MAIL_FORCE_KEY,
+          now.filter((id) => !handled.has(id)),
+        );
+        repos.db.exec("commit");
+      } catch (e) {
+        repos.db.exec("rollback");
+        throw e;
+      }
+    }
     while (budget > 0) {
       const fromMs = cursorMs > sinceMs ? Math.max(sinceMs, cursorMs - OVERLAP_24H) : sinceMs;
       const toMs = Math.min(cursorMs + SLICE_MS, nowMs + 60_000);
@@ -206,83 +322,7 @@ export async function syncMail(input: {
           break;
         }
         budget--;
-        try {
-          const m = await source.getRaw(gmailId);
-          const rel = mailRawPath(gmailId);
-          writeRaw(join(input.dataDir, rel), m.raw);
-          const h = await parseMailHeaders(headerPart(m.raw));
-          const receivedAt = new Date(m.internalDate);
-          if (Number.isNaN(receivedAt.getTime())) throw new Error("data do e-mail inválida");
-          repos.mail.insert(
-            {
-              gmailId,
-              threadId: m.threadId,
-              ...h,
-              receivedAt: receivedAt.toISOString(),
-              size: m.raw.length,
-              labels: m.labelIds,
-              rawPath: rel,
-            },
-            new Date().toISOString(),
-          );
-          delete failures[gmailId];
-          fetched++;
-          ctx.item({
-            kind: "mail",
-            refId: gmailId,
-            label: h.subject ?? "(sem assunto)",
-            action: "baixado",
-            detail: h.fromAddr,
-          });
-        } catch (e) {
-          if (e instanceof GmailApiError && e.status === 404) {
-            ctx.log("info", `${gmailId} sumiu do Gmail antes de ser baixado`);
-            continue;
-          }
-          if (isAuthRefusal(e) || e instanceof GmailApiError || e instanceof MailAuthError) {
-            // Gmail fora do ar, limite de uso ou recusa: para a rodada sem avançar o cursor
-            // o cursor fica onde estava (finally) e a execução termina com o erro do Gmail
-            await fail(e);
-          }
-          errors++;
-          const n = (failures[gmailId] ?? 0) + 1;
-          failures[gmailId] = n;
-          const msg = e instanceof Error ? e.message : String(e);
-          if (n >= MAX_ATTEMPTS) {
-            const { record } = repos.mail.insert(
-              {
-                gmailId,
-                threadId: null,
-                fromAddr: null,
-                fromName: null,
-                replyTo: null,
-                subject: null,
-                receivedAt: new Date(nowMs).toISOString(),
-                size: 0,
-                labels: [],
-                rawPath: mailRawPath(gmailId),
-              },
-              new Date().toISOString(),
-            );
-            repos.mail.setStatus(record.id, "error", new Date().toISOString(), { error: msg });
-            delete failures[gmailId];
-            ctx.log("error", `${gmailId} falhou ${n} vezes e fica como erro: ${msg}`);
-          } else {
-            sliceDone = false;
-            ctx.log(
-              "warn",
-              `Falha ao baixar ${gmailId} (tentativa ${n} de ${MAX_ATTEMPTS}): ${msg}`,
-            );
-          }
-          ctx.item({
-            kind: "mail",
-            refId: gmailId,
-            label: gmailId,
-            action: "falhou",
-            result: "error",
-            detail: msg,
-          });
-        }
+        if ((await download(gmailId)) === "failed") sliceDone = false;
       }
       if (!sliceDone) break;
       cursorMs = toMs;

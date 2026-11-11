@@ -339,6 +339,7 @@ export function createApp(deps: AppDeps) {
     "/",
     gmailRoutes({
       repos: deps.repos,
+      queue: deps.queue,
       dataDir: deps.dataDir,
       fetch:
         deps.gmail?.fetch ??

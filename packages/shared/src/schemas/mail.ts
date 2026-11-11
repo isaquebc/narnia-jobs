@@ -23,5 +23,22 @@ export const MailSettingsSchema = z.object({
 });
 export type MailSettingsView = z.infer<typeof MailSettingsSchema>;
 
+/** F14/M3 · remetente na lista (confiável ou bloqueado) ou sugerido pelo histórico. */
+export const MailSenderSchema = z.object({
+  value: z.string(),
+  override: z.enum(["trusted", "blocked"]).nullable(),
+  overrideOrigin: z.enum(["manual", "extension", "review"]).nullable(),
+  seenCount: z.number(),
+  okCount: z.number(),
+  rejectedCount: z.number(),
+  lastSeenAt: z.string().nullable(),
+});
+export type MailSenderView = z.infer<typeof MailSenderSchema>;
+export interface MailSendersView {
+  trusted: MailSenderView[];
+  blocked: MailSenderView[];
+  suggestions: MailSenderView[];
+}
+
 /** A conexão com o Gmail mudou (conectou, falhou, desconectou): Configurações recarrega. */
 export const GmailUpdatedEventSchema = z.object({ type: z.literal("gmail.updated") });

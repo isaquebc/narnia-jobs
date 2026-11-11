@@ -18,9 +18,14 @@
       <div id="paired" hidden>
         <p class="hint">O que fazer nesta página?</p>
         <button type="button" id="posting">Analisar a vaga</button>
-        <p class="hint">Salvar, ver o fit com os seus perfis e gerar o CV e a carta.</p>
+        <p class="hint" id="posting-hint">Salvar, ver o fit com os seus perfis e gerar o CV e a carta.</p>
         <button type="button" id="form">Ajudar no formulário</button>
-        <p class="hint">Ver as perguntas, copiar ou preencher as respostas.</p>
+        <p class="hint" id="form-hint">Ver as perguntas, copiar ou preencher as respostas.</p>
+        <button type="button" id="trust-sender" hidden>Confiar neste remetente</button>
+        <button type="button" id="block-sender" hidden>Bloquear este remetente</button>
+        <button type="button" id="process-mail" hidden>Processar este e-mail agora</button>
+        <p class="hint" id="mail-hint" hidden>No Gmail, o narnia lê só o remetente e o id do e-mail aberto.</p>
+        <p class="hint" id="mail-result" role="status" hidden></p>
         <button type="button" id="open" class="secondary">Abrir o narnia</button>
       </div>
       <div id="unpaired" hidden>

@@ -10,6 +10,7 @@ import {
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { jobApplicationUrl } from "../job-applications/tools";
+import { assessPendingMail } from "../mail/process";
 import type { MailSource } from "../mail/source";
 import { syncMail } from "../mail/sync";
 
@@ -101,7 +102,10 @@ async function jobApplicationsArchive(ctx: ScheduledContext) {
 /** Handlers por tarefa; mutável só para os testes trocarem um handler. */
 /** Leitura do Gmail (F14/M2): baixa os e-mails novos de vagas; o processamento vem nos marcos seguintes. */
 async function mailSync(ctx: ScheduledContext) {
-  await syncMail({ repos: ctx.repos, dataDir: ctx.dataDir, source: ctx.mailSource(), ctx });
+  const source = ctx.mailSource();
+  await syncMail({ repos: ctx.repos, dataDir: ctx.dataDir, source, ctx });
+  // M3: risco, pré-filtro e quarentena do que foi baixado (nesta ou em execuções anteriores)
+  await assessPendingMail({ repos: ctx.repos, dataDir: ctx.dataDir, source, ctx });
 }
 
 export const SCHEDULED_TASK_HANDLERS: Record<ScheduledTaskId, ScheduledHandler> = {

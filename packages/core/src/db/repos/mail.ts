@@ -31,6 +31,8 @@ export interface MailMessageRecord {
   result: Record<string, unknown> | null;
   error: string | null;
   gmailSynced: boolean;
+  /** A etiqueta `narnia-jobs/suspeito` está no Gmail. */
+  suspectLabel: boolean;
   processedAt: string | null;
   createdAt: string;
 }
@@ -60,6 +62,29 @@ export interface MailRepo {
   pending(limit: number): MailMessageRecord[];
   counts(): Record<MailStatus, number>;
   setStatus(id: string, status: MailStatus, at: string, extra?: { error?: string | null }): void;
+  /** Ainda sem risco e pré-filtro (M3), do mais antigo para o mais novo. */
+  unassessed(limit: number): MailMessageRecord[];
+  setAssessment(
+    id: string,
+    a: {
+      status: MailStatus;
+      class: string;
+      riskLevel: "trusted" | "neutral" | "high";
+      riskReasons: string[];
+      error?: string | null;
+    },
+    at: string,
+  ): void;
+  /** Em quarentena e ainda sem a etiqueta `narnia-jobs/suspeito` no Gmail. */
+  quarantineToSync(limit: number): MailMessageRecord[];
+  /** Com a etiqueta de suspeito no Gmail, mas fora da quarentena (reprocessado): a etiqueta sai. */
+  suspectToRemove(limit: number): MailMessageRecord[];
+  setSuspectLabel(ids: string[], on: boolean, at: string): void;
+  setGmailSynced(ids: string[], synced: boolean, at: string): void;
+  /** Mensagens deste remetente (endereço) ou domínio (`@dominio`) num estado. */
+  bySender(value: string, status: MailStatus): MailMessageRecord[];
+  /** Volta para o começo do processamento (avaliar de novo). */
+  reset(id: string, at: string): void;
 }
 
 interface Row {
@@ -82,6 +107,7 @@ interface Row {
   result_json: string | null;
   error: string | null;
   gmail_synced: number;
+  suspect_label: number;
   processed_at: string | null;
   created_at: string;
 }
@@ -106,6 +132,7 @@ const map = (r: Row): MailMessageRecord => ({
   result: r.result_json ? (JSON.parse(r.result_json) as Record<string, unknown>) : null,
   error: r.error,
   gmailSynced: r.gmail_synced === 1,
+  suspectLabel: r.suspect_label === 1,
   processedAt: r.processed_at,
   createdAt: r.created_at,
 });
@@ -189,6 +216,65 @@ export function mailRepo(db: Db): MailRepo {
       }>)
         out[r.status] = Number(r.n);
       return out;
+    },
+    unassessed(limit) {
+      return (
+        q(
+          "select * from mail_message where status = 'pending' and class is null order by received_at, rowid limit ?",
+        ).all(limit) as unknown as Row[]
+      ).map(map);
+    },
+    setAssessment(id, a, at) {
+      q(
+        `update mail_message set status = ?, class = ?, risk_level = ?, risk_reasons_json = ?, error = ?, updated_at = ?
+         where id = ?`,
+      ).run(a.status, a.class, a.riskLevel, JSON.stringify(a.riskReasons), a.error ?? null, at, id);
+    },
+    quarantineToSync(limit) {
+      return (
+        q(
+          "select * from mail_message where status = 'quarantine' and suspect_label = 0 order by received_at limit ?",
+        ).all(limit) as unknown as Row[]
+      ).map(map);
+    },
+    suspectToRemove(limit) {
+      return (
+        q(
+          "select * from mail_message where status != 'quarantine' and suspect_label = 1 order by received_at limit ?",
+        ).all(limit) as unknown as Row[]
+      ).map(map);
+    },
+    setSuspectLabel(ids, on, at) {
+      for (const id of ids)
+        q("update mail_message set suspect_label = ?, updated_at = ? where id = ?").run(
+          on ? 1 : 0,
+          at,
+          id,
+        );
+    },
+    setGmailSynced(ids, synced, at) {
+      for (const id of ids)
+        q("update mail_message set gmail_synced = ?, updated_at = ? where id = ?").run(
+          synced ? 1 : 0,
+          at,
+          id,
+        );
+    },
+    bySender(value, status) {
+      const rows = (value.startsWith("@")
+        ? q(
+            "select * from mail_message where status = ? and (from_addr like ? or from_addr like ?) order by received_at",
+          ).all(status, `%${value}`, `%.${value.slice(1)}`)
+        : q(
+            "select * from mail_message where status = ? and from_addr = ? order by received_at",
+          ).all(status, value)) as unknown as Row[];
+      return rows.map(map);
+    },
+    reset(id, at) {
+      q(
+        `update mail_message set status = 'pending', class = null, risk_level = null, risk_reasons_json = '[]',
+           error = null, updated_at = ? where id = ?`,
+      ).run(at, id);
     },
     setStatus(id, status, at, extra = {}) {
       q("update mail_message set status = ?, error = ?, updated_at = ? where id = ?").run(

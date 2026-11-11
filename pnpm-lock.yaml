@@ -463,6 +463,9 @@ importers:
       tesseract.js:
         specifier: 7.0.0
         version: 7.0.0
+      tldts:
+        specifier: 7.4.19
+        version: 7.4.19
       unpdf:
         specifier: 1.8.1
         version: 1.8.1
@@ -3365,8 +3368,15 @@ packages:
   tldts-core@7.4.16:
     resolution: {integrity: sha512-MDolfaSJtlSK5Y0A1xl3277ekubZwobpBjugknDizI9O5Rm60a1m8k4ICK+MRsCDzPygT81mp3BBf5RKDlFRfA==}
 
+  tldts-core@7.4.19:
+    resolution: {integrity: sha512-goNXV6Ho9TIOfpJZanTd6CKG5DyYgYAL+k+22T0SLh8l6+KHIfBUPFuePuSZv05UttIaaLmI9tb7TmGIdK5AkQ==}
+
   tldts@7.4.16:
     resolution: {integrity: sha512-QwBER5KMR86IIjpIiO7H/Z3IMJPsZ1A6RKPAqzTTgOyUQUSt9FdnKcqhTaJmkY6HVrgouZHZR0ncK5QxvmnQeg==}
+    hasBin: true
+
+  tldts@7.4.19:
+    resolution: {integrity: sha512-48dH6aSpQnpbzDUc4vIQZ1VjB8tkK+e8c1yx05/SZK+rkssgjEOlxDd/yU8/a4vGYQ9vRgJr9dwMq9TJ0b3X2Q==}
     hasBin: true
 
   toidentifier@1.0.1:
@@ -6131,9 +6141,15 @@ snapshots:
 
   tldts-core@7.4.16: {}
 
+  tldts-core@7.4.19: {}
+
   tldts@7.4.16:
     dependencies:
       tldts-core: 7.4.16
+
+  tldts@7.4.19:
+    dependencies:
+      tldts-core: 7.4.19
 
   toidentifier@1.0.1: {}
 

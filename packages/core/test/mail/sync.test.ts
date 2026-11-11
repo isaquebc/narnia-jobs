@@ -108,8 +108,13 @@ describe("F14/M2 · sincronização do Gmail", () => {
       "Subject: Vaga 1",
     );
     expect(JSON.stringify(state.messages.map((m) => m.labelIds))).toBe(before);
-    expect(repos.scheduled.run(r.id)?.counts).toEqual({ fetched: 2 });
-    expect(repos.scheduled.run(r.id)?.items.map((i) => i.refId)).toEqual(["m1", "m2"]);
+    expect(repos.scheduled.run(r.id)?.counts).toMatchObject({ fetched: 2, assessed: 2 });
+    expect(
+      repos.scheduled
+        .run(r.id)
+        ?.items.filter((i) => i.action === "baixado")
+        .map((i) => i.refId),
+    ).toEqual(["m1", "m2"]);
     expect(repos.settings.get(MAIL_LAST_SYNC_KEY)).toBe(new Date(T).toISOString());
   });
 
@@ -227,6 +232,46 @@ describe("F14/M2 · sincronização do Gmail", () => {
     expect(repos.notifications.list().some((n) => n.kind === "mail.reconnect")).toBe(true);
   });
 
+  it("pedido da extensão: baixado primeiro, mesmo fora da janela, e sai da lista", async () => {
+    repos.settings.set(MAIL_SINCE_KEY, new Date(T - 5 * DAY).toISOString());
+    fakeGmailAdd(state, { id: "velho", internalDate: T - 60 * DAY, raw: raw("Fora da janela") });
+    fakeGmailAdd(state, { id: "novo", internalDate: T - DAY, raw: raw("Dentro") });
+    repos.settings.set("mail.forceIds", ["velho"]);
+    const { syncMail } = await import("../../src");
+    await syncMail({ repos, dataDir, source: source(), ctx: ctxOf() });
+    expect(repos.mail.byGmailId("velho")?.subject).toBe("Fora da janela");
+    expect(repos.mail.byGmailId("novo")).not.toBeNull();
+    expect(repos.settings.get("mail.forceIds")).toEqual([]);
+  });
+
+  it("revisão #8: pedido da extensão com id que o Gmail recusa (400) sai da lista em vez de travar a leitura", async () => {
+    repos.settings.set(MAIL_SINCE_KEY, new Date(T - 5 * DAY).toISOString());
+    repos.settings.set("mail.forceIds", ["ffffffffffffffff"]);
+    const { syncMail, GmailApiError } = await import("../../src");
+    const src = source();
+    src.getRaw = async () => {
+      throw new GmailApiError(400, "Invalid id value");
+    };
+    const r = await syncMail({ repos, dataDir, source: src, ctx: ctxOf() });
+    expect(r.caughtUp).toBe(true);
+    expect(repos.settings.get("mail.forceIds")).toEqual([]);
+  });
+
+  it("revisão #7: pedido da extensão que chega durante a rodada não se perde", async () => {
+    repos.settings.set(MAIL_SINCE_KEY, new Date(T - 5 * DAY).toISOString());
+    fakeGmailAdd(state, { id: "a1", internalDate: T - DAY, raw: raw("A") });
+    repos.settings.set("mail.forceIds", ["a1"]);
+    const { syncMail } = await import("../../src");
+    const src = source();
+    const get = src.getRaw.bind(src);
+    src.getRaw = async (id) => {
+      repos.settings.set("mail.forceIds", ["a1", "b2b2b2b2b2b2"]);
+      return get(id);
+    };
+    await syncMail({ repos, dataDir, source: src, ctx: ctxOf() });
+    expect(repos.settings.get("mail.forceIds")).toEqual(["b2b2b2b2b2b2"]);
+  });
+
   it("e-mail apagado entre a busca e o download (404) é pulado sem travar", async () => {
     repos.settings.set(MAIL_SINCE_KEY, new Date(T - 10 * DAY).toISOString());
     fakeGmailAdd(state, { id: "sumiu", internalDate: T - 2 * DAY, raw: raw("X") });
@@ -245,7 +290,7 @@ describe("F14/M2 · sincronização do Gmail", () => {
     await sync();
     fakeGmailAdd(state, { id: "m2", internalDate: T + 30 * 60_000, raw: raw("V2") });
     const r = await sync(new Date(T + 60 * 60_000));
-    expect(repos.scheduled.run(r.id)?.counts).toEqual({ fetched: 1 });
+    expect(repos.scheduled.run(r.id)?.counts).toMatchObject({ fetched: 1, assessed: 1 });
     expect(repos.settings.get(MAIL_LAST_SYNC_KEY)).toBe(new Date(T + 60 * 60_000).toISOString());
     expect(repos.mail.pending(10).map((m) => m.gmailId)).toEqual(["m1", "m2"]);
   });

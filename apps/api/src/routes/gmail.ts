@@ -2,15 +2,21 @@ import { createServer } from "node:http";
 import {
   deleteGoogleClient,
   disconnectGmail,
+  domainOfAddress,
   finishGmailConnect,
   gmailStatus,
+  isWebmail,
+  MAIL_FORCE_KEY,
   MAIL_LAST_SYNC_KEY,
   MAIL_SINCE_KEY,
   oauthRedirectUri,
   type PendingGmailConnect,
+  platformOf,
   type Repos,
+  readGmailToken,
   resolveGoogleClient,
   resolveMailReconnect,
+  SCHEDULED_RUN_TASK,
   saveGoogleClient,
   startGmailConnect,
 } from "@narnia-jobs/core";
@@ -18,6 +24,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
+import type { QueueAdapter } from "../queue";
 import { validate } from "./validate";
 
 /**
@@ -78,9 +85,23 @@ const ClientSchema = z.object({
 });
 
 const MailSettingsSchema = z.object({ since: z.iso.datetime() });
+/** Endereço (`rh@acme.example`) ou domínio com @ (`@acme.example`). */
+const SenderValueSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^([^@\s]+@[^@\s]+\.[^@\s]+|@[a-z0-9.-]+\.[a-z]{2,})$/, "use um endereço ou @domínio");
+const SenderPutSchema = z.object({
+  value: SenderValueSchema,
+  override: z.enum(["trusted", "blocked"]),
+  origin: z.enum(["manual", "extension", "review"]).default("manual"),
+});
+const ProcessSchema = z.object({ gmailId: z.string().regex(/^[0-9a-f]{8,32}$/i) });
 
 export function gmailRoutes(deps: {
   repos: Repos;
+  /** Para "rodar a leitura agora" depois de confiar num remetente ou de um pedido da extensão. */
+  queue?: QueueAdapter;
   dataDir: string;
   fetch: typeof fetch;
   env: Record<string, string | undefined>;
@@ -123,6 +144,83 @@ export function gmailRoutes(deps: {
     counts: deps.repos.mail.counts(),
   });
   app.get("/api/mail/settings", (c) => c.json(mailView()));
+
+  // F14/M3 · lista de remetentes (F14-13): confiáveis e bloqueados, sugestões pelo histórico
+  const runSyncNow = async () =>
+    deps.queue?.enqueueTask({
+      queue: "scheduled",
+      type: SCHEDULED_RUN_TASK,
+      key: "mail.sync",
+      payload: { taskId: "mail.sync", trigger: "manual" },
+    });
+  const sendersView = () => {
+    const all = deps.repos.mailSenders.list();
+    return {
+      trusted: all.filter((s) => s.override === "trusted"),
+      blocked: all.filter((s) => s.override === "blocked"),
+      suggestions: all.filter(
+        (s) =>
+          !s.override &&
+          !s.value.startsWith("@") &&
+          s.okCount >= 3 &&
+          s.rejectedCount === 0 &&
+          !platformOf(domainOfAddress(s.value)),
+      ),
+    };
+  };
+  app.get("/api/mail/senders", (c) => c.json(sendersView()));
+  app.put("/api/mail/senders", validate("json", SenderPutSchema), (c) => {
+    const { value, override, origin } = c.req.valid("json");
+    // revisão do M3: a extensão pode mandar o próprio endereço (a última mensagem aberta era a resposta da pessoa)
+    const own = readGmailToken(deps.dataDir)?.email?.toLowerCase();
+    if (own && value === own)
+      return apiError(
+        c,
+        422,
+        "own_address",
+        "Esse é o seu próprio endereço; abra um e-mail recebido e tente de novo",
+      );
+    if (value.startsWith("@") && isWebmail(value.slice(1)))
+      return apiError(
+        c,
+        422,
+        "webmail_domain",
+        "Domínio de webmail só entra por endereço (confiar no domínio liberaria qualquer pessoa)",
+      );
+    const sender = deps.repos.mailSenders.setOverride(
+      value,
+      override,
+      origin,
+      new Date().toISOString(),
+    );
+    const quarantined =
+      override === "trusted" ? deps.repos.mail.bySender(value, "quarantine").length : 0;
+    return c.json({ sender, quarantined, ...sendersView() });
+  });
+  app.delete("/api/mail/senders/:value", (c) => {
+    const value = c.req.param("value").toLowerCase();
+    deps.repos.mailSenders.setOverride(value, null, null, new Date().toISOString());
+    return c.json(sendersView());
+  });
+  app.post("/api/mail/senders/:value/reprocess", async (c) => {
+    const value = c.req.param("value").toLowerCase();
+    const msgs = deps.repos.mail.bySender(value, "quarantine");
+    const at = new Date().toISOString();
+    // volta para a avaliação; se sair da quarentena, a tarefa agendada tira a etiqueta de suspeito do Gmail
+    for (const m of msgs) deps.repos.mail.reset(m.id, at);
+    if (msgs.length) await runSyncNow();
+    return c.json({ reprocessed: msgs.length });
+  });
+  // extensão: "processar este e-mail agora" (o id da mensagem aberta no Gmail web)
+  app.post("/api/mail/process", validate("json", ProcessSchema), async (c) => {
+    const { gmailId } = c.req.valid("json");
+    const known = deps.repos.mail.byGmailId(gmailId);
+    if (known) return c.json({ status: "known", mail: { id: known.id, status: known.status } });
+    const list = deps.repos.settings.get<string[]>(MAIL_FORCE_KEY) ?? [];
+    if (!list.includes(gmailId)) deps.repos.settings.set(MAIL_FORCE_KEY, [...list, gmailId]);
+    await runSyncNow();
+    return c.json({ status: "queued" }, 202);
+  });
   app.put("/api/mail/settings", validate("json", MailSettingsSchema), (c) => {
     const since = new Date(c.req.valid("json").since);
     const now = Date.now();

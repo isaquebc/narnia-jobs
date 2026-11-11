@@ -130,6 +130,68 @@ export async function disconnect(
   };
 }
 
+export type MailActionResult = { ok: true; message: string } | { ok: false; message: string };
+
+/**
+ * F14/M3 · botões do Gmail web: confiar ou bloquear o remetente e processar o e-mail aberto. O narnia recebe só o
+ * endereço e o id da mensagem.
+ */
+export async function sendMailAction(
+  fetch: Fetch,
+  instance: string,
+  token: string,
+  action: { kind: "trust" | "block"; sender: string } | { kind: "process"; messageId: string },
+): Promise<MailActionResult> {
+  const [path, body] =
+    action.kind === "process"
+      ? ["/api/mail/process", { gmailId: action.messageId }]
+      : [
+          "/api/mail/senders",
+          {
+            value: action.sender,
+            override: action.kind === "trust" ? "trusted" : "blocked",
+            origin: "extension",
+          },
+        ];
+  let res: Response;
+  try {
+    res = await fetch(`${instance}${path}`, {
+      method: action.kind === "process" ? "POST" : "PUT",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, message: offlineMessage(instance) };
+  }
+  if (res.status === 401)
+    return {
+      ok: false,
+      message: "Este navegador foi desconectado no narnia. Abra as opções e pareie de novo.",
+    };
+  const data = (await res.json().catch(() => ({}))) as {
+    status?: string;
+    quarantined?: number;
+    error?: { message?: string };
+  };
+  if (!res.ok)
+    return { ok: false, message: data.error?.message ?? `O narnia respondeu ${res.status}.` };
+  if (action.kind === "process")
+    return {
+      ok: true,
+      message:
+        data.status === "known"
+          ? "Este e-mail já foi lido pelo narnia."
+          : "O narnia vai ler este e-mail agora.",
+    };
+  if (action.kind === "block") return { ok: true, message: `${action.sender} bloqueado.` };
+  return {
+    ok: true,
+    message: data.quarantined
+      ? `${action.sender} agora é confiável. ${data.quarantined} e-mail(s) dele estão em quarentena: avalie de novo em Configurações › Gmail.`
+      : `${action.sender} agora é confiável.`,
+  };
+}
+
 /** Entrada da janela popup (F12/M2): o token do dispositivo vira o cookie da web e o narnia redireciona para `next`. */
 export function enterUrl(instance: string, token: string, next: string): string {
   return `${instance}/api/extension/enter?device=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
