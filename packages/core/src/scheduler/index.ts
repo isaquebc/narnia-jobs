@@ -10,6 +10,7 @@ import {
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { jobApplicationUrl } from "../job-applications/tools";
+import { applyMailApplications, syncMailReviewNotification } from "../mail/applications";
 import { digestMail, type MailClassifier, syncDigestLabels } from "../mail/digest";
 import { archiveStaleFeed, markAutoAnalyses } from "../mail/feed";
 import { openMailPostingLinks } from "../mail/postings";
@@ -137,6 +138,9 @@ async function mailSync(ctx: ScheduledContext) {
     ctx,
     classify: ctx.services.classifyMail ?? null,
   });
+  // M5: confirmações e negativas viram candidaturas (ou encerram), com a data e a hora do e-mail
+  await applyMailApplications({ repos: ctx.repos, dataDir: ctx.dataDir, ctx });
+  await syncMailReviewNotification(ctx.repos, ctx.publish);
   // etiqueta e lido antes dos links (que podem levar minutos), para o Gmail refletir logo o que foi processado
   if (source) await syncDigestLabels({ repos: ctx.repos, source, ctx });
   if (ctx.services.enqueuePostingExtract)

@@ -208,6 +208,29 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, details);
 }
 
+/** F14/M5 · item da caixa de revisão ou da quarentena. */
+export interface MailReviewItem {
+  id: string;
+  gmailId: string;
+  status: string;
+  class: string | null;
+  from: string | null;
+  fromAddr: string | null;
+  subject: string | null;
+  receivedAt: string;
+  riskLevel: string | null;
+  riskReasons: string[];
+  summary: string | null;
+  reason: string | null;
+  company: string | null;
+  title: string | null;
+  mailUrl: string;
+  /** Vaga que o narnia achou, quando falta só a confirmação da pessoa. */
+  suggestedPosting: { id: string; title: string | null; company: string | null } | null;
+  /** Remetente sem confiança: a ação automática espera "Aplicar mesmo assim". */
+  needsConfirm: boolean;
+}
+
 /** F14-6, F14-7, F14-10: configurações do feed. */
 export interface FeedSettingsView {
   preanalysisCut: number;
@@ -927,6 +950,14 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<GmailStatusView>("/api/integrations/gmail", { method: "DELETE" }),
     getMailSettings: () => request<MailSettingsView>("/api/mail/settings"),
     listMailSenders: () => request<MailSendersView>("/api/mail/senders"),
+    getMailReview: () =>
+      request<{ review: MailReviewItem[]; quarantine: MailReviewItem[] }>("/api/mail/review"),
+    ignoreMail: (id: string) =>
+      request<MailReviewItem>(`/api/mail/${encodeURIComponent(id)}/ignore`, json({})),
+    applyMail: (id: string, body: { postingId: string } | { confirm: true }) =>
+      request<{ status: string }>(`/api/mail/${encodeURIComponent(id)}/apply`, json(body)),
+    processQuarantinedMail: (id: string) =>
+      request<{ status: string }>(`/api/mail/${encodeURIComponent(id)}/process`, json({})),
     putMailSender: (body: { value: string; override: "trusted" | "blocked" }) =>
       request<MailSendersView & { quarantined: number }>("/api/mail/senders", {
         method: "PUT",

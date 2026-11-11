@@ -101,7 +101,7 @@ describe("F07/M1 · aplicar", () => {
 
     // regerar o CV depois não muda o que foi enviado
     r.documents.addVersion(cv.documentId, versionInput);
-    expect(r.jobApplications.get(app.id)?.cv.version).toBe(1);
+    expect(r.jobApplications.get(app.id)?.cv?.version).toBe(1);
   });
 
   it("CV é obrigatório e precisa estar pronto e ser desta vaga ou o geral; carta de outra vaga não vale", () => {
@@ -174,7 +174,7 @@ describe("F07/M1 · aplicar", () => {
     ).toBe("duplicate_pending");
     // o CV geral do perfil vale
     const app = applyToPosting(r, { ...input, cvVersionId: geral.versionIds[0] as string });
-    expect(app.cv.scope).toBe("profile");
+    expect(app.cv?.scope).toBe("profile");
   });
 
   it("uma candidatura ativa por vaga; encerrada ou arquivada deixa aplicar de novo", () => {

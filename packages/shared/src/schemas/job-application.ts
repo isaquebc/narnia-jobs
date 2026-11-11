@@ -56,7 +56,8 @@ export const JobApplicationSchema = z.object({
   id: IdSchema,
   postingId: IdSchema,
   profileId: IdSchema.nullable(),
-  cv: LockedDocumentSchema,
+  /** F14-15: a candidatura vinda de e-mail pode não ter o CV do narnia (feita fora dele). */
+  cv: LockedDocumentSchema.nullable(),
   coverLetter: LockedDocumentSchema.nullable(),
   appliedOn: CalendarDateSchema,
   column: JobApplicationColumnSchema,
@@ -72,6 +73,17 @@ export const JobApplicationSchema = z.object({
   archivedAt: IsoDateTimeSchema.nullable(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
+  /** F14 · de onde veio: o botão Aplicar (`manual`) ou um e-mail de confirmação/negativa (`email`). */
+  source: z.enum(["manual", "email"]).default("manual"),
+  /** F14-15 · CV gerado para a vaga ligado sem a pessoa confirmar que foi o enviado. */
+  cvPresumed: z.boolean().default(false),
+  /** F14-5 · perfil ainda a escolher (o modelo escolhe pela análise da vaga, ou a pessoa). */
+  profilePending: z.boolean().default(false),
+  /** F14 · e-mail de origem. */
+  sourceRef: z
+    .object({ gmailId: z.string(), mailUrl: z.string().nullable() })
+    .nullable()
+    .default(null),
 });
 export type JobApplication = z.infer<typeof JobApplicationSchema>;
 

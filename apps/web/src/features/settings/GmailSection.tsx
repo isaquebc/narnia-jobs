@@ -1,5 +1,6 @@
 import type { GmailStatusView } from "@narnia-jobs/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useState } from "react";
 import { useApi, useWs } from "../../app/context";
 import { Alert } from "../../components/ui/alert";
@@ -76,6 +77,11 @@ export function GmailSection() {
       {s?.status === "connected" ? <MailWindow /> : null}
       {s?.status === "connected" ? <MailFeedSettings /> : null}
       {s && s.status !== "not_configured" ? <MailSenders /> : null}
+      {s && s.status !== "not_configured" ? (
+        <Link to="/emails" className="text-sm underline">
+          {t("integrations.gmail.reviewLink")}
+        </Link>
+      ) : null}
       {s?.status === "needs_reconnect" ? (
         <Alert tone="warn">{t("integrations.gmail.needsReconnect")}</Alert>
       ) : null}

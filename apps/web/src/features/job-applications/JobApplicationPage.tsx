@@ -150,7 +150,34 @@ export function JobApplicationPage({ id }: { id: string }) {
         </p>
       ) : null}
       <Card className="flex flex-col gap-2">
-        <LockedDoc label={t("jobApplications.detail.cv")} doc={a.cv} />
+        {a.cv ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <LockedDoc label={t("jobApplications.detail.cv")} doc={a.cv} />
+            {a.cvPresumed ? (
+              <Badge tone="warn">{t("jobApplications.fromMail.cvPresumed")}</Badge>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-fg">{t("jobApplications.fromMail.noCv")}</p>
+        )}
+        {a.source === "email" ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-fg">
+            {t("jobApplications.fromMail.badge")}
+            {a.sourceRef?.mailUrl ? (
+              <a
+                href={a.sourceRef.mailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                {t("jobApplications.fromMail.open")}
+              </a>
+            ) : null}
+            {a.profilePending ? (
+              <Badge tone="warn">{t("jobApplications.fromMail.profilePending")}</Badge>
+            ) : null}
+          </p>
+        ) : null}
         {a.coverLetter ? (
           <LockedDoc label={t("jobApplications.detail.letter")} doc={a.coverLetter} letter />
         ) : (

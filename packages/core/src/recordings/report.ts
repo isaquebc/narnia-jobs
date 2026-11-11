@@ -131,7 +131,7 @@ export function buildInterviewBrief(
   const keyOf = new Map(a.persons.map((p) => [p.id, p.key]));
   const app = rec.jobApplicationId ? repos.jobApplications.get(rec.jobApplicationId) : null;
   const posting = app ? repos.postings.get(app.postingId) : null;
-  const cv = app ? repos.documents.versionById(app.cv.versionId) : null;
+  const cv = app?.cv ? repos.documents.versionById(app.cv.versionId) : null;
   const profile = repos.profiles.get(rec.profileId);
   const stage = app?.stages.find((s) => s.id === rec.stageId)?.name ?? null;
   const previous = (

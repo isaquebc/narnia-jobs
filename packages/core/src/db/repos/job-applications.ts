@@ -15,10 +15,26 @@ export const ARCHIVE_AFTER_DAYS = 40;
 export interface JobApplicationCreateRecord {
   postingId: string;
   profileId: string | null;
-  cvVersionId: string;
+  /** F14-15: null na candidatura vinda de e-mail sem CV do narnia. */
+  cvVersionId: string | null;
   coverLetterVersionId: string | null;
   appliedOn: string;
   stages: string[];
+  /** F14: candidatura vinda de e-mail. */
+  source?: "manual" | "email";
+  cvPresumed?: boolean;
+  profilePending?: boolean;
+  sourceRef?: { gmailId: string; mailUrl: string | null } | null;
+  /** F14: instante da passagem para Aplicado (o do e-mail); sem ele, o de agora. */
+  appliedAt?: string;
+  mailMessageId?: string | null;
+}
+
+/** F14: a passagem de coluna com o instante do e-mail (a atividade continua sendo agora). */
+export interface MoveOrigin {
+  at: string;
+  source: "email";
+  mailMessageId: string | null;
 }
 
 export interface JobApplicationUpdate {
@@ -42,7 +58,11 @@ export interface JobApplicationsRepo {
   /** A não encerrada e não arquivada desta vaga (F07-9). */
   activeForPosting(postingId: string): JobApplication | null;
   /** Encerrar pede o motivo (F07-6); sair de Encerrado limpa o motivo. */
-  update(id: string, patch: JobApplicationUpdate, now?: Date): JobApplication;
+  update(id: string, patch: JobApplicationUpdate, now?: Date, origin?: MoveOrigin): JobApplication;
+  /** F14-5: perfil escolhido (pelo modelo na análise da vaga, ou pela pessoa); limpa o "a escolher". */
+  setProfile(id: string, profileId: string | null, now?: Date): JobApplication;
+  /** F14-15: liga a versão do CV (a pessoa confirma ou troca o presumido). */
+  setCv(id: string, cvVersionId: string | null, presumed: boolean, now?: Date): JobApplication;
   /**
    * Troca o pipeline pela lista em ordem (F07/M2): as que trazem `id` ficam com ele, as sem id nascem, as que faltam
    * saem. A etapa atual continua se ficou; se saiu, passa para a que ficou na mesma posição (ou a última).
@@ -104,7 +124,7 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
     id: String(r.id),
     postingId: String(r.posting_id),
     profileId: r.profile_id === null ? null : String(r.profile_id),
-    cv: locked(db, String(r.cv_version_id)) as LockedDocument,
+    cv: r.cv_version_id === null ? null : (locked(db, String(r.cv_version_id)) as LockedDocument),
     coverLetter: locked(db, r.cover_letter_version_id as string | null),
     appliedOn: String(r.applied_on),
     column: String(r.board_column) as JobApplicationColumn,
@@ -121,6 +141,10 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
     archivedAt: r.archived_at === null ? null : String(r.archived_at),
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
+    source: (r.source as "manual" | "email" | undefined) ?? "manual",
+    cvPresumed: r.cv_presumed === 1,
+    profilePending: r.profile_pending === 1,
+    sourceRef: r.source_ref_json ? JSON.parse(String(r.source_ref_json)) : null,
   });
 
   const move = (
@@ -128,12 +152,14 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
     from: JobApplicationColumn | null,
     to: JobApplicationColumn,
     at: string,
+    origin?: { source: "email"; mailMessageId: string | null },
   ) =>
     db
       .prepare(
-        "insert into job_application_move (id, job_application_id, from_column, to_column, at) values (?, ?, ?, ?, ?)",
+        `insert into job_application_move (id, job_application_id, from_column, to_column, at, source, mail_message_id)
+         values (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(newId(), id, from, to, at);
+      .run(newId(), id, from, to, at, origin?.source ?? "manual", origin?.mailMessageId ?? null);
 
   const get = (id: string) => {
     const r = db.prepare("select * from job_application where id = ?").get(id) as Row | undefined;
@@ -152,7 +178,8 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
       withTransaction(db, () => {
         db.prepare(
           `insert into job_application (id, posting_id, profile_id, cv_version_id, cover_letter_version_id, applied_on,
-             last_activity_at, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             last_activity_at, created_at, updated_at, source, cv_presumed, profile_pending, source_ref_json)
+           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           id,
           input.postingId,
@@ -163,6 +190,10 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
           at,
           at,
           at,
+          input.source ?? "manual",
+          input.cvPresumed ? 1 : 0,
+          input.profilePending ? 1 : 0,
+          input.sourceRef ? JSON.stringify(input.sourceRef) : null,
         );
         const ins = db.prepare(
           "insert into job_application_stage (id, job_application_id, name, position, created_at) values (?, ?, ?, ?, ?)",
@@ -174,7 +205,15 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
           ins.run(sid, id, name, i + 1, at);
         });
         db.prepare("update job_application set current_stage_id = ? where id = ?").run(first, id);
-        move(id, null, "applied", at);
+        move(
+          id,
+          null,
+          "applied",
+          input.appliedAt ?? at,
+          input.source === "email"
+            ? { source: "email", mailMessageId: input.mailMessageId ?? null }
+            : undefined,
+        );
       });
       return must(id);
     },
@@ -211,7 +250,21 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
         .get(postingId) as Row | undefined;
       return r ? map(r) : null;
     },
-    update(id, patch, now = new Date()) {
+    setProfile(id, profileId, now = new Date()) {
+      const at = now.toISOString();
+      db.prepare(
+        "update job_application set profile_id = ?, profile_pending = 0, updated_at = ? where id = ?",
+      ).run(profileId, at, id);
+      return must(id);
+    },
+    setCv(id, cvVersionId, presumed, now = new Date()) {
+      const at = now.toISOString();
+      db.prepare(
+        "update job_application set cv_version_id = ?, cv_presumed = ?, updated_at = ? where id = ?",
+      ).run(cvVersionId, presumed ? 1 : 0, at, id);
+      return must(id);
+    },
+    update(id, patch, now = new Date(), origin) {
       const cur = must(id);
       const column = patch.column ?? cur.column;
       const reason =
@@ -235,7 +288,16 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
       const entry = keep(patch.closedEntryId, cur.closedEntryId);
       const at = now.toISOString();
       const archivedAt = patch.archived === true ? (cur.archivedAt ?? at) : null;
-      if (column !== cur.column) move(id, cur.column, column, at);
+      // F14: com origem de e-mail, a passagem leva o instante do e-mail; a atividade continua sendo agora (uma data
+      // antiga em last_activity_at arquivaria a candidatura na rodada seguinte)
+      if (column !== cur.column)
+        move(
+          id,
+          cur.column,
+          column,
+          origin?.at ?? at,
+          origin ? { source: origin.source, mailMessageId: origin.mailMessageId } : undefined,
+        );
       db.prepare(
         `update job_application set board_column = ?, closed_reason = ?, closed_stage = ?, closed_entry_id = ?,
            applied_on = ?, archived_at = ?, last_activity_at = ?, updated_at = ? where id = ?`,

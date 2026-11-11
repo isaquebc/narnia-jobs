@@ -225,6 +225,107 @@ export function gmailRoutes(deps: {
     if (msgs.length) await runSyncNow();
     return c.json({ reprocessed: msgs.length });
   });
+  // F14/M5 · caixa de revisão (F14-11) e quarentena (F14-14)
+  const reviewItem = (m: NonNullable<ReturnType<typeof deps.repos.mail.get>>) => {
+    const r = (m.result ?? {}) as {
+      summary?: string;
+      review?: string;
+      company?: string | null;
+      title?: string | null;
+      suggestedPostingId?: string;
+      needsConfirm?: boolean;
+    };
+    const suggested = r.suggestedPostingId ? deps.repos.postings.get(r.suggestedPostingId) : null;
+    return {
+      id: m.id,
+      gmailId: m.gmailId,
+      status: m.status,
+      class: m.class,
+      from: m.fromName ? `${m.fromName} <${m.fromAddr ?? ""}>` : m.fromAddr,
+      fromAddr: m.fromAddr,
+      subject: m.subject,
+      receivedAt: m.receivedAt,
+      riskLevel: m.riskLevel,
+      riskReasons: m.riskReasons,
+      summary: r.summary ?? null,
+      reason: r.review ?? m.error ?? null,
+      company: r.company ?? null,
+      title: r.title ?? null,
+      mailUrl: `https://mail.google.com/mail/u/0/#all/${m.gmailId}`,
+      needsConfirm: r.needsConfirm === true,
+      suggestedPosting: suggested
+        ? { id: suggested.id, title: suggested.title, company: suggested.company }
+        : null,
+    };
+  };
+  app.get("/api/mail/review", (c) =>
+    c.json({
+      review: deps.repos.mail.listByStatus(["review"], 200).map(reviewItem),
+      quarantine: deps.repos.mail.listByStatus(["quarantine"], 200).map(reviewItem),
+    }),
+  );
+  app.post("/api/mail/:id/ignore", (c) => {
+    const m = deps.repos.mail.get(c.req.param("id"));
+    if (!m || (m.status !== "review" && m.status !== "quarantine"))
+      return apiError(c, 404, "not_found", "E-mail não está na revisão");
+    deps.repos.mail.setStatus(m.id, "ignored", new Date().toISOString());
+    // ignorar a quarentena confirma a suspeita: o remetente desce na confiabilidade
+    if (m.status === "quarantine" && m.fromAddr)
+      deps.repos.mailSenders.bump(m.fromAddr, "rejected", new Date().toISOString());
+    return c.json(reviewItem(deps.repos.mail.get(m.id) as typeof m));
+  });
+  // a vaga escolhida, ou "aplicar mesmo assim" (remetente sem confiança: a pessoa confirma a ligação automática)
+  const ApplySchema = z
+    .object({ postingId: z.string().min(1).optional(), confirm: z.literal(true).optional() })
+    .refine((b) => !!b.postingId !== !!b.confirm, "Informe a vaga ou confirme");
+  app.post("/api/mail/:id/apply", validate("json", ApplySchema), async (c) => {
+    const m = deps.repos.mail.get(c.req.param("id"));
+    if (!m || m.status !== "review")
+      return apiError(c, 404, "not_found", "E-mail não está na revisão");
+    const { postingId, confirm } = c.req.valid("json");
+    if (postingId) {
+      const p = deps.repos.postings.get(postingId);
+      if (!p) return apiError(c, 404, "posting_not_found", "Vaga não encontrada");
+      if (p.archivedAt) return apiError(c, 422, "posting_archived", "Vaga arquivada");
+    }
+    if (m.class !== "application_received" && m.class !== "rejection")
+      return apiError(
+        c,
+        422,
+        "not_applicable",
+        "Só candidatura recebida e negativa se ligam a uma vaga",
+      );
+    deps.repos.mail.setPendingWith(
+      m.id,
+      {
+        ...(m.result ?? {}),
+        ...(postingId ? { forcedPostingId: postingId } : { confirmed: confirm }),
+      },
+      new Date().toISOString(),
+    );
+    if (m.fromAddr) deps.repos.mailSenders.bump(m.fromAddr, "ok", new Date().toISOString());
+    await runSyncNow();
+    return c.json({ status: "queued" }, 202);
+  });
+  app.post("/api/mail/:id/process", async (c) => {
+    const m = deps.repos.mail.get(c.req.param("id"));
+    if (!m || m.status !== "quarantine")
+      return apiError(c, 404, "not_found", "E-mail não está na quarentena");
+    // "processar mesmo assim": a pessoa assume o risco deste e-mail (a etiqueta de suspeito sai na próxima leitura)
+    deps.repos.mail.setAssessment(
+      m.id,
+      {
+        status: "pending",
+        class: "unknown",
+        riskLevel: "neutral",
+        riskReasons: [...m.riskReasons, "liberado por você na quarentena"],
+      },
+      new Date().toISOString(),
+    );
+    await runSyncNow();
+    return c.json({ status: "queued" }, 202);
+  });
+
   // extensão: "processar este e-mail agora" (o id da mensagem aberta no Gmail web)
   app.post("/api/mail/process", validate("json", ProcessSchema), async (c) => {
     const { gmailId } = c.req.valid("json");

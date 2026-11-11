@@ -52,6 +52,7 @@ export const INFORMATIONAL_KINDS: readonly NotificationKind[] = [
   "ingestion.done",
   "posting.analysis_done",
   "document.ready",
+  "mail.application_closed",
 ];
 export const INFORMATIONAL_TTL_DAYS = 7;
 

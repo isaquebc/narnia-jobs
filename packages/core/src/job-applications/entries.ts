@@ -7,6 +7,7 @@ import {
   type JobApplicationEntryPatch,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
+import { type MoveOrigin, withTransaction } from "../db";
 import { newId } from "../ids";
 import { removeApplicationRecordingFiles } from "../recordings";
 import { JobApplicationError, notAfterToday } from "./index";
@@ -150,6 +151,8 @@ export function rejectJobApplication(
   applicationId: string,
   input: { occurredOn: string; message: string; stageId: string | null },
   now = new Date(),
+  /** F14: negativa vinda de e-mail (a passagem leva o instante dele). */
+  origin?: MoveOrigin,
 ): JobApplication {
   const app = repos.jobApplications.get(applicationId);
   if (!app) throw new JobApplicationError("not_found", "Candidatura não encontrada");
@@ -161,21 +164,25 @@ export function rejectJobApplication(
   if (stage === undefined)
     throw new JobApplicationError("stage_not_found", "Etapa não encontrada no processo");
   notAfterToday(input.occurredOn, now);
-  const entry = addJobApplicationEntry(
-    repos,
-    dataDir,
-    applicationId,
-    { occurredOn: input.occurredOn, body: message, files: [] },
-    now,
-  );
-  return repos.jobApplications.update(
-    applicationId,
-    {
-      column: "closed",
-      closedReason: "rejected",
-      closedStage: stage?.name ?? null,
-      closedEntryId: entry.id,
-    },
-    now,
-  );
+  // F14/M5 (defeito 5 de §2.0.4): nota e encerramento juntos; se o encerramento falha, a nota não fica
+  return withTransaction(repos.db, () => {
+    const entry = addJobApplicationEntry(
+      repos,
+      dataDir,
+      applicationId,
+      { occurredOn: input.occurredOn, body: message, files: [] },
+      now,
+    );
+    return repos.jobApplications.update(
+      applicationId,
+      {
+        column: "closed",
+        closedReason: "rejected",
+        closedStage: stage?.name ?? null,
+        closedEntryId: entry.id,
+      },
+      now,
+      origin,
+    );
+  });
 }

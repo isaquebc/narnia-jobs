@@ -14,7 +14,37 @@ export function openDatabase(path: string): Db {
   return db;
 }
 
+/** Transações abertas por conexão: uma chamada dentro de outra vira savepoint na de fora (F14/M5: negativa que grava nota). */
+const depth = new WeakMap<Db, number>();
+
 export function withTransaction<T>(db: Db, fn: () => T): T {
+  const d = depth.get(db) ?? 0;
+  if (d > 0) {
+    // dentro de outra: savepoint, para que um erro capturado por quem chama desfaça só esta parte
+    const name = `narnia_sp_${d}`;
+    depth.set(db, d + 1);
+    db.exec(`savepoint ${name}`);
+    try {
+      const result = fn();
+      db.exec(`release ${name}`);
+      return result;
+    } catch (e) {
+      db.exec(`rollback to ${name}`);
+      db.exec(`release ${name}`);
+      throw e;
+    } finally {
+      depth.set(db, d);
+    }
+  }
+  depth.set(db, 1);
+  try {
+    return outer(db, fn);
+  } finally {
+    depth.set(db, 0);
+  }
+}
+
+function outer<T>(db: Db, fn: () => T): T {
   db.exec("begin immediate");
   try {
     const result = fn();

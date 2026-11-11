@@ -45,6 +45,13 @@ export const ptBR = {
     processes: "Processos",
   },
   jobApplications: {
+    fromMail: {
+      badge: "Candidatura registrada por e-mail.",
+      open: "Abrir o e-mail no Gmail",
+      noCv: "CV enviado não registrado: a candidatura veio de um e-mail e foi feita fora do narnia.",
+      cvPresumed: "CV presumido (gerado para esta vaga)",
+      profilePending: "Perfil a escolher",
+    },
     savedColumn: "Vagas salvas",
     savedOn: "Salva em {date}",
     title: "Candidaturas",
@@ -215,6 +222,7 @@ export const ptBR = {
   },
   integrations: {
     gmail: {
+      reviewLink: "E-mails para revisar e quarentena",
       title: "Gmail (opcional)",
       hint: "Lê os e-mails de vagas e de candidaturas: alertas viram vagas no feed, confirmações e negativas atualizam as candidaturas. Cada e-mail lido ganha a etiqueta narnia-jobs e fica marcado como lido. O narnia nunca envia nem apaga e-mails.",
       status: {
@@ -919,6 +927,8 @@ export const ptBR = {
       document_review_failed: "Currículos e cartas que não passaram na revisão",
       search_index_full: "Fatos acima do contexto do recrutador",
       mail_reconnect: "Gmail desconectado",
+      mail_application_closed: "Negativas recebidas por e-mail",
+      mail_review: "E-mails para revisar",
     },
   },
   ingestion: {
@@ -1877,6 +1887,37 @@ export const ptBR = {
       code: '"Código inválido ou vencido": gere um código novo em Configurações; cada código vale uma vez, por 10 minutos.',
       warning:
         "O Chrome pode mostrar um aviso sobre extensões no modo do desenvolvedor ao abrir. É esperado para extensões instaladas fora da Chrome Web Store.",
+    },
+  },
+  mailReview: {
+    title: "E-mails para revisar",
+    hint: "E-mails que o narnia não conseguiu ligar a uma vaga com segurança e os que ficaram em quarentena por parecerem suspeitos. Nada aqui mudou suas candidaturas.",
+    review: "Revisão",
+    quarantine: "Quarentena",
+    quarantineHint:
+      "No Gmail estes e-mails têm a etiqueta narnia-jobs/suspeito e continuam não lidos. O narnia não abriu links nem anexos deles.",
+    empty: "Nada aqui.",
+    noSubject: "(sem assunto)",
+    reason: "Motivo: {reason}",
+    riskReasons: "Por que ficou em quarentena",
+    openGmail: "Abrir no Gmail",
+    pickPosting: "Escolher a vaga",
+    applySuggested: "Aplicar a {posting}",
+    applyAnyway: "Aplicar mesmo assim",
+    searchPosting: "Buscar a vaga (empresa ou cargo)",
+    trustAndProcess: "Confiar no remetente e processar",
+    processAnyway: "Processar mesmo assim",
+    ignore: "Ignorar",
+    class: {
+      job_alert: "Alerta de vagas",
+      application_received: "Candidatura recebida",
+      rejection: "Negativa",
+      update: "Atualização",
+      interview_invite: "Convite de entrevista",
+      recruiter_contact: "Contato de recrutador",
+      not_job: "Fora do assunto",
+      candidate: "Para análise",
+      unknown: "Sem classe",
     },
   },
   postings: {

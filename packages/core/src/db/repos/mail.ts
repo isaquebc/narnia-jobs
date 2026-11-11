@@ -77,7 +77,7 @@ export interface MailRepo {
   ): void;
   /** Em quarentena e ainda sem a etiqueta `narnia-jobs/suspeito` no Gmail. */
   quarantineToSync(limit: number): MailMessageRecord[];
-  /** Com a etiqueta de suspeito no Gmail, mas fora da quarentena (reprocessado): a etiqueta sai. */
+  /** Com a etiqueta de suspeito no Gmail, mas fora da quarentena (reprocessado): a etiqueta sai; ignorado na quarentena a mantém. */
   suspectToRemove(limit: number): MailMessageRecord[];
   setSuspectLabel(ids: string[], on: boolean, at: string): void;
   setGmailSynced(ids: string[], synced: boolean, at: string): void;
@@ -85,6 +85,8 @@ export interface MailRepo {
   bySender(value: string, status: MailStatus): MailMessageRecord[];
   /** Volta para o começo do processamento (avaliar de novo). */
   reset(id: string, at: string): void;
+  /** Revisão: guarda o que a pessoa decidiu (vaga escolhida) e devolve o e-mail à fila da classe dele. */
+  setPendingWith(id: string, result: Record<string, unknown>, at: string): void;
   /** Avaliados e à espera do modelo ou do leitor por código (M4), do mais antigo para o mais novo. */
   toDigest(limit: number): MailMessageRecord[];
   setResult(
@@ -101,6 +103,10 @@ export interface MailRepo {
   digestToSync(limit: number): MailMessageRecord[];
   /** Por classe e estado (M5 e M6 pegam as candidaturas, negativas, atualizações e convites). */
   byClass(cls: string, status: MailStatus, limit: number): MailMessageRecord[];
+  /** Várias classes juntas, do mais antigo para o mais novo (a ordem entre elas importa: §2.2). */
+  byClasses(classes: string[], status: MailStatus, limit: number): MailMessageRecord[];
+  /** Caixa de revisão e quarentena (F14-11, F14-14): os mais novos primeiro. */
+  listByStatus(statuses: MailStatus[], limit: number): MailMessageRecord[];
 }
 
 interface Row {
@@ -256,7 +262,7 @@ export function mailRepo(db: Db): MailRepo {
     suspectToRemove(limit) {
       return (
         q(
-          "select * from mail_message where status != 'quarantine' and suspect_label = 1 order by received_at limit ?",
+          "select * from mail_message where status not in ('quarantine', 'ignored') and suspect_label = 1 order by received_at limit ?",
         ).all(limit) as unknown as Row[]
       ).map(map);
     },
@@ -321,6 +327,29 @@ export function mailRepo(db: Db): MailRepo {
           "select * from mail_message where class = ? and status = ? order by received_at, rowid limit ?",
         ).all(cls, status, limit) as unknown as Row[]
       ).map(map);
+    },
+    byClasses(classes, status, limit) {
+      if (!classes.length) return [];
+      return (
+        q(
+          `select * from mail_message where status = ? and class in (${classes.map(() => "?").join(",")})
+           order by received_at, rowid limit ?`,
+        ).all(status, ...classes, limit) as unknown as Row[]
+      ).map(map);
+    },
+    listByStatus(statuses, limit) {
+      if (!statuses.length) return [];
+      return (
+        q(
+          `select * from mail_message where status in (${statuses.map(() => "?").join(",")})
+           order by received_at desc, rowid desc limit ?`,
+        ).all(...statuses, limit) as unknown as Row[]
+      ).map(map);
+    },
+    setPendingWith(id, result, at) {
+      q(
+        "update mail_message set status = 'pending', result_json = ?, error = null, updated_at = ? where id = ?",
+      ).run(JSON.stringify(result), at, id);
     },
     reset(id, at) {
       q(

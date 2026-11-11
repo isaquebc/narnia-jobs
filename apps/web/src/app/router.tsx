@@ -379,6 +379,16 @@ const processesRoute = createRoute({
   path: "/processos",
   component: ProcessesPage,
 });
+// F14/M5 · e-mails para revisar (caixa de revisão e quarentena)
+const MailReviewPage = lazyRouteComponent(
+  () => import("../features/mail/MailReviewPage"),
+  "MailReviewPage",
+);
+const mailReviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/emails",
+  component: MailReviewPage,
+});
 const ExtensionInstallPage = lazyRouteComponent(
   () => import("../features/extension/ExtensionInstallPage"),
   "ExtensionInstallPage",
@@ -433,6 +443,7 @@ const routeTree = rootRoute.addChildren([
   extensionRoute,
   captureRoute,
   processesRoute,
+  mailReviewRoute,
   postingsRoute,
   postingRoute,
   jobApplicationsRoute,

@@ -150,7 +150,9 @@ export function createJobApplicationTools(
     "job_application.get": wrap("job_application.get", (i) => {
       const a = must(i.id);
       const doc = (d: JobApplication["cv"], label: string) =>
-        `${label} ${d.scope === "posting" ? "desta vaga" : "geral do perfil"} · versão ${d.version}`;
+        d
+          ? `${label} ${d.scope === "posting" ? "desta vaga" : "geral do perfil"} · versão ${d.version}${a.cvPresumed && label === "CV" ? " (presumido)" : ""}`
+          : `${label} enviado não registrado (candidatura vinda de e-mail)`;
       return {
         id: a.id,
         postingId: a.postingId,

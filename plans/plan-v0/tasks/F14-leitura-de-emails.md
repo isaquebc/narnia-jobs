@@ -305,3 +305,18 @@ Script descartável (container `node:22-bookworm-slim`, porta 8189 da instância
 - **Arquivamento do feed (F14-9)**: tarefa `postings.feed_archive` (24 h) arquiva numa só instrução as vagas do e-mail sem interação há 30 dias e sem candidatura (`archive_auto = 'stale'`). Interação: abrir a página (`POST /api/postings/:id/seen`), editar, nota, contato, análise pedida, candidatar, ações pelo chat.
 - **Tela**: aba "Feed do e-mail" na página de vagas (selos nova, origem e plataforma, match, link não abriu); "Feed de vagas" em Configurações › Gmail (corte, teto, links por execução); textos das tarefas novas.
 - **Revisão independente:** 15 pontos, todos tratados. Ficam: e-mails sem leitor esperam se a execução não tiver modelo (no worker sempre tem); a contagem `seenCount` (M3).
+
+### M5 · execução (2026-11-11)
+- **Regressão primeiro:** RT-C1 (uma linha de `job_application_move` por criar, mover, encerrar e reabrir, com o instante), RT-C2 (o Aplicar continua exigindo CV pronto e uma ativa por vaga); RT-C3, RT-C4 e RT-C7 seguem nos testes de F07 sem mudança. **Defeito 5** corrigido: nota e encerramento da negativa numa transação; `withTransaction` aninhada vira savepoint.
+- **Migração 0044** (reconstrói `job_application` com `-- narnia: foreign-keys-off`): `cv_version_id` opcional (F14-15), `source` (`manual`/`email`), `cv_presumed`, `profile_pending`, `source_ref_json`; `job_application_move` ganha `source` e `mail_message_id`. A passagem de coluna leva o instante do e-mail; `last_activity_at` fica no agora (não arquiva na rodada seguinte).
+- **Candidatura recebida e negativa** (`mail/applications.ts`, dentro do `mail.sync`, do mais antigo para o mais novo): vaga pelo link canônico → empresa e cargo → candidatura ativa da empresa; na dúvida, revisão. Confirmação → candidatura nova com o instante do e-mail (vaga criada se não existir, fora do feed) ou nota na existente; negativa → encerra com o instante e a nota com o link do Gmail, notificação informativa. Perfil (F14-5): CV gerado para a vaga (última versão pronta, CV presumido) → carta gerada → perfil recomendado pela análise → único perfil → a escolher (a análise da vaga define, pedida só com remetente confiável). Cartão da candidatura: selos "veio do e-mail", "CV presumido" e "CV enviado não registrado".
+- **Caixa de revisão e quarentena** (`/emails`, link no cartão do Gmail e notificação agrupada `mail.review`): motivo, resumo, abrir no Gmail; escolher a vaga, aplicar à vaga sugerida, aplicar mesmo assim, ignorar; na quarentena, os motivos do risco, confiar no remetente (reavalia o risco dos e-mails dele) e processar mesmo assim.
+- **Revisão independente (12 pontos):** tratados 1 a 7 e 9 a 12.
+  - Remetente sem confiança (`neutral`, §2.7) não cria nem encerra candidatura sozinho: revisão com "aplicar mesmo assim"; nota em candidatura existente passa.
+  - Cada e-mail numa transação, avisos depois do commit.
+  - Candidatura arquivada recebe a negativa (sem duplicar); encerrada só ganha a nota; confirmação de candidatura encerrada depois do e-mail vira nota.
+  - Ordem: nada mais novo que o e-mail mais antigo ainda sem classe é aplicado.
+  - Negativa sem vaga salva ou sem candidatura → revisão (nunca cria vaga e candidatura para encerrar).
+  - "Confiar" reavalia em vez de liberar; ignorar a quarentena mantém `narnia-jobs/suspeito`.
+  - Nota no fuso da pessoa; campos de controle da revisão saem do resultado; vaga arquivada não é escolhida.
+  - **Fica para o M7 (ponto 8):** tela para trocar o perfil, ligar uma versão de CV ou anexar o arquivo enviado na candidatura vinda de e-mail (hoje o perfil a escolher se resolve pela análise da vaga). O CV presumido prende o documento como qualquer candidatura (não dá para apagar o CV ligado).

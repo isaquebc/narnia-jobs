@@ -32,6 +32,10 @@ export const NOTIFICATION_KINDS = [
   "search.index_full",
   /** F14: o Google recusou o acesso ao Gmail (login expirou ou foi revogado): conectar de novo em Configurações. */
   "mail.reconnect",
+  /** F14/M5: uma negativa chegou por e-mail e encerrou a candidatura. Informativa. */
+  "mail.application_closed",
+  /** F14/M5: e-mails na caixa de revisão (agrupada). */
+  "mail.review",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

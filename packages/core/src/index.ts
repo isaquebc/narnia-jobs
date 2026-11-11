@@ -73,6 +73,7 @@ export * from "./job-applications";
 export * from "./jobs/concurrency";
 export * from "./jobs/tasks";
 export * from "./mail/alerts";
+export * from "./mail/applications";
 export * from "./mail/connection";
 export * from "./mail/digest";
 export * from "./mail/domains";

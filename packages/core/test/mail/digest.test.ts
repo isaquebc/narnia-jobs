@@ -185,7 +185,7 @@ describe("F14/M4 · processamento dos e-mails", () => {
     expect(repos.postings.feed()).toHaveLength(1);
   });
 
-  it("e-mail sem leitor: o modelo classifica; alerta vira vaga; fora do assunto fica intocado; negativa fica para o M5", async () => {
+  it("e-mail sem leitor: o modelo classifica; alerta vira vaga; fora do assunto fica intocado; negativa sem candidatura vai para a revisão", async () => {
     add(
       "generico",
       {
@@ -253,8 +253,9 @@ describe("F14/M4 · processamento dos e-mails", () => {
       gmailSynced: false,
     });
     expect(state.messages.find((m) => m.id === "curso")?.labelIds).toEqual(["INBOX", "UNREAD"]);
+    // M5: negativa da Acme sem candidatura e sem cargo não liga a nada com segurança → revisão
     expect(repos.mail.byGmailId("nao")).toMatchObject({
-      status: "pending",
+      status: "review",
       class: "rejection",
       gmailSynced: false,
     });

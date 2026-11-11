@@ -518,6 +518,12 @@ export function createPostingTools(
         usage: null,
         chatSessionId: s?.id ?? null,
       });
+      // F14-5: candidatura vinda de e-mail com o perfil a escolher fica com o perfil que o modelo recomendou
+      const app =
+        repos.jobApplications.activeForPosting(p.id) ??
+        repos.jobApplications.latestForPosting(p.id);
+      if (app?.profilePending)
+        repos.jobApplications.setProfile(app.id, analysis.recommendedProfileId);
       ctx.ports.changed?.(p.id);
       // a pendência "não concluída" desta conversa, se houver, se resolve
       const resolved = s

@@ -5,6 +5,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GmailSection } from "../../src/features/settings/GmailSection";
 import { renderWithProviders } from "../helpers";
 
+// o cartão só usa o Link do roteador para "E-mails para revisar"; aqui basta um <a>
+vi.mock("@tanstack/react-router", async (orig) => ({
+  ...(await orig<typeof import("@tanstack/react-router")>()),
+  Link: ({ to, children, ...p }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...p}>
+      {children}
+    </a>
+  ),
+}));
+
 /**
  * F14/M1 · Configurações › Gmail: sem cliente, o formulário com o endereço de retorno (o segredo vai como senha e
  * some depois de salvar); com cliente, conectar abre o login numa aba nova; conectado mostra a conta e desconecta
