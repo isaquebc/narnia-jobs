@@ -7,6 +7,7 @@ import {
   type PostingModelKey,
   recordDuplicateCheck,
   recordUsage,
+  refreshMatchScore,
   resolveModel,
   usageFromSdkResult,
 } from "@narnia-jobs/core";
@@ -74,6 +75,8 @@ export const postingExtract: TaskHandler = async (data, ctx, deps) => {
       duplicate = { candidateId: check.candidateId, confidence: check.confidence };
     }
     repos.postings.setStatus(id, "ready");
+    // F14/M4: vaga vinda de e-mail ganha o score de match com a pré-análise refeita (ordena o feed)
+    if (posting.source === "email") refreshMatchScore(repos, id);
     await deps.publish({ type: "posting.updated", postingId: id });
     return { postingId: id, duplicate };
   } catch (e) {

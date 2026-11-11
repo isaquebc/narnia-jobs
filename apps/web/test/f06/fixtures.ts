@@ -76,6 +76,14 @@ export function posting(id: string, partial: Partial<Posting> = {}): Posting {
     archivedAt: null,
     archiveReason: null,
     archiveNote: null,
+    source: "manual",
+    sourceRef: null,
+    linkStatus: null,
+    feedState: null,
+    matchScore: null,
+    archiveAuto: null,
+    lastInteractionAt: null,
+    autoAnalysisAt: null,
     ...partial,
   };
 }

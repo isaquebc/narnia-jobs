@@ -42,6 +42,18 @@ export function usePostings(query = "", archived = false) {
   return { ...q, postings: q.data?.postings ?? [] };
 }
 
+/** F14: feed das vagas vindas de e-mail (pelo match); recarrega com as mesmas mudanças das vagas. */
+export function useFeed(enabled = true) {
+  const api = useApi();
+  usePostingEvents();
+  const q = useQuery({
+    queryKey: [...postingKeys.all, "feed"],
+    queryFn: () => api.listFeed(),
+    enabled,
+  });
+  return { ...q, postings: q.data?.postings ?? [] };
+}
+
 export function usePosting(id: string) {
   const api = useApi();
   usePostingEvents();

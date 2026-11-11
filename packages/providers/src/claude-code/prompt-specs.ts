@@ -5,6 +5,7 @@ import {
   CV_OUTPUT_JSON_SCHEMAS,
   EXTRACTION_JSON_SCHEMAS,
   INGEST_OUTPUT_JSON_SCHEMAS,
+  MAIL_OUTPUT_JSON_SCHEMAS,
   POSTING_OUTPUT_JSON_SCHEMAS,
   RECORDING_OUTPUT_JSON_SCHEMAS,
   toJsonSchema,
@@ -23,6 +24,7 @@ import type {
   ExtractFactsInput,
   InterviewFramesInput,
   InterviewReportInput,
+  MailClassifyInput,
   PickFilesInput,
   PostingDuplicateInput,
   PostingExtractInput,
@@ -159,6 +161,17 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
     userTemplate: "<mensagem>\n{{message}}\n</mensagem>",
     defaultModel: "haiku",
     jsonSchema: CHAT_OUTPUT_JSON_SCHEMAS.chatTitle,
+    tools: [],
+  }),
+  mailClassify: spec("mailClassify", {
+    name: "narnia-mail-classify",
+    description:
+      "F14: tipo do e-mail de vagas (alerta, candidatura, negativa, atualização, convite) e os dados dele.",
+    file: FILE("mail-classify"),
+    userTemplate:
+      "<email>\nDe: {{from}}\nAssunto: {{subject}}\nData: {{date}}\n\n{{text}}\n</email>\n\n<links>\n{{links}}\n</links>",
+    defaultModel: "haiku",
+    jsonSchema: MAIL_OUTPUT_JSON_SCHEMAS.mailClassify,
     tools: [],
   }),
   postingExtract: spec("postingExtract", {
@@ -324,6 +337,13 @@ export const structuredPromptVars = {
   checkProposals: (i: CheckProposalsInput) => ({ items_json: JSON.stringify(i.items, null, 1) }),
   chatTitle: (i: ChatTitleInput) => ({ message: i.message }),
   postingExtract: (i: PostingExtractInput) => ({ text: i.text }),
+  mailClassify: (i: MailClassifyInput) => ({
+    from: i.from,
+    subject: i.subject,
+    date: i.date,
+    text: i.text,
+    links: i.links.join("\n"),
+  }),
   postingMerge: (i: PostingMergeInput) => ({
     text: i.text,
     heuristic_json: JSON.stringify(i.heuristic, null, 1),

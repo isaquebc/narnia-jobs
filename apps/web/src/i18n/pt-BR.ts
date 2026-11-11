@@ -254,6 +254,13 @@ export const ptBR = {
       totals: "{total} e-mail(s) lidos, {pending} aguardando processamento.",
       extend: "Ler mais para trás",
       runs: "Ver as execuções em Processos › Tarefas agendadas",
+      feed: {
+        title: "Feed de vagas",
+        preanalysisCut: "Pré-análise automática a partir do match",
+        preanalysisDailyCap: "Pré-análises automáticas por dia",
+        linksPerRun: "Links abertos por execução",
+        save: "Salvar",
+      },
       senders: {
         title: "Remetentes",
         hint: "Confiáveis passam direto quando a autenticação do e-mail confere; bloqueados vão sempre para a quarentena (etiqueta narnia-jobs/suspeito, não lidos). Use um endereço ou @domínio; domínio de webmail só por endereço.",
@@ -447,6 +454,14 @@ export const ptBR = {
         name: "Limpeza das capturas da extensão",
         hint: "Apaga as páginas capturadas pela extensão que não viraram vaga nem formulário em 30 dias.",
       },
+      postings_auto_analyze: {
+        name: "Pré-análise automática do feed",
+        hint: "Pede a pré-análise das vagas do feed com match acima do corte, até o teto do dia (Configurações › Gmail).",
+      },
+      postings_feed_archive: {
+        name: "Arquivamento do feed",
+        hint: "Arquiva as vagas do feed sem interação há 30 dias (fora da calibração do fit).",
+      },
       mail_sync: {
         name: "Leitura do Gmail",
         hint: "Baixa os e-mails novos de vagas e de candidaturas. Configure a conta em Configurações › Gmail.",
@@ -466,6 +481,11 @@ export const ptBR = {
       assessed: "avaliado(s)",
       quarantined: "em quarentena",
       ignored: "fora do assunto",
+      digested: "processado(s)",
+      postings: "vaga(s) nova(s)",
+      links_opened: "link(s) aberto(s)",
+      links_failed: "link(s) que não abriram",
+      requested: "pré-análise(s) pedida(s)",
     },
     last: "Última execução",
     next: "Próxima",
@@ -1860,6 +1880,16 @@ export const ptBR = {
     },
   },
   postings: {
+    tabs: { all: "Todas", feed: "Feed do e-mail" },
+    feed: {
+      hint: "Vagas que chegaram nos alertas do Gmail, da maior compatibilidade para a menor. As de match alto ganham a pré-análise sozinhas (Configurações › Gmail).",
+      empty: "Nenhuma vaga do e-mail ainda. Conecte o Gmail em Configurações.",
+      new: "Nova",
+      fromMail: "do e-mail",
+      fromMailPlatform: "do e-mail · {platform}",
+      match: "match {n}",
+      linkFailed: "link não abriu",
+    },
     applied: "Aplicada · {column}",
     appliedArchived: "Aplicada · candidatura arquivada",
     showArchived: "Ver arquivadas",

@@ -80,11 +80,15 @@ export function postingsRoutes(deps: {
 
   // busca por texto (empresa, cliente, cargo, role, contatos); sem `q`, todas
   // F07: cada vaga com a candidatura dela (destaque das aplicadas); arquivadas só com `archived=1`
+  // F14: `feed=1` = as vagas vindas de e-mail não arquivadas, pelo match (o resto da lista não muda, RT-V7)
   app.get("/api/postings", (c) =>
     c.json({
-      postings: searchPostings(repos, c.req.query("q") ?? "", {
-        archived: c.req.query("archived") === "1",
-      }).map((p) => ({ ...p, application: postingApplicationRef(repos, p.id) })),
+      postings: (c.req.query("feed") === "1"
+        ? repos.postings.feed()
+        : searchPostings(repos, c.req.query("q") ?? "", {
+            archived: c.req.query("archived") === "1",
+          })
+      ).map((p) => ({ ...p, application: postingApplicationRef(repos, p.id) })),
     }),
   );
 
@@ -203,11 +207,22 @@ export function postingsRoutes(deps: {
     });
   });
 
+  // F14-9 (revisão do M4): a página da vaga avisa que a pessoa abriu (interação e fim do "nova" no feed); o GET não
+  // grava nada, para um refetch ou uma aba esquecida não contar como interação
+  app.post("/api/postings/:id/seen", (c) => {
+    const p = repos.postings.get(c.req.param("id"));
+    if (!p) return notFound(c);
+    repos.postings.touchInteraction(p.id);
+    if (p.feedState === "new") repos.postings.setFeedState(p.id, "seen");
+    return c.body(null, 204);
+  });
+
   app.patch("/api/postings/:id", validate("json", PostingPatchSchema), (c) => {
     const id = c.req.param("id");
     if (!repos.postings.get(id)) return notFound(c);
     const patch = c.req.valid("json");
     let posting = repos.postings.update(id, patch, { source: "user" });
+    repos.postings.touchInteraction(id);
     // JD editada pelo usuário: a heurística refaz a pré-análise na hora (sem tokens); a extração é sob pedido
     if (patch.jdText !== undefined && posting.jdText) {
       repos.postings.setPreAnalysis(
@@ -243,6 +258,7 @@ export function postingsRoutes(deps: {
   app.post("/api/postings/:id/contacts", validate("json", PostingContactInputSchema), (c) => {
     const id = c.req.param("id");
     if (!repos.postings.get(id)) return notFound(c);
+    repos.postings.touchInteraction(id);
     const input = c.req.valid("json");
     const dup = repos.postingContacts.findDuplicate(id, input);
     if (dup) return duplicateContact(c, dup.name);
@@ -303,6 +319,7 @@ export function postingsRoutes(deps: {
   app.post("/api/postings/:id/notes", validate("json", PostingNoteInputSchema), (c) => {
     const id = c.req.param("id");
     if (!repos.postings.get(id)) return notFound(c);
+    repos.postings.touchInteraction(id);
     const note = repos.postingNotes.add(id, "user", c.req.valid("json").body);
     touched(id);
     return c.json({ note }, 201);

@@ -30,7 +30,7 @@ function capture() {
 }
 
 describe("registro dos prompts estruturados", () => {
-  it("21 operações (F06: + 3 da vaga; F05: CV, carta e revisão; F12: perguntas, respostas e roleplay do formulário e motivações do perfil; F13: quadros e relatório da entrevista gravada), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
+  it("22 operações (F14: classificação do e-mail; F06: + 3 da vaga; F05: CV, carta e revisão; F12: perguntas, respostas e roleplay do formulário e motivações do perfil; F13: quadros e relatório da entrevista gravada), nome narnia-*, system do arquivo, modelo padrão, schema e template sem sobra", () => {
     const ops = Object.keys(STRUCTURED_PROMPTS).sort();
     expect(ops).toEqual(
       [
@@ -48,6 +48,7 @@ describe("registro dos prompts estruturados", () => {
         "extractFacts",
         "interviewFrames",
         "interviewReport",
+        "mailClassify",
         "pickFiles",
         "postingDuplicate",
         "postingExtract",

@@ -18,6 +18,7 @@ import type {
   FormField,
   InterviewFramesOutput,
   InterviewReportDraft,
+  MailClassifyOutput,
   PickFilesOutput,
   PlanUsage,
   PostingDuplicateOutput,
@@ -142,6 +143,16 @@ export interface CheckProposalsInput {
 /** Título da conversa (2026-10-13): primeira mensagem do usuário, modelo mais barato. */
 export interface ChatTitleInput {
   message: string;
+  model: string;
+}
+
+/** F14/M4: e-mail de vagas para classificar e extrair (o texto já vem limitado e sem HTML). */
+export interface MailClassifyInput {
+  from: string;
+  subject: string;
+  date: string;
+  text: string;
+  links: string[];
   model: string;
 }
 
@@ -290,6 +301,8 @@ export interface Provider {
   chatTitle(input: ChatTitleInput): Promise<ProviderResult<ChatTitleOutput>>;
   /** F06: extração da vaga (Haiku), merge com a heurística (Haiku) e comparação de duplicata (Haiku). */
   postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>>;
+  /** F14/M4: tipo do e-mail de vagas e os dados dele (Haiku, sem tools). */
+  mailClassify(input: MailClassifyInput): Promise<ProviderResult<MailClassifyOutput>>;
   postingMerge(input: PostingMergeInput): Promise<ProviderResult<PostingMergeOutput>>;
   postingDuplicate(input: PostingDuplicateInput): Promise<ProviderResult<PostingDuplicateOutput>>;
   /** F12/M3: organiza os campos do formulário de candidatura em perguntas (Haiku). */

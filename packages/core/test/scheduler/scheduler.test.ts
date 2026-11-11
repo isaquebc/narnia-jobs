@@ -51,16 +51,20 @@ describe("F14/M1 · agendador", () => {
     const tasks = listScheduledTasks(repos);
     expect(tasks.map((t) => t.id)).toEqual([
       "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
       "captures.prune",
       "job_applications.archive",
     ]);
-    const prune = tasks[1];
+    const prune = tasks.find((t) => t.id === "captures.prune");
     expect(prune?.intervalMinutes).toBe(SCHEDULED_TASKS["captures.prune"].defaultIntervalMinutes);
     expect(prune?.paused).toBe(false);
     expect(prune?.lastRun).toBeNull();
     expect(prune?.nextRunAt).toBeNull();
     expect(dueScheduledTasks(repos, T0)).toEqual([
       "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
       "captures.prune",
       "job_applications.archive",
     ]);
@@ -73,7 +77,12 @@ describe("F14/M1 · agendador", () => {
     expect(task?.lastRun?.id).toBe(r.id);
     expect(task?.lastRun?.trigger).toBe("schedule");
     expect(task?.nextRunAt).toBe(plus(24 * 60).toISOString());
-    expect(dueScheduledTasks(repos, plus(60))).toEqual(["mail.sync", "job_applications.archive"]);
+    expect(dueScheduledTasks(repos, plus(60))).toEqual([
+      "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
+      "job_applications.archive",
+    ]);
     expect(dueScheduledTasks(repos, plus(24 * 60))).toContain("captures.prune");
     expect(
       events
@@ -98,7 +107,12 @@ describe("F14/M1 · agendador", () => {
     );
     expect(t.intervalMinutes).toBe(min);
     expect(t.paused).toBe(true);
-    expect(dueScheduledTasks(repos, T0)).toEqual(["mail.sync", "job_applications.archive"]);
+    expect(dueScheduledTasks(repos, T0)).toEqual([
+      "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
+      "job_applications.archive",
+    ]);
     updateScheduledTask(repos, "captures.prune", { paused: false }, T0);
     expect(dueScheduledTasks(repos, T0)).toContain("captures.prune");
   });
@@ -133,7 +147,12 @@ describe("F14/M1 · agendador", () => {
       at: T0.toISOString(),
     });
     expect(listScheduledTasks(repos).find((t) => t.id === "captures.prune")?.running).toBe(true);
-    expect(dueScheduledTasks(repos, T0)).toEqual(["mail.sync", "job_applications.archive"]);
+    expect(dueScheduledTasks(repos, T0)).toEqual([
+      "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
+      "job_applications.archive",
+    ]);
     const again = await run("captures.prune", T0, "manual");
     expect(again.skipped).toBe(true);
     repos.scheduled.finishRun(id, {

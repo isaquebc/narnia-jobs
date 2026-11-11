@@ -62,13 +62,31 @@ describe("F14/M1 · agendador no worker", () => {
   it("o laço enfileira cada tarefa devida na fila scheduled, com a chave da tarefa", async () => {
     h = harness();
     const due = await enqueueDueScheduledTasks(h.deps, new Date("2026-11-11T12:00:00Z"));
-    expect(due).toEqual(["mail.sync", "captures.prune", "job_applications.archive"]);
+    expect(due).toEqual([
+      "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
+      "captures.prune",
+      "job_applications.archive",
+    ]);
     expect(h.enqueued).toEqual([
       {
         queue: "scheduled",
         type: "scheduled.run",
         key: "mail.sync",
         payload: { taskId: "mail.sync", trigger: "schedule" },
+      },
+      {
+        queue: "scheduled",
+        type: "scheduled.run",
+        key: "postings.auto_analyze",
+        payload: { taskId: "postings.auto_analyze", trigger: "schedule" },
+      },
+      {
+        queue: "scheduled",
+        type: "scheduled.run",
+        key: "postings.feed_archive",
+        payload: { taskId: "postings.feed_archive", trigger: "schedule" },
       },
       {
         queue: "scheduled",
@@ -102,6 +120,8 @@ describe("F14/M1 · agendador no worker", () => {
     expect(h.events.map((e) => e.type)).toEqual(["scheduled_run.updated", "scheduled_run.updated"]);
     expect(await enqueueDueScheduledTasks(h.deps)).toEqual([
       "mail.sync",
+      "postings.auto_analyze",
+      "postings.feed_archive",
       "job_applications.archive",
     ]);
   });

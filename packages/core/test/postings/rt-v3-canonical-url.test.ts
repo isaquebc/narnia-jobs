@@ -31,3 +31,28 @@ describe("F14 · RT-V3 · mesma vaga pelo link", () => {
     expect(samePostingUrl(a, b)).toBe(false);
   });
 });
+
+describe("F14/M4 · links do LinkedIn vindos de e-mail", () => {
+  it.each([
+    [
+      "https://www.linkedin.com/comm/jobs/view/4012345678/?trackingId=abc%3D%3D&refId=x&midToken=AQ&midSig=1&trk=eml&eid=9&otpToken=z",
+      "https://www.linkedin.com/jobs/view/4012345678/",
+    ],
+    [
+      "https://br.linkedin.com/jobs/view/desenvolvedor-backend-at-acme-4012345678",
+      "https://www.linkedin.com/jobs/view/4012345678",
+    ],
+    ["https://www.vagas.example/job/1", "https://vagas.example/job/1"],
+  ])("%s = %s", (a, b) => {
+    expect(samePostingUrl(a, b)).toBe(true);
+  });
+
+  it("vagas diferentes do LinkedIn continuam diferentes", () => {
+    expect(
+      samePostingUrl(
+        "https://www.linkedin.com/jobs/view/4012345678/",
+        "https://www.linkedin.com/jobs/view/4099999999/",
+      ),
+    ).toBe(false);
+  });
+});

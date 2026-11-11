@@ -176,6 +176,8 @@ export function chatRoutes(deps: { repos: Repos; sessions: SessionManager }) {
   // F06 §1.1: conversa própria da análise da vaga (título da vaga, categoria job), já com o pedido de análise
   app.post("/api/postings/:id/analyze", (c) => {
     try {
+      // F14-9: análise pedida pela pessoa é interação (a automática não conta)
+      if (repos.postings.get(c.req.param("id"))) repos.postings.touchInteraction(c.req.param("id"));
       return c.json({ session: sessions.openPostingAnalysis(c.req.param("id")) }, 201);
     } catch (e) {
       return sessionError(c, e);

@@ -208,6 +208,13 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, details);
 }
 
+/** F14-6, F14-7, F14-10: configurações do feed. */
+export interface FeedSettingsView {
+  preanalysisCut: number;
+  preanalysisDailyCap: number;
+  linksPerRun: number;
+}
+
 export function createApiClient(opts: ApiClientOptions = {}) {
   const doFetch = opts.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const base = opts.baseUrl ?? "";
@@ -683,11 +690,22 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       const s = qs.toString();
       return request<{ postings: PostingListItem[] }>(`/api/postings${s ? `?${s}` : ""}`);
     },
+    /** F14: feed das vagas vindas de e-mail (não arquivadas, pelo match). */
+    listFeed: () => request<{ postings: PostingListItem[] }>("/api/postings?feed=1"),
+    getFeedSettings: () => request<FeedSettingsView>("/api/mail/feed-settings"),
+    putFeedSettings: (patch: Partial<FeedSettingsView>) =>
+      request<FeedSettingsView>("/api/mail/feed-settings", {
+        method: "PUT",
+        body: JSON.stringify(patch),
+      }),
     archivePosting: (id: string, body: PostingArchiveRequest) =>
       request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}/archive`, json(body)),
     unarchivePosting: (id: string) =>
       request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}/unarchive`, json({})),
     getPosting: (id: string) => request<PostingDetail>(`/api/postings/${encodeURIComponent(id)}`),
+    /** F14-9: a página da vaga foi aberta (interação; tira o "nova" do feed). */
+    markPostingSeen: (id: string) =>
+      request<void>(`/api/postings/${encodeURIComponent(id)}/seen`, json({})),
     intakePosting: (body: { text?: string; url?: string; fields?: PostingPatch }) =>
       request<{ posting: Posting; job: Job | null }>("/api/postings/intake", json(body)),
     patchPosting: (id: string, patch: PostingPatch) =>

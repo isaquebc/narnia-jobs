@@ -41,6 +41,12 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
     resposta: OUTPUT,
   },
   postingDuplicate: { salva: "input.saved_json", nova: "input.incoming_json", resposta: OUTPUT },
+  mailClassify: {
+    email: "input.text",
+    assunto: "input.subject",
+    remetente: "input.from",
+    resposta: OUTPUT,
+  },
   applicationLocate: { pagina: "input.page_json", campos: "input.fields_json", resposta: OUTPUT },
   applicationAnswer: {
     resumo: "input.brief_json",

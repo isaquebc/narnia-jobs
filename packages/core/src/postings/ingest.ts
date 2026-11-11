@@ -13,7 +13,7 @@ import {
   type PreAnalysisKeyword,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
-import { samePostingUrl } from "../extension/captures";
+import { canonicalUrl } from "./canonical";
 import { canonicalTerm } from "./dictionary";
 import { normalizeIdentityPart } from "./identity";
 import { buildPreAnalysis, matchKeywords, postingRisks } from "./match";
@@ -80,6 +80,8 @@ export function applyPostingMerge(
   const sources: Partial<Record<PostingFieldName, FieldSource>> = {};
   for (const f of POSTING_FIELD_NAMES) {
     if (f === "jdText" || current.fieldSources[f] === "user") continue;
+    // F14 (revisão do M4): o link que veio do e-mail é a chave da vaga no feed; o modelo não troca
+    if (f === "postingUrl" && current.fieldSources.postingUrl === "email") continue;
     const v = (merge.fields as Partial<PostingFields>)[f];
     if (!filled(v)) continue;
     (patch as Record<string, unknown>)[f] = v;
@@ -149,15 +151,9 @@ export function refreshPreAnalysis(
  * rastreio), que pega a vaga com o cargo escrito de outro jeito, e depois o mesmo hash de identidade.
  */
 export function duplicatePostings(repos: Repos, p: Posting): Posting[] {
-  const byUrl = p.postingUrl
-    ? repos.postings
-        .list()
-        .filter(
-          (o) =>
-            o.id !== p.id && o.postingUrl && samePostingUrl(o.postingUrl, p.postingUrl as string),
-        )
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    : [];
+  // F14 (revisão do M4): pelo link canônico em SQL, sem o teto de 500 do `list()`
+  const canonical = p.postingUrl ? canonicalUrl(p.postingUrl) : null;
+  const byUrl = canonical ? repos.postings.findByCanonicalUrl(canonical, p.id) : [];
   const byIdentity = p.identityHash ? repos.postings.findByIdentity(p.identityHash, p.id) : [];
   const seen = new Set<string>();
   return [...byUrl, ...byIdentity].filter((o) => !seen.has(o.id) && seen.add(o.id));
@@ -238,13 +234,39 @@ export function decideDuplicate(
     }
     repos.postings.update(savedId, patch, { sources });
     if (incoming.preAnalysis) repos.postings.setPreAnalysis(savedId, incoming.preAnalysis);
-    for (const c of repos.postingContacts.list(postingId))
-      repos.postingContacts.add(savedId, {
+    // F14/M4 (defeito 4 de §2.0.4): leva o contato inteiro (LinkedIn, papel, data, resumo) e não repete quem a vaga
+    // salva já tem (mesmo e-mail ou LinkedIn); a indicação ("quem indicou") é religada pelo nome depois
+    const moved = new Map<string, string>();
+    const incomingContacts = repos.postingContacts.list(postingId);
+    for (const c of incomingContacts) {
+      const dup = repos.postingContacts.findDuplicate(savedId, {
+        name: c.name,
+        email: c.email,
+        linkedinUrl: c.linkedinUrl,
+      });
+      if (dup) {
+        moved.set(c.id, dup.id);
+        continue;
+      }
+      const added = repos.postingContacts.add(savedId, {
         name: c.name,
         origin: c.origin,
         email: c.email,
         phone: c.phone,
+        linkedinUrl: c.linkedinUrl,
+        role: c.role,
+        contactedOn: c.contactedOn,
+        summary: c.summary,
       });
+      moved.set(c.id, added.id);
+    }
+    for (const c of incomingContacts) {
+      const to = moved.get(c.id);
+      const by = c.referredById ? moved.get(c.referredById) : undefined;
+      // não sobrescreve a indicação que o contato já tinha na vaga salva
+      if (to && by && !repos.postingContacts.list(savedId).find((x) => x.id === to)?.referredById)
+        repos.postingContacts.update(to, { referredById: by });
+    }
     for (const n of repos.postingNotes.list(postingId))
       repos.postingNotes.add(savedId, n.author, n.body);
   }

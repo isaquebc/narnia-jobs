@@ -9,7 +9,8 @@ import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Field } from "../../components/ui/field";
 import { Input, Textarea } from "../../components/ui/input";
-import { usePostings } from "../../hooks/usePostings";
+import { TabPanel, Tabs } from "../../components/ui/tabs";
+import { useFeed, usePostings } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { ApiError } from "../../lib/api";
 import { formatDate } from "../../lib/format";
@@ -61,6 +62,24 @@ function PostingCard({ p }: { p: PostingListItem }) {
                 reason: t(`postings.archiveReason.${p.archiveReason}` as TKey),
               })}
             </Badge>
+          ) : null}
+          {p.source === "email" ? (
+            <span className="flex flex-wrap gap-1 self-start">
+              {p.feedState === "new" ? <Badge tone="info">{t("postings.feed.new")}</Badge> : null}
+              <Badge tone="neutral">
+                {p.sourceRef?.platform
+                  ? t("postings.feed.fromMailPlatform", { platform: p.sourceRef.platform })
+                  : t("postings.feed.fromMail")}
+              </Badge>
+              {p.matchScore !== null ? (
+                <Badge tone={p.matchScore >= 70 ? "ok" : "neutral"}>
+                  {t("postings.feed.match", { n: p.matchScore })}
+                </Badge>
+              ) : null}
+              {p.linkStatus === "failed" ? (
+                <Badge tone="warn">{t("postings.feed.linkFailed")}</Badge>
+              ) : null}
+            </span>
           ) : null}
           {p.client ? <p className="text-sm text-muted-fg">{p.client}</p> : null}
           <p className="text-sm">
@@ -148,7 +167,49 @@ function useDebounced(value: string, ms = 250): string {
  * cliente, cargo, role ou contato; correção de 2026-10-15) e a entrada de uma nova. F07: as aplicadas em destaque e as
  * arquivadas à parte ("Ver arquivadas").
  */
+function FeedList() {
+  const { postings, isLoading } = useFeed();
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-fg">{t("postings.feed.hint")}</p>
+      {!isLoading && postings.length === 0 ? (
+        <p className="text-sm text-muted-fg">{t("postings.feed.empty")}</p>
+      ) : (
+        <ul
+          aria-label={t("postings.tabs.feed")}
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {postings.map((p) => (
+            <PostingCard key={p.id} p={p} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function PostingsPage() {
+  const [tab, setTab] = useState("all");
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={setTab}
+      items={[
+        { value: "all", label: t("postings.tabs.all") },
+        { value: "feed", label: t("postings.tabs.feed") },
+      ]}
+    >
+      <TabPanel value="all">
+        <AllPostings />
+      </TabPanel>
+      <TabPanel value="feed">
+        <FeedList />
+      </TabPanel>
+    </Tabs>
+  );
+}
+
+function AllPostings() {
   const [search, setSearch] = useState("");
   const [archived, setArchived] = useState(false);
   const query = useDebounced(search.trim());

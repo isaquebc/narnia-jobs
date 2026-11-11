@@ -39,6 +39,9 @@ import {
   InterviewFramesOutputSchema,
   type InterviewReportDraft,
   InterviewReportDraftSchema,
+  MAIL_OUTPUT_JSON_SCHEMAS,
+  type MailClassifyOutput,
+  MailClassifyOutputSchema,
   messageAttrs,
   type PickFilesOutput,
   PickFilesOutputSchema,
@@ -93,6 +96,7 @@ import {
   type InterviewReportInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
+  type MailClassifyInput,
   type PickFilesInput,
   type PostingDuplicateInput,
   type PostingExtractInput,
@@ -893,6 +897,17 @@ export class ClaudeCodeProvider implements Provider {
       CHAT_OUTPUT_JSON_SCHEMAS.chatTitle,
       ChatTitleOutputSchema,
       "chatTitle",
+    );
+  }
+
+  mailClassify(input: MailClassifyInput): Promise<ProviderResult<MailClassifyOutput>> {
+    return this.single(
+      renderStructuredPrompt("mailClassify", input),
+      input.model,
+      PROMPTS.mailClassify(),
+      MAIL_OUTPUT_JSON_SCHEMAS.mailClassify,
+      MailClassifyOutputSchema,
+      "mailClassify",
     );
   }
 

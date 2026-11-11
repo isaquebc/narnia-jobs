@@ -20,6 +20,7 @@ import {
   type PostingStatus,
 } from "@narnia-jobs/shared";
 import { newId } from "../../ids";
+import { canonicalUrl } from "../../postings/canonical";
 import { postingIdentityHash } from "../../postings/identity";
 import type { Db } from "../open";
 import { json, type Row } from "../sql";
@@ -99,6 +100,14 @@ function mapPosting(r: Row): Posting {
     archivedAt: r.archived_at ?? null,
     archiveReason: r.archive_reason ?? null,
     archiveNote: r.archive_note ?? null,
+    source: r.source ?? "manual",
+    sourceRef: json(r.source_ref_json, null),
+    linkStatus: r.link_status ?? null,
+    feedState: r.feed_state ?? null,
+    matchScore: r.match_score ?? null,
+    archiveAuto: r.archive_auto ?? null,
+    lastInteractionAt: r.last_interaction_at ?? null,
+    autoAnalysisAt: r.auto_analysis_at ?? null,
   });
 }
 
@@ -107,7 +116,7 @@ export interface PostingsRepo {
   create(input: PostingCreate, opts?: { source?: FieldSource; status?: PostingStatus }): Posting;
   get(id: string): Posting | null;
   /** Mais recentes primeiro. */
-  list(opts?: { limit?: number }): Posting[];
+  list(opts?: { limit?: number; archived?: boolean }): Posting[];
   /** Outras vagas com o mesmo hash de identidade (F06-9). */
   findByIdentity(hash: string, excludeId?: string): Posting[];
   /**
@@ -130,6 +139,39 @@ export interface PostingsRepo {
     now?: Date,
   ): void;
   remove(id: string): void;
+  /** F14 · origem da vaga vinda de e-mail (ou outra) e o estado do link e do feed. */
+  setOrigin(
+    id: string,
+    o: {
+      source: Posting["source"];
+      sourceRef?: Posting["sourceRef"];
+      linkStatus?: Posting["linkStatus"];
+      feedState?: Posting["feedState"];
+    },
+  ): void;
+  setLinkStatus(id: string, status: Posting["linkStatus"]): void;
+  setFeedState(id: string, state: Posting["feedState"]): void;
+  setMatchScore(id: string, score: number | null): void;
+  setCanonicalUrl(id: string, url: string | null): void;
+  /** Vagas com o mesmo link canônico (F14: duplicata por SQL, sem o teto de 500 do `list`). */
+  findByCanonicalUrl(url: string, excludeId?: string): Posting[];
+  /** Interação da pessoa (abrir, editar, analisar, candidatar, nota): a vaga não é arquivada por inatividade. */
+  touchInteraction(id: string, at?: string): void;
+  setArchiveAuto(id: string, auto: Posting["archiveAuto"], at?: string): void;
+  setAutoAnalysisAt(id: string, at: string | null): void;
+  /** Feed (F14): vagas vindas de e-mail não arquivadas, pelo match e depois pela data. */
+  feed(opts?: { limit?: number }): Posting[];
+  /** Vagas do e-mail com link ainda não tentado, das mais antigas (revisão do M4: consulta própria, sem teto do feed). */
+  linkPending(limit: number): Posting[];
+  /** Pré-análise automática pedida e ainda sem análise gravada (revisão do M4: SQL em vez de reler o feed). */
+  autoAnalysisPending(): Posting[];
+  /** Quantas pré-análises automáticas foram pedidas desde o instante (todas as vagas, arquivadas inclusive). */
+  autoAnalysesSince(iso: string): number;
+  /**
+   * Arquiva numa só instrução as vagas do e-mail sem interação desde `before` e sem candidatura (F14-9; revisão do M4:
+   * atômico, uma interação que chega no meio não é perdida). Devolve os ids.
+   */
+  archiveStale(before: string, at: string): string[];
 }
 
 export function postingsRepo(db: Db): PostingsRepo {
@@ -165,6 +207,10 @@ export function postingsRepo(db: Db): PostingsRepo {
       }
       cols.push("field_sources_json");
       values.push(JSON.stringify(sources));
+      if (input.postingUrl) {
+        cols.push("canonical_url");
+        values.push(canonicalUrl(input.postingUrl));
+      }
       db.prepare(
         `insert into posting (${cols.join(", ")}) values (${cols.map(() => "?").join(", ")})`,
       ).run(...(values as never[]));
@@ -175,8 +221,14 @@ export function postingsRepo(db: Db): PostingsRepo {
       return r ? mapPosting(r) : null;
     },
     list(opts = {}) {
+      const where =
+        opts.archived === undefined
+          ? ""
+          : opts.archived
+            ? "where archived_at is not null"
+            : "where archived_at is null";
       return (
-        q("select * from posting order by created_at desc, rowid desc limit ?").all(
+        q(`select * from posting ${where} order by created_at desc, rowid desc limit ?`).all(
           opts.limit ?? 500,
         ) as Row[]
       ).map(mapPosting);
@@ -211,6 +263,10 @@ export function postingsRepo(db: Db): PostingsRepo {
         sets.push("identity_hash = ?");
         values.push(postingIdentityHash(next));
       }
+      if ("postingUrl" in patch) {
+        sets.push("canonical_url = ?");
+        values.push(patch.postingUrl ? canonicalUrl(patch.postingUrl) : null);
+      }
       const now = nowUtc();
       sets.push("field_sources_json = ?", "updated_at = ?");
       values.push(JSON.stringify(sources), now);
@@ -243,7 +299,7 @@ export function postingsRepo(db: Db): PostingsRepo {
     },
     setArchived(id, archive, now = new Date()) {
       q(
-        "update posting set archived_at = ?, archive_reason = ?, archive_note = ? where id = ?",
+        "update posting set archived_at = ?, archive_reason = ?, archive_note = ?, archive_auto = null where id = ?",
       ).run(archive ? now.toISOString() : null, archive?.reason ?? null, archive?.note ?? null, id);
     },
     setDuplicate(id, check) {
@@ -254,6 +310,95 @@ export function postingsRepo(db: Db): PostingsRepo {
     },
     remove(id) {
       q("delete from posting where id = ?").run(id);
+    },
+    setOrigin(id, o) {
+      q(
+        `update posting set source = ?, source_ref_json = ?, link_status = coalesce(?, link_status),
+           feed_state = coalesce(?, feed_state) where id = ?`,
+      ).run(
+        o.source,
+        o.sourceRef ? JSON.stringify(o.sourceRef) : null,
+        o.linkStatus ?? null,
+        o.feedState ?? null,
+        id,
+      );
+    },
+    setLinkStatus(id, status) {
+      q("update posting set link_status = ? where id = ?").run(status, id);
+    },
+    setFeedState(id, state) {
+      q("update posting set feed_state = ? where id = ?").run(state, id);
+    },
+    setMatchScore(id, score) {
+      q("update posting set match_score = ? where id = ?").run(score, id);
+    },
+    setCanonicalUrl(id, url) {
+      q("update posting set canonical_url = ? where id = ?").run(url, id);
+    },
+    findByCanonicalUrl(url, excludeId) {
+      return (
+        q("select * from posting where canonical_url = ? and id <> ? order by created_at desc").all(
+          url,
+          excludeId ?? "",
+        ) as Row[]
+      ).map(mapPosting);
+    },
+    touchInteraction(id, at = nowUtc()) {
+      q("update posting set last_interaction_at = ? where id = ?").run(at, id);
+    },
+    setArchiveAuto(id, auto, at = nowUtc()) {
+      q("update posting set archive_auto = ?, archived_at = ? where id = ?").run(
+        auto,
+        auto ? at : null,
+        id,
+      );
+    },
+    setAutoAnalysisAt(id, at) {
+      q("update posting set auto_analysis_at = ? where id = ?").run(at, id);
+    },
+    linkPending(limit) {
+      return (
+        q(
+          `select * from posting where source = 'email' and link_status = 'none' and archived_at is null
+           order by created_at limit ?`,
+        ).all(limit) as Row[]
+      ).map(mapPosting);
+    },
+    autoAnalysisPending() {
+      return (
+        q(
+          `select * from posting p where p.auto_analysis_at is not null and p.archived_at is null
+             and not exists (select 1 from job_analysis a where a.posting_id = p.id)
+           order by p.auto_analysis_at`,
+        ).all() as Row[]
+      ).map(mapPosting);
+    },
+    autoAnalysesSince(iso) {
+      return Number(
+        (
+          q("select count(*) as n from posting where auto_analysis_at >= ?").get(iso) as {
+            n: number;
+          }
+        ).n,
+      );
+    },
+    archiveStale(before, at) {
+      const rows = q(
+        `update posting set archive_auto = 'stale', archived_at = ?
+         where source = 'email' and archived_at is null
+           and coalesce(last_interaction_at, created_at) < ?
+           and not exists (select 1 from job_application j where j.posting_id = posting.id)
+         returning id`,
+      ).all(at, before) as Array<{ id: string }>;
+      return rows.map((r) => r.id);
+    },
+    feed(opts = {}) {
+      return (
+        q(
+          `select * from posting where source = 'email' and archived_at is null
+           order by match_score is null, match_score desc, created_at desc limit ?`,
+        ).all(opts.limit ?? 500) as Row[]
+      ).map(mapPosting);
     },
   };
   return repo;

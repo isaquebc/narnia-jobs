@@ -8,6 +8,8 @@ import { IdSchema, IsoDateTimeSchema } from "./common";
  */
 export const SCHEDULED_TASK_IDS = [
   "mail.sync",
+  "postings.auto_analyze",
+  "postings.feed_archive",
   "captures.prune",
   "job_applications.archive",
 ] as const;

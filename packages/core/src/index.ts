@@ -74,8 +74,11 @@ export * from "./jobs/concurrency";
 export * from "./jobs/tasks";
 export * from "./mail/alerts";
 export * from "./mail/connection";
+export * from "./mail/digest";
 export * from "./mail/domains";
+export * from "./mail/feed";
 export * from "./mail/google-oauth";
+export * from "./mail/postings";
 export * from "./mail/prefilter";
 export * from "./mail/process";
 export * from "./mail/risk";
@@ -86,7 +89,20 @@ export * from "./models";
 export * from "./net/guard";
 export * from "./pdf";
 export * from "./phone";
+export * from "./postings/canonical";
 export * from "./postings/dictionary";
+export * from "./postings/fetch/browser";
+export {
+  extractPosting,
+  type FetchFailure,
+  type FetchPostingOptions,
+  type FetchPostingResult,
+  fetchPostingPage,
+  hostGuard,
+  type PageRender,
+  POSTING_USER_AGENT,
+  robotsAllows,
+} from "./postings/fetch/fetch";
 export * from "./postings/heuristics";
 export * from "./postings/identity";
 export * from "./postings/ingest";

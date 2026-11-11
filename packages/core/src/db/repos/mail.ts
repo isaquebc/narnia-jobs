@@ -85,6 +85,22 @@ export interface MailRepo {
   bySender(value: string, status: MailStatus): MailMessageRecord[];
   /** Volta para o começo do processamento (avaliar de novo). */
   reset(id: string, at: string): void;
+  /** Avaliados e à espera do modelo ou do leitor por código (M4), do mais antigo para o mais novo. */
+  toDigest(limit: number): MailMessageRecord[];
+  setResult(
+    id: string,
+    r: {
+      status: MailStatus;
+      class: string;
+      confidence: number | null;
+      result: Record<string, unknown> | null;
+    },
+    at: string,
+  ): void;
+  /** Processados (`done`) que ainda não ganharam `narnia-jobs` e lido no Gmail. */
+  digestToSync(limit: number): MailMessageRecord[];
+  /** Por classe e estado (M5 e M6 pegam as candidaturas, negativas, atualizações e convites). */
+  byClass(cls: string, status: MailStatus, limit: number): MailMessageRecord[];
 }
 
 interface Row {
@@ -269,6 +285,42 @@ export function mailRepo(db: Db): MailRepo {
             "select * from mail_message where status = ? and from_addr = ? order by received_at",
           ).all(status, value)) as unknown as Row[];
       return rows.map(map);
+    },
+    toDigest(limit) {
+      return (
+        q(
+          `select * from mail_message where status = 'pending' and class in ('candidate', 'unknown')
+           order by received_at, rowid limit ?`,
+        ).all(limit) as unknown as Row[]
+      ).map(map);
+    },
+    setResult(id, r, at) {
+      q(
+        `update mail_message set status = ?, class = ?, confidence = ?, result_json = ?, processed_at = ?, updated_at = ?
+         where id = ?`,
+      ).run(
+        r.status,
+        r.class,
+        r.confidence,
+        r.result ? JSON.stringify(r.result) : null,
+        at,
+        at,
+        id,
+      );
+    },
+    digestToSync(limit) {
+      return (
+        q(
+          "select * from mail_message where status = 'done' and gmail_synced = 0 order by received_at limit ?",
+        ).all(limit) as unknown as Row[]
+      ).map(map);
+    },
+    byClass(cls, status, limit) {
+      return (
+        q(
+          "select * from mail_message where class = ? and status = ? order by received_at, rowid limit ?",
+        ).all(cls, status, limit) as unknown as Row[]
+      ).map(map);
     },
     reset(id, at) {
       q(

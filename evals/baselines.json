@@ -270,6 +270,17 @@
     "commit": "8b414db",
     "updatedAt": "2026-11-10T18:48:14.865Z"
   },
+  "narnia-mail-classify": {
+    "scores": {
+      "cobertura_da_referencia": 1,
+      "idioma": 1,
+      "json_schema": 1,
+      "padrao_de_entrega": 1
+    },
+    "versionId": "4501167944a59aac7775c3e07a37cdcb458f1d0719d190c51d32e4364af5df3e",
+    "commit": "8aff859",
+    "updatedAt": "2026-11-11T18:25:59.627Z"
+  },
   "narnia-posting-duplicate": {
     "scores": {
       "cobertura_da_referencia": 1,

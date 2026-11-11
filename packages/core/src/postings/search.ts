@@ -14,9 +14,8 @@ export function searchPostings(
   opts: { archived?: boolean | undefined } = {},
 ): Posting[] {
   // a lista de vagas separa as arquivadas (F07); o recrutador (sem filtro) vê todas
-  const all = repos.postings
-    .list()
-    .filter((p) => opts.archived === undefined || (p.archivedAt !== null) === opts.archived);
+  // revisão do M4: o filtro de arquivadas vai no SQL, antes do teto (as vagas do feed não empurram as outras)
+  const all = repos.postings.list(opts.archived === undefined ? {} : { archived: opts.archived });
   const words = normalizeIdentityPart(query).split(" ").filter(Boolean);
   if (words.length === 0) return all;
   return all.filter((p) => {

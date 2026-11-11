@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   analyzePostingText,
+  canonicalUrl,
   type ExtensionCaptureRecord,
   findLikelyPosting,
   isDeviceToken,
@@ -16,6 +17,7 @@ import {
   ExtensionCaptureFormRequestSchema,
   type ExtensionCaptureReading,
   ExtensionPairRequestSchema,
+  type Posting,
 } from "@narnia-jobs/shared";
 import { type Context, Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -26,7 +28,7 @@ import type { EventBus } from "../events";
 import { extractPosting } from "../postings/fetch";
 import type { QueueAdapter } from "../queue";
 import { enqueueLocate, suggestingMotivations } from "../services/applications";
-import { intakePosting } from "../services/postings";
+import { enqueueExtraction, intakePosting } from "../services/postings";
 import { validate } from "./validate";
 
 /** Tentativas erradas de pareamento aceitas por minuto, somadas (a rota é pública). */
@@ -199,6 +201,33 @@ export function extensionRoutes(deps: {
     } catch {
       html = null;
     }
+    // F14/M4: a vaga veio de um e-mail e o link não abriu (LinkedIn pede login): a captura completa essa vaga em vez
+    // de criar outra; o texto da página vira a descrição e a extração roda de novo
+    const canonical = canonicalUrl(capture.url);
+    const fromMail = canonical
+      ? deps.repos.postings
+          .findByCanonicalUrl(canonical)
+          .find((x) => x.source === "email" && x.linkStatus === "failed")
+      : undefined;
+    if (fromMail && p.text) {
+      deps.repos.postings.update(fromMail.id, { jdText: p.text }, { source: "user" });
+      deps.repos.postings.setLinkStatus(fromMail.id, "ok");
+      deps.repos.postings.touchInteraction(fromMail.id);
+      if (html) {
+        const rel = join("snapshots", "postings", `${fromMail.id}.html`);
+        mkdirSync(join(deps.dataDir, "snapshots", "postings"), { recursive: true });
+        writeFileSync(join(deps.dataDir, rel), html);
+        deps.repos.postings.setRawPath(fromMail.id, rel);
+      }
+      const job = await enqueueExtraction(
+        { repos: deps.repos, queue: deps.queue, dataDir: deps.dataDir, bus: deps.bus },
+        deps.repos.postings.get(fromMail.id) as Posting,
+      );
+      deps.repos.extension.linkCapturePosting(capture.id, fromMail.id);
+      deps.repos.extension.requestCaptureAnalysis(capture.id);
+      deps.bus?.emit({ type: "posting.updated", postingId: fromMail.id });
+      return c.json({ posting: deps.repos.postings.get(fromMail.id), job, completed: true }, 200);
+    }
     const r = await intakePosting(
       { repos: deps.repos, queue: deps.queue, dataDir: deps.dataDir, bus: deps.bus },
       {
@@ -209,6 +238,8 @@ export function extensionRoutes(deps: {
       },
     );
     if (!r.ok) return apiError(c, 422, r.code, r.message);
+    // F14 (revisão do M4): a origem da vaga salva pela extensão fica registrada (o feed separa as do e-mail)
+    deps.repos.postings.setOrigin(r.posting.id, { source: "extension" });
     deps.repos.extension.linkCapturePosting(capture.id, r.posting.id);
     // pedido do dono (2026-10-23): salvar também analisa; a análise abre quando a extração termina
     // (`watchCaptureAnalyses`), ou já, se a vaga não ficou extraindo

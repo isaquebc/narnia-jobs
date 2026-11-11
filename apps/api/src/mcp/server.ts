@@ -126,7 +126,11 @@ function registry(deps: McpDeps, session: SessionInfo): Map<string, ToolEntry> {
                 },
               }
             : {}),
-          changed: (postingId) => deps.bus.emit({ type: "posting.updated", postingId }),
+          changed: (postingId) => {
+            // F14-9 (revisão do M4): o que a pessoa faz na vaga pelo chat também conta como interação
+            deps.repos.postings.touchInteraction(postingId);
+            deps.bus.emit({ type: "posting.updated", postingId });
+          },
           sessionChanged: (id) => {
             const s = deps.repos.chatSessions.get(id);
             if (s)

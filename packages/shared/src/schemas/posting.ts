@@ -59,7 +59,8 @@ export const PostingStatusSchema = z.enum(["draft", "extracting", "ready", "erro
 export type PostingStatus = z.infer<typeof PostingStatusSchema>;
 
 /** De onde veio cada campo (F06-6): heurística, modelo, os dois concordando, ou o usuário. */
-export const FieldSourceSchema = z.enum(["heuristic", "model", "both", "user"]);
+/** `email` (F14): veio do e-mail (alerta ou confirmação); o modelo e a extensão podem corrigir, a pessoa vence. */
+export const FieldSourceSchema = z.enum(["heuristic", "model", "both", "user", "email"]);
 export type FieldSource = z.infer<typeof FieldSourceSchema>;
 
 const Text = z.string().trim().min(1);
@@ -159,6 +160,30 @@ export const PostingSchema = PostingFieldsSchema.extend({
   archivedAt: IsoDateTimeSchema.nullable().default(null),
   archiveReason: PostingArchiveReasonSchema.nullable().default(null),
   archiveNote: z.string().nullable().default(null),
+  /** F14 · de onde veio: digitada/colada ou link (`manual`), extensão do navegador ou e-mail. */
+  source: z.enum(["manual", "extension", "email"]).default("manual"),
+  /** F14 · referência da origem (e-mail: id no Gmail, plataforma, link do e-mail). */
+  sourceRef: z
+    .object({
+      gmailId: z.string().nullable().default(null),
+      platform: z.string().nullable().default(null),
+      mailUrl: z.string().nullable().default(null),
+      /** Remetente confiável (plataforma autenticada, lista ou histórico): só assim entra na pré-análise automática. */
+      trusted: z.boolean().default(false),
+    })
+    .nullable()
+    .default(null),
+  /** F14 · o link da vaga abriu (`ok`), não abriu (`failed`, a flag pedida pelo dono) ou ainda não foi tentado. */
+  linkStatus: z.enum(["ok", "failed", "none"]).nullable().default(null),
+  /** F14 · feed: nova ou já vista. */
+  feedState: z.enum(["new", "seen"]).nullable().default(null),
+  /** F14-6 · match sem tokens (0–100) para ordenar o feed e decidir a pré-análise automática. */
+  matchScore: z.number().int().min(0).max(100).nullable().default(null),
+  /** F14-9 · arquivada sozinha por falta de interação (não é motivo da pessoa, fica fora do fit). */
+  archiveAuto: z.enum(["stale"]).nullable().default(null),
+  lastInteractionAt: IsoDateTimeSchema.nullable().default(null),
+  /** F14-6 · quando a pré-análise automática foi pedida. */
+  autoAnalysisAt: IsoDateTimeSchema.nullable().default(null),
 });
 export type Posting = z.infer<typeof PostingSchema>;
 

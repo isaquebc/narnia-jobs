@@ -1,7 +1,7 @@
 import type { DocumentKind, PreAnalysis } from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
@@ -58,6 +58,11 @@ export function PostingPage({
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { detail, analyses } = usePosting(postingId);
+  // F14-9: abrir a página é interação (a vaga do feed não é arquivada por inatividade) e tira o "nova"; uma vez por
+  // vaga aberta, não a cada recarga dos dados
+  useEffect(() => {
+    void api.markPostingSeen(postingId).catch(() => {});
+  }, [api, postingId]);
   const { profiles, active } = useProfiles();
   // F07: com candidatura ativa a vaga não é arquivada (encerra ou arquiva a candidatura antes)
   const applyOptions = useApplyOptions(postingId);

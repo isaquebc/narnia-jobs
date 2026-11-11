@@ -17,6 +17,7 @@ import {
   PickFilesOutputSchema,
   SynthesizeRunOutputSchema,
 } from "./schemas/ingest-output";
+import { MailClassifyOutputSchema } from "./schemas/mail";
 import {
   PostingDuplicateOutputSchema,
   PostingExtractOutputSchema,
@@ -56,6 +57,11 @@ export const INGEST_OUTPUT_JSON_SCHEMAS = {
 
 export const CHAT_OUTPUT_JSON_SCHEMAS = {
   chatTitle: toJsonSchema(ChatTitleOutputSchema),
+} as const;
+
+/** F14: classificação e extração de e-mails de vagas. */
+export const MAIL_OUTPUT_JSON_SCHEMAS = {
+  mailClassify: toJsonSchema(MailClassifyOutputSchema),
 } as const;
 
 /** Saídas das chamadas da F06 (extração, merge e duplicata da vaga). */

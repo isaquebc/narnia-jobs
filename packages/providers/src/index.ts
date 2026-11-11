@@ -88,6 +88,7 @@ export {
   type InterviewReportInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
+  type MailClassifyInput,
   type PickFilesInput,
   type PostingDuplicateInput,
   type PostingExtractInput,

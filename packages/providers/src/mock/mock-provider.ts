@@ -18,6 +18,7 @@ import type {
   ExtractFactsOutput,
   InterviewFramesOutput,
   InterviewReportDraft,
+  MailClassifyOutput,
   PickFilesOutput,
   PlanUsage,
   PostingDuplicateOutput,
@@ -49,6 +50,7 @@ import {
   type InterviewReportInput,
   LOGIN_EXPIRED_HINT,
   LOGIN_HINT,
+  type MailClassifyInput,
   type PickFilesInput,
   type PostingDuplicateInput,
   type PostingExtractInput,
@@ -83,6 +85,7 @@ export type MockOperation =
   | "checkProposals"
   | "chatTitle"
   | "postingExtract"
+  | "mailClassify"
   | "postingMerge"
   | "postingDuplicate"
   | "applicationLocate"
@@ -805,6 +808,60 @@ export class MockProvider implements Provider {
    * (ou o trecho antes de "·" na 2ª linha), role e senioridade por palavras do título, termos conhecidos como
    * obrigatórios. O real lê a vaga inteira.
    */
+  /**
+   * F14/M4 · classificação do e-mail no mock: pelas palavras do assunto e do texto (o real lê o e-mail). Vagas de
+   * alerta no formato das fixtures: uma linha `VAGA: cargo | empresa | local | link` por vaga.
+   */
+  async mailClassify(input: MailClassifyInput): Promise<ProviderResult<MailClassifyOutput>> {
+    await this.gate("mailClassify");
+    const t = `${input.subject}\n${input.text}`.toLowerCase();
+    const jobs = [...input.text.matchAll(/^VAGA:\s*(.+)$/gim)].map((m) => {
+      const [title = "", company = "", location = "", url = ""] = (m[1] ?? "")
+        .split("|")
+        .map((x) => x.trim());
+      return { title, company: company || null, location: location || null, url: url || null };
+    });
+    const cls: MailClassifyOutput["class"] = jobs.length
+      ? "job_alert"
+      : /n[ãa]o (seguiremos|vamos seguir)|optamos por (seguir|outros)|not (be )?moving forward|position has been filled/.test(
+            t,
+          )
+        ? "rejection"
+        : /recebemos (a )?sua candidatura|application (was )?(sent|received)|candidatura (foi )?(enviada|recebida)/.test(
+              t,
+            )
+          ? "application_received"
+          : /convite|agendar|entrevista marcada|interview (invitation|scheduled)/.test(t)
+            ? "interview_invite"
+            : /pr[óo]xima etapa|avan[çc]ou|next step|teste t[ée]cnico/.test(t)
+              ? "update"
+              : /vaga|oportunidade|position|opportunity/.test(t)
+                ? "recruiter_contact"
+                : "not_job";
+    const field = (re: RegExp) => re.exec(input.text)?.[1]?.trim() ?? null;
+    const output: MailClassifyOutput = {
+      class: cls,
+      confidence: cls === "not_job" ? 60 : 90,
+      company: field(/empresa:\s*([^\n]+)/i),
+      title: field(/vaga:\s*([^\n|]+)$/im) ?? field(/cargo:\s*([^\n]+)/i),
+      postingUrl: input.links.find((l) => /vaga|job/i.test(l)) ?? null,
+      jobs,
+      stageHint: field(/etapa:\s*([^\n]+)/i),
+      interview:
+        cls === "interview_invite"
+          ? {
+              startsAt: field(/quando:\s*([^\n]+)/i),
+              timeZone: null,
+              durationMin: null,
+              link: input.links.find((l) => /meet|teams|zoom/.test(l)) ?? null,
+              location: null,
+            }
+          : null,
+      summary: `E-mail classificado como ${cls}.`,
+    };
+    return this.result(output, input.text, input.model);
+  }
+
   async postingExtract(input: PostingExtractInput): Promise<ProviderResult<PostingExtractOutput>> {
     await this.gate("postingExtract");
     const lines = input.text

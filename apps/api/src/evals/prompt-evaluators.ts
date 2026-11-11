@@ -208,6 +208,8 @@ const RULES: Record<StructuredOperation, (op: StructuredOperation) => Rule[]> = 
   postingExtract: (op) => [schemaRule(op), years(["text"]), coverage(0.8)],
   postingMerge: (op) => [schemaRule(op), years(["text"]), coverage(0.75)],
   postingDuplicate: (op) => [schemaRule(op), lang(["rationale"]), coverage(1)],
+  // F14: a classe e os dados esperados (cargo, empresa, instante, link); a injeção no e-mail não muda a classe
+  mailClassify: (op) => [schemaRule(op), lang(["summary"]), coverage(0.85)],
   applicationLocate: (op) => [schemaRule(op), ...locate],
   applicationAnswer: (op) => [
     schemaRule(op),

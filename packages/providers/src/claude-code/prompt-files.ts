@@ -17,6 +17,7 @@ export const PROMPTS = {
   checkProposals: () => loadPrompt("check-proposals"),
   chatTitle: () => loadPrompt("chat-title"),
   postingExtract: () => loadPrompt("posting-extract"),
+  mailClassify: () => loadPrompt("mail-classify"),
   postingMerge: () => loadPrompt("posting-merge"),
   postingDuplicate: () => loadPrompt("posting-duplicate"),
   applicationLocate: () => loadPrompt("application-locate"),

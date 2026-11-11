@@ -10,9 +10,13 @@ import {
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { jobApplicationUrl } from "../job-applications/tools";
+import { digestMail, type MailClassifier, syncDigestLabels } from "../mail/digest";
+import { archiveStaleFeed, markAutoAnalyses } from "../mail/feed";
+import { openMailPostingLinks } from "../mail/postings";
 import { assessPendingMail } from "../mail/process";
 import type { MailSource } from "../mail/source";
 import { syncMail } from "../mail/sync";
+import type { FetchPostingOptions } from "../postings/fetch/fetch";
 
 /**
  * Agendador (F14-12, plans/plan-v0/tasks/F14-leitura-de-emails.md §2.6): as rotinas periódicas rodam no worker como
@@ -33,6 +37,18 @@ const DAY = 24 * 60;
 export const SCHEDULED_TASKS: Record<ScheduledTaskId, ScheduledTaskDefinition> = {
   // F14-8: 1 h por padrão, mínimo 10 min
   "mail.sync": { id: "mail.sync", defaultIntervalMinutes: 60, minIntervalMinutes: 10 },
+  // F14-6/7: pré-análise automática do feed acima do corte, com teto por dia
+  "postings.auto_analyze": {
+    id: "postings.auto_analyze",
+    defaultIntervalMinutes: 60,
+    minIntervalMinutes: 10,
+  },
+  // F14-9: vagas do feed sem interação há 30 dias saem do feed
+  "postings.feed_archive": {
+    id: "postings.feed_archive",
+    defaultIntervalMinutes: DAY,
+    minIntervalMinutes: 60,
+  },
   "captures.prune": { id: "captures.prune", defaultIntervalMinutes: DAY, minIntervalMinutes: 60 },
   "job_applications.archive": {
     id: "job_applications.archive",
@@ -64,6 +80,14 @@ export interface ScheduledContext {
   publish(event: WsEvent): Promise<void>;
   /** F14: fonte do Gmail com o token guardado; null quando não está conectado. */
   mailSource(): MailSource | null;
+  /** F14/M4: serviços do worker (modelo, extração da vaga, busca do link); ausentes nos testes que não usam. */
+  services: ScheduledServices;
+}
+
+export interface ScheduledServices {
+  classifyMail?: MailClassifier | null;
+  enqueuePostingExtract?: (postingId: string) => Promise<void>;
+  fetchOptions?: FetchPostingOptions;
 }
 
 export type ScheduledHandler = (ctx: ScheduledContext) => Promise<void>;
@@ -106,10 +130,28 @@ async function mailSync(ctx: ScheduledContext) {
   await syncMail({ repos: ctx.repos, dataDir: ctx.dataDir, source, ctx });
   // M3: risco, pré-filtro e quarentena do que foi baixado (nesta ou em execuções anteriores)
   await assessPendingMail({ repos: ctx.repos, dataDir: ctx.dataDir, source, ctx });
+  // M4: alertas viram vagas do feed, o resto fica classificado; os links abrem devagar; processado ganha etiqueta e lido
+  await digestMail({
+    repos: ctx.repos,
+    dataDir: ctx.dataDir,
+    ctx,
+    classify: ctx.services.classifyMail ?? null,
+  });
+  // etiqueta e lido antes dos links (que podem levar minutos), para o Gmail refletir logo o que foi processado
+  if (source) await syncDigestLabels({ repos: ctx.repos, source, ctx });
+  if (ctx.services.enqueuePostingExtract)
+    await openMailPostingLinks({
+      repos: ctx.repos,
+      ctx,
+      enqueueExtract: ctx.services.enqueuePostingExtract,
+      ...(ctx.services.fetchOptions ? { fetchOptions: ctx.services.fetchOptions } : {}),
+    });
 }
 
 export const SCHEDULED_TASK_HANDLERS: Record<ScheduledTaskId, ScheduledHandler> = {
   "mail.sync": mailSync,
+  "postings.auto_analyze": (ctx) => markAutoAnalyses(ctx),
+  "postings.feed_archive": (ctx) => archiveStaleFeed(ctx),
   "captures.prune": capturesPrune,
   "job_applications.archive": jobApplicationsArchive,
 };
@@ -193,6 +235,7 @@ export async function runScheduledTask(input: {
   now?: Date;
   publish: (event: WsEvent) => Promise<void>;
   mailSource?: () => MailSource | null;
+  services?: ScheduledServices;
 }): Promise<RunScheduledResult> {
   const { repos, taskId } = input;
   const handler = SCHEDULED_TASK_HANDLERS[taskId];
@@ -228,6 +271,7 @@ export async function runScheduledTask(input: {
     },
     publish,
     mailSource: () => input.mailSource?.() ?? null,
+    services: input.services ?? {},
   };
   let status: "done" | "error" = "done";
   let error: string | null = null;

@@ -1,31 +1,11 @@
 import type { Posting } from "@narnia-jobs/shared";
+import { canonicalUrl } from "../postings/canonical";
 import { normalizeIdentityPart } from "../postings/identity";
 
 /**
  * Vaga provavelmente já salva (F12/M2), sem tokens: mesmo link ou mesma empresa e cargo. A janela só avisa e oferece
  * abrir a salva; a duplicata de verdade continua com a F06 (F06-9) depois de salvar.
  */
-
-/** Parâmetros de rastreio que não mudam a vaga. */
-const TRACKING = /^(utm_|ref$|refid$|trk|tracking|source$|src$|gclid$|fbclid$|lipi$|origin$)/i;
-
-const APPLY_SUFFIX =
-  /\/(application|apply|applications\/new|job_app|candidatar|candidatura|inscricao)$/i;
-
-function canonicalUrl(raw: string): string | null {
-  try {
-    const u = new URL(raw);
-    const params = [...u.searchParams.entries()]
-      .filter(([k]) => !TRACKING.test(k))
-      .sort(([a], [b]) => a.localeCompare(b));
-    const query = params.length ? `?${new URLSearchParams(params).toString()}` : "";
-    // a página do formulário é a mesma vaga: Ashby /application, Lever e Gupy /apply, Greenhouse /applications/new
-    const path = u.pathname.replace(/\/+$/, "").replace(APPLY_SUFFIX, "");
-    return `${u.host.toLowerCase()}${path}${query}`;
-  } catch {
-    return null;
-  }
-}
 
 export function samePostingUrl(a: string, b: string): boolean {
   const x = canonicalUrl(a);

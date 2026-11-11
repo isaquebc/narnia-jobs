@@ -1,11 +1,16 @@
 import {
   dueScheduledTasks,
   isScheduledTaskId,
+  MAIL_MODEL_KEY,
+  POSTING_TASKS,
+  recordUsage,
+  resolveModel,
   runScheduledTask,
   SCHEDULED_RUN_TASK,
   type TaskJobData,
   TERMINAL_JOB_STATUSES,
   taskJobId,
+  usageFromSdkResult,
 } from "@narnia-jobs/core";
 import { SCHEDULED_TASK_IDS } from "@narnia-jobs/shared";
 import type { WorkerDeps } from "../pipeline";
@@ -27,6 +32,27 @@ export async function scheduledRun(
     trigger,
     publish: deps.publish,
     mailSource: () => deps.mailSource?.() ?? null,
+    services: {
+      // F14/M4: o e-mail vai ao modelo barato, sem tools; o uso entra no medidor como qualquer chamada
+      classifyMail: async (input) => {
+        const model = resolveModel(deps.repos.settings, MAIL_MODEL_KEY, "haiku");
+        const r = await deps.provider.mailClassify({ ...input, model });
+        recordUsage(
+          deps.repos,
+          deps.dataDir,
+          usageFromSdkResult(r.sdk, { category: "mail.classify", model, jobId: _ctx.jobId }),
+        );
+        return r.output;
+      },
+      enqueuePostingExtract: async (postingId) => {
+        await deps.enqueueTask({
+          queue: "extract",
+          type: POSTING_TASKS.extract,
+          key: `${postingId}-${Date.now()}`,
+          payload: { postingId },
+        });
+      },
+    },
   });
   return { runId: r.id, status: r.status, skipped: r.skipped ?? false };
 }

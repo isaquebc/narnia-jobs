@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { type TKey, t } from "../../i18n";
+import { MailFeedSettings } from "./MailFeedSettings";
 import { MailSenders } from "./MailSenders";
 import { MailWindow } from "./MailWindow";
 
@@ -73,6 +74,7 @@ export function GmailSection() {
         <p className="text-sm">{t("integrations.gmail.connectedAs", { email: s.email })}</p>
       ) : null}
       {s?.status === "connected" ? <MailWindow /> : null}
+      {s?.status === "connected" ? <MailFeedSettings /> : null}
       {s && s.status !== "not_configured" ? <MailSenders /> : null}
       {s?.status === "needs_reconnect" ? (
         <Alert tone="warn">{t("integrations.gmail.needsReconnect")}</Alert>

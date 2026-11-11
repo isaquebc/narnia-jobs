@@ -3,6 +3,7 @@ import {
   deleteGoogleClient,
   disconnectGmail,
   domainOfAddress,
+  feedSettings,
   finishGmailConnect,
   gmailStatus,
   isWebmail,
@@ -17,6 +18,7 @@ import {
   resolveGoogleClient,
   resolveMailReconnect,
   SCHEDULED_RUN_TASK,
+  saveFeedSettings,
   saveGoogleClient,
   startGmailConnect,
 } from "@narnia-jobs/core";
@@ -85,6 +87,13 @@ const ClientSchema = z.object({
 });
 
 const MailSettingsSchema = z.object({ since: z.iso.datetime() });
+const FeedSettingsSchema = z
+  .object({
+    preanalysisCut: z.number().int().min(0).max(100).optional(),
+    preanalysisDailyCap: z.number().int().min(0).max(100).optional(),
+    linksPerRun: z.number().int().min(0).max(1000).optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "nada para mudar");
 /** Endereço (`rh@acme.example`) ou domínio com @ (`@acme.example`). */
 const SenderValueSchema = z
   .string()
@@ -144,6 +153,11 @@ export function gmailRoutes(deps: {
     counts: deps.repos.mail.counts(),
   });
   app.get("/api/mail/settings", (c) => c.json(mailView()));
+  // F14-6, F14-7, F14-10: corte e teto da pré-análise automática e links abertos por execução
+  app.get("/api/mail/feed-settings", (c) => c.json(feedSettings(deps.repos)));
+  app.put("/api/mail/feed-settings", validate("json", FeedSettingsSchema), (c) =>
+    c.json(saveFeedSettings(deps.repos, c.req.valid("json"))),
+  );
 
   // F14/M3 · lista de remetentes (F14-13): confiáveis e bloqueados, sugestões pelo histórico
   const runSyncNow = async () =>

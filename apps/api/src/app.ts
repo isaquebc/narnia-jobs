@@ -68,6 +68,7 @@ import { snapshotsRoutes } from "./routes/snapshots";
 import { usageRoutes } from "./routes/usage";
 import { userRoutes } from "./routes/user";
 import { workerSettingsRoutes } from "./routes/worker-settings";
+import { watchAutoAnalyses } from "./services/auto-analysis";
 import { defaultEmbedderFactory, SemanticSearchService } from "./services/semantic-search";
 
 export interface AppDeps {
@@ -97,6 +98,8 @@ export interface AppDeps {
   semantic?: SemanticSearchService;
   /** F13: serviço media; ausente = do ambiente (`NARNIA_MEDIA_URL`). */
   media?: MediaClient;
+  /** F14-6: observador da pré-análise automática (os testes que não usam desligam com `false`). */
+  autoAnalyses?: boolean;
   /** F14: Gmail; ausente = API real (ou o Gmail falso em arquivo com o mock), ambiente e porta do processo. */
   gmail?: {
     fetch?: typeof fetch;
@@ -313,6 +316,14 @@ export function createApp(deps: AppDeps) {
     bus: deps.bus,
     openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
   });
+  // F14-6/7: pré-análise automática das vagas do feed acima do corte, uma por vez (o worker marca)
+  if (deps.autoAnalyses !== false)
+    watchAutoAnalyses({
+      repos: deps.repos,
+      bus: deps.bus,
+      openAnalysis: (postingId) => sessions.openPostingAnalysis(postingId),
+      log: (m) => console.warn(m),
+    });
   app.route("/", onboardingRoutes({ repos: deps.repos }));
   app.route("/", filesRoutes({ repos: deps.repos, dataDir: deps.dataDir }));
   app.route(

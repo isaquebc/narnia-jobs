@@ -112,6 +112,7 @@ export function jobApplicationsRoutes(deps: {
   app.post("/api/job-applications", validate("json", JobApplicationCreateSchema), (c) => {
     try {
       const created = applyToPosting(repos, c.req.valid("json"));
+      repos.postings.touchInteraction(created.postingId);
       changed(created.id, created.postingId);
       return c.json({ application: summarize(repos, created) }, 201);
     } catch (e) {

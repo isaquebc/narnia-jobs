@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import {
   type BootBackupResult,
+  backfillCanonicalUrls,
   backupOnBoot,
   type Db,
   detectFreshDatabase,
@@ -41,6 +42,14 @@ export function bootData(input: {
   if (backup.error)
     log(`[api] aviso: backup no boot falhou (${backup.error}); seguindo sem backup`);
   else if (backup.created) log(`[api] backup do dia: ${backup.created}`);
+
+  // F14/M4: link canônico das vagas antigas (coluna nova da migração 0043)
+  try {
+    const n = backfillCanonicalUrls(input.db as never);
+    if (n) log(`[api] link canônico preenchido em ${n} vaga(s)`);
+  } catch (e) {
+    log(`[api] aviso: link canônico das vagas antigas falhou (${(e as Error).message})`);
+  }
 
   let fresh: FreshDatabase | null = null;
   try {

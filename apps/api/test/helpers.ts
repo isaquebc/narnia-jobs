@@ -144,6 +144,7 @@ export function makeTestApp(
     ghConfigDir,
     sessions,
     media: opts.media ?? new MediaClient(null),
+    autoAnalyses: false,
     // F14: nunca o ambiente do processo nem a porta real nos testes
     gmail: { env: {}, port: 8189, listen: async () => ({ close: () => {} }), ...opts.gmail },
   });
