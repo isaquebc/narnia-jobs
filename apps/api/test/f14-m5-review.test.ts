@@ -102,7 +102,7 @@ describe("F14/M5 · /api/mail/review", () => {
     expect(t.repos.mail.suspectToRemove(10).map((m) => m.id)).not.toContain(q.id);
   });
 
-  it("escolher a vaga: guarda a vaga forçada, volta à fila e roda a leitura; vaga inexistente 404; atualização 422", async () => {
+  it("escolher a vaga: guarda a vaga forçada, volta à fila e roda a leitura; vaga inexistente 404; alerta 422", async () => {
     t = makeTestApp();
     const r = inReview(t, "r1");
     const posting = t.repos.postings.create({ title: "Dev Backend", company: "Acme" });
@@ -122,7 +122,8 @@ describe("F14/M5 · /api/mail/review", () => {
     expect(
       (await t.api(`/api/mail/${r3.id}/apply`, req("POST", { postingId: archived.id }))).status,
     ).toBe(422);
-    const u = inReview(t, "u1", "update");
+    // M6: atualização, convite e contato também se ligam a uma vaga; alerta não
+    const u = inReview(t, "u1", "job_alert");
     expect(
       (await t.api(`/api/mail/${u.id}/apply`, req("POST", { postingId: posting.id }))).status,
     ).toBe(422);

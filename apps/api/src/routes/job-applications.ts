@@ -4,6 +4,7 @@ import {
   addJobApplicationEvent,
   applyOptions,
   applyToPosting,
+  approveStageSuggestion,
   attachmentPath,
   type EntryFile,
   JobApplicationError,
@@ -12,10 +13,14 @@ import {
   listSavedPostings,
   type Repos,
   rejectJobApplication,
+  rejectStageSuggestion,
   removeJobApplication,
   removeJobApplicationEntry,
   removeJobApplicationEvent,
+  resolveStageSuggestionNotification,
+  StageSuggestionError,
   setCurrentStage,
+  setJobApplicationProfileAndCv,
   setJobApplicationStages,
   summarize,
   upcomingJobApplicationEvents,
@@ -36,6 +41,7 @@ import {
 } from "@narnia-jobs/shared";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
 import { apiError } from "../errors";
 import type { EventBus } from "../events";
 import { serveFile } from "../serve-file";
@@ -55,6 +61,8 @@ const ERROR_STATUS: Record<JobApplicationError["code"], ContentfulStatusCode> = 
   file_too_large: 413,
   invalid_datetime: 400,
   already_closed: 409,
+  profile_not_found: 404,
+  wrong_profile: 400,
 };
 
 /**
@@ -146,7 +154,12 @@ export function jobApplicationsRoutes(deps: {
       return apiError(c, 404, "not_found", "Candidatura não encontrada");
     const { currentStageId, ...patch } = c.req.valid("json");
     try {
-      if (currentStageId !== undefined) setCurrentStage(repos, id, currentStageId);
+      if (currentStageId !== undefined) {
+        setCurrentStage(repos, id, currentStageId);
+        // F14-2: a troca à mão pode ter aprovado ou fechado sugestões do e-mail
+        for (const notification of resolveStageSuggestionNotification(repos, id))
+          deps.bus?.emit({ type: "notification.updated", notification });
+      }
     } catch (e) {
       if (!(e instanceof JobApplicationError)) throw e;
       return apiError(c, ERROR_STATUS[e.code], e.code, e.message);
@@ -356,6 +369,7 @@ export function jobApplicationsRoutes(deps: {
       link: ev.link,
       notes: ev.notes,
       sequence: ev.icsSequence,
+      cancelled: !!ev.cancelledAt,
       appUrl: `${base.replace(/\/$/, "")}/candidaturas/${id}`,
     });
     return c.body(ics, 200, {
@@ -363,6 +377,121 @@ export function jobApplicationsRoutes(deps: {
       "content-disposition": `attachment; filename="narnia-${ev.id}.ics"`,
     });
   });
+
+  // F14-5, F14-15 · trocar o perfil e ligar (ou tirar) o CV enviado, na candidatura vinda de e-mail
+  app.put(
+    "/api/job-applications/:id/profile-cv",
+    validate(
+      "json",
+      z
+        .object({
+          profileId: z.string().min(1).optional(),
+          cvVersionId: z.string().min(1).nullable().optional(),
+        })
+        .refine((b) => b.profileId !== undefined || b.cvVersionId !== undefined, "Nada a mudar"),
+    ),
+    (c) => {
+      const id = c.req.param("id");
+      try {
+        const updated = setJobApplicationProfileAndCv(repos, id, c.req.valid("json"));
+        changed(id, updated.postingId);
+        return c.json({ application: summarize(repos, updated) });
+      } catch (e) {
+        return fail(c, e);
+      }
+    },
+  );
+
+  // F14/M6 · o que os e-mails fizeram na candidatura: e-mails (com desfazer), sugestões de etapa abertas e o histórico
+  app.get("/api/job-applications/:id/mail-activity", (c) => {
+    const id = c.req.param("id");
+    const ja = repos.jobApplications.get(id);
+    if (!ja) return apiError(c, 404, "not_found", "Candidatura não encontrada");
+    const stageName = (sid: string | null) => ja.stages.find((s) => s.id === sid)?.name ?? null;
+    return c.json({
+      mails: repos.mail.forApplication(id).map((m) => ({
+        id: m.id,
+        gmailId: m.gmailId,
+        subject: m.subject,
+        from: m.fromName ?? m.fromAddr,
+        receivedAt: m.receivedAt,
+        class: m.class,
+        summary: (m.result as { summary?: string } | null)?.summary ?? null,
+        undoneAt: m.undoneAt,
+        canUndo: m.status === "done" && !m.undoneAt && !!m.undo,
+        mailUrl: `https://mail.google.com/mail/u/0/#all/${m.gmailId}`,
+      })),
+      suggestions: repos.stageSuggestions.open(id).map((s) => ({
+        id: s.id,
+        toStageId: s.toStageId,
+        toStageName: s.toStageName,
+        hint: s.hint,
+        confidence: s.confidence,
+        createdAt: s.createdAt,
+        mailMessageId: s.mailMessageId,
+      })),
+      stageChanges: repos.jobApplications.stageChanges(id).map((x) => ({
+        ...x,
+        fromStageName: stageName(x.fromStageId),
+        toStageName: stageName(x.toStageId),
+      })),
+    });
+  });
+
+  const suggestionFail = (c: Parameters<typeof fail>[0], e: unknown) => {
+    if (e instanceof StageSuggestionError) {
+      const status =
+        e.code === "not_found" ? 404 : e.code === "decided" || e.code === "stale" ? 409 : 400;
+      return apiError(c, status, e.code, e.message);
+    }
+    return fail(c, e);
+  };
+  const afterSuggestion = (applicationId: string) => {
+    for (const notification of resolveStageSuggestionNotification(repos, applicationId))
+      deps.bus?.emit({ type: "notification.updated", notification });
+    touched(applicationId);
+  };
+  app.post(
+    "/api/stage-suggestions/:sid/approve",
+    validate("json", z.object({ stageId: z.string().min(1).nullable().optional() })),
+    (c) => {
+      try {
+        const ja = approveStageSuggestion(repos, c.req.param("sid"), c.req.valid("json").stageId);
+        afterSuggestion(ja.id);
+        return c.json({ application: ja });
+      } catch (e) {
+        return suggestionFail(c, e);
+      }
+    },
+  );
+  app.post("/api/stage-suggestions/:sid/reject", (c) => {
+    const s = repos.stageSuggestions.get(c.req.param("sid"));
+    try {
+      rejectStageSuggestion(repos, c.req.param("sid"));
+      if (s) afterSuggestion(s.applicationId);
+      return c.body(null, 204);
+    } catch (e) {
+      return suggestionFail(c, e);
+    }
+  });
+
+  // F14-3 · bloquear a agenda para a etapa provisória (a web baixa o .ics ou abre o Google Agenda)
+  app.post(
+    "/api/job-applications/:id/events/:eid/block",
+    validate("json", z.object({ blocked: z.boolean() })),
+    (c) => {
+      const id = c.req.param("id");
+      const ev = repos.jobApplicationEvents.get(c.req.param("eid"));
+      if (!ev || ev.applicationId !== id)
+        return apiError(c, 404, "not_found", "Evento não encontrado");
+      repos.jobApplicationEvents.setBlocked(
+        ev.id,
+        c.req.valid("json").blocked ? new Date().toISOString() : null,
+      );
+      touched(id);
+      return c.json({ event: repos.jobApplicationEvents.get(ev.id) });
+    },
+  );
 
   return app;
 }

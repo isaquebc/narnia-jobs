@@ -17,6 +17,8 @@ import { ChatAboutCard } from "./ChatAboutCard";
 import { ContactChainCard } from "./ContactChainCard";
 import { EntriesCard } from "./EntriesCard";
 import { applicationWho, columnLabel, useMoveApplication } from "./JobApplicationsPage";
+import { MailActivityCard } from "./MailActivityCard";
+import { ProfileCvPicker } from "./ProfileCvPicker";
 import { RejectButton } from "./RejectDialog";
 import { StagesEditor } from "./StagesEditor";
 
@@ -178,6 +180,7 @@ export function JobApplicationPage({ id }: { id: string }) {
             ) : null}
           </p>
         ) : null}
+        {a.source === "email" ? <ProfileCvPicker application={a} /> : null}
         {a.coverLetter ? (
           <LockedDoc label={t("jobApplications.detail.letter")} doc={a.coverLetter} letter />
         ) : (
@@ -186,6 +189,7 @@ export function JobApplicationPage({ id }: { id: string }) {
       </Card>
       <ChatAboutCard appId={a.id} />
       <StagesEditor application={a} />
+      <MailActivityCard application={a} />
       <AgendaCard application={a} />
       <ContactChainCard postingId={a.postingId} />
       <RecordingsCard application={a} />

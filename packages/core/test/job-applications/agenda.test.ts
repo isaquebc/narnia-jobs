@@ -148,6 +148,26 @@ describe("F07/M5 · agenda", () => {
     const u = upcomingJobApplicationEvents(r, { hours: 24 }, at("2026-10-28T12:00:00Z"));
     expect(u.upcoming).toEqual([]);
   });
+
+  it("F14/M6 · RT-C5: arquivada (sem encerrar) não lembra; reabrir o evento (done:false) volta a lembrar", () => {
+    const { r, apply } = setup();
+    const app = apply("Acme", at("2026-10-20T12:00:00Z"));
+    const ev = addJobApplicationEvent(r, app.id, {
+      kind: "interview",
+      title: "Entrevista",
+      startsLocal: "2026-10-28T11:00",
+      timezone: "America/Sao_Paulo",
+      durationMin: 30,
+      stageId: null,
+    });
+    const now = at("2026-10-28T12:00:00Z");
+    updateJobApplicationEvent(r, app.id, ev.id, { done: true }, now);
+    expect(upcomingJobApplicationEvents(r, { hours: 24 }, now).upcoming).toEqual([]);
+    updateJobApplicationEvent(r, app.id, ev.id, { done: false }, now);
+    expect(upcomingJobApplicationEvents(r, { hours: 24 }, now).upcoming).toHaveLength(1);
+    r.jobApplications.update(app.id, { archived: true });
+    expect(upcomingJobApplicationEvents(r, { hours: 24 }, now).upcoming).toEqual([]);
+  });
 });
 
 describe("F07/M5 · funil", () => {

@@ -119,7 +119,14 @@ function Item({ m, quarantine }: { m: MailReviewItem; quarantine?: boolean }) {
             {t("mailReview.applyAnyway")}
           </Button>
         ) : null}
-        {!quarantine && (m.class === "application_received" || m.class === "rejection") ? (
+        {!quarantine &&
+        [
+          "application_received",
+          "rejection",
+          "update",
+          "interview_invite",
+          "recruiter_contact",
+        ].includes(m.class ?? "") ? (
           <Button
             size="sm"
             variant="secondary"

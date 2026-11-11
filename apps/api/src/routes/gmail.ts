@@ -7,9 +7,11 @@ import {
   finishGmailConnect,
   gmailStatus,
   isWebmail,
+  MAIL_AUTO_STAGE_KEY,
   MAIL_FORCE_KEY,
   MAIL_LAST_SYNC_KEY,
   MAIL_SINCE_KEY,
+  MailUndoError,
   oauthRedirectUri,
   type PendingGmailConnect,
   platformOf,
@@ -17,10 +19,13 @@ import {
   readGmailToken,
   resolveGoogleClient,
   resolveMailReconnect,
+  resolveStageSuggestionNotification,
   SCHEDULED_RUN_TASK,
   saveFeedSettings,
   saveGoogleClient,
+  stageLearning,
   startGmailConnect,
+  undoMail,
 } from "@narnia-jobs/core";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -288,13 +293,18 @@ export function gmailRoutes(deps: {
       if (!p) return apiError(c, 404, "posting_not_found", "Vaga não encontrada");
       if (p.archivedAt) return apiError(c, 422, "posting_archived", "Vaga arquivada");
     }
-    if (m.class !== "application_received" && m.class !== "rejection")
-      return apiError(
-        c,
-        422,
-        "not_applicable",
-        "Só candidatura recebida e negativa se ligam a uma vaga",
-      );
+    // candidatura, negativa, atualização, convite e contato se ligam a uma vaga (M5 e M6)
+    if (
+      !m.class ||
+      ![
+        "application_received",
+        "rejection",
+        "update",
+        "interview_invite",
+        "recruiter_contact",
+      ].includes(m.class)
+    )
+      return apiError(c, 422, "not_applicable", "Este e-mail não se liga a uma vaga");
     deps.repos.mail.setPendingWith(
       m.id,
       {
@@ -324,6 +334,37 @@ export function gmailRoutes(deps: {
     );
     await runSyncNow();
     return c.json({ status: "queued" }, 202);
+  });
+
+  // F14/M6 · desfazer o que um e-mail fez
+  app.post("/api/mail/:id/undo", (c) => {
+    try {
+      const m = deps.repos.mail.get(c.req.param("id"));
+      const before = (m?.result as { applicationId?: string } | null)?.applicationId ?? null;
+      const r = undoMail(deps.repos, deps.dataDir, c.req.param("id"));
+      // a candidatura apagada também avisa (as abas abertas saem da página)
+      if (r.applicationId ?? before)
+        deps.bus?.emit({
+          type: "job_application.updated",
+          applicationId: (r.applicationId ?? before) as string,
+        });
+      for (const appId of r.touchedApplications)
+        for (const notification of resolveStageSuggestionNotification(deps.repos, appId))
+          deps.bus?.emit({ type: "notification.updated", notification });
+      if (r.postingId && deps.repos.postings.get(r.postingId))
+        deps.bus?.emit({ type: "posting.updated", postingId: r.postingId });
+      return c.json(r);
+    } catch (e) {
+      if (e instanceof MailUndoError)
+        return apiError(c, e.code === "not_found" ? 404 : 409, e.code, e.message, e.details);
+      throw e;
+    }
+  });
+  // F14-2 · aprendizado do movimento de etapa: taxa de acerto e a chave do automático
+  app.get("/api/mail/stage-learning", (c) => c.json(stageLearning(deps.repos)));
+  app.put("/api/mail/stage-learning", validate("json", z.object({ allowed: z.boolean() })), (c) => {
+    deps.repos.settings.set(MAIL_AUTO_STAGE_KEY, c.req.valid("json").allowed);
+    return c.json(stageLearning(deps.repos));
   });
 
   // extensão: "processar este e-mail agora" (o id da mensagem aberta no Gmail web)

@@ -11,6 +11,7 @@ import { Input } from "../../components/ui/input";
 import { type TKey, t } from "../../i18n";
 import { MailFeedSettings } from "./MailFeedSettings";
 import { MailSenders } from "./MailSenders";
+import { MailStageLearning } from "./MailStageLearning";
 import { MailWindow } from "./MailWindow";
 
 const TONE = {
@@ -76,6 +77,7 @@ export function GmailSection() {
       ) : null}
       {s?.status === "connected" ? <MailWindow /> : null}
       {s?.status === "connected" ? <MailFeedSettings /> : null}
+      {s?.status === "connected" ? <MailStageLearning /> : null}
       {s && s.status !== "not_configured" ? <MailSenders /> : null}
       {s && s.status !== "not_configured" ? (
         <Link to="/emails" className="text-sm underline">

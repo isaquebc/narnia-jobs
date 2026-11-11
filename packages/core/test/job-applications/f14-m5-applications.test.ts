@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createRepos, migrate, openDatabase } from "../../src/db";
 import { withTransaction } from "../../src/db/open";
-import { applyToPosting, JobApplicationError } from "../../src/job-applications";
+import {
+  applyToPosting,
+  JobApplicationError,
+  setJobApplicationProfileAndCv,
+} from "../../src/job-applications";
 import { seedFixture } from "../../src/testing/profile-fixtures";
 
 /**
@@ -94,5 +98,57 @@ describe("F14/M5 · transação aninhada (revisão do M5, #11)", () => {
       }
     });
     expect(db.prepare("select v from t").all()).toEqual([{ v: "fora" }]);
+  });
+});
+
+describe("F14/M7 · perfil e CV da candidatura vinda de e-mail (revisão do M5, #8)", () => {
+  it("troca o perfil, liga um CV pronto do perfil (deixa de ser presumido) e recusa CV de outro perfil", () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const repos = createRepos(db);
+    const { profileId } = seedFixture(repos, "engineer");
+    const { profileId: other } = seedFixture(repos, "leader");
+    const posting = repos.postings.create({ company: "Acme", title: "Dev" }, { source: "user" });
+    const app = repos.jobApplications.create({
+      postingId: posting.id,
+      profileId: null,
+      cvVersionId: null,
+      coverLetterVersionId: null,
+      appliedOn: "2026-11-01",
+      stages: ["Triagem"],
+      source: "email",
+      profilePending: true,
+    });
+    const cvOf = (pid: string) => {
+      const d = repos.documents.create({
+        kind: "cv",
+        profileId: pid,
+        postingId: posting.id,
+        templateId: "classico",
+        paper: "A4",
+        locale: "pt-BR",
+        format: "pdf",
+      });
+      const v = repos.documents.addVersion(d.id, {
+        source: "agent",
+        instructions: null,
+        factsVersion: 1,
+        postingUpdatedAt: null,
+        profileHash: "h",
+      });
+      repos.documents.updateVersion(v.id, { status: "ready" });
+      return v.id;
+    };
+    const mine = cvOf(profileId);
+    const theirs = cvOf(other);
+    const a = setJobApplicationProfileAndCv(repos, app.id, { profileId, cvVersionId: mine });
+    expect(a).toMatchObject({ profileId, profilePending: false, cvPresumed: false });
+    expect(a.cv?.versionId).toBe(mine);
+    expect(() => setJobApplicationProfileAndCv(repos, app.id, { cvVersionId: theirs })).toThrow(
+      /outro perfil/,
+    );
+    // trocar o perfil tira o CV do perfil anterior
+    const b = setJobApplicationProfileAndCv(repos, app.id, { profileId: other });
+    expect(b).toMatchObject({ profileId: other, cv: null });
   });
 });

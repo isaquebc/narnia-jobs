@@ -65,6 +65,7 @@ Salvar uma vaga não é se candidatar: na página da vaga, **Aplicar** cria a ca
 
 - **Etapas** do processo, em ordem, com a etapa atual marcada.
 - **Agenda:** entrevistas, testes ou cases, prazos e retornos, com data, hora, link e notas, cada um ligado a uma etapa se você quiser. Cada evento tem **Adicionar ao Google Calendar** e o arquivo `.ics`. Com o Google Calendar conectado ([docs/google-calendar.md](google-calendar.md)), o recrutador cria o evento direto no seu calendário quando você agenda pela conversa (mão única: editar no Google não muda o narnia-jobs); sem ele, tudo funciona com o link e o `.ics`.
+- **Pelo e-mail:** com o Gmail conectado ([docs/gmail.md](gmail.md)), confirmações, negativas, atualizações e convites chegam sozinhos: a candidatura nasce ou encerra com a data e a hora do e-mail, a próxima etapa é sugerida e cada e-mail pode ser desfeito. Os alertas de vagas viram a aba **Feed do e-mail** em Vagas.
 - **Notas e anexos** (o CV e a carta enviados, e o que mais quiser guardar).
 - **Contatos**: com quem você falou, por LinkedIn, WhatsApp ou e-mail, quem indicou quem. Dá para editar um contato pela interface ou pedir ao recrutador ("o e-mail da Ana mudou").
 - **Conversar** sobre a candidatura com o recrutador, que conhece a vaga, a análise e as etapas.

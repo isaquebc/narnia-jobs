@@ -208,6 +208,51 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, details);
 }
 
+/** F14/M6 · atividade de e-mail na candidatura. */
+export interface MailActivity {
+  mails: Array<{
+    id: string;
+    gmailId: string;
+    subject: string | null;
+    from: string | null;
+    receivedAt: string;
+    class: string | null;
+    summary: string | null;
+    undoneAt: string | null;
+    canUndo: boolean;
+    mailUrl: string;
+  }>;
+  suggestions: Array<{
+    id: string;
+    toStageId: string | null;
+    toStageName: string;
+    hint: string | null;
+    confidence: number;
+    createdAt: string;
+    mailMessageId: string;
+  }>;
+  stageChanges: Array<{
+    id: string;
+    at: string;
+    source: "manual" | "email" | "suggestion";
+    mailMessageId: string | null;
+    fromStageName: string | null;
+    toStageName: string | null;
+  }>;
+}
+
+/** F14-2 · aprendizado do movimento de etapa. */
+export interface StageLearningView {
+  allowed: boolean;
+  decisions: number;
+  accuracy: number | null;
+  lastUndoAt: string | null;
+  active: boolean;
+  reason: "off" | "few_decisions" | "low_accuracy" | "recent_undo" | null;
+  minDecisions: number;
+  minAccuracy: number;
+}
+
 /** F14/M5 · item da caixa de revisão ou da quarentena. */
 export interface MailReviewItem {
   id: string;
@@ -878,6 +923,43 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         `/api/job-applications/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
         { method: "DELETE" },
       ),
+    /** F14-3: bloquear (ou não) a agenda para a etapa provisória. */
+    blockJobApplicationEvent: (appId: string, eventId: string, blocked: boolean) =>
+      request<{ event: JobApplicationEvent }>(
+        `/api/job-applications/${encodeURIComponent(appId)}/events/${encodeURIComponent(eventId)}/block`,
+        json({ blocked }),
+      ),
+    /** F14-5, F14-15: perfil e CV da candidatura vinda de e-mail. */
+    putJobApplicationProfileCv: (
+      appId: string,
+      body: { profileId?: string; cvVersionId?: string | null },
+    ) =>
+      request<{ application: JobApplicationSummary }>(
+        `/api/job-applications/${encodeURIComponent(appId)}/profile-cv`,
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
+    /** F14/M6: o que os e-mails fizeram na candidatura. */
+    getMailActivity: (appId: string) =>
+      request<MailActivity>(`/api/job-applications/${encodeURIComponent(appId)}/mail-activity`),
+    approveStageSuggestion: (id: string, stageId?: string) =>
+      request<{ application: unknown }>(
+        `/api/stage-suggestions/${encodeURIComponent(id)}/approve`,
+        json(stageId ? { stageId } : {}),
+      ),
+    rejectStageSuggestion: (id: string) =>
+      request<void>(`/api/stage-suggestions/${encodeURIComponent(id)}/reject`, json({})),
+    undoMail: (id: string) =>
+      request<{ applicationId: string | null; applicationRemoved: boolean; skipped: string[] }>(
+        `/api/mail/${encodeURIComponent(id)}/undo`,
+        json({}),
+      ),
+    getStageLearning: () => request<StageLearningView>("/api/mail/stage-learning"),
+    putStageLearning: (allowed: boolean) =>
+      request<StageLearningView>("/api/mail/stage-learning", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ allowed }),
+      }),
     jobApplicationEventIcsUrl: (id: string, eventId: string) =>
       `${base}/api/job-applications/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}/calendar.ics`,
     getJobApplicationUpcoming: (hours = 24) =>

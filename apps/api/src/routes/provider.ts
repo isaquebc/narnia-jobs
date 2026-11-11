@@ -1,11 +1,18 @@
-import { rmSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  deleteGmailToken,
+  deleteGoogleClient,
+  FAKE_GMAIL_STATE_FILENAME,
   FIXTURE_NAMES,
+  fakeGmailAdd,
+  fakeGmailState,
   type Repos,
   resetDatabase,
+  saveGoogleClient,
   seedFixture,
   trackInvalidation,
+  writeGmailToken,
 } from "@narnia-jobs/core";
 import { MockProvider, type Provider } from "@narnia-jobs/providers";
 import { EmphasisFactKindSchema, PlanUsageSchema } from "@narnia-jobs/shared";
@@ -102,6 +109,11 @@ export function providerRoutes(deps: {
       for (const dir of RESET_DIRS)
         rmSync(join(deps.dataDir, dir), { recursive: true, force: true });
       rmSync(fakeStateFile(deps.dataDir), { force: true });
+      // F14: Gmail falso e conexão de volta ao zero
+      rmSync(join(deps.dataDir, FAKE_GMAIL_STATE_FILENAME), { force: true });
+      rmSync(join(deps.dataDir, "mail"), { recursive: true, force: true });
+      deleteGmailToken(deps.dataDir);
+      deleteGoogleClient(deps.dataDir);
       mock.reset();
       deps.bus.emit({ type: "provider.status", status: await mock.detect() });
       return c.json({ ok: true, tables });
@@ -139,6 +151,46 @@ export function providerRoutes(deps: {
         ...(deps.githubAuth ? { status: await githubAuthStatus(deps.githubAuth) } : {}),
       });
     });
+    // F14/M7 · e2e: caixa do Gmail falso (mensagens em RFC 822) e a conta já conectada, sem o login do Google
+    app.post(
+      "/api/_test/gmail",
+      validate(
+        "json",
+        z.object({
+          messages: z.array(
+            z.object({
+              id: z.string().regex(/^[0-9a-f]{8,32}$/),
+              threadId: z.string().optional(),
+              raw: z.string().min(1),
+              receivedAt: z.string().datetime(),
+            }),
+          ),
+        }),
+      ),
+      (c) => {
+        const state = fakeGmailState({ email: "pessoa@example.com" });
+        for (const m of c.req.valid("json").messages)
+          fakeGmailAdd(state, {
+            id: m.id,
+            raw: m.raw,
+            internalDate: Date.parse(m.receivedAt),
+            ...(m.threadId ? { threadId: m.threadId } : {}),
+            labelIds: ["INBOX", "UNREAD"],
+          });
+        writeFileSync(join(deps.dataDir, FAKE_GMAIL_STATE_FILENAME), JSON.stringify(state));
+        saveGoogleClient(deps.dataDir, {
+          clientId: "e2e-client.apps.googleusercontent.com",
+          clientSecret: "e2e",
+        });
+        writeGmailToken(deps.dataDir, {
+          refreshToken: state.refreshToken,
+          scope: "https://www.googleapis.com/auth/gmail.modify",
+          email: state.email,
+          connectedAt: new Date().toISOString(),
+        });
+        return c.json({ ok: true, messages: state.messages.length });
+      },
+    );
     app.post("/api/_test/mock", validate("json", MockModeSchema), async (c) => {
       const body = c.req.valid("json");
       mock.setMode(
@@ -164,6 +216,9 @@ export function providerRoutes(deps: {
       apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
     );
     app.post("/api/_test/github", (c) =>
+      apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
+    );
+    app.post("/api/_test/gmail", (c) =>
       apiError(c, 404, "not_found", "Endpoint de teste indisponível"),
     );
   }

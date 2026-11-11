@@ -13,6 +13,7 @@
 - **Candidaturas.** Quadro por etapa, agenda com `.ics` e, opcionalmente, o Google Calendar.
 - **Extensão do Chrome.** Leva vagas de qualquer site e ajuda a preencher formulários de candidatura com respostas a partir dos seus dados.
 - **Análise de entrevista gravada (opcional).** Envie o vídeo de uma entrevista real: transcrição por pessoa, o que você falou e não deveria, respostas erradas ou incompletas com a correção, discurso, sorriso e expressão (com alerta de confiabilidade), reações e anotações de quem entrevistou, câmera e áudio, e treinos. Roda num serviço local à parte ([guia](docs/entrevista-gravada.md)).
+- **Leitura do Gmail (opcional).** Alertas de vagas viram um feed ordenado pelo match; confirmações criam a candidatura e negativas a encerram, com a data e a hora do e-mail; atualizações e convites viram notas, etapas sugeridas e entrevistas na agenda. E-mails suspeitos ficam em quarentena ([guia](docs/gmail.md)).
 
 > **Regra de uso da análise de entrevista gravada:** ela existe só para você se desenvolver durante o processo seletivo. **Nenhum vídeo, dado ou leitura pode ser publicado ou compartilhado.** Cabe a quem usa respeitar a lei e as regras sobre a gravação e o consentimento de quem aparece nela.
 
@@ -120,6 +121,7 @@ Remova a extensão em `chrome://extensions`. Por fim, apague a pasta do projeto:
 | [Guia de uso](docs/guia-de-uso.md) | referência de cada funcionalidade, configurações, comandos, dados e backup |
 | [Modelos de currículo](docs/templates-de-cv.md) | como criar o seu modelo (`.zip`) |
 | [Google Calendar](docs/google-calendar.md) | conexão opcional da agenda das candidaturas |
+| [Gmail](docs/gmail.md) | leitura opcional dos e-mails de vagas: cliente OAuth, feed, candidaturas, revisão, quarentena, desfazer |
 | [Entrevista gravada](docs/entrevista-gravada.md) | análise opcional do vídeo de uma entrevista: ligar, token, GPU, privacidade, créditos (inclui o modelo `pyannote/speaker-diarization-community-1`, CC-BY-4.0) |
 | [Primeira contribuição](docs/contribuir.md) · [First contribution](docs/en/contributing.md) | do fork ao pull request aceito, passo a passo |
 | [Contribuir](CONTRIBUTING.md) | ambiente de desenvolvimento, testes, avaliações dos prompts |

@@ -48,6 +48,41 @@ describe("F14/M4 · feed", () => {
     expect(within(globex).queryByText("link não abriu")).toBeNull();
   });
 
+  it("M7 · filtros: plataforma, só novas, só link que não abriu e o aviso quando nada sobra", async () => {
+    renderApp({
+      api: {
+        listPostings: async () => ({ postings: [] }),
+        listFeed: async () => ({
+          postings: [
+            mail("p1", { company: "Acme" }),
+            mail("p2", {
+              company: "Globex",
+              feedState: "seen",
+              linkStatus: "ok",
+              sourceRef: { gmailId: "g", platform: "glassdoor", mailUrl: null, trusted: true },
+            }),
+          ],
+        }),
+      } as never,
+      initialUrl: "/vagas",
+    });
+    await userEvent.click(await screen.findByRole("tab", { name: "Feed do e-mail" }));
+    const list = await screen.findByRole("list", { name: "Feed do e-mail" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "glassdoor");
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((li) => li.getAttribute("aria-label")),
+    ).toEqual([expect.stringMatching(/Globex/)]);
+    await userEvent.click(screen.getByLabelText("Só as novas"));
+    expect(await screen.findByText("Nenhuma vaga com esses filtros.")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "");
+    await userEvent.click(screen.getByLabelText("Só link que não abriu"));
+    const again = await screen.findByRole("list", { name: "Feed do e-mail" });
+    expect(within(again).getAllByRole("listitem")).toHaveLength(1);
+  });
+
   it("feed vazio: explica como conectar", async () => {
     renderApp({
       api: {

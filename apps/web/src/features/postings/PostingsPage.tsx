@@ -8,7 +8,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Field } from "../../components/ui/field";
-import { Input, Textarea } from "../../components/ui/input";
+import { Input, Select, Textarea } from "../../components/ui/input";
 import { TabPanel, Tabs } from "../../components/ui/tabs";
 import { useFeed, usePostings } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
@@ -167,13 +167,81 @@ function useDebounced(value: string, ms = 250): string {
  * cliente, cargo, role ou contato; correção de 2026-10-15) e a entrada de uma nova. F07: as aplicadas em destaque e as
  * arquivadas à parte ("Ver arquivadas").
  */
+/** Filtros do feed (F14/M7, plano §4): plataforma, período, só as novas, só as de link que não abriu. */
+const FEED_PERIODS = ["all", "7", "30"] as const;
+
 function FeedList() {
-  const { postings, isLoading } = useFeed();
+  const { postings: all, isLoading } = useFeed();
+  const [platform, setPlatform] = useState("");
+  const [period, setPeriod] = useState<(typeof FEED_PERIODS)[number]>("all");
+  const [onlyNew, setOnlyNew] = useState(false);
+  const [onlyFailed, setOnlyFailed] = useState(false);
+  const platforms = [
+    ...new Set(all.map((p) => p.sourceRef?.platform).filter((x): x is string => !!x)),
+  ].sort();
+  const since = period === "all" ? 0 : Date.now() - Number(period) * 86_400_000;
+  const postings = all.filter(
+    (p) =>
+      (!platform || p.sourceRef?.platform === platform) &&
+      Date.parse(p.createdAt) >= since &&
+      (!onlyNew || p.feedState === "new") &&
+      (!onlyFailed || p.linkStatus === "failed"),
+  );
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-fg">{t("postings.feed.hint")}</p>
-      {!isLoading && postings.length === 0 ? (
+      {all.length ? (
+        <fieldset
+          aria-label={t("postings.feed.filters")}
+          className="flex flex-wrap items-center gap-3 text-sm"
+        >
+          <Select
+            aria-label={t("postings.feed.platform")}
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value)}
+            className="w-auto"
+          >
+            <option value="">{t("postings.feed.allPlatforms")}</option>
+            {platforms.map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label={t("postings.feed.period")}
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as (typeof FEED_PERIODS)[number])}
+            className="w-auto"
+          >
+            {FEED_PERIODS.map((x) => (
+              <option key={x} value={x}>
+                {t(`postings.feed.periods.${x}` as TKey)}
+              </option>
+            ))}
+          </Select>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={onlyNew}
+              onChange={(e) => setOnlyNew(e.target.checked)}
+            />
+            {t("postings.feed.onlyNew")}
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={onlyFailed}
+              onChange={(e) => setOnlyFailed(e.target.checked)}
+            />
+            {t("postings.feed.onlyFailed")}
+          </label>
+        </fieldset>
+      ) : null}
+      {!isLoading && all.length === 0 ? (
         <p className="text-sm text-muted-fg">{t("postings.feed.empty")}</p>
+      ) : !isLoading && postings.length === 0 ? (
+        <p className="text-sm text-muted-fg">{t("postings.feed.noMatch")}</p>
       ) : (
         <ul
           aria-label={t("postings.tabs.feed")}

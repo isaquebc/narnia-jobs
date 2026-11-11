@@ -37,6 +37,23 @@ export interface MoveOrigin {
   mailMessageId: string | null;
 }
 
+/** F14/M6 · origem de uma mudança de etapa (sem origem = a pessoa). */
+export interface StageOrigin {
+  source: "manual" | "email" | "suggestion" | "undo";
+  at?: string;
+  mailMessageId?: string | null;
+}
+
+export interface StageChange {
+  id: string;
+  applicationId: string;
+  fromStageId: string | null;
+  toStageId: string | null;
+  at: string;
+  source: StageOrigin["source"];
+  mailMessageId: string | null;
+}
+
 export interface JobApplicationUpdate {
   column?: JobApplicationColumn | undefined;
   closedReason?: JobApplicationClosedReason | null | undefined;
@@ -72,7 +89,15 @@ export interface JobApplicationsRepo {
     stages: Array<{ id?: string | undefined; name: string }>,
     now?: Date,
   ): JobApplication;
-  setCurrentStage(id: string, stageId: string | null, now?: Date): JobApplication;
+  /** Troca a etapa atual e grava a mudança no histórico (F14/M6), se mudou. */
+  setCurrentStage(
+    id: string,
+    stageId: string | null,
+    now?: Date,
+    origin?: StageOrigin,
+  ): JobApplication;
+  /** Histórico das mudanças de etapa, da mais antiga para a mais nova. */
+  stageChanges(id: string): StageChange[];
   /** Mudanças de coluna em ordem (a primeira é a criação, sem origem): o funil sai daqui. */
   moves(): Array<{
     applicationId: string;
@@ -340,14 +365,45 @@ export function jobApplicationsRepo(db: Db): JobApplicationsRepo {
       });
       return must(id);
     },
-    setCurrentStage(id, stageId, now = new Date()) {
-      must(id);
+    setCurrentStage(id, stageId, now = new Date(), origin) {
+      const cur = must(id);
       const at = now.toISOString();
       db.prepare(
         `update job_application set current_stage_id = ?, archived_at = null, last_activity_at = ?, updated_at = ?
            where id = ?`,
       ).run(stageId, at, at, id);
+      if (cur.currentStageId !== stageId)
+        db.prepare(
+          `insert into job_application_stage_change (id, job_application_id, from_stage_id, to_stage_id, at, source,
+             mail_message_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          newId(),
+          id,
+          cur.currentStageId,
+          stageId,
+          origin?.at ?? at,
+          origin?.source ?? "manual",
+          origin?.mailMessageId ?? null,
+          at,
+        );
       return must(id);
+    },
+    stageChanges(id) {
+      return (
+        db
+          .prepare(
+            "select * from job_application_stage_change where job_application_id = ? order by created_at, rowid",
+          )
+          .all(id) as Row[]
+      ).map((r) => ({
+        id: String(r.id),
+        applicationId: String(r.job_application_id),
+        fromStageId: r.from_stage_id == null ? null : String(r.from_stage_id),
+        toStageId: r.to_stage_id == null ? null : String(r.to_stage_id),
+        at: String(r.at),
+        source: String(r.source) as StageOrigin["source"],
+        mailMessageId: r.mail_message_id == null ? null : String(r.mail_message_id),
+      }));
     },
     moves() {
       return (

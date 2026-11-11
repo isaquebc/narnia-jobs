@@ -11,6 +11,45 @@ export type MailStatus =
   | "ignored"
   | "error";
 
+/**
+ * O que um e-mail fez no domínio, para o desfazer (F14/M6): ids criados e o estado anterior do que mudou.
+ */
+export interface MailUndo {
+  createdApplicationId?: string;
+  createdPostingId?: string;
+  entryIds?: string[];
+  /** Negativa: o estado da candidatura antes de encerrar. */
+  closed?: {
+    applicationId: string;
+    column: string;
+    closedReason: string | null;
+    closedStage: string | null;
+    closedEntryId: string | null;
+  };
+  /** Etapa movida: a de antes. */
+  stage?: { applicationId: string; fromStageId: string | null; toStageId: string | null };
+  suggestionIds?: string[];
+  eventIds?: string[];
+  /** Eventos que já existiam e mudaram (remarcação, cancelamento, oficial no lugar da provisória). */
+  eventPrev?: Array<{
+    id: string;
+    title: string;
+    startsAt: string;
+    durationMin: number;
+    timezone: string;
+    location: string | null;
+    link: string | null;
+    provisional: boolean;
+    icsUid: string | null;
+    cancelledAt: string | null;
+    mailMessageId: string | null;
+    remoteSequence: number | null;
+    /** Como o e-mail deixou: o desfazer só reverte se o evento ainda estiver assim. */
+    afterStartsAt: string;
+    afterCancelledAt: string | null;
+  }>;
+}
+
 export interface MailMessageRecord {
   id: string;
   gmailId: string;
@@ -34,6 +73,9 @@ export interface MailMessageRecord {
   /** A etiqueta `narnia-jobs/suspeito` está no Gmail. */
   suspectLabel: boolean;
   processedAt: string | null;
+  /** F14/M6: o que o e-mail fez (para desfazer) e quando foi desfeito. */
+  undo: MailUndo | null;
+  undoneAt: string | null;
   createdAt: string;
 }
 
@@ -107,6 +149,12 @@ export interface MailRepo {
   byClasses(classes: string[], status: MailStatus, limit: number): MailMessageRecord[];
   /** Caixa de revisão e quarentena (F14-11, F14-14): os mais novos primeiro. */
   listByStatus(statuses: MailStatus[], limit: number): MailMessageRecord[];
+  /** F14/M6: guarda o que o e-mail fez (soma ao que já havia). */
+  addUndo(id: string, undo: MailUndo): void;
+  /** F14/M6: desfeito; sai do processamento (`ignored`), com a data. */
+  markUndone(id: string, at: string): void;
+  /** E-mails que agiram sobre uma candidatura (resultado com o `applicationId`), do mais novo para o mais antigo. */
+  forApplication(applicationId: string): MailMessageRecord[];
 }
 
 interface Row {
@@ -131,6 +179,8 @@ interface Row {
   gmail_synced: number;
   suspect_label: number;
   processed_at: string | null;
+  undo_json: string | null;
+  undone_at: string | null;
   created_at: string;
 }
 
@@ -156,6 +206,8 @@ const map = (r: Row): MailMessageRecord => ({
   gmailSynced: r.gmail_synced === 1,
   suspectLabel: r.suspect_label === 1,
   processedAt: r.processed_at,
+  undo: r.undo_json ? (JSON.parse(r.undo_json) as MailUndo) : null,
+  undoneAt: r.undone_at ?? null,
   createdAt: r.created_at,
 });
 
@@ -344,6 +396,29 @@ export function mailRepo(db: Db): MailRepo {
           `select * from mail_message where status in (${statuses.map(() => "?").join(",")})
            order by received_at desc, rowid desc limit ?`,
         ).all(...statuses, limit) as unknown as Row[]
+      ).map(map);
+    },
+    addUndo(id, undo) {
+      const cur = get(id)?.undo ?? {};
+      const merged: MailUndo = { ...cur };
+      for (const [k, v] of Object.entries(undo) as Array<[keyof MailUndo, unknown]>) {
+        const prev = cur[k];
+        (merged as Record<string, unknown>)[k] =
+          Array.isArray(prev) && Array.isArray(v) ? [...prev, ...v] : v;
+      }
+      q("update mail_message set undo_json = ? where id = ?").run(JSON.stringify(merged), id);
+    },
+    markUndone(id, at) {
+      q(
+        "update mail_message set status = 'ignored', undone_at = ?, updated_at = ? where id = ?",
+      ).run(at, at, id);
+    },
+    forApplication(applicationId) {
+      return (
+        q(
+          `select * from mail_message where json_extract(result_json, '$.applicationId') = ?
+             order by received_at desc`,
+        ).all(applicationId) as unknown as Row[]
       ).map(map);
     },
     setPendingWith(id, result, at) {

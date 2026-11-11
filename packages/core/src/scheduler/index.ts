@@ -17,6 +17,7 @@ import { openMailPostingLinks } from "../mail/postings";
 import { assessPendingMail } from "../mail/process";
 import type { MailSource } from "../mail/source";
 import { syncMail } from "../mail/sync";
+import { applyMailUpdates } from "../mail/updates";
 import type { FetchPostingOptions } from "../postings/fetch/fetch";
 
 /**
@@ -139,7 +140,14 @@ async function mailSync(ctx: ScheduledContext) {
     classify: ctx.services.classifyMail ?? null,
   });
   // M5: confirmações e negativas viram candidaturas (ou encerram), com a data e a hora do e-mail
-  await applyMailApplications({ repos: ctx.repos, dataDir: ctx.dataDir, ctx });
+  // candidaturas (M5) e atualizações (M6) em ordem cronológica entre si: cada passada só aplica o que é anterior ao
+  // mais antigo pendente da outra; alterna até não sobrar progresso (revisão do M6, #13)
+  for (let pass = 0; pass < 20; pass++) {
+    const a = await applyMailApplications({ repos: ctx.repos, dataDir: ctx.dataDir, ctx });
+    const b = await applyMailUpdates({ repos: ctx.repos, dataDir: ctx.dataDir, ctx });
+    const progress = a.created + a.closed + a.noted + a.review + b.noted + b.review + b.contacts;
+    if (!progress) break;
+  }
   await syncMailReviewNotification(ctx.repos, ctx.publish);
   // etiqueta e lido antes dos links (que podem levar minutos), para o Gmail refletir logo o que foi processado
   if (source) await syncDigestLabels({ repos: ctx.repos, source, ctx });

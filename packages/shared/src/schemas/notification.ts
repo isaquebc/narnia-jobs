@@ -36,6 +36,10 @@ export const NOTIFICATION_KINDS = [
   "mail.application_closed",
   /** F14/M5: e-mails na caixa de revisão (agrupada). */
   "mail.review",
+  /** F14/M6: um e-mail sugere mudar a etapa de uma candidatura (aprovar ou recusar na página dela). */
+  "mail.stage_suggestion",
+  /** F14/M6: convite de entrevista: etapa marcada, remarcada, cancelada ou o oficial chegou. Informativa. */
+  "mail.interview",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

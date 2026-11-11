@@ -53,6 +53,7 @@ export const INFORMATIONAL_KINDS: readonly NotificationKind[] = [
   "posting.analysis_done",
   "document.ready",
   "mail.application_closed",
+  "mail.interview",
 ];
 export const INFORMATIONAL_TTL_DAYS = 7;
 

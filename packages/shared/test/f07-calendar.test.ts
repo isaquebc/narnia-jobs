@@ -45,7 +45,7 @@ describe("F07/M5 · .ics", () => {
     expect(p.DTEND).toBe("20261029T183000Z");
     expect(p.DTSTAMP).toBe("20261028T120000Z");
     expect(p.SUMMARY).toBe("Entrevista técnica · Acme\\, Inc.");
-    expect(p.DESCRIPTION).toContain("Levar exemplos de\\nsistemas de pagamento; revisar o case");
+    expect(p.DESCRIPTION).toContain("Levar exemplos de\\nsistemas de pagamento\\; revisar o case");
     expect(p.DESCRIPTION).toContain("http://127.0.0.1:5173/candidaturas/a1");
     expect(p.LOCATION).toBe("Google Meet");
     expect(p.URL).toBe("https://meet.example/abc");

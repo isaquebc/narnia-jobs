@@ -229,6 +229,18 @@ export const JobApplicationEventSchema = z.object({
   doneAt: IsoDateTimeSchema.nullable(),
   icsSequence: z.number().int().min(0),
   googleEventId: z.string().nullable(),
+  /** F14-3: etapa com horário combinado no e-mail, sem o convite oficial da empresa. */
+  provisional: z.boolean().default(false),
+  /** F14-3: UID do convite `.ics` da empresa (remarcação e cancelamento chegam com o mesmo). */
+  icsUid: z.string().nullable().default(null),
+  /** F14-3: a pessoa bloqueou a agenda para a etapa provisória. */
+  blockedAt: IsoDateTimeSchema.nullable().default(null),
+  /** F14-3: a empresa cancelou (não lembra mais). */
+  cancelledAt: IsoDateTimeSchema.nullable().default(null),
+  /** F14: e-mail que criou ou mudou o evento. */
+  mailMessageId: z.string().nullable().default(null),
+  /** F14-3: SEQUENCE do convite recebido (remarcação mais antiga que esta é ignorada). */
+  remoteSequence: z.number().int().nullable().default(null),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
 });

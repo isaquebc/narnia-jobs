@@ -69,6 +69,7 @@ import { type SelfDeclarationsRepo, selfDeclarationsRepo } from "./self-declarat
 import { type SettingsRepo, settingsRepo } from "./settings";
 import { type SnapshotsRepo, snapshotsRepo } from "./snapshots";
 import { type SourceFilesRepo, sourceFilesRepo } from "./source-files";
+import { type StageSuggestionsRepo, stageSuggestionsRepo } from "./stage-suggestions";
 import { type SuggestionsRepo, suggestionsRepo } from "./suggestions";
 import { type UsageEventsRepo, usageEventsRepo } from "./usage-events";
 import { type UsersRepo, usersRepo } from "./users";
@@ -79,6 +80,7 @@ export interface Repos {
   scheduled: ScheduledRepo;
   mail: MailRepo;
   mailSenders: MailSendersRepo;
+  stageSuggestions: StageSuggestionsRepo;
   users: UsersRepo;
   profiles: ProfilesRepo;
   emphasis: EmphasisRepo;
@@ -203,6 +205,7 @@ export function createRepos(db: Db): Repos {
     scheduled: scheduledRepo(db),
     mail: mailRepo(db),
     mailSenders: mailSendersRepo(db),
+    stageSuggestions: stageSuggestionsRepo(db),
   };
 }
 
@@ -233,6 +236,7 @@ export * from "./scheduled";
 export * from "./settings";
 export * from "./snapshots";
 export * from "./source-files";
+export * from "./stage-suggestions";
 export * from "./suggestions";
 export * from "./usage-events";
 export * from "./users";

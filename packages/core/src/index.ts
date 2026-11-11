@@ -85,6 +85,8 @@ export * from "./mail/process";
 export * from "./mail/risk";
 export * from "./mail/source";
 export * from "./mail/sync";
+export * from "./mail/undo";
+export * from "./mail/updates";
 export * from "./media/client";
 export * from "./models";
 export * from "./net/guard";

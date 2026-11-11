@@ -127,6 +127,8 @@ export async function digestMail(input: {
           ...cls,
           postingUrl: keep(cls.postingUrl),
           jobs: cls.jobs.map((j) => ({ ...j, url: keep(j.url) })),
+          // F14/M6: o link da chamada do convite também precisa estar no e-mail
+          interview: cls.interview ? { ...cls.interview, link: keep(cls.interview.link) } : null,
         };
       }
       const trusted = msg.riskLevel === "trusted";

@@ -16,6 +16,8 @@ export interface CalendarEventInput {
   sequence: number;
   /** Página da candidatura na interface. */
   appUrl: string;
+  /** F14-3: a empresa cancelou; o `.ics` sai como cancelamento (tira o evento de quem já importou). */
+  cancelled?: boolean;
 }
 
 /** `2026-10-29T17:00:00.000Z` → `20261029T170000Z`. */
@@ -50,7 +52,7 @@ export function googleCalendarUrl(e: CalendarEventInput): string {
 
 /** TEXT (RFC 5545 §3.3.11): barra, ponto e vírgula, vírgula e quebra de linha escapados. */
 const text = (s: string) =>
-  s.replace(/\\/g, "\\\\").replace(/;/g, ";").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 
 /** Dobra a linha em pedaços de até 75 octetos (§3.1), sem partir um caractere UTF-8. */
 function fold(line: string): string {
@@ -80,7 +82,7 @@ export function buildIcs(e: CalendarEventInput, now = new Date()): string {
     "VERSION:2.0",
     "PRODID:-//narnia-jobs//candidaturas//PT-BR",
     "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
+    e.cancelled ? "METHOD:CANCEL" : "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${e.id}@narnia-jobs`,
     `SEQUENCE:${e.sequence}`,
@@ -88,6 +90,7 @@ export function buildIcs(e: CalendarEventInput, now = new Date()): string {
     `DTSTART:${start}`,
     `DTEND:${end}`,
     `SUMMARY:${text(e.title)}`,
+    ...(e.cancelled ? ["STATUS:CANCELLED"] : []),
     `DESCRIPTION:${text(details(e))}`,
     ...(e.location ? [`LOCATION:${text(e.location)}`] : []),
     ...(e.link ? [`URL:${e.link}`] : []),

@@ -140,7 +140,7 @@ export interface MailApplicationsResult {
 }
 
 /** Instante em que a candidatura foi encerrada pela última vez (passagem para Encerrado). */
-function closedAt(repos: Repos, applicationId: string): string | null {
+export function closedAt(repos: Repos, applicationId: string): string | null {
   const r = repos.db
     .prepare(
       "select max(at) as at from job_application_move where job_application_id = ? and to_column = 'closed'",
@@ -244,7 +244,12 @@ function planMail(repos: Repos, msg: MailMessageRecord, cls: MailClassifyOutput)
 }
 
 /** E-mail mais antigo ainda sem classe (avaliação ou modelo pendentes): nada mais novo que ele é aplicado (§2.2). */
-function oldestUnclassified(repos: Repos): string | null {
+/** E-mail pendente mais antigo destas classes (a ordem entre o M5 e o M6, revisão do M6, #13). */
+export function oldestPendingOf(repos: Repos, classes: string[]): string | null {
+  return repos.mail.byClasses(classes, "pending", 1)[0]?.receivedAt ?? null;
+}
+
+export function oldestUnclassified(repos: Repos): string | null {
   const a = repos.mail.unassessed(1)[0]?.receivedAt ?? null;
   const b = repos.mail.toDigest(1)[0]?.receivedAt ?? null;
   if (!a) return b;
@@ -260,7 +265,10 @@ export async function applyMailApplications(input: {
 }): Promise<MailApplicationsResult> {
   const { repos, ctx } = input;
   const out: MailApplicationsResult = { created: 0, closed: 0, noted: 0, review: 0 };
-  const barrier = oldestUnclassified(repos);
+  const unclassified = oldestUnclassified(repos);
+  // atualização ou convite mais antigo ainda pendente (M6) também segura os mais novos daqui
+  const m6 = oldestPendingOf(repos, ["update", "interview_invite", "recruiter_contact"]);
+  const barrier = !unclassified ? m6 : !m6 ? unclassified : unclassified < m6 ? unclassified : m6;
   let held = 0;
   // do mais antigo para o mais novo, as duas classes juntas: a negativa nunca antes da confirmação (§2.2)
   for (const msg of repos.mail.byClasses(
@@ -318,26 +326,48 @@ export async function applyMailApplications(input: {
         let counter: "noted" | "created" | "closed";
         if (plan.kind === "note") {
           ({ app, posting, action } = plan);
-          addJobApplicationEntry(repos, input.dataDir, app.id, {
+          const entry = addJobApplicationEntry(repos, input.dataDir, app.id, {
             occurredOn,
             body: mailNote(repos, msg, cls, plan.title),
             files: [],
           });
+          repos.mail.addUndo(msg.id, { entryIds: [entry.id] });
           counter = "noted";
         } else if (plan.kind === "create") {
           posting = plan.posting ?? newPostingFromMail(repos, msg, cls);
           app = createFromMail(repos, posting, msg);
-          addJobApplicationEntry(repos, input.dataDir, app.id, {
+          const note = addJobApplicationEntry(repos, input.dataDir, app.id, {
             occurredOn,
             body: mailNote(repos, msg, cls, "Confirmação de candidatura"),
             files: [],
+          });
+          // desfazer apaga a candidatura (e a nota com ela) e a vaga criada pelo e-mail
+          repos.mail.addUndo(msg.id, {
+            createdApplicationId: app.id,
+            entryIds: [note.id],
+            ...(plan.posting ? {} : { createdPostingId: posting.id }),
           });
           action = "candidatura criada";
           counter = "created";
         } else {
           posting = plan.posting;
-          app = plan.app ?? createFromMail(repos, posting, msg);
-          rejectJobApplication(
+          const existing = plan.app;
+          app = existing ?? createFromMail(repos, posting, msg);
+          repos.mail.addUndo(
+            msg.id,
+            existing
+              ? {
+                  closed: {
+                    applicationId: app.id,
+                    column: app.column,
+                    closedReason: app.closedReason,
+                    closedStage: app.closedStage,
+                    closedEntryId: app.closedEntryId,
+                  },
+                }
+              : { createdApplicationId: app.id },
+          );
+          const closedApp = rejectJobApplication(
             repos,
             input.dataDir,
             app.id,
@@ -349,6 +379,8 @@ export async function applyMailApplications(input: {
             new Date(),
             origin,
           );
+          if (closedApp.closedEntryId)
+            repos.mail.addUndo(msg.id, { entryIds: [closedApp.closedEntryId] });
           action = "candidatura encerrada (negativa)";
           counter = "closed";
           const { notification, created } = repos.notifications.upsert({

@@ -8,6 +8,8 @@ import type {
   SavedPostingCard,
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
+import { withTransaction } from "../db/open";
+import { learnFromManualStage } from "../mail/updates";
 
 export { ARCHIVE_AFTER_DAYS } from "../db/repos/job-applications";
 
@@ -38,7 +40,9 @@ export type JobApplicationErrorCode =
   | "entry_empty"
   | "file_too_large"
   | "invalid_datetime"
-  | "already_closed";
+  | "already_closed"
+  | "profile_not_found"
+  | "wrong_profile";
 
 export class JobApplicationError extends Error {
   constructor(
@@ -184,6 +188,8 @@ export function setCurrentStage(
   const app = mustApplication(repos, id);
   if (stageId && !app.stages.some((s) => s.id === stageId))
     throw new JobApplicationError("stage_not_found", "Etapa não é desta candidatura");
+  // F14-2: a troca à mão aprova a sugestão igual ou corrige a decisão recente do e-mail
+  learnFromManualStage(repos, id, stageId, now);
   return repos.jobApplications.setCurrentStage(id, stageId, now);
 }
 
@@ -289,3 +295,46 @@ export * from "./agenda";
 export * from "./entries";
 export * from "./google-calendar";
 export * from "./tools";
+
+/**
+ * Perfil e CV da candidatura (F14-5, F14-15; revisão do M5, #8): a pessoa troca o perfil escolhido pelo e-mail ou pela
+ * análise, e liga a versão do CV que enviou (ou tira). O CV ligado aqui é confirmado (deixa de ser presumido) e precisa
+ * ser um CV pronto do mesmo perfil. Trocar o perfil tira o CV de outro perfil.
+ */
+export function setJobApplicationProfileAndCv(
+  repos: Repos,
+  id: string,
+  input: { profileId?: string | undefined; cvVersionId?: string | null | undefined },
+  now = new Date(),
+): JobApplication {
+  const app = mustApplication(repos, id);
+  let profileId = app.profileId;
+  if (input.profileId !== undefined) {
+    const p = repos.profiles.get(input.profileId);
+    if (!p) throw new JobApplicationError("profile_not_found", "Perfil não encontrado");
+    profileId = p.id;
+  }
+  let cv: string | null | undefined = input.cvVersionId;
+  if (cv) {
+    const v = repos.documents.versionById(cv);
+    const d = v ? repos.documents.get(v.documentId) : null;
+    if (!v || !d || d.kind !== "cv")
+      throw new JobApplicationError("not_found", "CV não encontrado");
+    if (v.status !== "ready" && v.status !== "ready_with_issues")
+      throw new JobApplicationError("version_not_ready", "Esta versão do CV não está pronta");
+    if (profileId && d.profileId !== profileId)
+      throw new JobApplicationError("wrong_profile", "O CV é de outro perfil");
+    profileId ??= d.profileId;
+  } else if (cv === undefined && app.cv && input.profileId !== undefined) {
+    // trocar o perfil tira o CV de outro perfil
+    const v = repos.documents.versionById(app.cv.versionId);
+    const d = v ? repos.documents.get(v.documentId) : null;
+    if (d && d.profileId !== profileId) cv = null;
+  }
+  return withTransaction(repos.db, () => {
+    if (input.profileId !== undefined || (cv && !app.profileId))
+      repos.jobApplications.setProfile(id, profileId, now);
+    if (cv !== undefined) repos.jobApplications.setCv(id, cv, false, now);
+    return mustApplication(repos, id);
+  });
+}

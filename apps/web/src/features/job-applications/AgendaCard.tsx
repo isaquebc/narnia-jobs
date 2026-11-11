@@ -35,7 +35,12 @@ function EventItem({ e, stage }: { e: JobApplicationEvent; stage: string | null 
     mutationFn: () => api.deleteJobApplicationEvent(e.applicationId, e.id),
     onSettled: done,
   });
-  const late = !e.doneAt && Date.parse(e.startsAt) < Date.now();
+  // F14-3: bloquear a agenda para a etapa provisória (abre o Google Agenda e marca o bloqueio)
+  const block = useMutation({
+    mutationFn: (v: boolean) => api.blockJobApplicationEvent(e.applicationId, e.id, v),
+    onSettled: done,
+  });
+  const late = !e.doneAt && !e.cancelledAt && Date.parse(e.startsAt) < Date.now();
   const google = googleCalendarUrl({
     id: e.id,
     title: e.title,
@@ -62,6 +67,15 @@ function EventItem({ e, stage }: { e: JobApplicationEvent; stage: string | null 
           </span>
         </span>
         <span className="flex gap-1">
+          {e.cancelledAt ? (
+            <Badge tone="danger">{t("jobApplications.agenda.cancelled")}</Badge>
+          ) : null}
+          {e.provisional && !e.cancelledAt ? (
+            <Badge tone="warn">{t("jobApplications.agenda.provisional")}</Badge>
+          ) : null}
+          {e.icsUid && !e.provisional && !e.cancelledAt ? (
+            <Badge tone="ok">{t("jobApplications.agenda.official")}</Badge>
+          ) : null}
           {late ? <Badge tone="warn">{t("jobApplications.agenda.late")}</Badge> : null}
           {e.doneAt ? <Badge tone="ok">{t("jobApplications.agenda.done")}</Badge> : null}
         </span>
@@ -81,15 +95,40 @@ function EventItem({ e, stage }: { e: JobApplicationEvent; stage: string | null 
         </a>
       ) : null}
       {e.notes ? <p className="whitespace-pre-wrap text-xs">{e.notes}</p> : null}
+      {e.provisional && !e.cancelledAt ? (
+        <p className="text-xs text-muted-fg">
+          {e.blockedAt
+            ? t("jobApplications.agenda.blockedHint")
+            : t("jobApplications.agenda.provisionalHint")}
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2 pt-1">
-        <a
-          href={google}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={buttonClass({ variant: "outline", size: "sm" })}
-        >
-          {t("jobApplications.agenda.google")}
-        </a>
+        {e.provisional && !e.cancelledAt && !e.blockedAt ? (
+          <a
+            href={google}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => block.mutate(true)}
+            className={buttonClass({ variant: "primary", size: "sm" })}
+          >
+            {t("jobApplications.agenda.block")}
+          </a>
+        ) : null}
+        {e.provisional && e.blockedAt ? (
+          <Button type="button" variant="ghost" size="sm" onClick={() => block.mutate(false)}>
+            {t("jobApplications.agenda.unblock")}
+          </Button>
+        ) : null}
+        {e.cancelledAt ? null : (
+          <a
+            href={google}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClass({ variant: "outline", size: "sm" })}
+          >
+            {t("jobApplications.agenda.google")}
+          </a>
+        )}
         <a href={ics} download className={buttonClass({ variant: "outline", size: "sm" })}>
           {t("jobApplications.agenda.ics")}
         </a>
