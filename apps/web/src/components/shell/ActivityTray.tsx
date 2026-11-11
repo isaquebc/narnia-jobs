@@ -38,6 +38,7 @@ const OTHER_STAGES = [
   "cv.render",
   "recording.analyze",
   "recording.report",
+  "scheduled.run",
   "stalled",
 ];
 

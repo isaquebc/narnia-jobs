@@ -26,6 +26,7 @@ import { handleQueueEvent } from "./events";
 import { withPlanSampling } from "./ingest/plan-sampling";
 import { createBeat, type FailedJobTarget, handleFinalFailure, runSweep, safely } from "./liveness";
 import { type OcrDeps, processStage, type WorkerDeps } from "./pipeline";
+import { enqueueDueScheduledTasks } from "./processors/scheduled-run";
 import { createQueues, QUEUE_NAMES } from "./queues";
 import { isTaskJob, processTask } from "./tasks";
 import { traceJob } from "./trace-job";
@@ -47,6 +48,8 @@ export interface StartWorkersOptions {
   heartbeatMs?: number;
   /** Intervalo do verificador de execuções presas (plano de comunicação C3); 0 desliga. */
   sweepMs?: number;
+  /** Intervalo do laço do agendador (F14-12, padrão 30 s); 0 desliga. */
+  schedulerPollMs?: number;
   log?: (line: string) => void;
 }
 
@@ -180,7 +183,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
         // F13: a análise leva até uma hora e retoma pelas etapas do media; um reinício do worker no meio não pode
         // derrubar o job de vez (padrão da BullMQ: 1)
         ...(name === "media" ? { maxStalledCount: 5 } : {}),
-        // `media` fica em 1 (F13): o serviço processa uma execução por vez
+        // `media` (F13) e `scheduled` (F14-12) ficam em 1, fora de Configurações: uma execução por vez
         concurrency:
           opts.concurrency?.[name] ??
           (resolveConcurrency(repos.settings) as Record<string, number>)[name] ??
@@ -285,6 +288,37 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
   const sweepTimer =
     sweepMs > 0 ? setInterval(() => void safely("verificador", sweep, log), sweepMs) : null;
 
+  // agendador (F14-12): execução que ficou em "running" quando o worker caiu vira erro; o laço enfileira as devidas,
+  // com trava no Redis para dois workers não enfileirarem juntos
+  const interrupted = repos.scheduled.failRunning(
+    "Interrompida: o worker reiniciou no meio",
+    nowUtc(),
+  );
+  if (interrupted.length)
+    log(`[worker] ${interrupted.length} execução(ões) agendada(s) interrompida(s)`);
+  const schedulerMs = opts.schedulerPollMs ?? 30_000;
+  const scheduleTick = async () => {
+    const locked =
+      (await connection.set(
+        `${prefix}:scheduler`,
+        "1",
+        "EX",
+        Math.max(5, Math.floor(schedulerMs / 1000) - 2),
+        "NX",
+      )) === "OK";
+    if (!locked) return;
+    const due = await enqueueDueScheduledTasks(deps, new Date(), async (jobId) => {
+      const job = await queues.scheduled.getJob(jobId);
+      return job ? await job.getState() : "missing";
+    });
+    if (due.length) log(`[worker] tarefas agendadas na fila: ${due.join(", ")}`);
+  };
+  const schedulerTimer =
+    schedulerMs > 0
+      ? setInterval(() => void safely("agendador", scheduleTick, log), schedulerMs)
+      : null;
+  if (schedulerMs > 0) void safely("agendador", scheduleTick, log);
+
   const ttlSeconds = Math.max(5, Math.ceil(((opts.heartbeatMs ?? 10_000) * 3) / 1000));
   const beat = async () => {
     await connection.set(heartbeatKey(prefix), nowUtc(), "EX", ttlSeconds);
@@ -317,6 +351,7 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
       clearInterval(timer);
       clearInterval(concurrencyTimer);
       if (sweepTimer) clearInterval(sweepTimer);
+      if (schedulerTimer) clearInterval(schedulerTimer);
       await Promise.all(workers.map((w) => w.close()));
       await Promise.all(queueEvents.map((q) => q.close()));
       await eventsConnection.quit();

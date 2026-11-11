@@ -48,6 +48,7 @@ import {
   RunStatusSchema,
 } from "../schemas/ingest";
 import { JobSchema } from "../schemas/job";
+import { GmailUpdatedEventSchema } from "../schemas/mail";
 import { NotificationSchema } from "../schemas/notification";
 import { PersonaOverridesSchema, PersonaSchema } from "../schemas/persona";
 import {
@@ -61,6 +62,7 @@ import {
 } from "../schemas/profile";
 import { ProfileCardSchema } from "../schemas/profile-card";
 import { ProfileSuggestionSchema } from "../schemas/profile-suggestion";
+import { ScheduledRunUpdatedEventSchema } from "../schemas/scheduled";
 import { UserSchema } from "../schemas/user";
 
 /** Contratos das rotas de F01 §2.6. Fonte única para api (validação) e web (tipos). */
@@ -1056,6 +1058,8 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   ProfileMotivationsUpdatedEventSchema,
   JobApplicationUpdatedEventSchema,
   RecordingUpdatedEventSchema,
+  ScheduledRunUpdatedEventSchema,
+  GmailUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

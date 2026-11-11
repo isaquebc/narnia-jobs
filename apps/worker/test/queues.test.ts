@@ -22,8 +22,8 @@ describe("M1/worker createQueues", () => {
     }
   });
 
-  it("filas de F01 são ingest, ocr e extract; a F13 acrescenta media (análise de vídeo, uma por vez)", () => {
-    expect(QUEUE_NAMES).toEqual(["ingest", "ocr", "extract", "media"]);
+  it("filas de F01 são ingest, ocr e extract; a F13 acrescenta media e a F14 scheduled (uma por vez cada)", () => {
+    expect(QUEUE_NAMES).toEqual(["ingest", "ocr", "extract", "media", "scheduled"]);
   });
 });
 

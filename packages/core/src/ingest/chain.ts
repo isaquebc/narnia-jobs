@@ -6,9 +6,11 @@ import type { Repos } from "../db";
  * Cadeia de jobs da ingestão (F01 §2.5). Cada etapa é um job BullMQ com id determinístico `(run, etapa)`;
  * a tabela `job` é o espelho durável. O plano depende do tipo de arquivo e das opções (OCR, leitura pelo modelo).
  */
-export type QueueName = "ingest" | "ocr" | "extract" | "media";
+/** `scheduled` (F14-12): tarefas agendadas, uma por vez. */
+export type QueueName = "ingest" | "ocr" | "extract" | "media" | "scheduled";
 /** Filas por nome; `media` (F13) é opcional para quem não roda a análise de vídeo (testes, sandbox das avaliações). */
-export type QueueRecord<Q> = Record<Exclude<QueueName, "media">, Q> & Partial<Record<"media", Q>>;
+export type QueueRecord<Q> = Record<Exclude<QueueName, "media" | "scheduled">, Q> &
+  Partial<Record<"media" | "scheduled", Q>>;
 
 export type StageName =
   | "ingest.read_text"

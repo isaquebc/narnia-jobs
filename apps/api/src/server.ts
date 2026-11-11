@@ -27,8 +27,6 @@ import { syncPrompts } from "./evals/prompt-sync";
 import { EventBus } from "./events";
 import { BullQueueAdapter } from "./queue";
 import { startRedisRelay } from "./relay";
-import { pruneCapturesNow } from "./routes/extension";
-import { archiveJobApplicationsNow } from "./routes/job-applications";
 import { attachWebSocket } from "./ws";
 
 const port = Number(process.env.PORT ?? 3100);
@@ -45,30 +43,7 @@ migrate(db, { backupDir });
 const repos = createRepos(db);
 // F03-fix L1: backup do dia fora da pasta de dados e aviso de banco recriado; nunca impede o boot
 bootData({ db, repos, dataDir, backupDir });
-// F12 §5: capturas que não viraram vaga nem formulário saem depois de 30 dias (no boot e uma vez por dia)
-const pruneCaptures = () => {
-  try {
-    const n = pruneCapturesNow({ repos, dataDir });
-    if (n) console.warn(`[api] ${n} captura(s) da extensão antiga(s) apagada(s)`);
-  } catch (e) {
-    console.warn(`[api] aviso: poda das capturas falhou (${(e as Error).message})`);
-  }
-};
-// F07 §0-6: candidaturas sem atividade há 40 dias ficam arquivadas (no boot e uma vez por dia; nunca apaga)
-const archiveApplications = () => {
-  try {
-    const n = archiveJobApplicationsNow({ repos });
-    if (n) console.warn(`[api] ${n} candidatura(s) arquivada(s) por inatividade`);
-  } catch (e) {
-    console.warn(`[api] aviso: arquivamento das candidaturas falhou (${(e as Error).message})`);
-  }
-};
-const daily = () => {
-  pruneCaptures();
-  archiveApplications();
-};
-daily();
-setInterval(daily, 24 * 60 * 60 * 1000).unref();
+// F12 §5 (poda das capturas) e F07 §0-6 (arquivamento das candidaturas) rodam no agendador do worker (F14-12)
 const provider = createProviderFromEnv();
 const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const queueOpts = { connection, prefix, defaultJobOptions: { ...DEFAULT_JOB_OPTIONS } };
@@ -77,6 +52,7 @@ const queues = {
   ocr: new Queue<StageJobData>("ocr", queueOpts),
   extract: new Queue<StageJobData>("extract", queueOpts),
   media: new Queue<StageJobData>("media", queueOpts),
+  scheduled: new Queue<StageJobData>("scheduled", queueOpts),
 };
 const bus = new EventBus();
 const relay = startRedisRelay({ redisUrl, prefix, bus });

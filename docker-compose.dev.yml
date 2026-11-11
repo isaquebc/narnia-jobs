@@ -43,6 +43,9 @@ services:
     command: ["pnpm", "--filter", "@narnia-jobs/api", "exec", "tsx", "watch", "src/server.ts"]
     ports:
       - "127.0.0.1:${NARNIA_DEV_API_PORT:-3100}:3100"   # só em dev: a API fica acessível no host para curl/Vite
+      # F14: retorno do login do Gmail, a mesma porta no host e no container; porta própria do dev (8090) para não
+      # colidir com a produção (8089) nem com o `google connect` do Calendar, que usa a da produção
+      - "127.0.0.1:${NARNIA_DEV_OAUTH_PORT:-8090}:${NARNIA_DEV_OAUTH_PORT:-8090}"
     environment:
       - REDIS_URL=redis://redis:6379
       - NARNIA_DATA_DIR=${NARNIA_DEV_DATA_DIR:-/app/data}
@@ -57,6 +60,9 @@ services:
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # vaga por URL que precisa de navegador (vazio desliga)
       - NARNIA_MEDIA_URL=${NARNIA_MEDIA_URL-http://media:8700}   # F13: serviço media (perfil opcional)
+      - NARNIA_OAUTH_PORT=${NARNIA_DEV_OAUTH_PORT:-8090}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}           # F14: cliente OAuth do Google (Gmail) da própria pessoa, do .env
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
     networks: [default, browser, media]
     depends_on: [redis]
 
@@ -76,6 +82,8 @@ services:
       - NARNIA_OTEL_ENDPOINT=${NARNIA_OTEL_ENDPOINT-http://phoenix:6006/v1/traces}   # F04-15: rastros no Phoenix local (vazio desliga)
       - NARNIA_OTEL_CONTENT=${NARNIA_OTEL_CONTENT:-1}   # 0 tira perguntas, respostas, prompts e resultados de tools dos rastros
       - NARNIA_BROWSER_WS=${NARNIA_BROWSER_WS-ws://browser:3000/narnia}   # F05: PDF do CV e da carta
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}           # F14: cliente OAuth do Google (Gmail) da própria pessoa, do .env
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - NARNIA_MEDIA_URL=${NARNIA_MEDIA_URL-http://media:8700}   # F13: serviço media (perfil opcional)
     networks: [default, browser, media]
     depends_on: [redis]

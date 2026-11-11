@@ -269,3 +269,39 @@ describe("F13/M4 · backup dos quadros das entrevistas, nunca do vídeo", async 
     }
   });
 });
+
+describe("F14/M1 · RT-I2: o backup é por lista de inclusão; segredos nunca entram", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readdirSync, rmSync } = await import(
+    "node:fs"
+  );
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { backupOnBoot, migrate, openDatabase } = await import("../../src/db");
+
+  it("backupOnBoot copia as pastas da lista e deixa secrets/ (token do Gmail) e pastas desconhecidas de fora", () => {
+    const root = mkdtempSync(join(tmpdir(), "narnia-bkp-secrets-"));
+    const data = join(root, "data");
+    const bk = join(root, "backups");
+    try {
+      mkdirSync(join(data, "uploads"), { recursive: true });
+      writeFileSync(join(data, "uploads/abc"), "pdf");
+      mkdirSync(join(data, "secrets"), { recursive: true });
+      writeFileSync(join(data, "secrets/gmail-token.json"), '{"refresh_token":"x"}');
+      mkdirSync(join(data, "outra-coisa"), { recursive: true });
+      writeFileSync(join(data, "outra-coisa/f"), "x");
+      const db = openDatabase(join(data, "narnia.sqlite"));
+      migrate(db);
+      const at = new Date().toISOString();
+      db.prepare("insert into user (id, created_at, updated_at) values ('u1', ?, ?)").run(at, at);
+      const r = backupOnBoot({ db, dataDir: data, backupDir: bk });
+      db.close();
+      expect(r.created).not.toBeNull();
+      expect(existsSync(join(bk, "uploads/abc"))).toBe(true);
+      expect(existsSync(join(bk, "secrets"))).toBe(false);
+      expect(existsSync(join(bk, "outra-coisa"))).toBe(false);
+      expect(readdirSync(bk).some((f) => /secret|token/i.test(f))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

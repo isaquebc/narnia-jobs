@@ -39,6 +39,7 @@ import type {
   GithubIngestionCreateRequest,
   GithubMetrics,
   GithubPreviewResponse,
+  GmailStatusView,
   IngestionCreateRequest,
   IngestionDecisionRequest,
   IngestionEstimateRequest,
@@ -101,6 +102,10 @@ import type {
   RunStatus,
   SalaryReference,
   SavedPostingCard,
+  ScheduledRun,
+  ScheduledRunDetail,
+  ScheduledTask,
+  ScheduledTaskPatch,
   SnapshotsListResponseSchema,
   SuggestionsListResponse,
   TrustedDomain,
@@ -479,6 +484,21 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         json(body),
       ),
     listJobs: () => request<{ jobs: Job[] }>("/api/jobs"),
+    listScheduledTasks: () => request<{ tasks: ScheduledTask[] }>("/api/scheduled-tasks"),
+    patchScheduledTask: (id: string, patch: ScheduledTaskPatch) =>
+      request<ScheduledTask>(`/api/scheduled-tasks/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+    runScheduledTask: (id: string) =>
+      request<{ jobId: string; enqueued: boolean }>(
+        `/api/scheduled-tasks/${encodeURIComponent(id)}/run`,
+        json({}),
+      ),
+    listScheduledRuns: (id: string) =>
+      request<{ runs: ScheduledRun[] }>(`/api/scheduled-tasks/${encodeURIComponent(id)}/runs`),
+    getScheduledRun: (id: string) =>
+      request<ScheduledRunDetail>(`/api/scheduled-runs/${encodeURIComponent(id)}`),
     getWorkerSettings: () => request<WorkerSettings>("/api/settings/workers"),
     getSemanticSearch: () => request<SemanticSearchView>("/api/settings/semantic-search"),
     putSemanticSearch: (body: { enabled: boolean }) =>
@@ -873,6 +893,18 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         `/api/recordings/${encodeURIComponent(id)}/chat`,
         json({ message }),
       ),
+    getGmailStatus: () => request<GmailStatusView>("/api/integrations/gmail"),
+    putGmailClient: (body: { clientId: string; clientSecret: string }) =>
+      request<GmailStatusView>("/api/integrations/gmail/client", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    deleteGmailClient: () =>
+      request<GmailStatusView>("/api/integrations/gmail/client", { method: "DELETE" }),
+    connectGmail: () =>
+      request<GmailStatusView & { authUrl: string }>("/api/integrations/gmail/connect", json({})),
+    disconnectGmail: () =>
+      request<GmailStatusView>("/api/integrations/gmail", { method: "DELETE" }),
     getGoogleCalendarStatus: (refresh = false) =>
       request<{
         status: "connected" | "needs_auth" | "not_configured" | "error" | "unavailable";

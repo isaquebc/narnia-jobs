@@ -6,6 +6,7 @@ import {
   POSTING_TASKS,
   PROFILE_MOTIVATIONS_TASK,
   RECORDING_TASKS,
+  SCHEDULED_RUN_TASK,
   type StageJobData,
   type TaskJobData,
 } from "@narnia-jobs/core";
@@ -26,6 +27,7 @@ import { postingExtract } from "./processors/posting-extract";
 import { profileMotivations } from "./processors/profile-motivations";
 import { recordingAnalyze } from "./processors/recording-analyze";
 import { recordingReport } from "./processors/recording-report";
+import { scheduledRun } from "./processors/scheduled-run";
 import { templateValidate } from "./processors/template-validate";
 
 /**
@@ -70,6 +72,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   [DOCUMENT_TASKS.validateTemplate]: templateValidate,
   [RECORDING_TASKS.analyze]: recordingAnalyze,
   [RECORDING_TASKS.report]: recordingReport,
+  [SCHEDULED_RUN_TASK]: scheduledRun,
 };
 
 export function isTaskJob(data: StageJobData | TaskJobData): data is TaskJobData {

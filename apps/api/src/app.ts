@@ -1,8 +1,11 @@
 import { join } from "node:path";
 import {
   defaultGhConfigDir,
+  FAKE_GMAIL_STATE_FILENAME,
+  fakeGmailFileFetch,
   googleCalendarCallbackPort,
   MediaClient,
+  oauthCallbackPort,
   type Repos,
 } from "@narnia-jobs/core";
 import type { Provider } from "@narnia-jobs/providers";
@@ -41,6 +44,7 @@ import { evalsSettingsRoutes } from "./routes/evals-settings";
 import { extensionRoutes, watchCaptureAnalyses } from "./routes/extension";
 import { filesRoutes } from "./routes/files";
 import { githubRoutes } from "./routes/github";
+import { type CallbackListener, gmailRoutes } from "./routes/gmail";
 import { ingestionsRoutes } from "./routes/ingestions";
 import { integrationsRoutes } from "./routes/integrations";
 import { jobApplicationsRoutes } from "./routes/job-applications";
@@ -58,6 +62,7 @@ import { providerRoutes } from "./routes/provider";
 import { recordingsRoutes } from "./routes/recordings";
 import { reposRoutes } from "./routes/repos";
 import { salaryReferenceRoutes } from "./routes/salary-reference";
+import { scheduledRoutes } from "./routes/scheduled";
 import { semanticSearchRoutes } from "./routes/semantic-search";
 import { snapshotsRoutes } from "./routes/snapshots";
 import { usageRoutes } from "./routes/usage";
@@ -92,6 +97,13 @@ export interface AppDeps {
   semantic?: SemanticSearchService;
   /** F13: serviço media; ausente = do ambiente (`NARNIA_MEDIA_URL`). */
   media?: MediaClient;
+  /** F14: Gmail; ausente = API real (ou o Gmail falso em arquivo com o mock), ambiente e porta do processo. */
+  gmail?: {
+    fetch?: typeof fetch;
+    env?: Record<string, string | undefined>;
+    port?: number;
+    listen?: CallbackListener;
+  };
 }
 
 /** Monta a aplicação Hono (F01 §2.6). Tudo atrás do token de boot, exceto health e a rota de entrada. */
@@ -321,6 +333,23 @@ export function createApp(deps: AppDeps) {
     }),
   );
   app.route("/", jobsRoutes({ repos: deps.repos, queue: deps.queue }));
+  app.route("/", scheduledRoutes({ repos: deps.repos, queue: deps.queue }));
+  // F14: Gmail pela API REST com o cliente OAuth da pessoa; com o mock, o Gmail falso em <dados>/.fake-gmail.json
+  app.route(
+    "/",
+    gmailRoutes({
+      dataDir: deps.dataDir,
+      fetch:
+        deps.gmail?.fetch ??
+        (fake
+          ? fakeGmailFileFetch(join(deps.dataDir, FAKE_GMAIL_STATE_FILENAME))
+          : globalThis.fetch),
+      env: deps.gmail?.env ?? process.env,
+      port: deps.gmail?.port ?? oauthCallbackPort(process.env),
+      bus: deps.bus,
+      ...(deps.gmail?.listen ? { listen: deps.gmail.listen } : {}),
+    }),
+  );
   app.route(
     "/",
     reposRoutes({ repos: deps.repos, provider: deps.provider, queue: deps.queue, bus: deps.bus }),

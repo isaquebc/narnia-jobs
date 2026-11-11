@@ -9,9 +9,10 @@ import {
   type StageJobData,
   type StageName,
   type TaskJobData,
+  taskOfJob,
 } from "@narnia-jobs/core";
 import type { Job as MirrorJob } from "@narnia-jobs/shared";
-import { Job, type Queue } from "bullmq";
+import type { Queue } from "bullmq";
 
 /** Fronteira entre a API e a fila (BullMQ em produção, fake nos testes). */
 export interface EnqueueTaskRequest {
@@ -43,12 +44,10 @@ const BULL_STATE: Record<string, QueueJobState> = {
   failed: "failed",
 };
 
-type Queues = Record<"ingest" | "ocr" | "extract" | "media", Queue<StageJobData>>;
+type QueueKey = "ingest" | "ocr" | "extract" | "media" | "scheduled";
+type Queues = Record<QueueKey, Queue<StageJobData>>;
 /** As mesmas filas aceitam dados de tarefa (F02 §2.9-1); o tipo genérico da BullMQ é só anotação. */
-type TaskQueues = Record<
-  "ingest" | "ocr" | "extract" | "media",
-  { add: Queue<TaskJobData>["add"] }
->;
+type TaskQueues = Record<QueueKey, { add: Queue<TaskJobData>["add"] }>;
 
 export class BullQueueAdapter implements QueueAdapter {
   constructor(
@@ -77,7 +76,7 @@ export class BullQueueAdapter implements QueueAdapter {
   async cancel(jobId: string) {
     const queue = this.queueFor(jobId);
     if (!queue) return "missing" as const;
-    const job = await Job.fromId(queue, jobId);
+    const job = await queue.getJob(jobId);
     if (!job) return "missing" as const;
     const state = await job.getState();
     if (state === "active") return "active" as const;
@@ -88,7 +87,7 @@ export class BullQueueAdapter implements QueueAdapter {
   async state(jobId: string) {
     const queue = this.queueFor(jobId);
     if (!queue) return { state: "missing" as const };
-    const job = await Job.fromId(queue, jobId);
+    const job = await queue.getJob(jobId);
     if (!job) return { state: "missing" as const };
     const raw = await job.getState();
     return {
@@ -101,12 +100,24 @@ export class BullQueueAdapter implements QueueAdapter {
     const mirror = this.repos.jobs.get(jobId);
     if (!mirror) return false;
     const queue = this.queues[mirror.queue];
-    const job = await Job.fromId(queue, jobId);
+    const job = await queue.getJob(jobId);
     if (job && (await job.getState()) === "failed") {
       await job.retry();
       return true;
     }
     if (job) await job.remove();
+    // F14/M1 (defeito 3): tarefa cancelada ou removida volta com o mesmo id e os mesmos dados do espelho
+    const task = taskOfJob(mirror);
+    if (task) {
+      const data: TaskJobData = {
+        kind: "task",
+        type: task.type,
+        key: task.key,
+        payload: task.payload,
+      };
+      await (queue as unknown as Queue<TaskJobData>).add(task.type, data, { jobId });
+      return true;
+    }
     const stage = mirror.type as StageName;
     if (!(stage in STAGES)) return false;
     await enqueueStage({

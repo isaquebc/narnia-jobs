@@ -1,4 +1,5 @@
 import { enterUrl } from "./client";
+import { popupView } from "./popup-view";
 import { loadPairing } from "./storage";
 
 /**
@@ -9,7 +10,9 @@ const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
 async function main() {
   const p = await loadPairing();
-  if (!p.token || !p.instance) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const view = popupView(p, tab?.url);
+  if (view.mode === "unpaired") {
     $("unpaired").hidden = false;
     $("connect").addEventListener("click", () => {
       void chrome.runtime.openOptionsPage();
@@ -18,7 +21,7 @@ async function main() {
     return;
   }
   $("paired").hidden = false;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  for (const id of ["posting", "form", "open"]) $(id).hidden = !view.actions.includes(id as never);
   for (const mode of ["posting", "form"] as const)
     $(mode).addEventListener("click", async () => {
       await chrome.runtime.sendMessage({ type: "narnia.capture", mode, tabId: tab?.id });

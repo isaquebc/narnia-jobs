@@ -20,6 +20,7 @@ import { CvTemplatesSection } from "./CvTemplatesSection";
 import { EvalsSettingsSection } from "./EvalsSettingsSection";
 import { ExtensionSettingsSection } from "./ExtensionSettingsSection";
 import { FactAliasesSection } from "./FactAliasesSection";
+import { GmailSection } from "./GmailSection";
 import { GoogleCalendarSection } from "./GoogleCalendarSection";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { PluginSettingsSection } from "./PluginSettingsSection";
@@ -219,6 +220,7 @@ export function SettingsPage() {
       <PluginSettingsSection />
       <ExtensionSettingsSection />
       <GoogleCalendarSection />
+      <GmailSection />
       <VideoAnalysisSection />
       <EvalsSettingsSection />
       {form ? (

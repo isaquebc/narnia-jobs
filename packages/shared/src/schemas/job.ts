@@ -6,7 +6,8 @@ export const JobStatusSchema = z.enum(JOB_STATUSES);
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 
 /** `media` (F13): análise de entrevista gravada, uma por vez (o serviço media processa uma execução de cada vez). */
-export const QUEUE_NAMES = ["ingest", "ocr", "extract", "media"] as const;
+/** `scheduled` (F14-12): tarefas agendadas (poda, arquivamento, Gmail), uma por vez. */
+export const QUEUE_NAMES = ["ingest", "ocr", "extract", "media", "scheduled"] as const;
 export const QueueNameSchema = z.enum(QUEUE_NAMES);
 
 /** Espelho durável de um job da BullMQ (F01 §3 `job`). */

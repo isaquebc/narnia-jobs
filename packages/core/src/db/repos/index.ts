@@ -62,6 +62,7 @@ import { type RecordingAnalysisRepo, recordingAnalysisRepo } from "./recording-a
 import { type RecordingsRepo, recordingsRepo } from "./recordings";
 import { type RelevanceRepo, relevanceRepo } from "./relevance";
 import { type SalaryReferencesRepo, salaryReferencesRepo } from "./salary-references";
+import { type ScheduledRepo, scheduledRepo } from "./scheduled";
 import { type SelfDeclarationsRepo, selfDeclarationsRepo } from "./self-declarations";
 import { type SettingsRepo, settingsRepo } from "./settings";
 import { type SnapshotsRepo, snapshotsRepo } from "./snapshots";
@@ -73,6 +74,7 @@ import { type UsersRepo, usersRepo } from "./users";
 export interface Repos {
   db: Db;
   settings: SettingsRepo;
+  scheduled: ScheduledRepo;
   users: UsersRepo;
   profiles: ProfilesRepo;
   emphasis: EmphasisRepo;
@@ -194,6 +196,7 @@ export function createRepos(db: Db): Repos {
     jobApplicationEvents: jobApplicationEventsRepo(db),
     recordings: recordingsRepo(db),
     recordingAnalysis: recordingAnalysisRepo(db),
+    scheduled: scheduledRepo(db),
   };
 }
 
@@ -218,6 +221,7 @@ export * from "./recording-analysis";
 export * from "./recordings";
 export * from "./relevance";
 export * from "./salary-references";
+export * from "./scheduled";
 export * from "./settings";
 export * from "./snapshots";
 export * from "./source-files";

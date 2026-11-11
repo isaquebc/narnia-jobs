@@ -50,7 +50,7 @@ export class FakeQueueAdapter implements QueueAdapter {
     this.tasks.push(req);
     const fake = { add: async () => {} };
     return enqueueTask({
-      queues: { ingest: fake, ocr: fake, extract: fake, media: fake },
+      queues: { ingest: fake, ocr: fake, extract: fake, media: fake, scheduled: fake },
       repos: this.repos,
       ...req,
     });
@@ -103,6 +103,8 @@ export function makeTestApp(
     interruptTimeoutMs?: number;
     /** F13: serviço media falso; padrão: desligado (sem URL). */
     media?: MediaClient;
+    /** F14: Gmail (fetch falso, ambiente, porta e servidor do retorno injetados). */
+    gmail?: import("../src/app").AppDeps["gmail"];
   } = {},
 ): TestApp {
   const db = openDatabase(":memory:");
@@ -142,6 +144,8 @@ export function makeTestApp(
     ghConfigDir,
     sessions,
     media: opts.media ?? new MediaClient(null),
+    // F14: nunca o ambiente do processo nem a porta real nos testes
+    gmail: { env: {}, port: 8189, listen: async () => ({ close: () => {} }), ...opts.gmail },
   });
   appRef = app;
   const api = async (path: string, init: RequestInit = {}) =>
