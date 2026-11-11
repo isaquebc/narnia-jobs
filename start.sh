@@ -148,7 +148,7 @@ prod_data_host_dir() { setting NARNIA_DATA_DIR ./data; }
 # prod_backup_host_dir -> pasta de backups montada em /backups na produção local
 prod_backup_host_dir() { setting NARNIA_BACKUP_HOST_DIR ./backups; }
 
-# --- F13 · serviço media opcional (análise de entrevista gravada; plans/plan-v0/tasks/F13 §6.1.1, R2) --------------
+# --- F13 · serviço media opcional (análise de entrevista gravada; plans/plan-v0/tasks/done/F13 §6.1.1, R2) --------------
 
 # media_enabled -> 0 se o serviço media está ligado nesta instância (NARNIA_MEDIA=1 no ambiente ou no $ENV_FILE)
 media_enabled() { [[ "$(setting NARNIA_MEDIA 0)" == 1 ]]; }

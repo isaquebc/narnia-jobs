@@ -2,20 +2,23 @@
 
 Cada task é um entregável fechado, escopado no mesmo padrão (objetivo, escopo, arquitetura, dados, layouts, decisões, cobertura de testes, riscos, registro). Os fluxos de `../02-fluxos-do-usuario.md` mapeiam assim: F1 → F01; F2 → F02; F3 → F03; F4 → F04; F5 (features) → F05 a F09, uma por feature, porque as features são isoladas por desenho; F6 → F10. F11 é o segundo provider.
 
+Tasks fechadas ficam em [`done/`](done/) (a tabela aponta para lá); as abertas e em andamento ficam nesta pasta.
+
 | Task | Fluxo | Entrega em uma frase | Depende de |
 |------|-------|----------------------|------------|
-| [F01-onboarding](F01-onboarding.md) | F1 | fundação (monorepo, Docker, SQLite, jobs, provider mínimo, testes) + primeiro uso com CV/texto livre, revisão e primeiro perfil | — |
-| [F02-troca-de-perfil](F02-troca-de-perfil.md) | F2 | vários perfis, ênfases, cartão do perfil, persona derivada, seletor no shell | F01 |
-| [F03-ingestao](F03-ingestao.md) | F3 | GitHub público e privado pelo `gh`, métricas, orçamento ligado ao plano, análise incremental e relatórios, segundo CV/texto com "já lido", reconciliação com conflitos, revisão anti-alucinação, notificações (LinkedIn adiado) | F01, F02 (clarificação entregue na F04) |
-| [F04-chat-recrutador](F04-chat-recrutador.md) | F4 | servidor MCP (`/mcp`), `plugin/`, chat web via Agent SDK (modo A), instalação no Claude Code (modo B), ingestão pela conversa, clarificação pós-ingestão, pesquisa em domínios confiáveis, observabilidade local (Phoenix) | F01, F02, F03 |
+| [F01-onboarding](done/F01-onboarding.md) | F1 | fundação (monorepo, Docker, SQLite, jobs, provider mínimo, testes) + primeiro uso com CV/texto livre, revisão e primeiro perfil | — |
+| [F02-troca-de-perfil](done/F02-troca-de-perfil.md) | F2 | vários perfis, ênfases, cartão do perfil, persona derivada, seletor no shell | F01 |
+| [F03-ingestao](done/F03-ingestao.md) | F3 | GitHub público e privado pelo `gh`, métricas, orçamento ligado ao plano, análise incremental e relatórios, segundo CV/texto com "já lido", reconciliação com conflitos, revisão anti-alucinação, notificações (LinkedIn adiado) | F01, F02 (clarificação entregue na F04) |
+| [F04-chat-recrutador](done/F04-chat-recrutador.md) | F4 | servidor MCP (`/mcp`), `plugin/`, chat web via Agent SDK (modo A), instalação no Claude Code (modo B), ingestão pela conversa, clarificação pós-ingestão, pesquisa em domínios confiáveis, observabilidade local (Phoenix) | F01, F02, F03 |
 | [F10-gestao-de-dados](F10-gestao-de-dados.md) | F6 | Meus dados completo, exportar/apagar, medidor de uso completo, limpar cache, Configurações, `doctor` | F01, F04 |
-| [F05-gerar-cv](F05-gerar-cv.md) | F5.1 | CV por perfil e por vaga e carta de apresentação, em PDF revisado (Sonnet gera, Haiku revisa), 3 templates e upload de template, versões e edição (sem DOCX, F05-14) | F02, F04, F06 |
-| [F06-analisar-vaga](F06-analisar-vaga.md) | F5.2 | fit, lacunas, riscos, palavras-chave ATS, perguntas prováveis; ponte para CV e entrevista | F02, F04 |
+| [F05-gerar-cv](done/F05-gerar-cv.md) | F5.1 | CV por perfil e por vaga e carta de apresentação, em PDF revisado (Sonnet gera, Haiku revisa), 3 templates e upload de template, versões e edição (sem DOCX, F05-14) | F02, F04, F06 |
+| [F06-analisar-vaga](done/F06-analisar-vaga.md) | F5.2 | fit, lacunas, riscos, palavras-chave ATS, perguntas prováveis; ponte para CV e entrevista | F02, F04 |
 | [F07-candidaturas](F07-candidaturas.md) | F5.3 | kanban, agenda com link/`.ics`, integração opcional com o MCP oficial do Google Calendar | F04, F06 |
 | [F09-carta-e-linkedin](F09-carta-e-linkedin.md) | F5.5/5.6 | mensagem curta a recrutador e otimização de LinkedIn (a carta foi para a F05, F05-21) | F05, F07, F12 (lê o perfil do LinkedIn pela extensão, F12-7) |
 | [F08-entrevista-voz](F08-entrevista-voz.md) | F5.4 | entrevista mãos livres com Whisper local + TTS local (padrão de N provedores), só modo A | F04, F07 |
-| [F12-extensao-navegador](F12-extensao-navegador.md) | F5 | extensão do Chrome: captura de vagas e janela de ajuda nos formulários de candidatura (Haiku localiza, skill sugere, copiar/refazer/chat); o LinkedIn fica na F09 (F12-7) | F04, F05, F06; gate pairwise (F04-avaliacoes M7) |
-| [F13-entrevista-gravada](F13-entrevista-gravada.md) | F5 | análise pelo recrutador do vídeo de uma entrevista real: transcrição por pessoa, voz, áudio, rosto, anotações do entrevistador e feedback do discurso; serviço `media` opcional | F04, F06, F07; gate de prompts |
+| [F12-extensao-navegador](done/F12-extensao-navegador.md) | F5 | extensão do Chrome: captura de vagas e janela de ajuda nos formulários de candidatura (Haiku localiza, skill sugere, copiar/refazer/chat); o LinkedIn fica na F09 (F12-7) | F04, F05, F06; gate pairwise (F04-avaliacoes M7) |
+| [F13-entrevista-gravada](done/F13-entrevista-gravada.md) | F5 | análise pelo recrutador do vídeo de uma entrevista real: transcrição por pessoa, voz, áudio, rosto, anotações do entrevistador e feedback do discurso; serviço `media` opcional | F04, F06, F07; gate de prompts |
+| [F14-leitura-de-emails](F14-leitura-de-emails.md) | F5 | leitura do Gmail pela API REST: alertas viram vagas num feed (origem, link não abriu), confirmações/negativas/atualizações/convites viram candidatura, encerramento, histórico e agenda; etiqueta `narnia-jobs` + lido | F06, F07, F12; gate de prompts |
 | [F11-provider-codex](F11-provider-codex.md) | — | segundo provider (Codex) nos modos A e B; exige verificação documental antes de implementar | F04, F10 |
 
 ## Ordem sugerida (ondas)

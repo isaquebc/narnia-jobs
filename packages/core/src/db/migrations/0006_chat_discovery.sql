@@ -1,5 +1,5 @@
 -- narnia: foreign-keys-off
--- Auditoria pós-F04 · bloco E2 (18a). Só para frente. Ver plans/plan-v0/tasks/F04-chat-recrutador.md §8.
+-- Auditoria pós-F04 · bloco E2 (18a). Só para frente. Ver plans/plan-v0/tasks/done/F04-chat-recrutador.md §8.
 -- Categoria `discovery` (entrevista de descoberta, passo 7 do primeiro uso). O SQLite não altera CHECK, então
 -- chat_session é reconstruída: cria nova → copia → apaga → renomeia (FKs desligadas pelo executor e
 -- foreign_key_check antes do commit). chat_message e research_source apontam pelo nome e seguem válidas.

@@ -12,7 +12,7 @@ import type { PersonInsert } from "../db/repos/recording-analysis";
 import { RecordingError, recordingDir, recordingFramesDir } from "./index";
 
 /**
- * F13/M4 · resultado do media → banco (plans/plan-v0/tasks/F13 §2.2, §3). Lê `interviews/<id>/work/*.json`, troca a
+ * F13/M4 · resultado do media → banco (plans/plan-v0/tasks/done/F13 §2.2, §3). Lê `interviews/<id>/work/*.json`, troca a
  * análise inteira (pessoas, turnos, eventos), copia os quadros escolhidos para `interview-frames/<id>/` (no backup) e
  * marca quem é o candidato: pelo nome na etiqueta igual ao da pessoa usuária; sem isso, quem mais fala (a pessoa
  * confirma na tela).

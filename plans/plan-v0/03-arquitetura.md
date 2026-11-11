@@ -47,7 +47,7 @@ O diagrama acima mostra o desenho lógico; o físico, com volumes e portas, est�
 
 ## 2 · Estrutura do repositório (monorepo TypeScript)
 
-Refinada em `tasks/F01-onboarding.md §2.2` (2026-10-06): stack React + Node, com `apps/` separando site e API.
+Refinada em `tasks/done/F01-onboarding.md §2.2` (2026-10-06): stack React + Node, com `apps/` separando site e API.
 
 ```
 narnia-jobs-helpper/
@@ -143,7 +143,7 @@ Pré-processamento no `core`, sem modelo:
 
 \*Estimativas de ordem de grandeza para calibrar a UI; medir na implementação. A tool `ingest.prepare` devolve a estimativa real (contagem de caracteres/4) antes de qualquer chamada, e a skill exige confirmação do usuário.
 
-**Como ficou na F03 (2026-10-09; detalhes em `tasks/F03-ingestao.md`).**
+**Como ficou na F03 (2026-10-09; detalhes em `tasks/done/F03-ingestao.md`).**
 - **GitHub pelo `gh`** no container (imagem com `gh` oficial): credencial do `gh` do computador repassada pelo lançador a um arquivo 0600 no volume `gh-auth`, ou login próprio pelo fluxo de dispositivo (`gh auth login --web` em segundo plano). Coleta pela API (`gh api`: repositórios, README, árvore, `contents` só dos arquivos escolhidos, `compare` para o diff), sem clone. Métricas pela GraphQL (`contributionsCollection`), que exige login. **Snapshots** por repositório em `snapshots/github/`: toda resposta é gravada e, sem rede, a mesma chamada é respondida a partir deles.
 - **Orçamento e plano**: o provider lê o uso do plano (adaptador sobre o `/usage` experimental do SDK, com fallback no `rate_limit_event` do stream); a conversão %→tokens é aprendida por modelo; recomendado = mín(padrão da profundidade, 70% do restante da janela de 5 h). Divisão igual por repositório sem redistribuir sobra; freio a 125% com decisão do usuário.
 - **Destaques sem tokens**: metadados → README → manifestos/CI → mensagens dos commits do usuário → entrypoints → testes → amostras, dentro da fatia; na profunda, uma chamada barata escolhe até 8 arquivos. Uma chamada por repositório (propostas com trecho literal + relatório), síntese final só sobre relatórios.
@@ -273,7 +273,7 @@ no boot do worker: jobs ativos órfãos são retomados pela própria BullMQ (sta
 | Saída | `document_version` com PDF, DOCX, JSON de conteúdo, template e parâmetros; prévia em PNG para a UI |
 | Imagem Docker | adiciona Chromium (~300 MB); alternativa menor avaliada e descartada por ora: Typst (binário pequeno, ótimo para CV, mas o usuário teria de escrever templates em Typst) |
 
-**Como ficou (F05, 2026-10-16):** sem DOCX (F05-14) e sem React no servidor: os templates padrão são funções que montam HTML com escape automático, em uma coluna (Clássico, Moderno, Compacto), com as fontes OFL inline. O PDF sai do serviço `browser` (o mesmo da F06) por `page.setContent` com toda a rede bloqueada; o worker entrou na rede `browser`. O conteúdo é gerado em duas partes: o código monta um resumo com os fatos já filtrados e com score de match, o Sonnet escreve só os textos e a origem de cada um, e o código preenche cabeçalho, empresas e datas e confere tudo. Depois, checagens por código (páginas, fonte, margem, sobreposição, links, ATS) e um revisor Haiku que lê as páginas em PNG pela tool `Read`. Templates do usuário em Handlebars, guardados só como `.zip`, com sandbox (JavaScript desligado, rede bloqueada, `sanitize-html`). Detalhes em `tasks/F05-gerar-cv.md` §2.
+**Como ficou (F05, 2026-10-16):** sem DOCX (F05-14) e sem React no servidor: os templates padrão são funções que montam HTML com escape automático, em uma coluna (Clássico, Moderno, Compacto), com as fontes OFL inline. O PDF sai do serviço `browser` (o mesmo da F06) por `page.setContent` com toda a rede bloqueada; o worker entrou na rede `browser`. O conteúdo é gerado em duas partes: o código monta um resumo com os fatos já filtrados e com score de match, o Sonnet escreve só os textos e a origem de cada um, e o código preenche cabeçalho, empresas e datas e confere tudo. Depois, checagens por código (páginas, fonte, margem, sobreposição, links, ATS) e um revisor Haiku que lê as páginas em PNG pela tool `Read`. Templates do usuário em Handlebars, guardados só como `.zip`, com sandbox (JavaScript desligado, rede bloqueada, `sanitize-html`). Detalhes em `tasks/done/F05-gerar-cv.md` §2.
 
 ## 15 · Medidor de uso e "limpar cache"
 

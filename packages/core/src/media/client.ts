@@ -1,7 +1,7 @@
 import type { MediaStatus } from "@narnia-jobs/shared";
 
 /**
- * Cliente do serviço `media` da F13 (Python, perfil Docker opcional; plans/plan-v0/tasks/F13 §6.1.1, R1, R2 e R4).
+ * Cliente do serviço `media` da F13 (Python, perfil Docker opcional; plans/plan-v0/tasks/done/F13 §6.1.1, R1, R2 e R4).
  * Quem processa é o worker; o api só consulta o estado e grava o token. O token do Hugging Face passa por aqui uma
  * vez, no corpo do `PUT /token`, e nunca entra em mensagem de erro, log ou resposta.
  */

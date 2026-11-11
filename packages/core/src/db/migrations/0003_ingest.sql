@@ -1,5 +1,5 @@
 -- narnia: foreign-keys-off
--- F03 · Ingestão (M1). Só para frente. Ver plans/plan-v0/tasks/F03-ingestao.md §3 e §2.9-2.
+-- F03 · Ingestão (M1). Só para frente. Ver plans/plan-v0/tasks/done/F03-ingestao.md §3 e §2.9-2.
 -- ingestion_run é reconstruída: file_id passa a nulo (GitHub não tem arquivo) e o CHECK de status ganha estados
 -- novos; o SQLite não altera CHECK/NOT NULL, então: cria nova → copia → apaga → renomeia (com FKs desligadas pelo
 -- executor e foreign_key_check antes do commit). As tabelas que referenciam ingestion_run apontam pelo nome.

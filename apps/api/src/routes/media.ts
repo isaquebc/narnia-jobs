@@ -7,7 +7,7 @@ import { apiError } from "../errors";
 import { validate } from "./validate";
 
 /**
- * F13 · Configurações › Análise de vídeo (plans/plan-v0/tasks/F13 §6.1.1, R2 e R4): estado do serviço `media` e token
+ * F13 · Configurações › Análise de vídeo (plans/plan-v0/tasks/done/F13 §6.1.1, R2 e R4): estado do serviço `media` e token
  * do Hugging Face. O token vai direto ao `media` (arquivo 0600 no volume dele): não passa pelo banco, não é logado e
  * nunca volta numa resposta.
  */

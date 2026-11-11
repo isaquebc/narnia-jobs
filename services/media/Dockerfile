@@ -3,7 +3,7 @@
 # Estágios:
 #   base       -> Python 3.12 + ffmpeg/ffprobe (Debian; chamados como processo, não linkados)
 #   media-test -> base + pytest + testes (scripts/claude-env.sh media-test)
-#   runtime    -> o serviço (porta 8700, rede só com api e worker; ver plans/plan-v0/tasks/F13-entrevista-gravada.md §6.1.1)
+#   runtime    -> o serviço (porta 8700, rede só com api e worker; ver plans/plan-v0/tasks/done/F13-entrevista-gravada.md §6.1.1)
 # A imagem de testes não leva os modelos (modo falso, NARNIA_MEDIA_FAKE=1); o runtime instala torch CPU, faster-whisper,
 # pyannote e MediaPipe, e os pesos baixam no primeiro uso para o volume media-models (nada de pesos na imagem).
 

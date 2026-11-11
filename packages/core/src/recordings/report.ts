@@ -12,7 +12,7 @@ import { getCard } from "../profile/cards";
 import { recordingAnalysis } from "./analysis";
 
 /**
- * F13/M5 · entrada e checagem do relatório do recrutador (plans/plan-v0/tasks/F13 §2.5). O código monta a transcrição
+ * F13/M5 · entrada e checagem do relatório do recrutador (plans/plan-v0/tasks/done/F13 §2.5). O código monta a transcrição
  * numerada e o resumo; depois confere o que o modelo devolveu, nos moldes do `assembleCv`: citação literal na pessoa
  * certa (senão corrigida pelo texto real ou removida), segundo exato pelas palavras, tempos que existem, uma leitura
  * por anotação e o alerta do sorriso, que nunca depende do modelo (F13-4).

@@ -138,7 +138,7 @@ function LimitsForm({ limits }: { limits: RecordingLimits }) {
 }
 
 /**
- * Configurações › Análise de vídeo (F13/M1.5; plans/plan-v0/tasks/F13 §6.1.1, R2 e R4). O app não liga containers:
+ * Configurações › Análise de vídeo (F13/M1.5; plans/plan-v0/tasks/done/F13 §6.1.1, R2 e R4). O app não liga containers:
  * desligada, mostra o comando do lançador; ligada sem token, o passo a passo do Hugging Face (F13-5); pronta, remover o
  * token. A regra de uso (F13-1) fica sempre visível, e os limites do envio (F13-11) são ajustáveis.
  */

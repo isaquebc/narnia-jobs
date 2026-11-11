@@ -1,4 +1,4 @@
--- 0001_init · esquema do F01 (plans/plan-v0/tasks/F01-onboarding.md §3)
+-- 0001_init · esquema do F01 (plans/plan-v0/tasks/done/F01-onboarding.md §3)
 -- Convenções: ids UUID v7 em texto; timestamps ISO 8601 em UTC; JSON em colunas *_json; booleanos em integer 0/1.
 -- Colunas de contato do usuário são nullable no banco (a identidade do CV chega antes do telefone);
 -- a obrigatoriedade é garantida pelo UserSchema do pacote shared nas fronteiras da API (decisão F01-33).

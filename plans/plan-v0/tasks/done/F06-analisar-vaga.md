@@ -1,6 +1,6 @@
 # F06 · Analisar vaga
 
-Entregável 6 do plan-v0. Cobre a feature **#2** de `../02-fluxos-do-usuario.md §F5`: a pessoa cola a descrição de uma vaga (ou a URL) e recebe uma análise honesta de aderência ao perfil ativo, com lacunas sem evidência, riscos, palavras-chave ausentes e perguntas prováveis, pronta para virar candidatura, CV direcionado (F05) ou simulação de entrevista (F08).
+Entregável 6 do plan-v0. Cobre a feature **#2** de `../../02-fluxos-do-usuario.md §F5`: a pessoa cola a descrição de uma vaga (ou a URL) e recebe uma análise honesta de aderência ao perfil ativo, com lacunas sem evidência, riscos, palavras-chave ausentes e perguntas prováveis, pronta para virar candidatura, CV direcionado (F05) ou simulação de entrevista (F08).
 
 Status: **fechada pelo dono em 2026-10-15** (M1 a M7 e as correções dos testes do dono, §8; replanejada em 2026-10-14: a F06 vem antes da F05). Decisões F06-1 a F06-17 fechadas (§5); F06-16 e F06-17 fechadas depois da revisão do código; requisitos novos em §1.1 a §1.4; marcos em §6.0. **Fechada pelo dono em 2026-10-15** (M1 a M7 e as correções dos testes do dono, §8). O roteiro formal do §6.4 (10 vagas) foi substituído pelos testes do dono com vagas reais. Nada pendente nesta task.
 
@@ -25,7 +25,7 @@ Com F01 e F04 prontos, a pessoa consegue:
 - Skill `plugin/skills/analisar-vaga` + tools `job_posting.*` e `analysis.*` no MCP (F04).
 - Resultado estruturado (`JobAnalysis`, schema em `packages/shared`) salvo e ligado a uma candidatura.
 - Cache: mesma vaga (hash do texto normalizado) + mesmo perfil + mesma versão dos fatos → reaproveita a análise sem tokens.
-- Página L6 de `../05-layouts.md`; ações para F05/F08.
+- Página L6 de `../../05-layouts.md`; ações para F05/F08.
 - Job `job_posting.analyze` com etapas persistidas.
 - **Perfil mais indicado (requisito do dono, 2026-10-11):** a análise compara a vaga com **todos os perfis não arquivados** (cartões e relevância da F02), devolve o fit de cada um e recomenda o melhor com justificativa; oferece trocar o perfil ativo ou criar um perfil sugerido; disponível pela tela e pelo chat (F04).
 - A vaga analisada fica salva e é a entrada do CV com vaga alvo (F05) e da candidatura (F07).
@@ -274,7 +274,7 @@ Cada marco fecha com lint, typecheck, testes e e2e verdes na instância `claude`
 4. **M4 · Captura e extração.** Fetch de URL (anti-SSRF, robots, Readability + linkedom); prompts `postingExtract`, `postingMerge`, `postingDuplicate` (provider, mock, datasets, avaliadores, juiz); tarefa `posting.extract`; origem por campo; % de duplicata (F06-9).
 5. **M5 · Análise.** Skill `analisar-vaga`, tools `posting.*` e `analysis.*`, tarefa `posting.analyze`, fit por perfil e recomendado, sessão nova com o título da vaga, botão "Criar CV" (em breve) derivado de `analysis.save`, alerta de candidatura "em breve", validade por `facts_version`/`posting_updated_at`. Avaliação da skill pelo caminho de sandbox do `evals chat`.
 6. **M6 · Páginas.** Vagas no menu, lista, página da vaga editável, contatos, notas com confirmação (F06-17), modal de diff largo, "seus dados mudaram", seção Modelos em Configurações (lista compartilhada de modelos do Claude).
-7. **M7 · Fechamento.** e2e `f06-NN-*`, modo B (`/narnia-jobs:analisar-vaga`), README, CLAUDE.md, `../02`–`../05`.
+7. **M7 · Fechamento.** e2e `f06-NN-*`, modo B (`/narnia-jobs:analisar-vaga`), README, CLAUDE.md, `../../02`–`../../05`.
 
 ### 6.1 Pré-requisitos e dependências
 1. **F01–F04** entregues: fila e bandeja, `facts_version`, tools `profile.*`, `evidence.*`, `fact.search`, sessões, sincronização e avaliações no Phoenix.
@@ -326,7 +326,7 @@ Arquivos `apps/e2e/tests/f06-NN-<slug>.spec.ts`, títulos `F06/E2E-NN …`; mock
 - Gate de avaliação verde para todos os prompts novos e alterados, com as rodadas visíveis no Phoenix.
 - Zero "atende" sem evidência e zero "lacuna" com evidência no teste manual.
 - Fetch com robots e anti-SSRF testados.
-- `../02`, `../03`, `../04`, `../05`, README e CLAUDE.md atualizados.
+- `../../02`, `../../03`, `../../04`, `../../05`, README e CLAUDE.md atualizados.
 
 ---
 

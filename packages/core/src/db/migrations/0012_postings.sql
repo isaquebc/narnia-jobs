@@ -1,4 +1,4 @@
--- F06 · M2 · vagas (postings), contatos, notas e análises. Só para frente. Ver plans/plan-v0/tasks/F06-analisar-vaga.md §3.
+-- F06 · M2 · vagas (postings), contatos, notas e análises. Só para frente. Ver plans/plan-v0/tasks/done/F06-analisar-vaga.md §3.
 -- A vaga é editável e cresce aos poucos (§1.2): quase tudo é opcional. Listas em JSON; datas em UTC (ISO 8601).
 -- `identity_hash` (F06-2, F06-9) cobre empresa, cliente, cargo e role (sem a data de publicação) e é recalculado pelo
 -- repositório quando esses campos mudam; não é único: o hash repetido dispara a comparação de duplicata.

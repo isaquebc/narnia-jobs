@@ -322,7 +322,7 @@ function RecordingItem({
 }
 
 /**
- * Entrevistas gravadas (F13/M1.5; plans/plan-v0/tasks/F13 §6.1.1, R5 e R6): na página da candidatura, com a etapa; na
+ * Entrevistas gravadas (F13/M1.5; plans/plan-v0/tasks/done/F13 §6.1.1, R5 e R6): na página da candidatura, com a etapa; na
  * aba Entrevistas do perfil, avulsa. O envio vai em partes e continua ao trocar de página; se a aba fechar, retoma
  * escolhendo o mesmo arquivo. Reprodução com avanço pelo player; apagar só o vídeo ou a entrevista inteira (F13-2).
  */

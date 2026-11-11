@@ -6,7 +6,7 @@ import { intake, JD } from "../helpers/postings";
 import { login } from "../helpers/profiles";
 
 /**
- * F13/M1.5 · entrevista gravada: Configurações › Análise de vídeo e envio do vídeo (plans/plan-v0/tasks/F13 §6.3).
+ * F13/M1.5 · entrevista gravada: Configurações › Análise de vídeo e envio do vídeo (plans/plan-v0/tasks/done/F13 §6.3).
  * O e2e sobe o serviço `media` em modo falso (sem modelos, entrevista sintética) e sem token: o estado real é "falta o
  * token". "Desligada" e o fluxo do token (que consultaria o Hugging Face) vêm de respostas de `/api/media/*`
  * interceptadas no navegador. O envio e a reprodução usam o api de verdade.

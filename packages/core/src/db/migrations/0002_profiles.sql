@@ -1,4 +1,4 @@
--- F02 · Troca de perfil (M1). Só para frente, como 0001. Ver plans/plan-v0/tasks/F02-troca-de-perfil.md §3.
+-- F02 · Troca de perfil (M1). Só para frente, como 0001. Ver plans/plan-v0/tasks/done/F02-troca-de-perfil.md §3.
 
 -- profile: persona (F02-7), arquivamento (F02-6), clonagem (F02-8) e validade do cartão por facts_version (F02-1).
 alter table profile add column persona_overrides_json text not null default '{}';

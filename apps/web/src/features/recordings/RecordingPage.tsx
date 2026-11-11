@@ -21,7 +21,7 @@ import { formatDate } from "../../lib/format";
 import { errorText } from "./errors";
 
 /**
- * Página da entrevista gravada (F13/M6; plans/plan-v0/tasks/F13 §1 e §2.5, no padrão das telas atuais): vídeo, quem é
+ * Página da entrevista gravada (F13/M6; plans/plan-v0/tasks/done/F13 §1 e §2.5, no padrão das telas atuais): vídeo, quem é
  * quem, relatório do recrutador na ordem aprovada pelo dono (F13-14), quadros, transcrição clicável com correção de
  * quem falou, refazer o relatório e conversar sobre a entrevista. Todo `[mm:ss]` vira botão que leva o vídeo ao trecho.
  */

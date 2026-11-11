@@ -13,7 +13,7 @@ import type { Repos } from "../db";
 import { newId } from "../ids";
 
 /**
- * F13 · entrevista gravada: arquivos e regras do envio (plans/plan-v0/tasks/F13 §2.6 e §6.1.1, R5 e R7).
+ * F13 · entrevista gravada: arquivos e regras do envio (plans/plan-v0/tasks/done/F13 §2.6 e §6.1.1, R5 e R7).
  *
  * - `<dados>/interviews/<id>/`: `video.part` durante o envio, `video.<ext>` pronto, `work/` do serviço media. Fica
  *   **fora** do backup (F13-2): a lista de pastas do backup não inclui `interviews/`.

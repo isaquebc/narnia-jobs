@@ -20,7 +20,7 @@ import {
 import type { TaskHandler } from "../tasks";
 
 /**
- * F13/M4 · análise da entrevista gravada (fila `media`, uma por vez; plans/plan-v0/tasks/F13 §2.1). O worker orquestra:
+ * F13/M4 · análise da entrevista gravada (fila `media`, uma por vez; plans/plan-v0/tasks/done/F13 §2.1). O worker orquestra:
  * pede as etapas ao serviço media (que grava um JSON por etapa e pula o que já fez, então tentar de novo retoma),
  * acompanha o progresso, importa o resultado para o banco e enfileira o relatório do recrutador (`recording.report`).
  * Se o media está ocupado com outra execução (o worker reiniciou no meio de uma), espera ela terminar.

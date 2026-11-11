@@ -1,5 +1,5 @@
 -- narnia: foreign-keys-off
--- F06 · M1 · recrutador global (F06-8). Só para frente. Ver plans/plan-v0/tasks/F06-analisar-vaga.md §3.
+-- F06 · M1 · recrutador global (F06-8). Só para frente. Ver plans/plan-v0/tasks/done/F06-analisar-vaga.md §3.
 -- A conversa deixa de pertencer a um perfil: `profile_id` vira contexto opcional (o perfil em foco quando a conversa
 -- nasceu) e apagar o perfil não apaga a conversa. Categoria nova `job` (análise de vaga). O SQLite não altera CHECK
 -- nem NOT NULL, então chat_session é reconstruída como na 0006 (FKs desligadas pelo executor e foreign_key_check antes

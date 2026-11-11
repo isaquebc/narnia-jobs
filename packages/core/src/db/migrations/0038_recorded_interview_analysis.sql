@@ -1,4 +1,4 @@
--- F13/M4 · análise da entrevista gravada (plans/plan-v0/tasks/F13 §3): pessoas, turnos, eventos, quadros e relatório.
+-- F13/M4 · análise da entrevista gravada (plans/plan-v0/tasks/done/F13 §3): pessoas, turnos, eventos, quadros e relatório.
 -- As medições brutas ficam em `<dados>/interviews/<id>/work/*.json` (fora do backup, junto do vídeo); o que entra aqui
 -- é o resultado consolidado, que vai para o backup com o banco. Os quadros escolhidos ficam em
 -- `<dados>/interview-frames/<id>/` (dentro do backup).

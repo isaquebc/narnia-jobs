@@ -1,4 +1,4 @@
--- F13/M1 · entrevista gravada (plans/plan-v0/tasks/F13 §3 e §6.1.1, R5): só a tabela principal; pessoas, turnos, eventos
+-- F13/M1 · entrevista gravada (plans/plan-v0/tasks/done/F13 §3 e §6.1.1, R5): só a tabela principal; pessoas, turnos, eventos
 -- e relatório vêm no M4. O vídeo fica em `<dados>/interviews/<id>/video.<ext>` (fora do backup, F13-2); a parte em
 -- envio em `video.part`. Apagar a candidatura apaga as entrevistas dela (o core apaga as pastas antes).
 create table recorded_interview (

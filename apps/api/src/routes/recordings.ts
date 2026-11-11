@@ -33,7 +33,7 @@ import { serveFile } from "../serve-file";
 import { validate } from "./validate";
 
 /**
- * F13 · entrevista gravada, envio e reprodução (plans/plan-v0/tasks/F13 §6.1.1, R5 e R6). O navegador cria a entrevista
+ * F13 · entrevista gravada, envio e reprodução (plans/plan-v0/tasks/done/F13 §6.1.1, R5 e R6). O navegador cria a entrevista
  * com nome e tamanho, manda partes de até 8 MB (`PUT …/video?offset=N`, corpo cru) e, se a aba fechar ou a rede cair,
  * pergunta quantos bytes já chegaram (`GET …`) e continua dali. O vídeo pronto é servido com `Range`.
  */

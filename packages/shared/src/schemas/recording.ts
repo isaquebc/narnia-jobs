@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * F13 · análise de entrevista gravada. Serviço `media` (Python, perfil Docker opcional): estado visto pelo api, para a
- * tela de Configurações e para recusar envios quando ele não está pronto (plans/plan-v0/tasks/F13 §6.1.1, R2 e R4).
+ * tela de Configurações e para recusar envios quando ele não está pronto (plans/plan-v0/tasks/done/F13 §6.1.1, R2 e R4).
  *
  * - `off`: sem `NARNIA_MEDIA_URL` ou o serviço não responde (perfil desligado); a tela mostra como ligar.
  * - `needs_token`: no ar, sem token do Hugging Face (a separação de vozes precisa dele, F13-5).

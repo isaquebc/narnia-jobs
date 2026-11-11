@@ -2,7 +2,7 @@
 
 Entregável 13 do plan-v0. O usuário envia o vídeo de uma entrevista real, e o recrutador devolve transcrição por pessoa, medições de voz, áudio, rosto, câmera e iluminação, leitura das reações e anotações de quem entrevistou, e feedback do discurso com minuto e trecho. Depende de F04 (`plugin/`, MCP, chat), F06 (vaga e análise), F07 (candidatura e etapas), do gate de prompts (F04-avaliacoes M7) e do padrão de tarefas da F05. Não depende da F08.
 
-Status: **implementada** (M1 a M7, 2026-11-10), plano aprovado pelo dono em 2026-11-09. Viabilidade e execução em §8. Primeira a ser feita depois da F12 (decisão do dono, 2026-11-09), antes de F09, F08 e F10.
+Status: **implementada** (M1 a M7, 2026-11-10), plano aprovado pelo dono em 2026-11-09. **2026-11-11: o dono confirmou que a feature funcionou; task fechada.** Viabilidade e execução em §8. Primeira a ser feita depois da F12 (decisão do dono, 2026-11-09), antes de F09, F08 e F10.
 
 > **Regra de uso, em destaque no README e na documentação ao entregar (decisão do dono):** a análise existe só para a pessoa se desenvolver durante o processo seletivo. Nenhum vídeo, dado ou leitura pode ser publicado ou compartilhado. Cabe a quem usa respeitar a lei e as regras sobre a gravação e o consentimento dos presentes.
 

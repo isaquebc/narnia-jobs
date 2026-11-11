@@ -45,7 +45,7 @@ Verificação do lote: unitários e bats verdes; prova na instância `claude`: a
 
 | # | Item | Ação |
 |---|------|------|
-| 17 | F03-41 sem dono | Registrar em `F10-gestao-de-dados.md`: seletor de modelo para CV e texto (rota do F01 aceita `model`, padrão por profundidade). |
+| 17 | F03-41 sem dono | Registrar em `../F10-gestao-de-dados.md`: seletor de modelo para CV e texto (rota do F01 aceita `model`, padrão por profundidade). |
 | 18 | README | Linha "Estado" (F01–F03 implementados), seção de dados com `./backups`, `./start.sh restore` e `doctor`; aviso de que apagar `data/` apaga os dados mas não os backups. |
 | 19 | CLAUDE.md | Backups (`./backups` do dono nunca é tocado pelo Claude), `restore` só a pedido do dono. |
 | 20 | F03 §8 | Uma linha por lote com commits e "teste antes: sim". |

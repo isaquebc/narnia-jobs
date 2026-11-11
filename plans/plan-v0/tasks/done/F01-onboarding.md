@@ -1,6 +1,6 @@
 # F01 · Primeiro uso (onboarding)
 
-Entregável 1 do plan-v0. Cobre o fluxo **F1** de `../02-fluxos-do-usuario.md` e toda a fundação técnica que ele exige (monorepo, Docker, banco, provider, testes). Os demais fluxos viram entregáveis próprios: F02 troca de perfil, F03 ingestão (GitHub/LinkedIn/profundidades), F04 chat com o recrutador, F05 features, F06 gestão de dados.
+Entregável 1 do plan-v0. Cobre o fluxo **F1** de `../../02-fluxos-do-usuario.md` e toda a fundação técnica que ele exige (monorepo, Docker, banco, provider, testes). Os demais fluxos viram entregáveis próprios: F02 troca de perfil, F03 ingestão (GitHub/LinkedIn/profundidades), F04 chat com o recrutador, F05 features, F06 gestão de dados.
 
 Status: **M1–M7 implementados** (2026-10-07 a 2026-10-08). Decisões de §5 fechadas pelo dono do projeto; progresso e desvios em §8. Falta para fechar o F01: §6.4 (teste manual com provider real) e o smoke de `start.ps1 up` em Windows/macOS reais. **Testes manuais do dono concluídos em 2026-10-29 (todos funcionaram, segundo o dono): task fechada.**
 
@@ -24,7 +24,7 @@ Uma pessoa com Docker e assinatura do Claude consegue, sem ajuda:
 - Fundação de jobs em segundo plano com **BullMQ + Redis** e serviço `worker` separado (tabela `job` como espelho durável, eventos via WS, bandeja), porque a extração já é um conjunto de jobs.
 - Leitura de PDF por três métodos consolidados: camada de texto (`unpdf`), **OCR** (Tesseract) e **leitura do documento pelo modelo** (tool `Read`), com consolidador por seção.
 - **Tudo em Docker**, inclusive desenvolvimento (`docker-compose.dev.yml` com hot reload) e e2e (Playwright em container). O host só precisa de Docker.
-- **TDD** em todos os marcos (`../09-metodologia-tdd.md`): teste que falha antes do código, registro em §8.
+- **TDD** em todos os marcos (`../../09-metodologia-tdd.md`): teste que falha antes do código, registro em §8.
 - Fundação do medidor: `usage_event` gravado a partir do `result.usage` do SDK e log JSONL próprio. A leitura dos logs do Claude Code e a tela completa são F06.
 - Lançador multiplataforma com porta dinâmica.
 - Tempo em UTC no banco e exibição no fuso do usuário via `moment-timezone` (isolado em `packages/shared/time.ts`).
@@ -81,7 +81,7 @@ narnia-jobs-helpper/
 ├─ plans/plan-v0/
 ├─ turbo.json · pnpm-workspace.yaml · biome.json · .github/workflows/ci.yml
 ```
-(`../03-arquitetura.md §2` foi ajustado para esta estrutura.)
+(`../../03-arquitetura.md §2` foi ajustado para esta estrutura.)
 
 ### 2.3 Processos e portas
 ```
@@ -157,7 +157,7 @@ Observações:
 
 ## 3 · Dados deste entregável
 
-Subconjunto de `../04-escopo-de-dados.md`. Migrations em SQL puro, versionadas (`0001_init.sql`...).
+Subconjunto de `../../04-escopo-de-dados.md`. Migrations em SQL puro, versionadas (`0001_init.sql`...).
 
 | Tabela | Colunas principais |
 |--------|--------------------|
@@ -196,7 +196,7 @@ Regras:
 
 ## 4 · Layouts deste entregável
 
-Referência: `../05-layouts.md` L0 (shell) e L1 (passos 1–5). Componentes a construir:
+Referência: `../../05-layouts.md` L0 (shell) e L1 (passos 1–5). Componentes a construir:
 
 | Tela | Componentes | Estados a cobrir |
 |------|-------------|------------------|
@@ -242,7 +242,7 @@ Todas confirmadas ou alteradas pelo dono do projeto (registro em §8). Reabrir s
 | F01-21 | Motor de OCR | **`tesseract.js`** (WASM, no worker) · binário Tesseract na imagem · serviço `ocr` separado | WASM evita binário nativo; migrar para serviço separado se o tempo por página passar de ~5 s |
 | F01-22 | Consolidação das leituras | **por seção com voto e confiança** (origem registrada por trecho) · concatenar e deixar o modelo resolver · escolher a melhor leitura inteira | rastreabilidade: a revisão mostra de onde veio cada trecho |
 | F01-23 | Desenvolvimento | **100% em containers** (`docker-compose.dev.yml`, `./start.sh dev|test|e2e`) | decisão do dono: sem conflitos no host |
-| F01-24 | Metodologia | **TDD** em todos os marcos, e2e por fluxo, registro em §8 (`../09-metodologia-tdd.md`) | decisão do dono |
+| F01-24 | Metodologia | **TDD** em todos os marcos, e2e por fluxo, registro em §8 (`../../09-metodologia-tdd.md`) | decisão do dono |
 | F01-25 | Renderização de páginas para OCR | `pdfjs` via `unpdf` + `canvas` WASM (`@napi-rs/canvas` é nativo: evitar) · `pdftoppm` (poppler) na imagem | **poppler na imagem** (`pdftoppm`, pequeno e confiável) |
 
 ## 6 · O que precisa estar coberto para o F1 funcionar
@@ -262,7 +262,7 @@ Ambiente de desenvolvimento verificado em 2026-10-07: Node 22.16, pnpm 9.15, Doc
 | **M7 E2E + fechamento** | Playwright em container sobre o compose e2e: cenários E2E-01 a E2E-17; CI roda build das imagens + e2e; smoke `start` nos 3 SOs; `README` de uso (pré-requisito: só Docker; `./start.sh up`, login, dados, backup, apagar, `down -v` apaga o login); checagem de `git ls-files` sem `data/`/`.env`; atualização dos documentos 02–05 e §8 | §6.5 completo |
 
 Regras durante a implementação:
-- **TDD** (`../09-metodologia-tdd.md`): em cada marco, o teste que falha vem antes do código; correções começam por teste de regressão; §8 registra os ids e "teste antes: sim/não".
+- **TDD** (`../../09-metodologia-tdd.md`): em cada marco, o teste que falha vem antes do código; correções começam por teste de regressão; §8 registra os ids e "teste antes: sim/não".
 - Nenhum comando exige Node/pnpm no host; tudo via `./start.sh`.
 - Nenhum teste automatizado usa a assinatura real; só `MockProvider`. O `ClaudeCodeProvider` é testado com `exec`/`query` injetados.
 - Cada marco registra em §8: data, o que foi entregue, desvios do escopo e decisões novas (`F01-21+`).
@@ -342,14 +342,14 @@ Rodam contra `docker compose -f docker-compose.yml -f docker-compose.e2e.yml up`
 - **E2E-15 fuso horário**: usuário com `America/Sao_Paulo` vê a hora do upload convertida (comparar com o UTC gravado via API).
 
 ### 6.4 Teste manual com provider real (antes de fechar F01)
-Checklist registrado em `tasks/F01-onboarding.md §8` ao final: 5 CVs reais (2 pt-BR, 2 en-US, 1 misto), medir tokens reais × estimativa por chamada, taxa de edição dos fatos (Haiku) e qualidade do digest (Sonnet) em separado, tempo total. Resultado calibra os padrões de `settings.models.extraction`.
+Checklist registrado em `tasks/done/F01-onboarding.md §8` ao final: 5 CVs reais (2 pt-BR, 2 en-US, 1 misto), medir tokens reais × estimativa por chamada, taxa de edição dos fatos (Haiku) e qualidade do digest (Sonnet) em separado, tempo total. Resultado calibra os padrões de `settings.models.extraction`.
 
 ### 6.5 Definição de pronto
 - Todos os testes de 6.2 e 6.3 verdes na CI; cobertura ≥ 80% em `core` e `shared` (`@vitest/coverage-v8`).
 - `docker compose up` funciona em Linux, Windows (Docker Desktop) e macOS, verificado manualmente uma vez cada.
 - `README` com: pré-requisitos, `docker compose up`, login, onde ficam os dados, como fazer backup, como apagar.
 - Nenhum dado pessoal, token ou `./data` no repositório (checagem na CI com `git ls-files`).
-- Documentos `../02`, `../03`, `../04`, `../05` atualizados com o que mudou durante a implementação.
+- Documentos `../../02`, `../../03`, `../../04`, `../../05` atualizados com o que mudou durante a implementação.
 - Critério de entregável publicável de `README.md` (tasks) cumprido: instalação limpa, README de uso, estados de erro, i18n completo, CI nos 3 SOs, sem dados pessoais. Para o F01 vale também: um usuário sem contexto consegue instalar, logar, extrair o CV e chegar ao dashboard só com o README.
 
 ---

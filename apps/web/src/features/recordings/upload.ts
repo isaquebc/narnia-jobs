@@ -2,7 +2,7 @@ import { RECORDING_CHUNK_BYTES, type Recording } from "@narnia-jobs/shared";
 import { ApiError } from "../../lib/api";
 
 /**
- * F13/M1.5 · envio do vídeo em partes (plans/plan-v0/tasks/F13 §6.1.1, R5). Começa de onde o servidor parou
+ * F13/M1.5 · envio do vídeo em partes (plans/plan-v0/tasks/done/F13 §6.1.1, R5). Começa de onde o servidor parou
  * (`rec.received`), manda uma parte por vez e segue o `received` que o servidor devolve no `offset_mismatch` (resposta
  * perdida ou outra aba). Queda de rede ou erro passageiro do servidor: espera e tenta de novo, até `retries` vezes
  * seguidas. Erro definitivo (tamanho, entrevista apagada…) para o envio com a mensagem do servidor.

@@ -17,7 +17,7 @@ import {
 import type { TaskHandler } from "../tasks";
 
 /**
- * F13/M5 · relatório do recrutador sobre a entrevista gravada (plans/plan-v0/tasks/F13 §2.5). Dois elos: o modelo
+ * F13/M5 · relatório do recrutador sobre a entrevista gravada (plans/plan-v0/tasks/done/F13 §2.5). Dois elos: o modelo
  * barato descreve os quadros escolhidos (tool Read) e o Sonnet escreve o relatório com a transcrição numerada, as
  * medições, a vaga, o CV enviado e as entrevistas anteriores do processo; o código confere citações e tempos, guarda
  * uma versão nova, a leitura de cada anotação e a ficha de cada pessoa. Falha nos quadros não impede o relatório.

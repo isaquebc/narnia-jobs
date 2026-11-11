@@ -1,4 +1,4 @@
--- F04 · Chat com o recrutador (M1). Só para frente. Ver plans/plan-v0/tasks/F04-chat-recrutador.md §3.
+-- F04 · Chat com o recrutador (M1). Só para frente. Ver plans/plan-v0/tasks/done/F04-chat-recrutador.md §3.
 -- Tabelas de sessão, mensagens, pesquisa e domínios confiáveis; colunas de dedupe em usage_event; índice FTS5 de fatos
 -- e resumos mantido por gatilhos (F04-12), com carga inicial dos dados existentes.
 
