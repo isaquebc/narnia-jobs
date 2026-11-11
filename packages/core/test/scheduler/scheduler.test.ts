@@ -49,23 +49,31 @@ describe("F14/M1 · agendador", () => {
 
   it("lista as tarefas com o intervalo padrão, sem execução e devidas no primeiro boot", () => {
     const tasks = listScheduledTasks(repos);
-    expect(tasks.map((t) => t.id)).toEqual(["captures.prune", "job_applications.archive"]);
-    const prune = tasks[0];
+    expect(tasks.map((t) => t.id)).toEqual([
+      "mail.sync",
+      "captures.prune",
+      "job_applications.archive",
+    ]);
+    const prune = tasks[1];
     expect(prune?.intervalMinutes).toBe(SCHEDULED_TASKS["captures.prune"].defaultIntervalMinutes);
     expect(prune?.paused).toBe(false);
     expect(prune?.lastRun).toBeNull();
     expect(prune?.nextRunAt).toBeNull();
-    expect(dueScheduledTasks(repos, T0)).toEqual(["captures.prune", "job_applications.archive"]);
+    expect(dueScheduledTasks(repos, T0)).toEqual([
+      "mail.sync",
+      "captures.prune",
+      "job_applications.archive",
+    ]);
   });
 
   it("execução grava início, fim, contadores e a próxima execução (início + intervalo); não fica devida antes disso", async () => {
     const r = await run("captures.prune");
     expect(r.status).toBe("done");
-    const [task] = listScheduledTasks(repos);
+    const task = listScheduledTasks(repos).find((t) => t.id === "captures.prune");
     expect(task?.lastRun?.id).toBe(r.id);
     expect(task?.lastRun?.trigger).toBe("schedule");
     expect(task?.nextRunAt).toBe(plus(24 * 60).toISOString());
-    expect(dueScheduledTasks(repos, plus(60))).toEqual(["job_applications.archive"]);
+    expect(dueScheduledTasks(repos, plus(60))).toEqual(["mail.sync", "job_applications.archive"]);
     expect(dueScheduledTasks(repos, plus(24 * 60))).toContain("captures.prune");
     expect(
       events
@@ -90,7 +98,7 @@ describe("F14/M1 · agendador", () => {
     );
     expect(t.intervalMinutes).toBe(min);
     expect(t.paused).toBe(true);
-    expect(dueScheduledTasks(repos, T0)).toEqual(["job_applications.archive"]);
+    expect(dueScheduledTasks(repos, T0)).toEqual(["mail.sync", "job_applications.archive"]);
     updateScheduledTask(repos, "captures.prune", { paused: false }, T0);
     expect(dueScheduledTasks(repos, T0)).toContain("captures.prune");
   });
@@ -110,7 +118,9 @@ describe("F14/M1 · agendador", () => {
         ["info", "começou"],
         ["error", "disco cheio"],
       ]);
-      expect(listScheduledTasks(repos)[0]?.nextRunAt).toBe(plus(24 * 60).toISOString());
+      expect(listScheduledTasks(repos).find((t) => t.id === "captures.prune")?.nextRunAt).toBe(
+        plus(24 * 60).toISOString(),
+      );
     } finally {
       SCHEDULED_TASK_HANDLERS["captures.prune"] = original;
     }
@@ -122,8 +132,8 @@ describe("F14/M1 · agendador", () => {
       trigger: "schedule",
       at: T0.toISOString(),
     });
-    expect(listScheduledTasks(repos)[0]?.running).toBe(true);
-    expect(dueScheduledTasks(repos, T0)).toEqual(["job_applications.archive"]);
+    expect(listScheduledTasks(repos).find((t) => t.id === "captures.prune")?.running).toBe(true);
+    expect(dueScheduledTasks(repos, T0)).toEqual(["mail.sync", "job_applications.archive"]);
     const again = await run("captures.prune", T0, "manual");
     expect(again.skipped).toBe(true);
     repos.scheduled.finishRun(id, {
@@ -145,7 +155,7 @@ describe("F14/M1 · agendador", () => {
     });
     expect(repos.scheduled.failRunning("interrompida", plus(1).toISOString())).toEqual([id]);
     expect(repos.scheduled.run(id)?.status).toBe("error");
-    expect(listScheduledTasks(repos)[0]?.running).toBe(false);
+    expect(listScheduledTasks(repos).find((t) => t.id === "captures.prune")?.running).toBe(false);
   });
 
   it("retenção: execuções mais antigas que 90 dias saem com o log e os itens", async () => {

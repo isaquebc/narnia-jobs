@@ -7,6 +7,10 @@ import {
   enqueueStage,
   enqueueTask,
   FAKE_GH_STATE_FILENAME,
+  FAKE_GMAIL_STATE_FILENAME,
+  fakeGmailFileFetch,
+  gmailSource,
+  gmailStatus,
   migrate,
   openDatabase,
   recordPctSample,
@@ -14,6 +18,7 @@ import {
   resolveBackupDir,
   resolveConcurrency,
   resolveGhRuntime,
+  resolveGoogleClient,
   type StageJobData,
   type StageName,
   type TaskJobData,
@@ -127,6 +132,19 @@ export async function startWorkers(opts: StartWorkersOptions): Promise<StartedWo
         ...req,
       }),
     publish,
+    // F14: Gmail só quando conectado; com o mock, o Gmail falso em arquivo (o mesmo do api)
+    mailSource: () => {
+      const client = () => resolveGoogleClient(process.env, opts.dataDir);
+      if (gmailStatus(opts.dataDir, client()).status !== "connected") return null;
+      return gmailSource({
+        fetch:
+          opts.provider.id === "mock"
+            ? fakeGmailFileFetch(join(opts.dataDir, FAKE_GMAIL_STATE_FILENAME))
+            : globalThis.fetch,
+        dataDir: opts.dataDir,
+        client,
+      });
+    },
     // F03-1: credencial lida a cada uso (o lançador pode renovar o token do host); mock usa o gh falso
     ghCloneTree: () =>
       resolveGhRuntime({

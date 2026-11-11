@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { type TKey, t } from "../../i18n";
+import { MailWindow } from "./MailWindow";
 
 const TONE = {
   connected: "ok",
@@ -70,6 +71,7 @@ export function GmailSection() {
       {s?.email && s.status !== "disconnected" ? (
         <p className="text-sm">{t("integrations.gmail.connectedAs", { email: s.email })}</p>
       ) : null}
+      {s?.status === "connected" ? <MailWindow /> : null}
       {s?.status === "needs_reconnect" ? (
         <Alert tone="warn">{t("integrations.gmail.needsReconnect")}</Alert>
       ) : null}

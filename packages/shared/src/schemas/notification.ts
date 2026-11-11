@@ -30,6 +30,8 @@ export const NOTIFICATION_KINDS = [
   "document.review_failed",
   /** R6 (FF-7): o índice dos fatos no contexto do recrutador chegou ao teto; sugere ligar a busca por sentido. */
   "search.index_full",
+  /** F14: o Google recusou o acesso ao Gmail (login expirou ou foi revogado): conectar de novo em Configurações. */
+  "mail.reconnect",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;

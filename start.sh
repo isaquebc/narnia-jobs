@@ -201,7 +201,8 @@ restore_files() {
   cp "$file" "$db.restoring" && mv -f "$db.restoring" "$db"
   rm -f "$db-wal" "$db-shm"
   local sub f
-  for sub in uploads templates job-applications; do
+  # F14: mail = e-mails lidos do Gmail (.eml), planos e imutáveis
+  for sub in uploads templates job-applications mail; do
     [[ -d "$bdir/$sub" ]] || continue
     mkdir -p "$data/$sub"
     for f in "$bdir/$sub"/*; do

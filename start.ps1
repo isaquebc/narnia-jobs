@@ -134,7 +134,7 @@ function Restore-Files([string] $DataDir, [string] $BackupDir, [string] $File, [
   Copy-Item $File "$db.restoring" -Force
   Move-Item "$db.restoring" $db -Force
   Remove-Item "$db-wal", "$db-shm" -Force -ErrorAction SilentlyContinue
-  foreach ($sub in @("uploads", "templates", "job-applications")) {
+  foreach ($sub in @("uploads", "templates", "job-applications", "mail")) {
     $src = Join-Path $BackupDir $sub
     if (-not (Test-Path $src)) { continue }
     $dst = Join-Path $DataDir $sub; New-Item -ItemType Directory -Force -Path $dst | Out-Null

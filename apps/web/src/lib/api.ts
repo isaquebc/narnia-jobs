@@ -61,6 +61,7 @@ import type {
   JobApplicationStagesPut,
   JobApplicationSummary,
   JobApplicationUpcoming,
+  MailSettingsView,
   MediaStatus,
   MotivationStatus,
   NotificationsListResponse,
@@ -905,6 +906,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<GmailStatusView & { authUrl: string }>("/api/integrations/gmail/connect", json({})),
     disconnectGmail: () =>
       request<GmailStatusView>("/api/integrations/gmail", { method: "DELETE" }),
+    getMailSettings: () => request<MailSettingsView>("/api/mail/settings"),
+    putMailSettings: (since: string) =>
+      request<MailSettingsView>("/api/mail/settings", {
+        method: "PUT",
+        body: JSON.stringify({ since }),
+      }),
     getGoogleCalendarStatus: (refresh = false) =>
       request<{
         status: "connected" | "needs_auth" | "not_configured" | "error" | "unavailable";

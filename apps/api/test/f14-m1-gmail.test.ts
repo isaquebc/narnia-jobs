@@ -231,3 +231,70 @@ describe("F14/M1 · página do retorno", async () => {
     expect(html).toContain("&lt;script&gt;");
   });
 });
+
+describe("F14/M2 · revisão #6: a notificação de reconectar some ao conectar e ao desconectar", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+  const notify = (tt: TestApp) =>
+    tt.repos.notifications.upsert({
+      kind: "mail.reconnect",
+      subjectKind: "mail",
+      subjectId: "gmail",
+      title: "x",
+      actionUrl: "/configuracoes",
+    });
+  const open = (tt: TestApp) =>
+    tt.repos.notifications.list().filter((n) => n.kind === "mail.reconnect");
+
+  it("conectar de novo resolve", async () => {
+    const s = setup({ GOOGLE_CLIENT_ID: "env-id-123456789", GOOGLE_CLIENT_SECRET: "env-secret" });
+    t = s.t;
+    notify(t);
+    const r = (await (
+      await t.api("/api/integrations/gmail/connect", { method: "POST" })
+    ).json()) as { authUrl: string };
+    await s.callback({
+      code: "code-ok",
+      state: new URL(r.authUrl).searchParams.get("state") as string,
+    });
+    expect(open(t)).toHaveLength(0);
+  });
+
+  it("desconectar resolve", async () => {
+    const s = setup({ GOOGLE_CLIENT_ID: "env-id-123456789", GOOGLE_CLIENT_SECRET: "env-secret" });
+    t = s.t;
+    notify(t);
+    await t.api("/api/integrations/gmail", { method: "DELETE" });
+    expect(open(t)).toHaveLength(0);
+  });
+});
+
+describe("F14/M2 · janela da primeira leitura", () => {
+  let t: TestApp;
+  afterEach(() => t?.cleanup());
+  const put = (since: string) =>
+    t.api("/api/mail/settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ since }),
+    });
+
+  it("sem janela: since null; escolher grava; janela maior volta a leitura ao começo; futuro e mais de um ano: 422", async () => {
+    t = makeTestApp();
+    const empty = (await (await t.api("/api/mail/settings")).json()) as {
+      since: string | null;
+      counts: { pending: number };
+    };
+    expect(empty.since).toBeNull();
+    expect(empty.counts.pending).toBe(0);
+    const d30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    expect((await put(d30)).status).toBe(200);
+    t.repos.settings.set("mail.lastSyncAt", new Date().toISOString());
+    const d90 = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const r = (await (await put(d90)).json()) as { since: string; lastSyncAt: string | null };
+    expect(r.since).toBe(d90);
+    expect(r.lastSyncAt).toBeNull();
+    expect((await put(new Date(Date.now() + 86_400_000).toISOString())).status).toBe(422);
+    expect((await put(new Date(Date.now() - 400 * 86_400_000).toISOString())).status).toBe(422);
+  });
+});

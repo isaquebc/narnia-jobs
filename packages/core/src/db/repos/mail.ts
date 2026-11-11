@@ -1,0 +1,202 @@
+import { newId } from "../../ids";
+import type { Db } from "../open";
+
+/** E-mail lido do Gmail (F14/M2). O conteúdo fica no `.eml`; aqui ficam o cabeçalho, o estado e o resultado. */
+export type MailStatus =
+  | "pending"
+  | "processing"
+  | "done"
+  | "review"
+  | "quarantine"
+  | "ignored"
+  | "error";
+
+export interface MailMessageRecord {
+  id: string;
+  gmailId: string;
+  threadId: string | null;
+  fromAddr: string | null;
+  fromName: string | null;
+  replyTo: string | null;
+  subject: string | null;
+  receivedAt: string;
+  size: number;
+  labels: string[];
+  rawPath: string;
+  status: MailStatus;
+  class: string | null;
+  confidence: number | null;
+  riskLevel: "trusted" | "neutral" | "high" | null;
+  riskReasons: string[];
+  result: Record<string, unknown> | null;
+  error: string | null;
+  gmailSynced: boolean;
+  processedAt: string | null;
+  createdAt: string;
+}
+
+export type NewMailMessage = Pick<
+  MailMessageRecord,
+  | "gmailId"
+  | "threadId"
+  | "fromAddr"
+  | "fromName"
+  | "replyTo"
+  | "subject"
+  | "receivedAt"
+  | "size"
+  | "labels"
+  | "rawPath"
+>;
+
+export interface MailRepo {
+  /** Insere se o `gmail_id` ainda não existe; devolve o registro (novo ou o que já estava). */
+  insert(m: NewMailMessage, at: string): { record: MailMessageRecord; created: boolean };
+  get(id: string): MailMessageRecord | null;
+  byGmailId(gmailId: string): MailMessageRecord | null;
+  /** Dos ids do Gmail informados, os que já estão no banco. */
+  known(gmailIds: string[]): Set<string>;
+  /** Pendentes do mais antigo para o mais novo (a negativa nunca antes da candidatura, §2.2). */
+  pending(limit: number): MailMessageRecord[];
+  counts(): Record<MailStatus, number>;
+  setStatus(id: string, status: MailStatus, at: string, extra?: { error?: string | null }): void;
+}
+
+interface Row {
+  id: string;
+  gmail_id: string;
+  thread_id: string | null;
+  from_addr: string | null;
+  from_name: string | null;
+  reply_to: string | null;
+  subject: string | null;
+  received_at: string;
+  size: number;
+  labels_json: string;
+  raw_path: string;
+  status: MailStatus;
+  class: string | null;
+  confidence: number | null;
+  risk_level: MailMessageRecord["riskLevel"];
+  risk_reasons_json: string;
+  result_json: string | null;
+  error: string | null;
+  gmail_synced: number;
+  processed_at: string | null;
+  created_at: string;
+}
+
+const map = (r: Row): MailMessageRecord => ({
+  id: r.id,
+  gmailId: r.gmail_id,
+  threadId: r.thread_id,
+  fromAddr: r.from_addr,
+  fromName: r.from_name,
+  replyTo: r.reply_to,
+  subject: r.subject,
+  receivedAt: r.received_at,
+  size: Number(r.size),
+  labels: JSON.parse(r.labels_json) as string[],
+  rawPath: r.raw_path,
+  status: r.status,
+  class: r.class,
+  confidence: r.confidence,
+  riskLevel: r.risk_level,
+  riskReasons: JSON.parse(r.risk_reasons_json) as string[],
+  result: r.result_json ? (JSON.parse(r.result_json) as Record<string, unknown>) : null,
+  error: r.error,
+  gmailSynced: r.gmail_synced === 1,
+  processedAt: r.processed_at,
+  createdAt: r.created_at,
+});
+
+const STATUSES: MailStatus[] = [
+  "pending",
+  "processing",
+  "done",
+  "review",
+  "quarantine",
+  "ignored",
+  "error",
+];
+
+export function mailRepo(db: Db): MailRepo {
+  const q = (sql: string) => db.prepare(sql);
+  const get = (id: string) => {
+    const r = q("select * from mail_message where id = ?").get(id) as unknown as Row | undefined;
+    return r ? map(r) : null;
+  };
+  const byGmailId = (gmailId: string) => {
+    const r = q("select * from mail_message where gmail_id = ?").get(gmailId) as unknown as
+      | Row
+      | undefined;
+    return r ? map(r) : null;
+  };
+  return {
+    insert(m, at) {
+      const existing = byGmailId(m.gmailId);
+      if (existing) return { record: existing, created: false };
+      const id = newId();
+      q(
+        `insert into mail_message (id, gmail_id, thread_id, from_addr, from_name, reply_to, subject, received_at, size,
+           labels_json, raw_path, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        m.gmailId,
+        m.threadId,
+        m.fromAddr,
+        m.fromName,
+        m.replyTo,
+        m.subject,
+        m.receivedAt,
+        m.size,
+        JSON.stringify(m.labels),
+        m.rawPath,
+        at,
+        at,
+      );
+      return { record: get(id) as MailMessageRecord, created: true };
+    },
+    get,
+    byGmailId,
+    known(gmailIds) {
+      const out = new Set<string>();
+      for (let i = 0; i < gmailIds.length; i += 500) {
+        const chunk = gmailIds.slice(i, i + 500);
+        if (!chunk.length) continue;
+        const rows = q(
+          `select gmail_id from mail_message where gmail_id in (${chunk.map(() => "?").join(",")})`,
+        ).all(...chunk) as Array<{ gmail_id: string }>;
+        for (const r of rows) out.add(r.gmail_id);
+      }
+      return out;
+    },
+    pending(limit) {
+      return (
+        q(
+          "select * from mail_message where status = 'pending' order by received_at, rowid limit ?",
+        ).all(limit) as unknown as Row[]
+      ).map(map);
+    },
+    counts() {
+      const out = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<MailStatus, number>;
+      for (const r of q(
+        "select status, count(*) as n from mail_message group by status",
+      ).all() as Array<{
+        status: MailStatus;
+        n: number;
+      }>)
+        out[r.status] = Number(r.n);
+      return out;
+    },
+    setStatus(id, status, at, extra = {}) {
+      q("update mail_message set status = ?, error = ?, updated_at = ? where id = ?").run(
+        status,
+        extra.error ?? null,
+        at,
+        id,
+      );
+    },
+  };
+}

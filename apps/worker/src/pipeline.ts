@@ -4,6 +4,7 @@ import {
   type GhClient,
   type IngestionRunRecord,
   localeFromLanguage,
+  type MailSource,
   type MediaClient,
   nextStage,
   planStages,
@@ -53,6 +54,8 @@ export interface WorkerDeps {
   /** F13: cliente do serviço media (padrão: `NARNIA_MEDIA_URL`) e intervalo da consulta do progresso. */
   media?: MediaClient;
   recordingPollMs?: number;
+  /** F14: fonte do Gmail (null = não conectado); ausente = nenhuma. */
+  mailSource?: () => MailSource | null;
 }
 
 export interface StageContext {

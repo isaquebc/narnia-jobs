@@ -6,7 +6,11 @@ import { IdSchema, IsoDateTimeSchema } from "./common";
  * que ela tocou (e-mails, vagas, candidaturas). As definições ficam no código (`SCHEDULED_TASKS`, core); o banco guarda
  * o intervalo escolhido, a pausa, a próxima execução e o histórico.
  */
-export const SCHEDULED_TASK_IDS = ["captures.prune", "job_applications.archive"] as const;
+export const SCHEDULED_TASK_IDS = [
+  "mail.sync",
+  "captures.prune",
+  "job_applications.archive",
+] as const;
 export const ScheduledTaskIdSchema = z.enum(SCHEDULED_TASK_IDS);
 export type ScheduledTaskId = z.infer<typeof ScheduledTaskIdSchema>;
 

@@ -75,6 +75,7 @@ export * from "./jobs/tasks";
 export * from "./mail/connection";
 export * from "./mail/google-oauth";
 export * from "./mail/source";
+export * from "./mail/sync";
 export * from "./media/client";
 export * from "./models";
 export * from "./net/guard";

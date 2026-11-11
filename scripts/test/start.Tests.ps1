@@ -176,6 +176,18 @@ Describe "Backups e restore (F03-fix L1)" {
     Get-Content -Raw (Join-Path $d "job-applications/a1") | Should -Be "email"
     Get-Content -Raw (Join-Path $d "job-applications/a2") | Should -Be "video-atual"
   }
+
+  It "Restore-Files devolve os e-mails lidos do Gmail (F14) que faltam, sem sobrescrever" {
+    $d = Join-Path $script:Tmp "mdata"; $b = Join-Path $script:Tmp "mbk"
+    New-Item -ItemType Directory -Force -Path (Join-Path $d "mail"), (Join-Path $b "mail") | Out-Null
+    Set-Content -NoNewline -Path (Join-Path $b "narnia-boot-x.sqlite") -Value "backup"
+    Set-Content -NoNewline -Path (Join-Path $b "mail/m1.eml") -Value "eml1"
+    Set-Content -NoNewline -Path (Join-Path $b "mail/m2.eml") -Value "eml2-backup"
+    Set-Content -NoNewline -Path (Join-Path $d "mail/m2.eml") -Value "eml2-atual"
+    Restore-Files $d $b (Join-Path $b "narnia-boot-x.sqlite") "STAMP"
+    Get-Content -Raw (Join-Path $d "mail/m1.eml") | Should -Be "eml1"
+    Get-Content -Raw (Join-Path $d "mail/m2.eml") | Should -Be "eml2-atual"
+  }
 }
 
 Describe "Regressão 2026-10-10: imagem antiga e volume do gh com dono root" {

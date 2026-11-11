@@ -26,6 +26,7 @@ export async function scheduledRun(
     taskId,
     trigger,
     publish: deps.publish,
+    mailSource: () => deps.mailSource?.() ?? null,
   });
   return { runId: r.id, status: r.status, skipped: r.skipped ?? false };
 }

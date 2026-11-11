@@ -87,6 +87,8 @@ function matches(m: FakeGmailMessage, q: string, now: number): boolean {
   for (const part of q.split(/\s+/).filter(Boolean)) {
     const after = part.match(/^after:(\d+)$/);
     if (after && m.internalDate < Number(after[1]) * 1000) return false;
+    const before = part.match(/^before:(\d+)$/);
+    if (before && m.internalDate >= Number(before[1]) * 1000) return false;
     const newer = part.match(/^newer_than:(\d+)d$/);
     if (newer && m.internalDate < now - Number(newer[1]) * 86_400_000) return false;
     const label = part.match(/^label:(.+)$/);

@@ -62,8 +62,14 @@ describe("F14/M1 · agendador no worker", () => {
   it("o laço enfileira cada tarefa devida na fila scheduled, com a chave da tarefa", async () => {
     h = harness();
     const due = await enqueueDueScheduledTasks(h.deps, new Date("2026-11-11T12:00:00Z"));
-    expect(due).toEqual(["captures.prune", "job_applications.archive"]);
+    expect(due).toEqual(["mail.sync", "captures.prune", "job_applications.archive"]);
     expect(h.enqueued).toEqual([
+      {
+        queue: "scheduled",
+        type: "scheduled.run",
+        key: "mail.sync",
+        payload: { taskId: "mail.sync", trigger: "schedule" },
+      },
       {
         queue: "scheduled",
         type: "scheduled.run",
@@ -94,7 +100,10 @@ describe("F14/M1 · agendador no worker", () => {
     expect(out.status).toBe("done");
     expect(h.repos.scheduled.run(String(out.runId))?.trigger).toBe("manual");
     expect(h.events.map((e) => e.type)).toEqual(["scheduled_run.updated", "scheduled_run.updated"]);
-    expect(await enqueueDueScheduledTasks(h.deps)).toEqual(["job_applications.archive"]);
+    expect(await enqueueDueScheduledTasks(h.deps)).toEqual([
+      "mail.sync",
+      "job_applications.archive",
+    ]);
   });
 
   it("tarefa desconhecida falha (o job vai para erro)", async () => {

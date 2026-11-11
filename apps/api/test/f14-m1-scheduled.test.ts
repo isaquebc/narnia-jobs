@@ -20,8 +20,12 @@ describe("F14/M1 · /api/scheduled-tasks", () => {
     const r = (await (await t.api("/api/scheduled-tasks")).json()) as {
       tasks: Array<{ id: string; intervalMinutes: number; paused: boolean; lastRun: unknown }>;
     };
-    expect(r.tasks.map((x) => x.id)).toEqual(["captures.prune", "job_applications.archive"]);
-    expect(r.tasks[0]).toMatchObject({ intervalMinutes: 1440, paused: false, lastRun: null });
+    expect(r.tasks.map((x) => x.id)).toEqual([
+      "mail.sync",
+      "captures.prune",
+      "job_applications.archive",
+    ]);
+    expect(r.tasks[1]).toMatchObject({ intervalMinutes: 1440, paused: false, lastRun: null });
   });
 
   it("PATCH muda intervalo e pausa; abaixo do mínimo dá 422; tarefa desconhecida 404", async () => {

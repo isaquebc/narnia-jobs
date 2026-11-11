@@ -4,9 +4,13 @@ import {
   disconnectGmail,
   finishGmailConnect,
   gmailStatus,
+  MAIL_LAST_SYNC_KEY,
+  MAIL_SINCE_KEY,
   oauthRedirectUri,
   type PendingGmailConnect,
+  type Repos,
   resolveGoogleClient,
+  resolveMailReconnect,
   saveGoogleClient,
   startGmailConnect,
 } from "@narnia-jobs/core";
@@ -73,7 +77,10 @@ const ClientSchema = z.object({
   clientSecret: z.string().trim().min(5).max(300),
 });
 
+const MailSettingsSchema = z.object({ since: z.iso.datetime() });
+
 export function gmailRoutes(deps: {
+  repos: Repos;
   dataDir: string;
   fetch: typeof fetch;
   env: Record<string, string | undefined>;
@@ -108,6 +115,29 @@ export function gmailRoutes(deps: {
   });
 
   app.get("/api/integrations/gmail", (c) => c.json(view()));
+
+  // F14/M2: janela da primeira leitura (pedido do dono) e o resumo do que já foi lido
+  const mailView = () => ({
+    since: deps.repos.settings.get<string>(MAIL_SINCE_KEY) ?? null,
+    lastSyncAt: deps.repos.settings.get<string>(MAIL_LAST_SYNC_KEY) ?? null,
+    counts: deps.repos.mail.counts(),
+  });
+  app.get("/api/mail/settings", (c) => c.json(mailView()));
+  app.put("/api/mail/settings", validate("json", MailSettingsSchema), (c) => {
+    const since = new Date(c.req.valid("json").since);
+    const now = Date.now();
+    if (since.getTime() > now)
+      return apiError(c, 422, "since_in_future", "A data não pode ser no futuro");
+    // um ano, com folga para a meia-noite local e o 29 de fevereiro
+    if (since.getTime() < now - 367 * 86_400_000)
+      return apiError(c, 422, "since_too_old", "Leia no máximo um ano para trás");
+    const previous = deps.repos.settings.get<string>(MAIL_SINCE_KEY);
+    deps.repos.settings.set(MAIL_SINCE_KEY, since.toISOString());
+    // janela maior que a anterior: a próxima leitura volta ao começo (o gmail_id único evita repetir)
+    if (!previous || since.toISOString() < previous)
+      deps.repos.settings.set(MAIL_LAST_SYNC_KEY, null);
+    return c.json(mailView());
+  });
 
   app.put("/api/integrations/gmail/client", validate("json", ClientSchema), (c) => {
     if (client()?.source === "env")
@@ -205,6 +235,7 @@ export function gmailRoutes(deps: {
         params: url.searchParams,
       });
       lastError = null;
+      await resolveMailReconnect(deps.repos, async (e) => deps.bus?.emit(e));
       return {
         status: 200,
         html: callbackPage(
@@ -224,6 +255,7 @@ export function gmailRoutes(deps: {
   app.delete("/api/integrations/gmail", async (c) => {
     stop();
     await disconnectGmail({ fetch: deps.fetch, dataDir: deps.dataDir });
+    await resolveMailReconnect(deps.repos, async (e) => deps.bus?.emit(e));
     deps.bus?.emit({ type: "gmail.updated" });
     return c.json(view());
   });

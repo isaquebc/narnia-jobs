@@ -43,6 +43,7 @@ import {
 import { type JobApplicationEventsRepo, jobApplicationEventsRepo } from "./job-application-events";
 import { type JobApplicationsRepo, jobApplicationsRepo } from "./job-applications";
 import { type JobsRepo, jobsRepo } from "./jobs";
+import { type MailRepo, mailRepo } from "./mail";
 import { type NotificationsRepo, notificationsRepo } from "./notifications";
 import {
   type JobAnalysesRepo,
@@ -75,6 +76,7 @@ export interface Repos {
   db: Db;
   settings: SettingsRepo;
   scheduled: ScheduledRepo;
+  mail: MailRepo;
   users: UsersRepo;
   profiles: ProfilesRepo;
   emphasis: EmphasisRepo;
@@ -197,6 +199,7 @@ export function createRepos(db: Db): Repos {
     recordings: recordingsRepo(db),
     recordingAnalysis: recordingAnalysisRepo(db),
     scheduled: scheduledRepo(db),
+    mail: mailRepo(db),
   };
 }
 
@@ -212,6 +215,7 @@ export * from "./github";
 export * from "./ingestion-runs";
 export * from "./job-applications";
 export * from "./jobs";
+export * from "./mail";
 export * from "./notifications";
 export * from "./postings";
 export * from "./profiles";

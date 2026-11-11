@@ -15,5 +15,13 @@ export const GmailStatusSchema = z.object({
 });
 export type GmailStatusView = z.infer<typeof GmailStatusSchema>;
 
+/** F14/M2 · janela da primeira leitura e o que já foi lido (por estado). */
+export const MailSettingsSchema = z.object({
+  since: z.string().nullable(),
+  lastSyncAt: z.string().nullable(),
+  counts: z.record(z.string(), z.number()),
+});
+export type MailSettingsView = z.infer<typeof MailSettingsSchema>;
+
 /** A conexão com o Gmail mudou (conectou, falhou, desconectou): Configurações recarrega. */
 export const GmailUpdatedEventSchema = z.object({ type: z.literal("gmail.updated") });

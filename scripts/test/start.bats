@@ -282,6 +282,16 @@ fake_gh() { # fake_gh <saida> <codigo> -> cria um `gh` falso em $TMP/bin
   [[ "$(cat "$TMP/data/job-applications/a2")" == "video-atual" ]]
 }
 
+@test "restore_files devolve os e-mails lidos do Gmail (F14) que faltam, sem sobrescrever" {
+  mkdir -p "$TMP/data/mail" "$TMP/b/mail"
+  printf 'backup' > "$TMP/b/narnia-boot-x.sqlite"
+  printf 'eml1' > "$TMP/b/mail/m1.eml"; printf 'eml2-backup' > "$TMP/b/mail/m2.eml"
+  printf 'eml2-atual' > "$TMP/data/mail/m2.eml"
+  restore_files "$TMP/data" "$TMP/b" "$TMP/b/narnia-boot-x.sqlite" STAMP
+  [[ "$(cat "$TMP/data/mail/m1.eml")" == "eml1" ]]
+  [[ "$(cat "$TMP/data/mail/m2.eml")" == "eml2-atual" ]]
+}
+
 @test "restore_files devolve os quadros das entrevistas (F13), por pasta, sem sobrescrever" {
   mkdir -p "$TMP/b/interview-frames/r1" "$TMP/data/interview-frames/r1"
   printf 'backup' > "$TMP/b/narnia-boot-x.sqlite"

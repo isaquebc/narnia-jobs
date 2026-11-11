@@ -10,6 +10,8 @@ import {
 } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
 import { jobApplicationUrl } from "../job-applications/tools";
+import type { MailSource } from "../mail/source";
+import { syncMail } from "../mail/sync";
 
 /**
  * Agendador (F14-12, plans/plan-v0/tasks/F14-leitura-de-emails.md §2.6): as rotinas periódicas rodam no worker como
@@ -28,6 +30,8 @@ export interface ScheduledTaskDefinition {
 
 const DAY = 24 * 60;
 export const SCHEDULED_TASKS: Record<ScheduledTaskId, ScheduledTaskDefinition> = {
+  // F14-8: 1 h por padrão, mínimo 10 min
+  "mail.sync": { id: "mail.sync", defaultIntervalMinutes: 60, minIntervalMinutes: 10 },
   "captures.prune": { id: "captures.prune", defaultIntervalMinutes: DAY, minIntervalMinutes: 60 },
   "job_applications.archive": {
     id: "job_applications.archive",
@@ -57,6 +61,8 @@ export interface ScheduledContext {
   ): void;
   count(key: string, n?: number): void;
   publish(event: WsEvent): Promise<void>;
+  /** F14: fonte do Gmail com o token guardado; null quando não está conectado. */
+  mailSource(): MailSource | null;
 }
 
 export type ScheduledHandler = (ctx: ScheduledContext) => Promise<void>;
@@ -93,7 +99,13 @@ async function jobApplicationsArchive(ctx: ScheduledContext) {
 }
 
 /** Handlers por tarefa; mutável só para os testes trocarem um handler. */
+/** Leitura do Gmail (F14/M2): baixa os e-mails novos de vagas; o processamento vem nos marcos seguintes. */
+async function mailSync(ctx: ScheduledContext) {
+  await syncMail({ repos: ctx.repos, dataDir: ctx.dataDir, source: ctx.mailSource(), ctx });
+}
+
 export const SCHEDULED_TASK_HANDLERS: Record<ScheduledTaskId, ScheduledHandler> = {
+  "mail.sync": mailSync,
   "captures.prune": capturesPrune,
   "job_applications.archive": jobApplicationsArchive,
 };
@@ -176,6 +188,7 @@ export async function runScheduledTask(input: {
   trigger: "schedule" | "manual";
   now?: Date;
   publish: (event: WsEvent) => Promise<void>;
+  mailSource?: () => MailSource | null;
 }): Promise<RunScheduledResult> {
   const { repos, taskId } = input;
   const handler = SCHEDULED_TASK_HANDLERS[taskId];
@@ -210,6 +223,7 @@ export async function runScheduledTask(input: {
       counts[key] = (counts[key] ?? 0) + n;
     },
     publish,
+    mailSource: () => input.mailSource?.() ?? null,
   };
   let status: "done" | "error" = "done";
   let error: string | null = null;

@@ -120,6 +120,11 @@ export function backupJobApplicationFiles(dataDir: string, dir: string): number 
   return copyMissing(dataDir, dir, "job-applications");
 }
 
+/** E-mails lidos do Gmail (F14/M2): `mail/<gmail_id>.eml`, planos e imutáveis. O token (`secrets/`) fica de fora. */
+export function backupMailFiles(dataDir: string, dir: string): number {
+  return copyMissing(dataDir, dir, "mail", (f) => f.endsWith(".eml"));
+}
+
 /**
  * Quadros escolhidos das entrevistas gravadas (F13-2): `interview-frames/<id>/*.jpg`. O vídeo (`interviews/`) fica
  * fora do backup de propósito: é grande e a pessoa escolhe apagar.
@@ -178,6 +183,7 @@ export function backupOnBoot(input: {
       backupUploads(dataDir, backupDir) +
       backupTemplates(dataDir, backupDir) +
       backupJobApplicationFiles(dataDir, backupDir) +
+      backupMailFiles(dataDir, backupDir) +
       backupInterviewFrames(dataDir, backupDir);
     const today = `narnia-boot-${now.toISOString().slice(0, 10)}`;
     if (listBackups(backupDir).some((b) => b.file.startsWith(today)))

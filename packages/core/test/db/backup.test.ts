@@ -278,7 +278,7 @@ describe("F14/M1 · RT-I2: o backup é por lista de inclusão; segredos nunca en
   const { join } = await import("node:path");
   const { backupOnBoot, migrate, openDatabase } = await import("../../src/db");
 
-  it("backupOnBoot copia as pastas da lista e deixa secrets/ (token do Gmail) e pastas desconhecidas de fora", () => {
+  it("backupOnBoot copia as pastas da lista (com os e-mails lidos, F14/M2) e deixa secrets/ (token do Gmail) e pastas desconhecidas de fora", () => {
     const root = mkdtempSync(join(tmpdir(), "narnia-bkp-secrets-"));
     const data = join(root, "data");
     const bk = join(root, "backups");
@@ -287,6 +287,8 @@ describe("F14/M1 · RT-I2: o backup é por lista de inclusão; segredos nunca en
       writeFileSync(join(data, "uploads/abc"), "pdf");
       mkdirSync(join(data, "secrets"), { recursive: true });
       writeFileSync(join(data, "secrets/gmail-token.json"), '{"refresh_token":"x"}');
+      mkdirSync(join(data, "mail"), { recursive: true });
+      writeFileSync(join(data, "mail/m1.eml"), "From: x");
       mkdirSync(join(data, "outra-coisa"), { recursive: true });
       writeFileSync(join(data, "outra-coisa/f"), "x");
       const db = openDatabase(join(data, "narnia.sqlite"));
@@ -297,6 +299,7 @@ describe("F14/M1 · RT-I2: o backup é por lista de inclusão; segredos nunca en
       db.close();
       expect(r.created).not.toBeNull();
       expect(existsSync(join(bk, "uploads/abc"))).toBe(true);
+      expect(existsSync(join(bk, "mail/m1.eml"))).toBe(true);
       expect(existsSync(join(bk, "secrets"))).toBe(false);
       expect(existsSync(join(bk, "outra-coisa"))).toBe(false);
       expect(readdirSync(bk).some((f) => /secret|token/i.test(f))).toBe(false);

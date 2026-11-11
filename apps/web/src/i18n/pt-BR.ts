@@ -242,6 +242,18 @@ export const ptBR = {
       disconnect: "Desconectar",
       disconnectConfirm:
         "Desconectar o Gmail? O narnia revoga o acesso no Google; o que já foi lido continua aqui.",
+      windowTitle: "Primeira leitura",
+      windowHint:
+        "Quanto tempo para trás o narnia lê na primeira vez? Depois ele lê só os e-mails novos.",
+      windowDays: "Últimos {n} dias",
+      windowCustom: "Desde uma data",
+      windowSave: "Começar a ler",
+      windowSince: "Lendo desde {date}.",
+      lastSync: "Última leitura: {date}.",
+      neverSynced: "Ainda não leu: a primeira leitura roda na próxima execução da tarefa agendada.",
+      totals: "{total} e-mail(s) lidos, {pending} aguardando processamento.",
+      extend: "Ler mais para trás",
+      runs: "Ver as execuções em Processos › Tarefas agendadas",
     },
     google: {
       title: "Google Calendar (opcional)",
@@ -418,6 +430,10 @@ export const ptBR = {
         name: "Limpeza das capturas da extensão",
         hint: "Apaga as páginas capturadas pela extensão que não viraram vaga nem formulário em 30 dias.",
       },
+      mail_sync: {
+        name: "Leitura do Gmail",
+        hint: "Baixa os e-mails novos de vagas e de candidaturas. Configure a conta em Configurações › Gmail.",
+      },
       job_applications_archive: {
         name: "Arquivamento de candidaturas paradas",
         hint: "Arquiva as candidaturas sem atividade há 40 dias (nada é apagado).",
@@ -425,7 +441,12 @@ export const ptBR = {
     },
     status: { running: "Rodando", done: "Concluída", error: "Erro" },
     trigger: { schedule: "agendada", manual: "manual" },
-    counts: { deleted: "apagada(s)", archived: "arquivada(s)" },
+    counts: {
+      deleted: "apagada(s)",
+      archived: "arquivada(s)",
+      fetched: "e-mail(s) baixado(s)",
+      errors: "erro(s)",
+    },
     last: "Última execução",
     next: "Próxima",
     never: "Nunca rodou",
@@ -857,6 +878,7 @@ export const ptBR = {
       document_ready: "Currículos e cartas prontos",
       document_review_failed: "Currículos e cartas que não passaram na revisão",
       search_index_full: "Fatos acima do contexto do recrutador",
+      mail_reconnect: "Gmail desconectado",
     },
   },
   ingestion: {
