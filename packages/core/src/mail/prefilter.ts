@@ -18,6 +18,14 @@ export interface PrefilterResult {
 
 const JOB_WORDS =
   /\b(vagas?|candidatura|candidat[oa]s?|processo seletivo|sele[çc][ãa]o|entrevistas?|oportunidades?|recrutador[a]?|recrutamento|contrata[çc][ãa]o|application|applied|apply|interviews?|jobs?|positions?|roles?|hiring|openings?|recruiter|talent|offer)\b/i;
+/**
+ * Cargo no assunto (alerta de uma vaga só, sem "vaga" escrito: "Programador Junior na empresa X", "[1321] Pessoa
+ * Desenvolvedora Fullstack"; correção 2026-11-11, os alertas do Glassdoor caíam como fora do assunto).
+ */
+const ROLE_WORDS =
+  /\b(candidatar(-se)?|inscri[çc][ãa]o|contratando|est[áa]gio|na empresa|desenvolvedor[a]?|programador[a]?|engenheir[oa]|analista|arquitet[oa]|pessoa desenvolvedora|tech lead|developer|engineer|programmer|architect|devops|sre|fullstack|full[- ]stack|back[- ]?end|front[- ]?end)\b/i;
+/** Canal do Indeed que só manda a confirmação da candidatura ("Inscrição via Indeed: …"). */
+const INDEED_APPLY = /^indeedapply$/i;
 
 /** Sistemas de candidatura (ATS): só escrevem sobre candidaturas. */
 const ATS = new Set([
@@ -60,6 +68,9 @@ export function prefilterMail(m: ParsedMail): PrefilterResult {
     (a) => /\.ics$/i.test(a.filename) || /text\/calendar/i.test(a.contentType),
   );
   const words = JOB_WORDS.test(m.subject);
+  // cargo e palavras como "inscrição" só contam nas plataformas de vaga (revisão: inscrição em curso ou webinar de
+  // qualquer remetente iria ao modelo; no LinkedIn, "fulano, engenheiro na X, viu seu perfil" é ruído)
+  const role = ROLE_WORDS.test(m.subject);
   const base = { platform, hasCalendar };
   if (hasCalendar) return { decision: "candidate", reason: "convite de calendário", ...base };
   if (
@@ -73,6 +84,8 @@ export function prefilterMail(m: ParsedMail): PrefilterResult {
           reason: "mensagem repassada pela plataforma; o modelo decide",
           ...base,
         };
+  if (platform === "indeed" && INDEED_APPLY.test(local))
+    return { decision: "candidate", reason: "confirmação de candidatura do Indeed", ...base };
   if (platform === "linkedin") {
     if (LINKEDIN_JOBS.test(local))
       return { decision: "candidate", reason: "canal de vagas do LinkedIn", ...base };
@@ -82,7 +95,7 @@ export function prefilterMail(m: ParsedMail): PrefilterResult {
   if (platform && ATS.has(platform))
     return { decision: "candidate", reason: `sistema de candidatura (${platform})`, ...base };
   if (platform && BOARDS.has(platform))
-    return words
+    return words || role
       ? { decision: "candidate", reason: `plataforma de vagas (${platform})`, ...base }
       : { decision: "ignored", reason: `notificação de ${platform} sem assunto de vaga`, ...base };
   if (words) return { decision: "candidate", reason: "assunto de vaga", ...base };

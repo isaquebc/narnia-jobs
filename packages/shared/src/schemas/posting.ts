@@ -179,6 +179,8 @@ export const PostingSchema = PostingFieldsSchema.extend({
   feedState: z.enum(["new", "seen"]).nullable().default(null),
   /** F14-6 · match sem tokens (0–100) para ordenar o feed e decidir a pré-análise automática. */
   matchScore: z.number().int().min(0).max(100).nullable().default(null),
+  /** Score só pelo cargo, senioridade e local do alerta (sem descrição); o completo o substitui (F14-16). */
+  matchScoreProvisional: z.boolean().default(false),
   /** F14-9 · arquivada sozinha por falta de interação (não é motivo da pessoa, fica fora do fit). */
   archiveAuto: z.enum(["stale"]).nullable().default(null),
   lastInteractionAt: IsoDateTimeSchema.nullable().default(null),

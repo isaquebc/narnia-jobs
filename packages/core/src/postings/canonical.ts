@@ -17,6 +17,11 @@ export function canonicalUrl(raw: string): string | null {
       ? u.pathname.match(/\/jobs\/view\/(?:[^/]*-)?(\d{6,})\/?$/)?.[1]
       : undefined;
     if (li) return `linkedin.com/jobs/view/${li}`;
+    // Glassdoor (correção 2026-11-11): a vaga é o `jl`/`jobListingId`, global entre os domínios do país; o resto é rastreio
+    if (/(^|\.)glassdoor\.[a-z.]+$/.test(host)) {
+      const jl = u.searchParams.get("jl") ?? u.searchParams.get("jobListingId");
+      if (jl && /^\d{6,}$/.test(jl)) return `glassdoor/job-listing/${jl}`;
+    }
     const params = [...u.searchParams.entries()]
       .filter(([k]) => !TRACKING.test(k))
       .sort(([a], [b]) => a.localeCompare(b));
@@ -38,10 +43,17 @@ export function backfillCanonicalUrls(db: {
 }): number {
   const rows = db
     .prepare(
-      "select id, posting_url from posting where posting_url is not null and canonical_url is null",
+      // Glassdoor sempre de novo: a regra do `jl` é de 2026-11-11 e as vagas antigas guardaram o rastreio
+      "select id, posting_url, canonical_url from posting where posting_url is not null and (canonical_url is null or posting_url like '%glassdoor.%')",
     )
-    .all() as Array<{ id: string; posting_url: string }>;
+    .all() as Array<{ id: string; posting_url: string; canonical_url: string | null }>;
   const set = db.prepare("update posting set canonical_url = ? where id = ?");
-  for (const r of rows) set.run(canonicalUrl(r.posting_url), r.id);
-  return rows.length;
+  let n = 0;
+  for (const r of rows) {
+    const c = canonicalUrl(r.posting_url);
+    if (c === r.canonical_url) continue;
+    set.run(c, r.id);
+    n++;
+  }
+  return n;
 }

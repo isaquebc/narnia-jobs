@@ -49,3 +49,14 @@ export function useScheduledRun(runId: string | null) {
     enabled: !!runId,
   });
 }
+
+/** Desfazer e refazer a leitura de e-mails a partir de uma execução (pedido do dono 2026-11-11). */
+export function useRedoMailRuns() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => api.redoMailRuns(runId),
+    // vagas, candidaturas, e-mails e notificações mudam juntos
+    onSettled: () => qc.invalidateQueries(),
+  });
+}

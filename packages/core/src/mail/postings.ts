@@ -3,7 +3,7 @@ import type { Repos } from "../db";
 import { canonicalUrl } from "../postings/canonical";
 import type { FetchPostingOptions } from "../postings/fetch/fetch";
 import { fetchPostingPage } from "../postings/fetch/fetch";
-import { postingIdentityHash } from "../postings/identity";
+import { sameTitle } from "../postings/identity";
 import { refreshPreAnalysis } from "../postings/ingest";
 import { buildPreAnalysis } from "../postings/match";
 import type { ScheduledContext } from "../scheduler";
@@ -78,12 +78,16 @@ export function intakePostingFromMail(
     ...parseLocation(job.location),
     ...(url ? { postingUrl: url } : {}),
   };
-  const hash = postingIdentityHash(fields);
-  if (hash) {
-    // mesma empresa e cargo é a mesma vaga, a não ser que as duas tenham links diferentes (ex.: SP e RJ)
+  if (fields.company && fields.title) {
+    // mesma empresa e cargo é a mesma vaga, a não ser que as duas tenham links diferentes (ex.: SP e RJ); por
+    // semelhança, não por hash (correção 2026-11-11: a vaga da extensão guarda a função e o hash nunca batia)
     const same = repos.postings
-      .findByIdentity(hash)
-      .find((p) => !canonical || !p.postingUrl || canonicalUrl(p.postingUrl) === canonical);
+      .byCompany(fields.company)
+      .find(
+        (p) =>
+          sameTitle(p.title, fields.title) &&
+          (!canonical || !p.postingUrl || canonicalUrl(p.postingUrl) === canonical),
+      );
     if (same) return { posting: same, created: false };
   }
   const posting = repos.postings.create(fields, { source: "email", status: "draft" });

@@ -204,7 +204,7 @@ const SENIORITY: Array<[PostingSeniority, RegExp]> = [
   ["director", /\b(diretor\w*|director|vp)\b/],
 ];
 
-function seniorityIn(text: string): PostingSeniority | null {
+export function seniorityIn(text: string): PostingSeniority | null {
   const t = strip(text);
   let best: PostingSeniority | null = null;
   SENIORITY.forEach(([level, re], i) => {
@@ -240,7 +240,7 @@ const ROLES: Array<[PostingRole, RegExp]> = [
   ["support", /\bsuporte\b|support engineer/],
 ];
 
-function roleIn(text: string): PostingRole | null {
+export function roleIn(text: string): PostingRole | null {
   const t = strip(text);
   for (const [role, re] of ROLES) if (re.test(t)) return role;
   return null;

@@ -5,7 +5,7 @@ import { withTransaction } from "../db/open";
 import { DEFAULT_STAGES } from "../job-applications";
 import { addJobApplicationEntry, rejectJobApplication } from "../job-applications/entries";
 import { canonicalUrl } from "../postings/canonical";
-import { normalizeIdentityPart, postingIdentityHash } from "../postings/identity";
+import { sameTitle, TITLE_NEAR, titleSimilarity } from "../postings/identity";
 import type { ScheduledContext } from "../scheduler";
 import { intakePostingFromMail } from "./postings";
 
@@ -20,39 +20,74 @@ export const MAIL_APPLICATION_CLASSES = ["application_received", "rejection"] as
 type Resolution =
   | { kind: "found"; posting: Posting; via: string }
   | { kind: "none" }
-  | { kind: "ambiguous"; reason: string };
+  | { kind: "ambiguous"; reason: string; suggestedPostingId?: string };
 
-/** Acha a vaga do e-mail: link canônico, depois empresa e cargo, depois a candidatura ativa da mesma empresa. */
+/**
+ * Acha a vaga do e-mail (correção 2026-11-11: comparar a identidade com hash duplicava as candidaturas, porque a vaga
+ * da extensão guarda também a função e o cargo vinha com código ou escrito diferente):
+ * 1. link canônico;
+ * 2. mesma empresa (sem sufixos) e cargo igual por semelhança: a vaga com candidatura vence a do feed; mais de uma
+ *    com candidatura, revisão;
+ * 3. sem cargo no e-mail: a única candidatura ativa da empresa;
+ * 4. empresa com candidatura e cargo só parecido: revisão com a sugestão (nunca outra candidatura por engano).
+ */
 export function resolveMailPosting(repos: Repos, cls: MailClassifyOutput): Resolution {
   const canonical = cls.postingUrl ? canonicalUrl(cls.postingUrl) : null;
   if (canonical) {
     const byUrl = repos.postings.findByCanonicalUrl(canonical)[0];
     if (byUrl) return { kind: "found", posting: byUrl, via: "link" };
   }
-  const hash = postingIdentityHash({ company: cls.company, title: cls.title });
-  if (hash) {
-    const same = repos.postings.findByIdentity(hash);
-    if (same.length === 1)
-      return { kind: "found", posting: same[0] as Posting, via: "empresa e cargo" };
-    if (same.length > 1) {
-      const active = same.filter((p) => repos.jobApplications.activeForPosting(p.id));
-      if (active.length === 1)
-        return { kind: "found", posting: active[0] as Posting, via: "empresa e cargo" };
-      return { kind: "ambiguous", reason: `${same.length} vagas com a mesma empresa e cargo` };
+  if (!cls.company) return { kind: "none" };
+  const sameCo = repos.postings.byCompany(cls.company);
+  const withApp = (p: Posting) => !!repos.jobApplications.latestForPosting(p.id);
+  if (cls.title) {
+    const scored = sameCo.map((p) => ({
+      p,
+      sim: titleSimilarity(p.title, cls.title),
+      same: sameTitle(p.title, cls.title),
+    }));
+    const same = scored.filter((x) => x.same);
+    if (same.length) {
+      const applied = same.filter((x) => withApp(x.p));
+      if (applied.length === 1)
+        return { kind: "found", posting: (applied[0] as { p: Posting }).p, via: "empresa e cargo" };
+      if (applied.length > 1)
+        return {
+          kind: "ambiguous",
+          reason: `${applied.length} candidaturas para ${cls.title} na ${cls.company}`,
+        };
+      // sem candidatura: as do feed do e-mail são cópias do alerta; a salva por você vence
+      const saved = same.filter((x) => x.p.source !== "email");
+      if (saved.length === 1)
+        return { kind: "found", posting: (saved[0] as { p: Posting }).p, via: "empresa e cargo" };
+      if (saved.length > 1)
+        return { kind: "ambiguous", reason: `${saved.length} vagas com a mesma empresa e cargo` };
+      const newest = [...same].sort((a, b) => b.p.createdAt.localeCompare(a.p.createdAt))[0];
+      return {
+        kind: "found",
+        posting: (newest as { p: Posting }).p,
+        via: "empresa e cargo (feed)",
+      };
     }
+    const near = scored
+      .filter((x) => !x.same && x.sim >= TITLE_NEAR && withApp(x.p))
+      .sort((a, b) => b.sim - a.sim);
+    if (near.length)
+      return {
+        kind: "ambiguous",
+        reason: `cargo parecido com uma candidatura que já existe na ${cls.company} (${near[0]?.p.title}): confirme se é a mesma`,
+        suggestedPostingId: (near[0] as { p: Posting }).p.id,
+      };
+    return { kind: "none" };
   }
-  if (cls.company) {
-    const company = normalizeIdentityPart(cls.company);
-    const apps = repos.jobApplications
-      .list({ archived: false })
-      .filter((a) => a.column !== "closed")
-      .map((a) => repos.postings.get(a.postingId))
-      .filter((p): p is Posting => !!p && normalizeIdentityPart(p.company ?? "") === company);
-    if (apps.length === 1 && !cls.title)
-      return { kind: "found", posting: apps[0] as Posting, via: "candidatura ativa da empresa" };
-    if (apps.length > 1 && !cls.title)
-      return { kind: "ambiguous", reason: `${apps.length} candidaturas ativas na ${cls.company}` };
-  }
+  const active = sameCo.filter((p) => {
+    const a = repos.jobApplications.latestForPosting(p.id);
+    return !!a && !a.archivedAt && a.column !== "closed";
+  });
+  if (active.length === 1)
+    return { kind: "found", posting: active[0] as Posting, via: "candidatura ativa da empresa" };
+  if (active.length > 1)
+    return { kind: "ambiguous", reason: `${active.length} candidaturas ativas na ${cls.company}` };
   return { kind: "none" };
 }
 
@@ -181,7 +216,12 @@ function planMail(repos: Repos, msg: MailMessageRecord, cls: MailClassifyOutput)
   const r: Resolution = forcedPosting
     ? { kind: "found", posting: forcedPosting, via: "escolha na revisão" }
     : resolveMailPosting(repos, cls);
-  if (r.kind === "ambiguous") return { kind: "review", reason: r.reason };
+  if (r.kind === "ambiguous")
+    return {
+      kind: "review",
+      reason: r.reason,
+      ...(r.suggestedPostingId ? { suggestedPostingId: r.suggestedPostingId } : {}),
+    };
   const posting = r.kind === "found" ? r.posting : null;
   // a última candidatura da vaga, inclusive arquivada ou encerrada (revisão do M5, #3: nunca duplicar)
   const latest = posting ? repos.jobApplications.latestForPosting(posting.id) : null;

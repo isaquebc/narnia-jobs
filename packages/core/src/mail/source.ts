@@ -27,15 +27,35 @@ export interface MailSource {
   modify(ids: string[], change: { add?: string[]; remove?: string[] }): Promise<void>;
 }
 
+/** Mensagem do Google para limite de uso (por minuto ou por dia): passa sozinho, não é acesso revogado. */
+export const GMAIL_RATE_LIMIT_MESSAGE =
+  /quota exceeded|rate ?limit|limit exceeded|too many (concurrent )?requests|user-rate limit/i;
+
 export class GmailApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** `error.errors[0].reason` do Google (ex.: `rateLimitExceeded`, `insufficientPermissions`). */
+    readonly reason: string | null = null,
+    /** Cabeçalho Retry-After (s), quando o Google manda. */
+    readonly retryAfterS: number | null = null,
   ) {
     super(message);
     this.name = "GmailApiError";
   }
+
+  /** 429, ou 403 por cota (a leitura de 2026-11-11 caiu em "Quota exceeded … per minute per user"). */
+  get rateLimited(): boolean {
+    if (this.status === 429) return true;
+    if (this.status !== 403) return false;
+    return (
+      /rate ?limit|quota|limitexceeded/i.test(this.reason ?? "") ||
+      GMAIL_RATE_LIMIT_MESSAGE.test(this.message)
+    );
+  }
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class GmailRestSource implements MailSource {
   constructor(
@@ -43,10 +63,50 @@ export class GmailRestSource implements MailSource {
       fetch: typeof fetch;
       accessToken: () => Promise<string>;
       baseUrl?: string;
+      /** Novas tentativas para limite de uso e erro passageiro do Google (padrão 5). */
+      retries?: number;
+      /** Espera antes da tentativa n (ms); padrão Retry-After ou 2ⁿ s, até 32 s. Os testes trocam. */
+      backoffMs?: (attempt: number, retryAfterS: number | null) => number;
+      /** Intervalo mínimo entre dois pedidos (ms; padrão 50 = até 20 por segundo). */
+      minIntervalMs?: number;
+      sleep?: (ms: number) => Promise<void>;
     },
   ) {}
 
+  private last = 0;
+
+  /**
+   * Um pedido com novas tentativas: 429, 403 de cota e 5xx esperam e repetem (com Retry-After quando vem); o resto, e
+   * o último erro, sobem como `GmailApiError`. Os pedidos saem espaçados (`minIntervalMs`) para não estourar a cota.
+   */
   private async call<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const retries = this.o.retries ?? 5;
+    const wait = this.o.sleep ?? sleep;
+    for (let attempt = 0; ; attempt++) {
+      const gap = this.last + (this.o.minIntervalMs ?? 50) - Date.now();
+      if (gap > 0) await wait(gap);
+      this.last = Date.now();
+      try {
+        return await this.once<T>(path, init);
+      } catch (e) {
+        if (!(e instanceof GmailApiError)) throw e;
+        // cota: até `retries` vezes, esperando mais a cada uma; erro do servidor: só 2, com espera curta
+        const quota = e.rateLimited;
+        if (!(quota || e.status >= 500) || attempt >= (quota ? retries : Math.min(2, retries)))
+          throw e;
+        const retryAfter = e.retryAfterS;
+        await wait(
+          this.o.backoffMs?.(attempt, retryAfter) ??
+            Math.min(
+              32_000,
+              retryAfter !== null ? retryAfter * 1000 : (quota ? 1000 : 250) * 2 ** attempt,
+            ),
+        );
+      }
+    }
+  }
+
+  private async once<T>(path: string, init: RequestInit): Promise<T> {
     const token = await this.o.accessToken();
     const r = await this.o.fetch(`${this.o.baseUrl ?? GMAIL_API}${path}`, {
       ...init,
@@ -57,12 +117,18 @@ export class GmailRestSource implements MailSource {
       },
     });
     if (r.status === 204) return null as T;
-    const body = (await r.json().catch(() => null)) as T & { error?: { message?: string } };
-    if (!r.ok)
+    const body = (await r.json().catch(() => null)) as T & {
+      error?: { message?: string; errors?: Array<{ reason?: string }> };
+    };
+    if (!r.ok) {
+      const ra = Number(r.headers?.get?.("retry-after"));
       throw new GmailApiError(
         r.status,
         `Gmail ${init.method ?? "GET"} ${path.split("?")[0]}: ${r.status} ${body?.error?.message ?? ""}`.trim(),
+        body?.error?.errors?.[0]?.reason ?? null,
+        Number.isFinite(ra) && ra > 0 ? ra : null,
       );
+    }
     return body;
   }
 

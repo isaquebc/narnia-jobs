@@ -21,7 +21,7 @@ import {
 } from "@narnia-jobs/shared";
 import { newId } from "../../ids";
 import { canonicalUrl } from "../../postings/canonical";
-import { postingIdentityHash } from "../../postings/identity";
+import { postingIdentityHash, sameCompany } from "../../postings/identity";
 import type { Db } from "../open";
 import { json, type Row } from "../sql";
 
@@ -105,6 +105,7 @@ function mapPosting(r: Row): Posting {
     linkStatus: r.link_status ?? null,
     feedState: r.feed_state ?? null,
     matchScore: r.match_score ?? null,
+    matchScoreProvisional: r.match_score_provisional === 1,
     archiveAuto: r.archive_auto ?? null,
     lastInteractionAt: r.last_interaction_at ?? null,
     autoAnalysisAt: r.auto_analysis_at ?? null,
@@ -151,10 +152,17 @@ export interface PostingsRepo {
   ): void;
   setLinkStatus(id: string, status: Posting["linkStatus"]): void;
   setFeedState(id: string, state: Posting["feedState"]): void;
+  /** Score completo (pela descrição); tira a marca de provisório. */
   setMatchScore(id: string, score: number | null): void;
+  /** Score provisório (só pelo alerta, F14-16); não mexe num score completo. */
+  setProvisionalScore(id: string, score: number | null): void;
+  /** Vagas do e-mail não arquivadas sem score completo (para o provisório). */
+  needingProvisionalScore(limit: number): Posting[];
   setCanonicalUrl(id: string, url: string | null): void;
   /** Vagas com o mesmo link canônico (F14: duplicata por SQL, sem o teto de 500 do `list`). */
   findByCanonicalUrl(url: string, excludeId?: string): Posting[];
+  /** Vagas da mesma empresa (sem caixa, acento nem sufixo jurídico; correção 2026-11-11), arquivadas inclusive. */
+  byCompany(company: string): Posting[];
   /** Interação da pessoa (abrir, editar, analisar, candidatar, nota): a vaga não é arquivada por inatividade. */
   touchInteraction(id: string, at?: string): void;
   setArchiveAuto(id: string, auto: Posting["archiveAuto"], at?: string): void;
@@ -330,7 +338,23 @@ export function postingsRepo(db: Db): PostingsRepo {
       q("update posting set feed_state = ? where id = ?").run(state, id);
     },
     setMatchScore(id, score) {
-      q("update posting set match_score = ? where id = ?").run(score, id);
+      q("update posting set match_score = ?, match_score_provisional = 0 where id = ?").run(
+        score,
+        id,
+      );
+    },
+    setProvisionalScore(id, score) {
+      q(
+        "update posting set match_score = ?, match_score_provisional = ? where id = ? and (match_score is null or match_score_provisional = 1)",
+      ).run(score, score === null ? 0 : 1, id);
+    },
+    needingProvisionalScore(limit) {
+      return (
+        q(
+          `select * from posting where source = 'email' and archived_at is null
+             and (match_score is null or match_score_provisional = 1) order by created_at desc limit ?`,
+        ).all(limit) as Row[]
+      ).map(mapPosting);
     },
     setCanonicalUrl(id, url) {
       q("update posting set canonical_url = ? where id = ?").run(url, id);
@@ -342,6 +366,11 @@ export function postingsRepo(db: Db): PostingsRepo {
           excludeId ?? "",
         ) as Row[]
       ).map(mapPosting);
+    },
+    byCompany(company) {
+      return (q("select * from posting where company is not null").all() as Row[])
+        .filter((r) => sameCompany(r.company as string, company))
+        .map(mapPosting);
     },
     touchInteraction(id, at = nowUtc()) {
       q("update posting set last_interaction_at = ? where id = ?").run(at, id);

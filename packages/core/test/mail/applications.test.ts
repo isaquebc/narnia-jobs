@@ -11,7 +11,7 @@ import {
   type Repos,
   syncMailReviewNotification,
 } from "../../src";
-import { applyToPosting } from "../../src/job-applications";
+import { applyToPosting, DEFAULT_STAGES } from "../../src/job-applications";
 import { seedFixture } from "../../src/testing/profile-fixtures";
 
 /**
@@ -241,6 +241,107 @@ describe("F14/M5 · candidaturas a partir de e-mail", () => {
     expect(repos.postings.get(app?.postingId as string)?.autoAnalysisAt).not.toBeNull();
   });
 
+  describe("correção 2026-11-11 · mesma vaga com nome escrito diferente (não duplicar)", () => {
+    /** Vaga salva pela extensão (a origem `extension` é da coluna `source`) com candidatura feita à mão. */
+    const applied = (fields: Record<string, unknown>) => {
+      const posting = repos.postings.create(fields as never, { source: "user" });
+      repos.postings.setOrigin(posting.id, { source: "extension" });
+      const app = repos.jobApplications.create({
+        postingId: posting.id,
+        profileId: null,
+        cvVersionId: null,
+        coverLetterVersionId: null,
+        appliedOn: "2026-11-01",
+        stages: [...DEFAULT_STAGES],
+      });
+      return { posting, app };
+    };
+
+    it("vaga da extensão com função preenchida e cargo igual: liga à candidatura que existe", async () => {
+      seedFixture(repos, "engineer");
+      const { app } = applied({
+        company: "Globex",
+        title: "Senior Software Engineer (Full Stack)",
+        role: "fullstack",
+      });
+      mail(
+        out({ company: "Globex", title: "Senior Software Engineer (Full Stack)" }),
+        "2026-11-05T10:00:00.000Z",
+      );
+      expect(await run()).toMatchObject({ created: 0, noted: 1 });
+      expect(repos.jobApplications.list().map((a) => a.id)).toEqual([app.id]);
+    });
+
+    it("código da vaga no cargo, caixa da empresa e sufixo jurídico não contam", async () => {
+      seedFixture(repos, "engineer");
+      const { app } = applied({
+        company: "initech",
+        title: "3672: Engenheiro(a) de Software Sênior Frontend Mobile",
+      });
+      mail(
+        out({
+          company: "Initech Ltda.",
+          title: "Engenheiro(a) de Software Sênior Frontend Mobile",
+        }),
+        "2026-11-05T10:00:00.000Z",
+      );
+      expect(await run()).toMatchObject({ created: 0, noted: 1 });
+      expect(repos.jobApplications.list()).toHaveLength(1);
+      expect(repos.jobApplicationEntries.list(app.id).length).toBeGreaterThan(0);
+    });
+
+    it("candidatura encerrada depois do e-mail: só a nota (não nasce outra)", async () => {
+      seedFixture(repos, "engineer");
+      const { app } = applied({
+        company: "Hooli",
+        title: "Desenvolvedor(a) Fullstack Sênior – Integrações de Sistemas",
+      });
+      repos.jobApplications.update(
+        app.id,
+        { column: "closed", closedReason: "withdrew" },
+        new Date("2026-11-10T10:00:00.000Z"),
+      );
+      mail(
+        out({
+          company: "Hooli",
+          title: "Desenvolvedor(a) Fullstack Sênior – Integrações de Sistemas",
+        }),
+        "2026-11-03T10:00:00.000Z",
+      );
+      expect(await run()).toMatchObject({ created: 0, noted: 1 });
+      expect(repos.jobApplications.list({ archived: false }).length).toBe(1);
+    });
+
+    it("a mesma vaga no feed do e-mail e salva pela extensão: vale a que tem candidatura", async () => {
+      seedFixture(repos, "engineer");
+      repos.postings.create({ company: "Umbrella", title: "Backend Engineer" } as never, {
+        source: "user",
+      });
+      const { app } = applied({ company: "Umbrella", title: "Backend Engineer", role: "backend" });
+      mail(out({ company: "Umbrella", title: "Backend Engineer" }), "2026-11-05T10:00:00.000Z");
+      expect(await run()).toMatchObject({ created: 0, noted: 1 });
+      expect(repos.jobApplicationEntries.list(app.id).length).toBeGreaterThan(0);
+    });
+
+    it("cargo parecido mas não igual numa empresa com candidatura: revisão com a sugestão, sem criar", async () => {
+      seedFixture(repos, "engineer");
+      const { posting } = applied({ company: "Vandelay", title: "Desenvolvedor Backend Sênior" });
+      const g = mail(
+        out({ company: "Vandelay", title: "Desenvolvedor Fullstack Sênior" }),
+        "2026-11-05T10:00:00.000Z",
+      );
+      expect(await run()).toMatchObject({ created: 0, review: 1 });
+      expect(repos.mail.byGmailId(g)?.result).toMatchObject({ suggestedPostingId: posting.id });
+    });
+
+    it("cargo diferente na mesma empresa: candidatura nova (é outro processo)", async () => {
+      seedFixture(repos, "engineer");
+      applied({ company: "Vandelay", title: "Desenvolvedor Backend Sênior" });
+      mail(out({ company: "Vandelay", title: "Analista de Dados" }), "2026-11-05T10:00:00.000Z");
+      expect(await run()).toMatchObject({ created: 1 });
+    });
+  });
+
   describe("revisão do M5", () => {
     it("#1 remetente sem confiança: não cria nem encerra sozinho; vai para a revisão pedindo confirmação", async () => {
       seedFixture(repos, "engineer");
@@ -347,7 +448,7 @@ describe("F14/M5 · candidaturas a partir de e-mail", () => {
       expect(repos.mail.byGmailId(neg)?.status).toBe("pending");
     });
 
-    it("#5 negativa sem vaga salva: revisão, sem criar vaga nem candidatura", async () => {
+    it("#5 negativa sem vaga salva: revisão (cargo parecido com a candidatura da empresa), sem criar vaga nem candidatura", async () => {
       seedFixture(repos, "engineer");
       mail(out({ company: "Acme", title: "Backend Sr" }), "2026-11-01T10:00:00.000Z");
       await run();
@@ -358,7 +459,7 @@ describe("F14/M5 · candidaturas a partir de e-mail", () => {
       expect(await run()).toMatchObject({ closed: 0, review: 1 });
       expect(
         (repos.mail.byGmailId(neg)?.result as { review?: string } | undefined)?.review,
-      ).toMatch(/nenhuma vaga salva/);
+      ).toMatch(/cargo parecido/);
       expect(repos.postings.list()).toHaveLength(1);
       expect(repos.jobApplications.list()[0]).toMatchObject({ column: "applied" });
     });

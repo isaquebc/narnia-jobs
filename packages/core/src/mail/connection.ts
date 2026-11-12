@@ -10,7 +10,7 @@ import {
   revokeGmailToken,
   writeGmailToken,
 } from "./google-oauth";
-import { GmailRestSource } from "./source";
+import { GMAIL_RATE_LIMIT_MESSAGE, GmailRestSource } from "./source";
 
 /** Etiquetas do narnia no Gmail (pedido do dono e F14-14). */
 export const MAIL_LABEL = "narnia-jobs";
@@ -33,7 +33,12 @@ export interface GmailStatus {
 }
 
 export function gmailStatus(dataDir: string, client: GoogleClient | null): GmailStatus {
-  const token = readGmailToken(dataDir);
+  let token = readGmailToken(dataDir);
+  // a versão anterior marcava "reconectar" no 403 de cota do Google (passa sozinho): desfaz a marca
+  if (token?.invalidAt && GMAIL_RATE_LIMIT_MESSAGE.test(token.invalidReason ?? "")) {
+    token = { ...token, invalidAt: null, invalidReason: null };
+    writeGmailToken(dataDir, token);
+  }
   const base = {
     clientSource: client?.source ?? null,
     clientIdHint: client ? `${client.clientId.slice(0, 12)}…` : null,

@@ -67,6 +67,7 @@ export async function markAutoAnalyses(
         p.sourceRef?.trusted === true &&
         p.status === "ready" &&
         p.matchScore !== null &&
+        !p.matchScoreProvisional && // F14-16: o provisório (só pelo cargo) nunca abre o agente
         p.matchScore >= s.preanalysisCut &&
         !repos.jobAnalyses.list(p.id).length,
     )

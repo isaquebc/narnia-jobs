@@ -13,8 +13,8 @@ export interface JobAlertItem {
   title: string;
   company: string | null;
   location: string | null;
-  /** Link canônico da vaga (sem rastreio). */
-  url: string;
+  /** Link canônico da vaga (sem rastreio); null quando o alerta não traz link por vaga (resumo da Coders). */
+  url: string | null;
   externalId: string;
 }
 
@@ -58,7 +58,7 @@ const RULES: Rule[] = [
     platform: "coders",
     id: (u) =>
       /(^|\.)coders\.com\.br$/.test(u.hostname)
-        ? (u.pathname.match(/\/vagas?\/([\w-]{3,})/)?.[1] ?? null)
+        ? (u.pathname.match(/^\/vagas?\/([\w-]{3,})\/?$/)?.[1] ?? null)
         : null,
     canonical: (id) => `https://coders.com.br/vagas/${id}`,
   },
@@ -96,7 +96,16 @@ interface Anchor {
   end: number;
   href: string;
   text: string;
+  /** Linhas do conteúdo do link (card inteiro no link: cargo, empresa, local em linhas próprias), sem ruído. */
+  lines: string[];
 }
+
+/** Linhas dos cards que não são cargo, empresa nem local ("Easy Apply", "Candidatura rápida", "2 dia(s)", salário). */
+const CARD_NOISE =
+  /^(easy apply|candidatura (r[áa]pida|simplificada)|promoted|promovida|actively recruiting|be an early applicant|\d+\s*dias?(\(s\))?|\d+\s*dia\(s\)|\d+\s*[hdw]|\d+\+? ?(days?|hours?|weeks?) ago|r\$.*|us?\$\s*\d.*|.*estimativa d[ao] (empresa|glassdoor).*|\d+[.,]\d\s*★)$/i;
+
+/** Cabeçalho "vagas parecidas com a que você viu" (o link é da vaga vista, não de uma vaga nova). */
+const SIMILAR_HEADER = /^(new )?(jobs|vagas) (similar|semelhantes|parecidas)/i;
 
 /**
  * Links do HTML em uma passada (revisão do M3): cada `<a …>` abre, o próximo `</a>` fecha; sem regex com `[\s\S]*?`
@@ -118,11 +127,16 @@ function anchors(html: string): Anchor[] {
           }
         : null;
     } else if (open) {
+      const inner = htmlToText(src.slice(open.contentStart, m.index));
       out.push({
         start: open.start,
         end: m.index + m[0].length,
         href: open.href,
-        text: clean(htmlToText(src.slice(open.contentStart, m.index))),
+        text: clean(inner),
+        lines: inner
+          .split("\n")
+          .map(clean)
+          .filter((l) => l && !CARD_NOISE.test(l)),
       });
       open = null;
     }
@@ -163,9 +177,33 @@ export function parseJobAlert(m: ParsedMail): JobAlert | null {
   const items: JobAlertItem[] = [];
   ordered.forEach(([id, g], i) => {
     const titleAnchor = g.anchors.find(
-      (a) => a.text.length > 2 && !STOP_TITLES.test(a.text) && /\p{L}/u.test(a.text),
+      (a) =>
+        a.text.length > 2 &&
+        !STOP_TITLES.test(a.text) &&
+        !SIMILAR_HEADER.test(a.text) &&
+        /\p{L}/u.test(a.text),
     );
     if (!titleAnchor) return;
+    const url = rule.canonical(id, g.url);
+    // card inteiro dentro do link (formato real visto em 2026-11-11): as linhas do próprio link
+    const lines = titleAnchor.lines;
+    if (lines.length >= 2) {
+      if (rule.platform === "glassdoor") {
+        // Glassdoor: empresa (com a nota "4.0 ★"), cargo, local
+        const company = clean((lines[0] as string).replace(/\s*\d[.,]\d\s*★\s*$/, "")) || null;
+        items.push({
+          title: lines[1] as string,
+          company,
+          location: lines[2] ?? null,
+          url,
+          externalId: id,
+        });
+        return;
+      }
+      const { company, location } = companyAndLocation(lines.slice(1));
+      items.push({ title: lines[0] as string, company, location, url, externalId: id });
+      return;
+    }
     const title = titleAnchor.text;
     // empresa e local: o texto logo depois do link do cargo, até o bloco da próxima vaga
     const nextStart = ordered[i + 1]?.[1].anchors[0]?.start ?? m.html.length;
@@ -175,7 +213,46 @@ export function parseJobAlert(m: ParsedMail): JobAlert | null {
       .split("\n")
       .filter((l) => clean(l) !== title);
     const { company, location } = companyAndLocation(after);
-    items.push({ title, company, location, url: rule.canonical(id, g.url), externalId: id });
+    items.push({ title, company, location, url, externalId: id });
   });
+  if (!items.length && rule.platform === "coders") items.push(...codersDigest(m.html));
   return items.length ? { platform: rule.platform, items } : null;
+}
+
+/**
+ * Resumo diário da Coders (correção 2026-11-11, formato real visto na caixa do dono): sem link por vaga; depois de "O
+ * que chegou", cada vaga é o cargo numa linha e "Empresa · via Fonte" (ou só a empresa) na seguinte, até "E mais N
+ * vagas" ou o botão do board. A vaga fica sem link (o feed mostra a origem) e o id sai da empresa e do cargo.
+ */
+function codersDigest(html: string): JobAlertItem[] {
+  // linha a mais numa vaga (local, modo, salário) sai antes de formar os pares (revisão: senão desalinha o resto)
+  const extra =
+    /^(remot[oa]|remote|h[íi]brid[oa]|hybrid|presencial|on-?site|home office|r\$.*|[^,]{2,40},\s*[A-Z]{2})$/i;
+  const lines = htmlToText(html)
+    .split("\n")
+    .map(clean)
+    .filter((l) => l && !extra.test(l));
+  const start = lines.findIndex((l) => /^o que chegou$/i.test(l));
+  if (start < 0) return [];
+  const out: JobAlertItem[] = [];
+  for (let i = start + 1; i + 1 < lines.length; i += 2) {
+    const title = lines[i] as string;
+    const second = lines[i + 1] as string;
+    if (/^e mais \d+ vagas?|^ver (as )?vagas|^se o bot[ãa]o/i.test(title)) break;
+    if (/^e mais \d+ vagas?|^ver (as )?vagas/i.test(second)) break;
+    // "Empresa · via Fonte", só a empresa, ou só "via Fonte" (vaga sem empresa no resumo)
+    const company = /^via\s/i.test(second)
+      ? null
+      : clean(second.split(/\s+·\s+via\s+/i)[0] ?? "") || null;
+    if (title.length > 160 || (company?.length ?? 0) > 80) break;
+    const key = `${company ?? ""} ${title}`
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 120);
+    out.push({ title, company, location: null, url: null, externalId: `digest-${key}` });
+  }
+  return out;
 }

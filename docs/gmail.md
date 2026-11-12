@@ -24,15 +24,17 @@ Tudo roda no seu computador. O narnia chama a API do Gmail direto (sem modelo no
 3. **Conectar.** Clique em **Conectar**: o login do Google abre numa aba nova. Entre com a conta que você pôs como usuário de teste e autorize. A aba mostra "pode fechar" e o cartão passa a **Conectado**.
 4. **Primeira leitura.** Escolha **quanto tempo para trás** ler (até um ano). A leitura vai do e-mail mais antigo para o mais novo, para que a negativa nunca chegue antes da candidatura.
 
+**Limite de uso do Google:** a primeira leitura de uma caixa cheia pode bater no limite por minuto do Google. O narnia espera e tenta de novo; se o limite continuar, a leitura para com um aviso no log e continua na próxima execução (sem pedir para reconectar).
+
 **Modo de teste do Google:** com a tela de consentimento em "Teste", o Google pode expirar o login depois de 7 dias. Quando isso acontece, o cartão mostra **Reconectar** e uma notificação avisa; é só conectar de novo (os e-mails já lidos não se repetem).
 
 ## Onde aparece
 
-- **Vagas › Feed do e-mail:** as vagas dos alertas, da maior compatibilidade para a menor, com os selos de nova, origem e plataforma, match e link que não abriu. Filtros por plataforma, período, só as novas e só as de link que não abriu. As de match alto ganham a pré-análise sozinhas (corte e teto diário em Configurações › Gmail › Feed de vagas). Vagas do feed sem nenhuma interação por 30 dias são arquivadas sozinhas.
+- **Vagas › Feed do e-mail:** as vagas dos alertas, da maior compatibilidade para a menor, com os selos de nova, origem e plataforma, match e link que não abriu. Vaga sem descrição (o LinkedIn não deixa robôs abrirem a página) ganha um **match provisório**, só pelo cargo, senioridade e local do alerta; o completo chega com a descrição, pela extensão, e o provisório nunca dispara a pré-análise automática. Filtros por plataforma, período, só as novas e só as de link que não abriu. As de match alto ganham a pré-análise sozinhas (corte e teto diário em Configurações › Gmail › Feed de vagas). Vagas do feed sem nenhuma interação por 30 dias são arquivadas sozinhas.
 - **Candidatura › Pelo e-mail:** as etapas sugeridas pelos e-mails (mover ou recusar), os e-mails que mexeram na candidatura (cada um com **Desfazer**) e o histórico das etapas com a origem de cada mudança.
 - **Candidatura › Agenda:** selos **Provisória**, **Convite da empresa** e **Cancelada**. A etapa provisória tem o botão **Bloquear agenda**, que abre o Google Agenda já preenchido; quando o convite oficial chega, ele toma o lugar da provisória e o narnia avisa para tirar o bloqueio.
 - **E-mails para revisar** (`/emails`, link no cartão do Gmail e notificação): e-mails que o narnia não conseguiu ligar a uma vaga com segurança e os da quarentena, com o motivo. Escolha a vaga, aplique à vaga sugerida, aplique mesmo assim, ignore, confie no remetente ou processe a quarentena mesmo assim.
-- **Processos › Tarefas agendadas:** cada leitura, com o log e os itens tocados (e-mails, vagas, candidaturas).
+- **Processos › Tarefas agendadas:** cada leitura, com o log e os itens tocados (e-mails, vagas, candidaturas). Cada leitura tem **Desfazer e refazer daqui em diante**: desfaz o que ela e as seguintes fizeram (candidaturas, notas, vagas do feed que você não usou), devolve esses e-mails à fila e começa uma leitura nova. O que você já usou fica (vaga aberta ou analisada, candidatura com nota sua), e o resumo avisa.
 
 ## Confiança no remetente
 

@@ -72,8 +72,18 @@ function PostingCard({ p }: { p: PostingListItem }) {
                   : t("postings.feed.fromMail")}
               </Badge>
               {p.matchScore !== null ? (
-                <Badge tone={p.matchScore >= 70 ? "ok" : "neutral"}>
-                  {t("postings.feed.match", { n: p.matchScore })}
+                <Badge
+                  tone={p.matchScore >= 70 && !p.matchScoreProvisional ? "ok" : "neutral"}
+                  title={p.matchScoreProvisional ? t("postings.feed.provisionalHint") : undefined}
+                >
+                  {t(
+                    p.matchScoreProvisional
+                      ? "postings.feed.matchProvisional"
+                      : "postings.feed.match",
+                    {
+                      n: p.matchScore,
+                    },
+                  )}
                 </Badge>
               ) : null}
               {p.linkStatus === "failed" ? (

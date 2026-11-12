@@ -226,3 +226,101 @@ describe("F14/M1 · fonte REST do Gmail (contra o Gmail falso)", () => {
     }
   });
 });
+
+describe("correção 2026-11-11 · limite de uso do Google", () => {
+  const quota = () =>
+    new Response(
+      JSON.stringify({
+        error: {
+          code: 403,
+          message:
+            "Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'",
+          errors: [{ reason: "rateLimitExceeded" }],
+        },
+      }),
+      { status: 403, headers: { "retry-after": "3" } },
+    );
+  const ok = () =>
+    new Response(
+      JSON.stringify({ emailAddress: "p@example.com", historyId: "1", messagesTotal: 0 }),
+    );
+
+  it("403 de cota e 429 esperam (Retry-After ou 2ⁿ s) e tentam de novo; 403 de permissão sobe na hora", async () => {
+    const { GmailApiError, GmailRestSource } = await import("../../src");
+    const replies = [quota(), new Response("{}", { status: 429 }), ok()];
+    const waits: number[] = [];
+    const src = new GmailRestSource({
+      fetch: (async () => replies.shift() as Response) as typeof fetch,
+      accessToken: async () => "t",
+      minIntervalMs: 0,
+      sleep: async (ms) => {
+        waits.push(ms);
+      },
+    });
+    expect((await src.profile()).email).toBe("p@example.com");
+    expect(waits).toEqual([3000, 2000]);
+
+    const denied = new GmailRestSource({
+      fetch: (async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              message: "Insufficient Permission",
+              errors: [{ reason: "insufficientPermissions" }],
+            },
+          }),
+          { status: 403 },
+        )) as typeof fetch,
+      accessToken: async () => "t",
+      minIntervalMs: 0,
+      sleep: async () => {},
+    });
+    const e = await denied.profile().catch((x) => x);
+    expect(e).toBeInstanceOf(GmailApiError);
+    expect(e.rateLimited).toBe(false);
+
+    let calls = 0;
+    const always = new GmailRestSource({
+      fetch: (async () => {
+        calls++;
+        return quota();
+      }) as typeof fetch,
+      accessToken: async () => "t",
+      retries: 2,
+      minIntervalMs: 0,
+      sleep: async () => {},
+    });
+    const last = await always.profile().catch((x) => x);
+    expect(calls).toBe(3);
+    expect(last.rateLimited).toBe(true);
+  });
+
+  it("marca antiga de reconectar por cota some sozinha; recusa de verdade continua", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "narnia-gmail-heal-"));
+    try {
+      const { writeGmailToken } = await import("../../src");
+      const base = {
+        refreshToken: "r",
+        scope: GMAIL_SCOPE,
+        email: "pessoa@example.com",
+        connectedAt: "2026-11-11T20:00:00.000Z",
+      };
+      writeGmailToken(dataDir, {
+        ...base,
+        invalidAt: "2026-11-11T23:05:50.000Z",
+        invalidReason:
+          "Gmail GET /messages/abc: 403 Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'",
+      });
+      expect(gmailStatus(dataDir, client).status).toBe("connected");
+      expect(readGmailToken(dataDir)?.invalidAt).toBeNull();
+      writeGmailToken(dataDir, {
+        ...base,
+        invalidAt: "2026-11-11T23:05:50.000Z",
+        invalidReason: "Token has been expired or revoked.",
+      });
+      expect(gmailStatus(dataDir, client).status).toBe("needs_reconnect");
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+});

@@ -41,6 +41,39 @@ export function decodeEntities(s: string): string {
     lt: "<",
     gt: ">",
     nbsp: " ",
+    // correção 2026-11-11: o LinkedIn separa empresa e local com `&middot;`
+    middot: "·",
+    bull: "•",
+    ndash: "–",
+    mdash: "—",
+    hellip: "…",
+    lsquo: "‘",
+    rsquo: "’",
+    ldquo: "“",
+    rdquo: "”",
+    copy: "©",
+    reg: "®",
+    trade: "™",
+    aacute: "á",
+    eacute: "é",
+    iacute: "í",
+    oacute: "ó",
+    uacute: "ú",
+    agrave: "à",
+    acirc: "â",
+    ecirc: "ê",
+    ocirc: "ô",
+    atilde: "ã",
+    otilde: "õ",
+    ccedil: "ç",
+    uuml: "ü",
+    Aacute: "Á",
+    Eacute: "É",
+    Iacute: "Í",
+    Oacute: "Ó",
+    Uacute: "Ú",
+    Atilde: "Ã",
+    Ccedil: "Ç",
   };
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === "#") {
@@ -48,7 +81,7 @@ export function decodeEntities(s: string): string {
         e[1] === "x" || e[1] === "X" ? Number.parseInt(e.slice(2), 16) : Number(e.slice(1));
       return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : m;
     }
-    return named[e.toLowerCase()] ?? m;
+    return named[e] ?? named[e.toLowerCase()] ?? m;
   });
 }
 

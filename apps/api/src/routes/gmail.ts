@@ -11,12 +11,14 @@ import {
   MAIL_FORCE_KEY,
   MAIL_LAST_SYNC_KEY,
   MAIL_SINCE_KEY,
+  MailRedoError,
   MailUndoError,
   oauthRedirectUri,
   type PendingGmailConnect,
   platformOf,
   type Repos,
   readGmailToken,
+  redoMailRuns,
   resolveGoogleClient,
   resolveMailReconnect,
   resolveStageSuggestionNotification,
@@ -25,6 +27,7 @@ import {
   saveGoogleClient,
   stageLearning,
   startGmailConnect,
+  syncMailReviewNotification,
   undoMail,
 } from "@narnia-jobs/core";
 import { Hono } from "hono";
@@ -360,6 +363,31 @@ export function gmailRoutes(deps: {
       throw e;
     }
   });
+  // Desfazer e refazer a leitura (pedido do dono 2026-11-11): a execução escolhida e as seguintes voltam, os e-mails
+  // voltam para a fila e uma leitura nova começa na hora
+  app.post(
+    "/api/mail/redo",
+    validate("json", z.object({ runId: z.string().min(1) })),
+    async (c) => {
+      try {
+        const r = redoMailRuns(deps.repos, deps.dataDir, c.req.valid("json").runId);
+        await syncMailReviewNotification(deps.repos, async (e) => {
+          deps.bus?.emit(e);
+        });
+        const queued = await runSyncNow();
+        return c.json({ ...r, enqueued: queued?.enqueued ?? false });
+      } catch (e) {
+        if (e instanceof MailRedoError)
+          return apiError(
+            c,
+            e.code === "not_found" ? 404 : e.code === "running" ? 409 : 422,
+            e.code,
+            e.message,
+          );
+        throw e;
+      }
+    },
+  );
   // F14-2 · aprendizado do movimento de etapa: taxa de acerto e a chave do automático
   app.get("/api/mail/stage-learning", (c) => c.json(stageLearning(deps.repos)));
   app.put("/api/mail/stage-learning", validate("json", z.object({ allowed: z.boolean() })), (c) => {

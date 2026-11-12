@@ -148,4 +148,46 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
       await within(prune).findByText("Já há uma execução desta tarefa na fila ou rodando."),
     ).toBeInTheDocument();
   });
+
+  it("leitura do Gmail: desfazer e refazer daqui em diante, com confirmação e o resumo (o que ficou é avisado)", async () => {
+    const mailRun = { ...run, id: "m1", taskId: "mail.sync" as const, counts: { digested: 3 } };
+    const a = {
+      ...api(),
+      listScheduledTasks: vi.fn(async () => ({
+        tasks: [{ ...task("job_applications.archive"), id: "mail.sync", lastRun: mailRun }],
+      })),
+      listScheduledRuns: vi.fn(async () => ({ runs: [mailRun] })),
+      getScheduledRun: vi.fn(async () => ({ ...mailRun, log: [], items: [] })),
+      redoMailRuns: vi.fn(async () => ({
+        mails: 3,
+        applicationsRemoved: 1,
+        postingsRemoved: 2,
+        kept: [
+          {
+            gmailId: "g9",
+            subject: "Recebemos sua candidatura",
+            reason: "a candidatura já tem 1 nota(s)",
+          },
+        ],
+        enqueued: true,
+      })),
+    };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<ProcessesPage />, { api: a as never });
+    await openTab();
+    const card = await screen.findByRole("region", { name: "Leitura do Gmail" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ver histórico" }));
+    await userEvent.click(await within(card).findByRole("button", { name: /Concluída/ }));
+    await userEvent.click(
+      await within(card).findByRole("button", { name: "Desfazer e refazer daqui em diante" }),
+    );
+    expect(confirm).toHaveBeenCalled();
+    expect(a.redoMailRuns).toHaveBeenCalledWith("m1");
+    const status = await within(card).findByRole("status");
+    expect(status).toHaveTextContent(
+      "3 e-mail(s) voltaram para a fila (1 candidatura(s) e 2 vaga(s) desfeitas)",
+    );
+    expect(status).toHaveTextContent("Recebemos sua candidatura: a candidatura já tem 1 nota(s)");
+    confirm.mockRestore();
+  });
 });

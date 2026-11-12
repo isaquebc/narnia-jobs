@@ -127,6 +127,8 @@ export interface MailRepo {
   bySender(value: string, status: MailStatus): MailMessageRecord[];
   /** Volta para o começo do processamento (avaliar de novo). */
   reset(id: string, at: string): void;
+  /** Desfazer e refazer a leitura: volta ao começo do processamento (risco, classe, resultado e desfazer zerados). */
+  resetForRedo(id: string, at: string): void;
   /** Revisão: guarda o que a pessoa decidiu (vaga escolhida) e devolve o e-mail à fila da classe dele. */
   setPendingWith(id: string, result: Record<string, unknown>, at: string): void;
   /** Avaliados e à espera do modelo ou do leitor por código (M4), do mais antigo para o mais novo. */
@@ -425,6 +427,13 @@ export function mailRepo(db: Db): MailRepo {
       q(
         "update mail_message set status = 'pending', result_json = ?, error = null, updated_at = ? where id = ?",
       ).run(JSON.stringify(result), at, id);
+    },
+    resetForRedo(id, at) {
+      q(
+        `update mail_message set status = 'pending', class = null, confidence = null, risk_level = null,
+           risk_reasons_json = '[]', result_json = null, error = null, undo_json = null, undone_at = null,
+           processed_at = null, gmail_synced = 0, updated_at = ? where id = ?`,
+      ).run(at, id);
     },
     reset(id, at) {
       q(

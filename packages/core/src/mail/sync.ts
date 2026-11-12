@@ -131,7 +131,10 @@ function writeRaw(abs: string, raw: Buffer) {
 /** Recusa do Gmail que só se resolve conectando de novo (escopo retirado, token revogado). */
 const isAuthRefusal = (e: unknown) =>
   (e instanceof MailAuthError && e.code === "needs_reconnect") ||
-  (e instanceof GmailApiError && (e.status === 401 || e.status === 403));
+  (e instanceof GmailApiError && (e.status === 401 || e.status === 403) && !e.rateLimited);
+
+/** Limite de uso do Google que sobrou depois das novas tentativas: a rodada para e continua na próxima. */
+class MailRateLimited extends Error {}
 
 /**
  * Uma rodada da sincronização; `ctx` é a execução agendada (log, itens, contadores). Percorre a janela em fatias de
@@ -170,6 +173,7 @@ export async function syncMail(input: {
   mkdirSync(join(input.dataDir, MAIL_DIR), { recursive: true });
 
   const fail = async (e: unknown) => {
+    if (e instanceof GmailApiError && e.rateLimited) throw new MailRateLimited(e.message);
     if (isAuthRefusal(e)) {
       await markReconnect(repos, input.dataDir, ctx, e);
       throw e instanceof MailAuthError
@@ -331,6 +335,14 @@ export async function syncMail(input: {
         break;
       }
     }
+  } catch (e) {
+    if (!(e instanceof MailRateLimited)) throw e;
+    // cota do Google: o cursor fica onde a fatia começou; a próxima execução continua de onde parou
+    ctx.log(
+      "warn",
+      `O Google pediu uma pausa (limite de uso); ${fetched} e-mail(s) baixado(s), o resto fica para a próxima execução (${e.message})`,
+    );
+    return { fetched, caughtUp: false, errors };
   } finally {
     repos.settings.set(MAIL_FAILURES_KEY, failures);
     // compare-and-set: se a janela mudou durante a rodada (PUT do api), o cursor desta rodada não vale mais

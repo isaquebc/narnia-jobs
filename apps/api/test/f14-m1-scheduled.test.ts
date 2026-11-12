@@ -109,4 +109,22 @@ describe("F14/M1 · /api/scheduled-tasks", () => {
     expect(detail.items.map((i) => i.refId)).toEqual(["c1"]);
     expect((await t.api("/api/scheduled-runs/nope")).status).toBe(404);
   });
+
+  it("desfazer e refazer a leitura de e-mails: devolve o resumo e já pede uma leitura nova; outra tarefa ou execução inexistente recusa", async () => {
+    t = makeTestApp();
+    const at = "2026-11-11T12:00:00.000Z";
+    const mailRun = t.repos.scheduled.startRun({ taskId: "mail.sync", trigger: "manual", at });
+    t.repos.scheduled.finishRun(mailRun, { status: "done", counts: {}, error: null, at });
+    const r = await t.api("/api/mail/redo", json("POST", { runId: mailRun }));
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ mails: 0, kept: [], enqueued: true });
+    expect(t.queue.tasks.at(-1)).toMatchObject({
+      key: "mail.sync",
+      payload: { trigger: "manual" },
+    });
+    const other = t.repos.scheduled.startRun({ taskId: "captures.prune", trigger: "manual", at });
+    t.repos.scheduled.finishRun(other, { status: "done", counts: {}, error: null, at });
+    expect((await t.api("/api/mail/redo", json("POST", { runId: other }))).status).toBe(422);
+    expect((await t.api("/api/mail/redo", json("POST", { runId: "nao-existe" }))).status).toBe(404);
+  });
 });

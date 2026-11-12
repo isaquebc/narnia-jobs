@@ -56,3 +56,27 @@ describe("F14/M4 · links do LinkedIn vindos de e-mail", () => {
     ).toBe(false);
   });
 });
+
+describe("correção 2026-11-11 · Glassdoor: a vaga é o jl (ou jobListingId), sem o resto do rastreio", () => {
+  it.each([
+    [
+      "https://www.glassdoor.com.br/job-listing/dev-backend-globex-JV_KO0,11_KE12,18.htm?ao=1&cb=2&cs=3&ctt=4&ea=1&gdir=1&guid=abc&ja=1&jl=1009999999001&jobListingId=1009999999001&jrtk=x&pos=1&s=2&srs=3&t=4&tgt=5&uido=6&vt=e",
+      "https://www.glassdoor.com.br/job-listing/j?jl=1009999999001",
+    ],
+    [
+      "https://www.glassdoor.com.br/Vaga/index.htm?ao=1&jobListingId=1009999999001&pos=2",
+      "https://www.glassdoor.com/job-listing/j?jl=1009999999001",
+    ],
+  ])("%s = %s", (a, b) => {
+    expect(samePostingUrl(a, b)).toBe(true);
+  });
+
+  it("vagas diferentes continuam diferentes", () => {
+    expect(
+      samePostingUrl(
+        "https://www.glassdoor.com.br/job-listing/j?jl=1",
+        "https://www.glassdoor.com.br/job-listing/j?jl=2",
+      ),
+    ).toBe(false);
+  });
+});

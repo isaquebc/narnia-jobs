@@ -82,6 +82,8 @@ export * from "./mail/google-oauth";
 export * from "./mail/postings";
 export * from "./mail/prefilter";
 export * from "./mail/process";
+export * from "./mail/provisional-score";
+export * from "./mail/redo";
 export * from "./mail/risk";
 export * from "./mail/source";
 export * from "./mail/sync";

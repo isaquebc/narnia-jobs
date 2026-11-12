@@ -70,7 +70,7 @@ export function matchKeywords(repos: Repos, keywords: HeuristicKeyword[]): PreAn
   });
 }
 
-const SENIORITY_RANK: Record<string, number> = {
+export const SENIORITY_RANK: Record<string, number> = {
   intern: 0,
   junior: 1,
   pleno: 2,

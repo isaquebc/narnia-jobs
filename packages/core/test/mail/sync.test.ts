@@ -232,6 +232,41 @@ describe("F14/M2 · sincronização do Gmail", () => {
     expect(repos.notifications.list().some((n) => n.kind === "mail.reconnect")).toBe(true);
   });
 
+  it("correção 2026-11-11: cota do Google no meio da leitura para a rodada sem pedir reconectar; a próxima continua", async () => {
+    repos.settings.set(MAIL_SINCE_KEY, new Date(T - 10 * DAY).toISOString());
+    for (let i = 1; i <= 4; i++)
+      fakeGmailAdd(state, { id: `m${i}`, internalDate: T - (6 - i) * DAY, raw: raw(`Vaga ${i}`) });
+    const { GmailApiError, readGmailToken } = await import("../../src");
+    const src = source();
+    const real = src.getRaw.bind(src);
+    let n = 0;
+    src.getRaw = async (id) => {
+      if (++n === 3)
+        throw new GmailApiError(
+          403,
+          "Gmail GET /messages/x: 403 Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user'",
+          "rateLimitExceeded",
+        );
+      return real(id);
+    };
+    const r = await runScheduledTask({
+      repos,
+      dataDir,
+      taskId: "mail.sync",
+      trigger: "schedule",
+      now: new Date(T),
+      publish: async () => {},
+      mailSource: () => src,
+    });
+    expect(r.status).toBe("done");
+    expect(readGmailToken(dataDir)?.invalidAt ?? null).toBeNull();
+    expect(repos.notifications.list().some((x) => x.kind === "mail.reconnect")).toBe(false);
+    expect(["m1", "m2"].every((id) => repos.mail.byGmailId(id))).toBe(true);
+    expect(repos.mail.byGmailId("m3")).toBeNull();
+    await sync();
+    expect(["m3", "m4"].every((id) => repos.mail.byGmailId(id))).toBe(true);
+  });
+
   it("pedido da extensão: baixado primeiro, mesmo fora da janela, e sai da lista", async () => {
     repos.settings.set(MAIL_SINCE_KEY, new Date(T - 5 * DAY).toISOString());
     fakeGmailAdd(state, { id: "velho", internalDate: T - 60 * DAY, raw: raw("Fora da janela") });

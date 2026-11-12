@@ -15,6 +15,8 @@ import { digestMail, type MailClassifier, syncDigestLabels } from "../mail/diges
 import { archiveStaleFeed, markAutoAnalyses } from "../mail/feed";
 import { openMailPostingLinks } from "../mail/postings";
 import { assessPendingMail } from "../mail/process";
+import { refreshProvisionalScores } from "../mail/provisional-score";
+import { mailRedoLocked } from "../mail/redo";
 import type { MailSource } from "../mail/source";
 import { syncMail } from "../mail/sync";
 import { applyMailUpdates } from "../mail/updates";
@@ -128,6 +130,10 @@ async function jobApplicationsArchive(ctx: ScheduledContext) {
 /** Handlers por tarefa; mutável só para os testes trocarem um handler. */
 /** Leitura do Gmail (F14/M2): baixa os e-mails novos de vagas; o processamento vem nos marcos seguintes. */
 async function mailSync(ctx: ScheduledContext) {
+  if (mailRedoLocked(ctx.repos, ctx.now)) {
+    ctx.log("info", "Desfazendo uma leitura agora; esta execução fica para depois");
+    return;
+  }
   const source = ctx.mailSource();
   await syncMail({ repos: ctx.repos, dataDir: ctx.dataDir, source, ctx });
   // M3: risco, pré-filtro e quarentena do que foi baixado (nesta ou em execuções anteriores)
@@ -149,6 +155,9 @@ async function mailSync(ctx: ScheduledContext) {
     if (!progress) break;
   }
   await syncMailReviewNotification(ctx.repos, ctx.publish);
+  // F14-16: score provisório (cargo, senioridade e local) das vagas do feed ainda sem o completo
+  const provisional = refreshProvisionalScores(ctx.repos);
+  if (provisional) ctx.count("provisional_scores", provisional);
   // etiqueta e lido antes dos links (que podem levar minutos), para o Gmail refletir logo o que foi processado
   if (source) await syncDigestLabels({ repos: ctx.repos, source, ctx });
   if (ctx.services.enqueuePostingExtract)

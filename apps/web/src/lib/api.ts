@@ -576,6 +576,14 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       request<{ runs: ScheduledRun[] }>(`/api/scheduled-tasks/${encodeURIComponent(id)}/runs`),
     getScheduledRun: (id: string) =>
       request<ScheduledRunDetail>(`/api/scheduled-runs/${encodeURIComponent(id)}`),
+    redoMailRuns: (runId: string) =>
+      request<{
+        mails: number;
+        applicationsRemoved: number;
+        postingsRemoved: number;
+        kept: Array<{ gmailId: string; subject: string | null; reason: string }>;
+        enqueued: boolean;
+      }>("/api/mail/redo", json({ runId })),
     getWorkerSettings: () => request<WorkerSettings>("/api/settings/workers"),
     getSemanticSearch: () => request<SemanticSearchView>("/api/settings/semantic-search"),
     putSemanticSearch: (body: { enabled: boolean }) =>

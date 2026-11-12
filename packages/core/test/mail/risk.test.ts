@@ -338,4 +338,25 @@ describe("F14/M3 · revisão: plataformas legítimas não vão para a quarentena
       ).decision,
     ).toBe("unknown");
   });
+
+  it("correção 2026-11-11: confirmação do Indeed e alertas de uma vaga do Glassdoor em português são de vaga", async () => {
+    const d = async (from: string, subject: string) =>
+      prefilterMail(await parseMail(rawMail({ from, subject }))).decision;
+    expect(
+      await d("Indeed <indeedapply@indeed.com>", "Inscrição via Indeed: Analista de Dados Sênior"),
+    ).toBe("candidate");
+    for (const subject of [
+      "Programador Junior, Curitiba na empresa Globex: uma ótima opção para você",
+      "[1234] Pessoa Desenvolvedora Fullstack Jr (Híbrido - Recife)",
+      "A Initech está contratando ANALISTA DE SISTEMAS",
+      "Umbrella, Hooli e Acme: Candidatar-se agora",
+      "ESTAGIO TI REMOTO na empresa Clínica Exemplo",
+      "Software Engineer | Back-End | Remote Work na empresa Globex",
+    ])
+      expect(await d("Glassdoor <noreply@glassdoor.com>", subject), subject).toBe("candidate");
+    // comunidade e notícias da plataforma continuam fora
+    expect(await d("Glassdoor <noreply@glassdoor.com>", "Novidades da sua comunidade")).toBe(
+      "ignored",
+    );
+  });
 });

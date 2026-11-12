@@ -6,6 +6,7 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
 import {
+  useRedoMailRuns,
   useScheduledRun,
   useScheduledRuns,
   useScheduledTasks,
@@ -92,7 +93,52 @@ function RunDetail({ runId }: { runId: string }) {
   );
 }
 
-function RunHistory({ taskId }: { taskId: string }) {
+/** Leitura do Gmail: desfaz esta execução e as seguintes e lê os e-mails de novo (pedido do dono 2026-11-11). */
+function RedoMail({ run, running }: { run: ScheduledRun; running: boolean }) {
+  const redo = useRedoMailRuns();
+  const r = redo.data;
+  return (
+    <div className="flex flex-col gap-1">
+      <Button
+        size="sm"
+        variant="outline"
+        className="self-start"
+        disabled={running || run.status === "running" || redo.isPending}
+        onClick={() => {
+          if (window.confirm(t("scheduled.redoConfirm"))) redo.mutate(run.id);
+        }}
+      >
+        {t("scheduled.redo")}
+      </Button>
+      {r ? (
+        <div role="status" className="text-xs text-muted-fg">
+          <p>
+            {t("scheduled.redoDone", {
+              mails: r.mails,
+              apps: r.applicationsRemoved,
+              postings: r.postingsRemoved,
+            })}
+          </p>
+          {r.kept.length ? (
+            <>
+              <p>{t("scheduled.redoKept")}</p>
+              <ul className="list-disc pl-4">
+                {r.kept.map((k) => (
+                  <li key={k.gmailId}>
+                    {k.subject ?? k.gmailId}: {k.reason}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      {redo.error ? <p className="text-xs text-danger">{(redo.error as Error).message}</p> : null}
+    </div>
+  );
+}
+
+function RunHistory({ taskId, running }: { taskId: string; running: boolean }) {
   const { data: runs = [], isLoading } = useScheduledRuns(taskId, true);
   const [open, setOpen] = useState<string | null>(null);
   if (isLoading) return null;
@@ -112,7 +158,12 @@ function RunHistory({ taskId }: { taskId: string }) {
             <span className="text-muted-fg">{t(`scheduled.trigger.${r.trigger}` as TKey)}</span>
             {countsText(r) ? <span className="text-muted-fg">{countsText(r)}</span> : null}
           </button>
-          {open === r.id ? <RunDetail runId={r.id} /> : null}
+          {open === r.id ? (
+            <>
+              {taskId === "mail.sync" ? <RedoMail run={r} running={running} /> : null}
+              <RunDetail runId={r.id} />
+            </>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -220,7 +271,7 @@ function TaskCard({ task }: { task: ScheduledTask }) {
         >
           {history ? t("scheduled.hideHistory") : t("scheduled.showHistory")}
         </Button>
-        {history ? <RunHistory taskId={task.id} /> : null}
+        {history ? <RunHistory taskId={task.id} running={task.running} /> : null}
       </div>
     </Card>
   );
