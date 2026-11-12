@@ -173,6 +173,19 @@ describe("desfazer e refazer a leitura dos e-mails", () => {
     expect(repos.postings.get(before.id)).not.toBeNull();
   });
 
+  it("vaga que um desfazer anterior deixou para trás (o e-mail já sem resultado) sai pela origem dela", async () => {
+    const run = await sync();
+    const left = repos.postings.feed().filter((p) => p.sourceRef?.platform === "linkedin");
+    expect(left).toHaveLength(2);
+    // como o desfazer antigo: o e-mail voltou à fila sem as vagas
+    repos.mail.resetForRedo(
+      repos.mail.byGmailId("alerta")?.id as string,
+      new Date(T).toISOString(),
+    );
+    redoMailRuns(repos, dataDir, run.id, new Date(T));
+    for (const p of left) expect(repos.postings.get(p.id)).toBeNull();
+  });
+
   it("desde uma leitura antiga: pega as seguintes também; sem leitura, todas; outra tarefa ou inexistente: erro", async () => {
     const first = await sync();
     fakeGmailAdd(state, {

@@ -103,11 +103,10 @@ function undoLocked(repos: Repos, dataDir: string, from: string, now: Date): Mai
           if (hadPosting && !repos.postings.get(msg.undo.createdPostingId as string))
             out.postingsRemoved++;
         }
-        // vagas que o alerta criou (a origem aponta para ele); as que já existiam têm outra origem e ficam
-        const postings = (msg.result as { postings?: string[] } | null)?.postings ?? [];
-        for (const pid of postings) {
-          const p = repos.postings.get(pid);
-          if (p?.source !== "email" || p.sourceRef?.gmailId !== msg.gmailId) continue;
+        // vagas que o e-mail criou, pela origem gravada na vaga (o resultado do e-mail some num desfazer anterior que
+        // deixou vagas para trás: 2026-11-12); as que já existiam têm outra origem e ficam
+        for (const p of repos.postings.fromMail(msg.gmailId)) {
+          const pid = p.id;
           // candidatura criada por e-mail nesta vaga sai junto; a feita pela pessoa segura a vaga
           const apps = repos.jobApplications.list().filter((a) => a.postingId === pid);
           if (apps.some((a) => a.source !== "email")) continue;

@@ -163,6 +163,8 @@ export interface PostingsRepo {
   findByCanonicalUrl(url: string, excludeId?: string): Posting[];
   /** Vagas da mesma empresa (sem caixa, acento nem sufixo jurídico; correção 2026-11-11), arquivadas inclusive. */
   byCompany(company: string): Posting[];
+  /** Vagas criadas por um e-mail (origem `email` apontando para ele), arquivadas inclusive. */
+  fromMail(gmailId: string): Posting[];
   /** Interação da pessoa (abrir, editar, analisar, candidatar, nota): a vaga não é arquivada por inatividade. */
   touchInteraction(id: string, at?: string): void;
   setArchiveAuto(id: string, auto: Posting["archiveAuto"], at?: string): void;
@@ -371,6 +373,13 @@ export function postingsRepo(db: Db): PostingsRepo {
       return (q("select * from posting where company is not null").all() as Row[])
         .filter((r) => sameCompany(r.company as string, company))
         .map(mapPosting);
+    },
+    fromMail(gmailId) {
+      return (
+        q(
+          "select * from posting where source = 'email' and json_extract(source_ref_json, '$.gmailId') = ?",
+        ).all(gmailId) as Row[]
+      ).map(mapPosting);
     },
     touchInteraction(id, at = nowUtc()) {
       q("update posting set last_interaction_at = ? where id = ?").run(at, id);
