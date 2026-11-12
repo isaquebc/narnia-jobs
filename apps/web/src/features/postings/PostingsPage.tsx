@@ -1,4 +1,5 @@
 import type { Posting, PostingListItem } from "@narnia-jobs/shared";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
 import { useApi, useTimezone } from "../../app/context";
@@ -10,7 +11,7 @@ import { Card, CardTitle } from "../../components/ui/card";
 import { Field } from "../../components/ui/field";
 import { Input, Select, Textarea } from "../../components/ui/input";
 import { TabPanel, Tabs } from "../../components/ui/tabs";
-import { useFeed, usePostings } from "../../hooks/usePostings";
+import { postingKeys, useFeed, usePostings } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { ApiError } from "../../lib/api";
 import { formatDate } from "../../lib/format";
@@ -65,7 +66,54 @@ function snippet(text: string | null): string | null {
  * Card do feed de vagas (pedido do dono 2026-11-12): uma coluna, com local, modo, começo da descrição, a data do e-mail
  * e as ações direto no card (analisar, vaga oficial, e-mail, arquivar).
  */
-function PostingCard({ p }: { p: PostingListItem }) {
+/**
+ * Uma versão de um grupo de vagas iguais: local, plataforma e data do e-mail, para escolher em qual se candidatar;
+ * "Separar" tira do grupo a que a pessoa confirmou ser outra vaga.
+ */
+function GroupMember({ v }: { v: PostingListItem }) {
+  const tz = useTimezone();
+  const api = useApi();
+  const qc = useQueryClient();
+  const split = useMutation({
+    mutationFn: () => api.setPostingGroupSplit(v.id, true),
+    onSuccess: () => qc.invalidateQueries({ queryKey: postingKeys.all }),
+  });
+  const receivedAt = v.source === "email" ? (v.sourceRef?.receivedAt ?? null) : null;
+  const info = [
+    placeLine(v) || null,
+    v.sourceRef?.platform ?? null,
+    receivedAt ? t("postings.group.received", { date: formatDate(receivedAt, tz) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <li aria-label={info || v.id} className="flex flex-wrap items-center justify-between gap-2">
+      <span className="flex flex-wrap items-center gap-2">
+        <span>{info || "—"}</span>
+        {v.application ? <Badge tone="ok">{t("postings.group.applied")}</Badge> : null}
+      </span>
+      <span className="flex flex-wrap items-center gap-2">
+        <NavLink to={`/vagas/${v.id}`} className={buttonClass({ variant: "ghost", size: "sm" })}>
+          {t("postings.group.open")}
+        </NavLink>
+        {isHttpUrl(v.postingUrl) ? (
+          <a
+            href={v.postingUrl}
+            {...external}
+            className={buttonClass({ variant: "ghost", size: "sm" })}
+          >
+            {t("postings.openOriginal")}
+          </a>
+        ) : null}
+        <Button size="sm" variant="ghost" disabled={split.isPending} onClick={() => split.mutate()}>
+          {t("postings.group.split")}
+        </Button>
+      </span>
+    </li>
+  );
+}
+
+function PostingCard({ p, variants = [] }: { p: PostingListItem; variants?: PostingListItem[] }) {
   const tz = useTimezone();
   // F07 (pedido do dono 2026-10-27): a vaga já aplicada fica destacada, com a coluna da candidatura
   const applied = p.application;
@@ -191,8 +239,42 @@ function PostingCard({ p }: { p: PostingListItem }) {
           ) : null}
           {p.archivedAt ? null : <ArchivePostingButton postingId={p.id} />}
         </div>
+        {variants.length ? (
+          <details className="rounded-md border border-border p-2 text-sm">
+            <summary className="cursor-pointer">
+              {t("postings.group.summary", { n: variants.length + 1 })}
+            </summary>
+            <ul aria-label={t("postings.group.list")} className="mt-2 flex flex-col gap-1">
+              {[p, ...variants].map((v) => (
+                <GroupMember key={v.id} v={v} />
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </Card>
     </li>
+  );
+}
+
+/** A lista de cards: vagas iguais (mesmo `groupId`) num card só, na posição da primeira. */
+function PostingList({ label, postings }: { label: string; postings: PostingListItem[] }) {
+  const byGroup = new Map<string, PostingListItem[]>();
+  for (const p of postings)
+    if (p.groupId) byGroup.set(p.groupId, [...(byGroup.get(p.groupId) ?? []), p]);
+  const shown = new Set<string>();
+  return (
+    <ul aria-label={label} className="flex flex-col gap-3">
+      {postings.map((p) => {
+        const members = p.groupId ? (byGroup.get(p.groupId) ?? [p]) : [p];
+        if (p.groupId) {
+          if (shown.has(p.groupId)) return null;
+          shown.add(p.groupId);
+        }
+        return (
+          <PostingCard key={p.id} p={members[0] as PostingListItem} variants={members.slice(1)} />
+        );
+      })}
+    </ul>
   );
 }
 
@@ -341,11 +423,7 @@ function FeedList() {
       ) : !isLoading && postings.length === 0 ? (
         <p className="text-sm text-muted-fg">{t("postings.feed.noMatch")}</p>
       ) : (
-        <ul aria-label={t("postings.tabs.feed")} className="flex flex-col gap-3">
-          {postings.map((p) => (
-            <PostingCard key={p.id} p={p} />
-          ))}
-        </ul>
+        <PostingList label={t("postings.tabs.feed")} postings={postings} />
       )}
     </div>
   );
@@ -408,11 +486,7 @@ function AllPostings() {
           {query ? t("postings.searchEmpty", { q: query }) : t("postings.empty")}
         </p>
       ) : (
-        <ul aria-label={t("postings.title")} className="flex flex-col gap-3">
-          {postings.map((p) => (
-            <PostingCard key={p.id} p={p} />
-          ))}
-        </ul>
+        <PostingList label={t("postings.title")} postings={postings} />
       )}
       <NewPosting />
     </div>

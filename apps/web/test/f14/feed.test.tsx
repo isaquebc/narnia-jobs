@@ -110,6 +110,41 @@ describe("F14/M4 · feed", () => {
     expect(analyzePosting).toHaveBeenCalledWith("p1");
   });
 
+  it("vagas iguais (mesma empresa e cargo) num card só; a lista mostra cada uma, com a candidatura; separar tira do grupo", async () => {
+    const setPostingGroupSplit = vi.fn(async () => ({}));
+    const listFeed = vi.fn(async () => ({
+      postings: [
+        { ...mail("p1", { company: "Acme", city: "Copenhagen", country: "DK" }), groupId: "p1" },
+        { ...mail("p2", { company: "Globex" }), groupId: null },
+        {
+          ...mail("p3", { company: "Acme", city: "Luxembourg", country: "LU" }),
+          groupId: "p1",
+          application: { id: "a1", column: "applied", archived: false },
+        },
+      ],
+    }));
+    renderApp({
+      api: {
+        listPostings: async () => ({ postings: [] }),
+        listFeed,
+        setPostingGroupSplit,
+      } as never,
+      initialUrl: "/vagas",
+    });
+    await userEvent.click(await screen.findByRole("tab", { name: "Feed do e-mail" }));
+    const list = await screen.findByRole("list", { name: "Feed do e-mail" });
+    // dois cards: Acme (com as duas versões) e Globex
+    expect(within(list).getAllByRole("listitem", { name: /Acme|Globex/ })).toHaveLength(2);
+    const acme = within(list).getByRole("listitem", { name: /Acme/ });
+    await userEvent.click(within(acme).getByText(/2 vagas iguais/));
+    const members = within(acme).getByRole("list", { name: "Vagas iguais" });
+    const lux = within(members).getByRole("listitem", { name: /Luxembourg/ });
+    expect(within(lux).getByText("com candidatura")).toBeInTheDocument();
+    expect(within(lux).getByRole("link", { name: "Abrir" })).toHaveAttribute("href", "/vagas/p3");
+    await userEvent.click(within(lux).getByRole("button", { name: "Separar" }));
+    expect(setPostingGroupSplit).toHaveBeenCalledWith("p3", true);
+  });
+
   it("M7 · filtros: plataforma, só novas, só link que não abriu e o aviso quando nada sobra", async () => {
     renderApp({
       api: {

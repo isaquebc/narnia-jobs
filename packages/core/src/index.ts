@@ -108,6 +108,7 @@ export {
   POSTING_USER_AGENT,
   robotsAllows,
 } from "./postings/fetch/fetch";
+export * from "./postings/groups";
 export * from "./postings/heuristics";
 export * from "./postings/identity";
 export * from "./postings/ingest";

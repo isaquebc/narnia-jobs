@@ -183,6 +183,8 @@ export const PostingSchema = PostingFieldsSchema.extend({
   matchScore: z.number().int().min(0).max(100).nullable().default(null),
   /** Score só pelo cargo, senioridade e local do alerta (sem descrição); o completo o substitui (F14-16). */
   matchScoreProvisional: z.boolean().default(false),
+  /** A pessoa separou esta vaga das iguais (mesma empresa e cargo): ela não entra em grupo (pedido do dono 2026-11-12). */
+  groupSplit: z.boolean().default(false),
   /** F14-9 · arquivada sozinha por falta de interação (não é motivo da pessoa, fica fora do fit). */
   archiveAuto: z.enum(["stale"]).nullable().default(null),
   lastInteractionAt: IsoDateTimeSchema.nullable().default(null),

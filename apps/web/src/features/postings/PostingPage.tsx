@@ -69,6 +69,11 @@ export function PostingPage({
     mutationFn: () => api.reextractPosting(postingId),
     onSuccess: () => qc.invalidateQueries({ queryKey: postingKeys.all }),
   });
+  // separada das iguais no feed (pedido do dono 2026-11-12): juntar de novo
+  const rejoin = useMutation({
+    mutationFn: () => api.setPostingGroupSplit(postingId, false),
+    onSuccess: () => qc.invalidateQueries({ queryKey: postingKeys.all }),
+  });
   const remove = useMutation({
     mutationFn: () => api.deletePosting(postingId),
     onSuccess: async () => {
@@ -91,6 +96,19 @@ export function PostingPage({
             {posting.role ? ` - ${t(`postings.role.${posting.role}` as TKey)}` : ""}
           </h1>
           <p className="text-sm text-muted-fg">{posting.title ?? ""}</p>
+          {posting.groupSplit ? (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-muted-fg">
+              {t("postings.group.splitHint")}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={rejoin.isPending}
+                onClick={() => rejoin.mutate()}
+              >
+                {t("postings.group.rejoin")}
+              </Button>
+            </p>
+          ) : null}
           {/* vaga do e-mail: quando o e-mail chegou e quando ela foi salva (pedido do dono 2026-11-12) */}
           {posting.source === "email" && posting.sourceRef?.receivedAt ? (
             <p className="text-xs text-muted-fg">

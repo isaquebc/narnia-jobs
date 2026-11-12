@@ -33,6 +33,34 @@ describe("F14/M4 · feed", () => {
     return posting;
   };
 
+  it("vagas iguais (mesma empresa e cargo, links diferentes) com o mesmo groupId; separar tira do grupo e juntar devolve", async () => {
+    t = makeTestApp();
+    const a = mailPosting("Backend Sênior", "https://www.linkedin.com/jobs/view/4000000001/", 80);
+    const b = mailPosting("Backend Sênior", "https://www.linkedin.com/jobs/view/4000000002/", 70);
+    mailPosting("Frontend Pleno", "https://www.linkedin.com/jobs/view/4000000003/", 60);
+    const groups = async () =>
+      (
+        (await (await t.api("/api/postings?feed=1")).json()) as {
+          postings: Array<{ id: string; groupId: string | null }>;
+        }
+      ).postings.map((p) => [p.id, p.groupId]);
+    expect(await groups()).toEqual(
+      expect.arrayContaining([
+        [a.id, a.id],
+        [b.id, a.id],
+      ]),
+    );
+    expect((await t.api(`/api/postings/${b.id}/group`, req("POST", { split: true }))).status).toBe(
+      200,
+    );
+    expect((await groups()).every(([, g]) => g === null)).toBe(true);
+    await t.api(`/api/postings/${b.id}/group`, req("POST", { split: false }));
+    expect(await groups()).toEqual(expect.arrayContaining([[b.id, a.id]]));
+    expect(
+      (await t.api("/api/postings/nao-existe/group", req("POST", { split: true }))).status,
+    ).toBe(404);
+  });
+
   it("feed=1: só as do e-mail não arquivadas, maior match primeiro (sem score por último); a lista normal não muda", async () => {
     t = makeTestApp();
     await t.api("/api/postings", req("POST", { company: "Globex", title: "Manual" }));

@@ -31,7 +31,7 @@ const COMPANY_LEGAL =
   /\b(ltda|ltd|s ?a|inc|llc|gmbh|eireli|epp|corp|corporation|co|company|plc|ag|bv|sarl|srl)\b/g;
 
 /** Nomes genéricos (empresa escondida): nunca são a mesma empresa por nome (revisão: "Empresa Confidencial"). */
-const COMPANY_GENERIC =
+export const COMPANY_GENERIC_NAME =
   /^(empresa )?(confidencial|sigilos[oa]|anonim[oa]|confidential|undisclosed|stealth( startup)?|empresa|company|cliente|client|consultoria)$/;
 
 /**
@@ -78,7 +78,7 @@ export function companyKey(company: string | null | undefined): string {
 export function sameCompany(a: string | null | undefined, b: string | null | undefined): boolean {
   const ka = companyKey(a);
   const kb = companyKey(b);
-  if (!ka || !kb || COMPANY_GENERIC.test(ka) || COMPANY_GENERIC.test(kb)) return false;
+  if (!ka || !kb || COMPANY_GENERIC_NAME.test(ka) || COMPANY_GENERIC_NAME.test(kb)) return false;
   if (ka === kb) return true;
   const [short, long] = ka.length <= kb.length ? [ka, kb] : [kb, ka];
   if (short.length < 3 || !` ${long} `.includes(` ${short} `)) return false;

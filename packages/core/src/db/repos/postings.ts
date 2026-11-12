@@ -106,6 +106,7 @@ function mapPosting(r: Row): Posting {
     feedState: r.feed_state ?? null,
     matchScore: r.match_score ?? null,
     matchScoreProvisional: r.match_score_provisional === 1,
+    groupSplit: r.group_split === 1,
     archiveAuto: r.archive_auto ?? null,
     lastInteractionAt: r.last_interaction_at ?? null,
     autoAnalysisAt: r.auto_analysis_at ?? null,
@@ -154,6 +155,8 @@ export interface PostingsRepo {
   setFeedState(id: string, state: Posting["feedState"]): void;
   /** Score completo (pela descrição); tira a marca de provisório. */
   setMatchScore(id: string, score: number | null): void;
+  /** Separar a vaga das iguais (ou juntar de novo). */
+  setGroupSplit(id: string, split: boolean): void;
   /** Score provisório (só pelo alerta, F14-16); não mexe num score completo. */
   setProvisionalScore(id: string, score: number | null): void;
   /** Vagas do e-mail não arquivadas sem score completo (para o provisório). */
@@ -380,6 +383,9 @@ export function postingsRepo(db: Db): PostingsRepo {
           "select * from posting where source = 'email' and json_extract(source_ref_json, '$.gmailId') = ?",
         ).all(gmailId) as Row[]
       ).map(mapPosting);
+    },
+    setGroupSplit(id, split) {
+      q("update posting set group_split = ? where id = ?").run(split ? 1 : 0, id);
     },
     touchInteraction(id, at = nowUtc()) {
       q("update posting set last_interaction_at = ? where id = ?").run(at, id);

@@ -776,6 +776,12 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       }),
     archivePosting: (id: string, body: PostingArchiveRequest) =>
       request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}/archive`, json(body)),
+    /** Separar a vaga das iguais (ou juntar de novo), pedido do dono 2026-11-12. */
+    setPostingGroupSplit: (id: string, split: boolean) =>
+      request<{ posting: Posting }>(
+        `/api/postings/${encodeURIComponent(id)}/group`,
+        json({ split }),
+      ),
     unarchivePosting: (id: string) =>
       request<{ posting: Posting }>(`/api/postings/${encodeURIComponent(id)}/unarchive`, json({})),
     getPosting: (id: string) => request<PostingDetail>(`/api/postings/${encodeURIComponent(id)}`),

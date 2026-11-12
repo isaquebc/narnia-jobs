@@ -8,6 +8,7 @@ import {
   duplicatePostings,
   editPostingNote,
   evidenceLabels,
+  groupPostings,
   type NoteEditResult,
   postingApplicationRef,
   type Repos,
@@ -81,20 +82,33 @@ export function postingsRoutes(deps: {
   // busca por texto (empresa, cliente, cargo, role, contatos); sem `q`, todas
   // F07: cada vaga com a candidatura dela (destaque das aplicadas); arquivadas só com `archived=1`
   // F14: `feed=1` = as vagas vindas de e-mail não arquivadas, pelo match (o resto da lista não muda, RT-V7)
-  app.get("/api/postings", (c) =>
-    c.json({
-      postings: (c.req.query("feed") === "1"
+  // pedido do dono 2026-11-12: vagas iguais (mesma empresa e cargo) levam o mesmo `groupId` (o id da primeira da lista)
+  app.get("/api/postings", (c) => {
+    const list =
+      c.req.query("feed") === "1"
         ? repos.postings.feed()
         : searchPostings(repos, c.req.query("q") ?? "", {
             archived: c.req.query("archived") === "1",
-          })
-      ).map((p) => ({
+          });
+    const groups = groupPostings(list);
+    return c.json({
+      postings: list.map((p) => ({
         ...p,
         application: postingApplicationRef(repos, p.id),
         analyzedAt: repos.jobAnalyses.latest(p.id)?.createdAt ?? null,
+        groupId: groups.get(p.id) ?? null,
       })),
-    }),
-  );
+    });
+  });
+
+  // separar a vaga das iguais (a pessoa confirmou que é outra) ou juntar de novo
+  app.post("/api/postings/:id/group", validate("json", z.object({ split: z.boolean() })), (c) => {
+    const id = c.req.param("id");
+    if (!repos.postings.get(id)) return notFound(c);
+    repos.postings.setGroupSplit(id, c.req.valid("json").split);
+    touched(id);
+    return c.json({ posting: repos.postings.get(id) });
+  });
 
   // F07 (pedido do dono 2026-10-27): arquivar a vaga que não deu um bom fit, com o motivo
   app.post("/api/postings/:id/archive", validate("json", PostingArchiveRequestSchema), (c) => {

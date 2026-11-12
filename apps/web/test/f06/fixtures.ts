@@ -82,6 +82,7 @@ export function posting(id: string, partial: Partial<Posting> = {}): Posting {
     feedState: null,
     matchScore: null,
     matchScoreProvisional: false,
+    groupSplit: false,
     archiveAuto: null,
     lastInteractionAt: null,
     autoAnalysisAt: null,
