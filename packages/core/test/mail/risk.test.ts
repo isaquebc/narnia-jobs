@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appliedSiteDomains,
   assessMailRisk,
   authVerdict,
   createRepos,
@@ -10,6 +11,7 @@ import {
   prefilterMail,
   registrableDomain,
 } from "../../src";
+import { DEFAULT_STAGES } from "../../src/job-applications";
 import { AUTH_OK, rawMail } from "./fixtures";
 
 /**
@@ -358,5 +360,89 @@ describe("F14/M3 · revisão: plataformas legítimas não vão para a quarentena
     expect(await d("Glassdoor <noreply@glassdoor.com>", "Novidades da sua comunidade")).toBe(
       "ignored",
     );
+  });
+});
+
+describe("remetentes de recrutamento e sites em que a pessoa se candidatou (pedido do dono 2026-11-12)", () => {
+  it("plataforma de recrutamento (InHire) com o Reply-To da empresa não vai para a quarentena; quadro de vagas sim", async () => {
+    const ats = await assess({
+      from: "Acme via InHire <no-reply@ses-mail.inhire.app>",
+      replyTo: "rh@acme.example",
+      subject: "Devolutiva - Desenvolvedor Fullstack",
+    });
+    expect(ats.level).toBe("trusted");
+    expect(ats.reasons).toContain("Reply-To em outro domínio (acme.example)");
+    const board = await assess({
+      from: "LinkedIn <jobs-noreply@linkedin.com>",
+      replyTo: "rh@acme.example",
+    });
+    expect(board.level).toBe("high");
+  });
+
+  it("remetente do site de uma vaga em que a pessoa se candidatou é confiável (com autenticação); sem autenticação, não", async () => {
+    const r = repos();
+    const applied = new Set(["acme.example"]);
+    const mail = await parseMail(
+      rawMail({ from: "RH Acme <rh@talentos.acme.example>", subject: "Sua candidatura" }),
+    );
+    expect(assessMailRisk(mail, r.mailSenders, applied)).toMatchObject({
+      level: "trusted",
+      trustedBy: "applied",
+    });
+    expect(assessMailRisk(mail, r.mailSenders).level).toBe("neutral");
+    const unauth = await parseMail(
+      rawMail({ from: "RH Acme <rh@acme.example>", subject: "Sua candidatura", auth: null }),
+    );
+    expect(assessMailRisk(unauth, r.mailSenders, applied).level).toBe("neutral");
+  });
+
+  it("texto puro bem mais pobre que o HTML (Indeed): o texto lido vem do HTML, com a empresa e o cargo", async () => {
+    const p = await parseMail(
+      rawMail({
+        from: "Indeed <indeedapply@indeed.com>",
+        subject: "Inscrição via Indeed: Senior Software Engineer",
+        text: "A sua inscrição foi enviada. Boa sorte!",
+        html: `<h1>Candidatura enviada</h1><p>Senior Software Engineer (Full Stack)</p><p>Acme Pagamentos - Remoto</p>
+<p>Os seguintes itens foram enviados para Acme Pagamentos. Boa sorte!</p><ul><li>Inscrição</li><li>Currículo</li></ul>
+<p>Próximos passos: a empresa ou o anunciante da vaga poderá entrar em contato.</p>`,
+      }),
+    );
+    expect(p.text).toContain("Acme Pagamentos");
+    // texto puro completo continua sendo o lido
+    const full = await parseMail(
+      rawMail({ text: "Olá! Recebemos sua candidatura para Dev na Acme.", html: "<p>Olá!</p>" }),
+    );
+    expect(full.text).toContain("Recebemos sua candidatura");
+  });
+});
+
+describe("domínios dos sites das vagas aplicadas", () => {
+  it("link da vaga e site da empresa das candidaturas; quadro de vagas, webmail e vaga sem candidatura ficam de fora", () => {
+    const r = repos();
+    const apply = (fields: Record<string, string>) => {
+      const p = r.postings.create(fields as never, { source: "user" });
+      r.jobApplications.create({
+        postingId: p.id,
+        profileId: null,
+        cvVersionId: null,
+        coverLetterVersionId: null,
+        appliedOn: "2026-11-01",
+        stages: [...DEFAULT_STAGES],
+      });
+    };
+    apply({
+      company: "Acme",
+      title: "Dev",
+      postingUrl: "https://carreiras.acme.example/vaga/1",
+      companyUrl: "https://www.acme-group.example",
+    });
+    apply({ company: "Globex", title: "Dev", postingUrl: "https://www.linkedin.com/jobs/view/1/" });
+    r.postings.create(
+      { company: "Initech", title: "Dev", postingUrl: "https://initech.example/1" } as never,
+      {
+        source: "user",
+      },
+    );
+    expect([...appliedSiteDomains(r)].sort()).toEqual(["acme-group.example", "acme.example"]);
   });
 });

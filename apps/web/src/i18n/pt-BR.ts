@@ -1983,6 +1983,7 @@ export const ptBR = {
     applySuggested: "Aplicar a {posting}",
     applyAnyway: "Aplicar mesmo assim",
     searchPosting: "Buscar a vaga (empresa ou cargo)",
+    applied: "com candidatura",
     trustAndProcess: "Confiar no remetente e processar",
     processAnyway: "Processar mesmo assim",
     ignore: "Ignorar",

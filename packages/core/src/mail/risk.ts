@@ -1,6 +1,7 @@
 import { simpleParser } from "mailparser";
 import type { MailSendersRepo } from "../db";
 import {
+  ATS_PLATFORMS,
   brandInName,
   domainOfAddress,
   isWebmail,
@@ -137,8 +138,12 @@ export function htmlToText(html: string): string {
 export async function parseMail(raw: Buffer): Promise<ParsedMail> {
   const p = await simpleParser(raw, { skipImageLinks: true });
   const html = typeof p.html === "string" ? p.html : "";
-  // e-mail só com HTML: o texto vem do HTML (o golpe e o modelo leem o texto)
-  const text = p.text?.trim() ? p.text : htmlToText(html);
+  // e-mail só com HTML: o texto vem do HTML (o golpe e o modelo leem o texto). Texto puro bem mais pobre que o HTML
+  // também (Indeed, 2026-11-12: a empresa e o cargo só estão no HTML; o texto puro é o rodapé)
+  const fromHtml = html ? htmlToText(html) : "";
+  const plain = p.text?.trim() ?? "";
+  const text =
+    plain && plain.length * 2 >= fromHtml.trim().length ? (p.text as string) : fromHtml || plain;
   return {
     fromAddr: p.from?.value?.[0]?.address?.toLowerCase() ?? null,
     fromName: p.from?.value?.[0]?.name || null,
@@ -269,7 +274,7 @@ export interface RiskAssessment {
   sender: SenderIdentity;
   auth: AuthVerdict;
   /** De onde veio a confiança (para a tela): lista da pessoa, plataforma autenticada ou histórico. */
-  trustedBy: "list" | "platform" | "history" | null;
+  trustedBy: "list" | "platform" | "history" | "applied" | null;
 }
 
 /**
@@ -296,7 +301,15 @@ export function senderOverride(senders: MailSendersRepo, address: string | null)
   return null;
 }
 
-export function assessMailRisk(m: ParsedMail, senders: MailSendersRepo): RiskAssessment {
+export function assessMailRisk(
+  m: ParsedMail,
+  senders: MailSendersRepo,
+  /**
+   * Domínios (registráveis) dos sites das vagas em que a pessoa se candidatou (pedido do dono 2026-11-12): o remetente
+   * desses domínios, com a autenticação alinhada, é confiável, e o `Reply-To` para eles não é risco.
+   */
+  appliedDomains: ReadonlySet<string> = new Set(),
+): RiskAssessment {
   const domain = domainOfAddress(m.fromAddr);
   const platform = platformOf(domain);
   const sender: SenderIdentity = {
@@ -324,7 +337,11 @@ export function assessMailRisk(m: ParsedMail, senders: MailSendersRepo): RiskAss
     high.push(`nome "${m.fromName}" cita ${nameBrand}, mas o domínio é ${domain}`);
   const replyDomain = domainOfAddress(m.replyTo);
   if (replyDomain && domain && registrableDomain(replyDomain) !== registrableDomain(domain)) {
-    if ((platform && !platformOf(replyDomain)) || lookalikeOf(replyDomain))
+    // plataforma de recrutamento provada responde pela empresa; Reply-To para um site em que a pessoa se candidatou também
+    const expected =
+      (provenPlatform && ATS_PLATFORMS.has(platform as string)) ||
+      appliedDomains.has(registrableDomain(replyDomain));
+    if (lookalikeOf(replyDomain) || (platform && !platformOf(replyDomain) && !expected))
       high.push(`Reply-To em outro domínio (${replyDomain})`);
     else notes.push(`Reply-To em outro domínio (${replyDomain})`);
   }
@@ -369,5 +386,7 @@ export function assessMailRisk(m: ParsedMail, senders: MailSendersRepo): RiskAss
   if (provenPlatform) return { level: "trusted", reasons, sender, auth, trustedBy: "platform" };
   if (history && history.okCount >= 3 && history.rejectedCount === 0 && auth.aligned)
     return { level: "trusted", reasons, sender, auth, trustedBy: "history" };
+  if (domain && auth.aligned && appliedDomains.has(registrableDomain(domain)))
+    return { level: "trusted", reasons, sender, auth, trustedBy: "applied" };
   return { level: "neutral", reasons, sender, auth, trustedBy: null };
 }

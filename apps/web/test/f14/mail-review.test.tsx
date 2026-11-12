@@ -55,9 +55,37 @@ describe("F14/M5 · e-mails para revisar", () => {
     expect(within(card).getByText("Motivo: duas vagas parecidas")).toBeInTheDocument();
     expect(within(card).getByText("Candidatura recebida")).toBeInTheDocument();
     await userEvent.click(within(card).getByRole("button", { name: "Escolher a vaga" }));
-    await userEvent.type(within(card).getByLabelText("Buscar a vaga (empresa ou cargo)"), "Acme");
+    // a busca já vem com a empresa do e-mail
+    expect(within(card).getByLabelText("Buscar a vaga (empresa ou cargo)")).toHaveValue("Acme");
     await userEvent.click(await within(card).findByRole("button", { name: "Dev Backend · Acme" }));
     await waitFor(() => expect(applyMail).toHaveBeenCalledWith("m1", { postingId: "p1" }));
+  });
+
+  it("escolher a vaga: as com candidatura vêm primeiro, com o selo (as repetidas do feed não escondem a aplicada)", async () => {
+    const listPostings = vi.fn(async () => ({
+      postings: [
+        ...Array.from({ length: 8 }, (_, i) => ({
+          id: `f${i}`,
+          title: "Dev Backend",
+          company: "Acme",
+          application: null,
+        })),
+        {
+          id: "p9",
+          title: "Dev Backend",
+          company: "Acme",
+          application: { id: "a1", column: "applied", archived: false },
+        },
+      ],
+    }));
+    renderWithProviders(<MailReviewPage />, {
+      api: { getMailReview: async () => view, applyMail: vi.fn(), listPostings } as never,
+    });
+    const card = await screen.findByRole("article", { name: "Recebemos sua candidatura" });
+    await userEvent.click(within(card).getByRole("button", { name: "Escolher a vaga" }));
+    const options = await within(card).findAllByRole("button", { name: /^Dev Backend · Acme/ });
+    expect(options[0]).toHaveTextContent("com candidatura");
+    expect(options).toHaveLength(9);
   });
 
   it("quarentena: mostra por quê; confiar no remetente libera; ignorar", async () => {

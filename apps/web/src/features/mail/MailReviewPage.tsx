@@ -13,15 +13,28 @@ const key = ["mail", "review"] as const;
 const when = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
-/** Escolher a vaga do e-mail: busca nas vagas salvas e liga com um clique. */
-function PickPosting({ onPick }: { onPick: (p: PostingListItem) => void }) {
+/**
+ * Escolher a vaga do e-mail: busca nas vagas salvas e liga com um clique. A busca já vem com a empresa (ou o cargo) do
+ * e-mail, e as vagas com candidatura vêm primeiro, com o selo: a confirmação de uma candidatura já feita liga a ela
+ * (pedido do dono 2026-11-12: as repetidas do feed escondiam a vaga aplicada).
+ */
+function PickPosting({
+  initial,
+  onPick,
+}: {
+  initial: string;
+  onPick: (p: PostingListItem) => void;
+}) {
   const api = useApi();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initial);
   const list = useQuery({
     queryKey: ["postings", "pick", q],
     queryFn: () => api.listPostings(q.trim()),
     enabled: q.trim().length >= 2,
   });
+  const postings = [...(list.data?.postings ?? [])].sort(
+    (a, b) => Number(!!b.application) - Number(!!a.application),
+  );
   return (
     <div className="flex flex-col gap-1">
       <Input
@@ -31,15 +44,16 @@ function PickPosting({ onPick }: { onPick: (p: PostingListItem) => void }) {
         onChange={(e) => setQ(e.target.value)}
         className="w-full sm:w-80"
       />
-      {(list.data?.postings ?? []).slice(0, 6).map((p) => (
+      {postings.slice(0, 10).map((p) => (
         <Button
           key={p.id}
           size="sm"
           variant="ghost"
-          className="justify-start"
+          className="justify-start gap-2"
           onClick={() => onPick(p)}
         >
-          {[p.title, p.company].filter(Boolean).join(" · ")}
+          <span>{[p.title, p.company].filter(Boolean).join(" · ")}</span>
+          {p.application ? <Badge tone="ok">{t("mailReview.applied")}</Badge> : null}
         </Button>
       ))}
     </div>
@@ -150,7 +164,12 @@ function Item({ m, quarantine }: { m: MailReviewItem; quarantine?: boolean }) {
           {t("mailReview.ignore")}
         </Button>
       </div>
-      {picking ? <PickPosting onPick={(p) => apply.mutate({ postingId: p.id })} /> : null}
+      {picking ? (
+        <PickPosting
+          initial={m.company ?? m.title ?? ""}
+          onPick={(p) => apply.mutate({ postingId: p.id })}
+        />
+      ) : null}
     </Card>
   );
 }

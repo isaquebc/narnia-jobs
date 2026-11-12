@@ -52,8 +52,47 @@ export const PLATFORMS: Record<string, string[]> = {
   kenoby: ["kenoby.com"],
   solides: ["solides.com.br", "solides.jobs"],
   programathor: ["programathor.com.br"],
+  // plataformas de recrutamento (ATS) que mandam e-mail em nome da empresa (2026-11-12)
+  factorial: ["factorial.co", "factorialhr.com"],
+  recruitee: ["recruitee.com"],
+  teamtailor: ["teamtailor.com", "teamtailor-mail.com"],
+  ashby: ["ashbyhq.com"],
+  bamboohr: ["bamboohr.com"],
+  jobvite: ["jobvite.com"],
+  icims: ["icims.com"],
+  breezy: ["breezy.hr"],
+  pinpoint: ["pinpointhq.com"],
+  quickin: ["quickin.io"],
   google: ["google.com"],
 };
+
+/**
+ * Plataformas de recrutamento (ATS): mandam o e-mail em nome da empresa, com o `Reply-To` dela; com a autenticação
+ * confirmada, isso não é sinal de golpe (InHire com Reply-To da empresa ia para a quarentena, 2026-11-12). Nos
+ * quadros de vagas (LinkedIn, Indeed, Glassdoor) continua sendo.
+ */
+export const ATS_PLATFORMS = new Set([
+  "gupy",
+  "greenhouse",
+  "lever",
+  "workday",
+  "successfactors",
+  "inhire",
+  "smartrecruiters",
+  "workable",
+  "kenoby",
+  "solides",
+  "factorial",
+  "recruitee",
+  "teamtailor",
+  "ashby",
+  "bamboohr",
+  "jobvite",
+  "icims",
+  "breezy",
+  "pinpoint",
+  "quickin",
+]);
 
 const PLATFORM_OF = new Map<string, string>(
   Object.entries(PLATFORMS).flatMap(([brand, ds]) => ds.map((d) => [d, brand] as const)),

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Repos } from "../db";
 import type { ScheduledContext } from "../scheduler";
 import { MAIL_LABEL, MAIL_SUSPECT_LABEL } from "./connection";
+import { isWebmail, platformOf, registrableDomain } from "./domains";
 import { prefilterMail } from "./prefilter";
 import { assessMailRisk, parseMail } from "./risk";
 import type { MailSource } from "./source";
@@ -22,6 +23,30 @@ export interface MailAssessResult {
   forModel: number;
 }
 
+/**
+ * Domínios dos sites das vagas em que a pessoa se candidatou (link da vaga e site da empresa), pedido do dono
+ * 2026-11-12: a empresa que responde do próprio domínio é confiável. Quadros de vagas e webmail ficam de fora (o
+ * LinkedIn na lista não diz nada sobre quem escreve).
+ */
+export function appliedSiteDomains(repos: Repos): Set<string> {
+  const out = new Set<string>();
+  for (const a of repos.jobApplications.list()) {
+    const p = repos.postings.get(a.postingId);
+    for (const raw of [p?.postingUrl, p?.companyUrl]) {
+      if (!raw) continue;
+      let host: string;
+      try {
+        host = new URL(raw).hostname.toLowerCase();
+      } catch {
+        continue;
+      }
+      const d = registrableDomain(host);
+      if (!platformOf(d) && !isWebmail(d)) out.add(d);
+    }
+  }
+  return out;
+}
+
 export async function assessPendingMail(input: {
   repos: Repos;
   dataDir: string;
@@ -31,11 +56,12 @@ export async function assessPendingMail(input: {
 }): Promise<MailAssessResult> {
   const { repos, ctx } = input;
   const out: MailAssessResult = { assessed: 0, quarantined: 0, ignored: 0, forModel: 0 };
+  const applied = appliedSiteDomains(repos);
   for (const msg of repos.mail.unassessed(input.limit ?? MAIL_ASSESS_PER_RUN)) {
     const at = new Date().toISOString();
     try {
       const parsed = await parseMail(readFileSync(join(input.dataDir, msg.rawPath)));
-      const risk = assessMailRisk(parsed, repos.mailSenders);
+      const risk = assessMailRisk(parsed, repos.mailSenders, applied);
       const pre = prefilterMail(parsed);
       if (risk.sender.address) repos.mailSenders.bump(risk.sender.address, "seen", at);
       const label = msg.subject ?? "(sem assunto)";
