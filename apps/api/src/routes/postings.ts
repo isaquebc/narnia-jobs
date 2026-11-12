@@ -88,7 +88,11 @@ export function postingsRoutes(deps: {
         : searchPostings(repos, c.req.query("q") ?? "", {
             archived: c.req.query("archived") === "1",
           })
-      ).map((p) => ({ ...p, application: postingApplicationRef(repos, p.id) })),
+      ).map((p) => ({
+        ...p,
+        application: postingApplicationRef(repos, p.id),
+        analyzedAt: repos.jobAnalyses.latest(p.id)?.createdAt ?? null,
+      })),
     }),
   );
 

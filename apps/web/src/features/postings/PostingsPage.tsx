@@ -5,7 +5,7 @@ import { useApi, useTimezone } from "../../app/context";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
+import { Button, buttonClass } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Field } from "../../components/ui/field";
 import { Input, Select, Textarea } from "../../components/ui/input";
@@ -14,6 +14,8 @@ import { useFeed, usePostings } from "../../hooks/usePostings";
 import { type TKey, t } from "../../i18n";
 import { ApiError } from "../../lib/api";
 import { formatDate } from "../../lib/format";
+import { AnalyzePostingButton } from "./PostingAnalysis";
+import { ArchivePostingButton } from "./PostingArchive";
 
 /** Quem contrata e o cliente, como no título da conversa da análise (F06 §1.1). */
 export function postingWho(p: Pick<Posting, "company" | "client">): string {
@@ -27,28 +29,91 @@ export const statusTone: Record<Posting["status"], "ok" | "warn" | "danger" | "n
   error: "danger",
 };
 
+const external = { target: "_blank", rel: "noopener noreferrer" } as const;
+/** Quadro de vagas da Coders: o alerta dela não traz link por vaga (2026-11-12). */
+export const CODERS_BOARD = "https://app.coders.com.br/vagas";
+
+export function isHttpUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
+/** Local, modo e contrato numa linha só ("São Paulo - SP · Híbrido · CLT"). */
+function placeLine(p: PostingListItem): string {
+  const place = [p.city, p.state].filter(Boolean).join(" - ") || p.country || null;
+  return [
+    place,
+    p.workMode ? t(`postings.workMode.${p.workMode}` as TKey) : null,
+    p.contractType ? p.contractType.toUpperCase() : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Começo da descrição, sem quebras: o card mostra três linhas (a vaga inteira fica na página dela). */
+function snippet(text: string | null): string | null {
+  if (!text) return null;
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > 400 ? `${flat.slice(0, 400)}…` : flat;
+}
+
+/**
+ * Card do feed de vagas (pedido do dono 2026-11-12): uma coluna, com local, modo, começo da descrição, a data do e-mail
+ * e as ações direto no card (analisar, vaga oficial, e-mail, arquivar).
+ */
 function PostingCard({ p }: { p: PostingListItem }) {
   const tz = useTimezone();
   // F07 (pedido do dono 2026-10-27): a vaga já aplicada fica destacada, com a coluna da candidatura
   const applied = p.application;
+  const receivedAt = p.source === "email" ? (p.sourceRef?.receivedAt ?? null) : null;
+  const mailUrl = p.source === "email" ? (p.sourceRef?.mailUrl ?? null) : null;
+  const place = placeLine(p);
+  const text = snippet(p.jdText);
   return (
     <li aria-label={postingWho(p)}>
-      <NavLink to={`/vagas/${p.id}`} className="block">
-        <Card
-          data-applied={applied ? "" : undefined}
-          className={`flex h-full flex-col gap-1 hover:bg-muted ${applied ? "border-ok bg-ok/5 ring-1 ring-ok/40" : ""}`}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-base font-medium">{p.company ?? t("postings.noCompany")}</h3>
-            <span className="flex shrink-0 gap-1">
-              {p.duplicate && p.duplicate.decision === null ? (
-                <Badge tone="warn">{t("postings.duplicate.badge")}</Badge>
-              ) : null}
-              <Badge tone={statusTone[p.status]}>{t(`postings.status.${p.status}` as TKey)}</Badge>
+      <Card
+        data-applied={applied ? "" : undefined}
+        className={`flex flex-col gap-2 ${applied ? "border-ok bg-ok/5 ring-1 ring-ok/40" : ""}`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-col">
+            <NavLink to={`/vagas/${p.id}`} className="text-base font-medium hover:underline">
+              {p.company ?? t("postings.noCompany")}
+            </NavLink>
+            {p.client ? <span className="text-sm text-muted-fg">{p.client}</span> : null}
+            <span className="text-sm">
+              {p.title ?? "—"}
+              {p.seniority ? ` · ${t(`postings.seniority.${p.seniority}` as TKey)}` : ""}
+              {p.role ? ` · ${t(`postings.role.${p.role}` as TKey)}` : ""}
             </span>
           </div>
+          <span className="flex shrink-0 flex-wrap gap-1">
+            {p.matchScore !== null ? (
+              <Badge
+                tone={p.matchScore >= 70 && !p.matchScoreProvisional ? "ok" : "neutral"}
+                title={p.matchScoreProvisional ? t("postings.feed.provisionalHint") : undefined}
+              >
+                {t(
+                  p.matchScoreProvisional
+                    ? "postings.feed.matchProvisional"
+                    : "postings.feed.match",
+                  { n: p.matchScore },
+                )}
+              </Badge>
+            ) : null}
+            {p.duplicate && p.duplicate.decision === null ? (
+              <Badge tone="warn">{t("postings.duplicate.badge")}</Badge>
+            ) : null}
+            <Badge tone={statusTone[p.status]}>{t(`postings.status.${p.status}` as TKey)}</Badge>
+          </span>
+        </div>
+        <span className="flex flex-wrap gap-1">
           {applied ? (
-            <Badge tone="ok" className="self-start">
+            <Badge tone="ok">
               {applied.archived
                 ? t("postings.appliedArchived")
                 : t("postings.applied", {
@@ -57,53 +122,76 @@ function PostingCard({ p }: { p: PostingListItem }) {
             </Badge>
           ) : null}
           {p.archiveReason ? (
-            <Badge tone="neutral" className="self-start">
+            <Badge tone="neutral">
               {t("postings.archivedBadge", {
                 reason: t(`postings.archiveReason.${p.archiveReason}` as TKey),
               })}
             </Badge>
           ) : null}
           {p.source === "email" ? (
-            <span className="flex flex-wrap gap-1 self-start">
+            <>
               {p.feedState === "new" ? <Badge tone="info">{t("postings.feed.new")}</Badge> : null}
               <Badge tone="neutral">
                 {p.sourceRef?.platform
                   ? t("postings.feed.fromMailPlatform", { platform: p.sourceRef.platform })
                   : t("postings.feed.fromMail")}
               </Badge>
-              {p.matchScore !== null ? (
-                <Badge
-                  tone={p.matchScore >= 70 && !p.matchScoreProvisional ? "ok" : "neutral"}
-                  title={p.matchScoreProvisional ? t("postings.feed.provisionalHint") : undefined}
-                >
-                  {t(
-                    p.matchScoreProvisional
-                      ? "postings.feed.matchProvisional"
-                      : "postings.feed.match",
-                    {
-                      n: p.matchScore,
-                    },
-                  )}
-                </Badge>
-              ) : null}
               {p.linkStatus === "failed" ? (
                 <Badge tone="warn">{t("postings.feed.linkFailed")}</Badge>
               ) : null}
-            </span>
+            </>
           ) : null}
-          {p.client ? <p className="text-sm text-muted-fg">{p.client}</p> : null}
-          <p className="text-sm">
-            {p.title ?? "—"}
-            {p.seniority ? ` · ${t(`postings.seniority.${p.seniority}` as TKey)}` : ""}
-          </p>
-          {p.role ? (
-            <p className="text-xs text-muted-fg">{t(`postings.role.${p.role}` as TKey)}</p>
+        </span>
+        {place ? <p className="text-sm text-muted-fg">{place}</p> : null}
+        {text ? <p className="line-clamp-3 text-sm text-muted-fg">{text}</p> : null}
+        <p className="text-xs text-muted-fg">
+          {receivedAt
+            ? t("postings.card.receivedAndSaved", {
+                received: formatDate(receivedAt, tz),
+                saved: formatDate(p.createdAt, tz),
+              })
+            : t("postings.createdAt", { date: formatDate(p.createdAt, tz) })}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {p.analyzedAt ? (
+            <NavLink
+              to={`/vagas/${p.id}`}
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.card.seeAnalysis")}
+            </NavLink>
+          ) : (
+            <AnalyzePostingButton postingId={p.id} />
+          )}
+          {isHttpUrl(p.postingUrl) ? (
+            <a
+              href={p.postingUrl}
+              {...external}
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.openOriginal")}
+            </a>
+          ) : p.source === "email" && p.sourceRef?.platform === "coders" ? (
+            <a
+              href={CODERS_BOARD}
+              {...external}
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.openCodersBoard")}
+            </a>
           ) : null}
-          <p className="mt-auto text-xs text-muted-fg">
-            {t("postings.createdAt", { date: formatDate(p.createdAt, tz) })}
-          </p>
-        </Card>
-      </NavLink>
+          {isHttpUrl(mailUrl) ? (
+            <a
+              href={mailUrl}
+              {...external}
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.openMail")}
+            </a>
+          ) : null}
+          {p.archivedAt ? null : <ArchivePostingButton postingId={p.id} />}
+        </div>
+      </Card>
     </li>
   );
 }
@@ -193,7 +281,7 @@ function FeedList() {
   const postings = all.filter(
     (p) =>
       (!platform || p.sourceRef?.platform === platform) &&
-      Date.parse(p.createdAt) >= since &&
+      Date.parse(p.sourceRef?.receivedAt ?? p.createdAt) >= since &&
       (!onlyNew || p.feedState === "new") &&
       (!onlyFailed || p.linkStatus === "failed"),
   );
@@ -253,10 +341,7 @@ function FeedList() {
       ) : !isLoading && postings.length === 0 ? (
         <p className="text-sm text-muted-fg">{t("postings.feed.noMatch")}</p>
       ) : (
-        <ul
-          aria-label={t("postings.tabs.feed")}
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-        >
+        <ul aria-label={t("postings.tabs.feed")} className="flex flex-col gap-3">
           {postings.map((p) => (
             <PostingCard key={p.id} p={p} />
           ))}
@@ -323,10 +408,7 @@ function AllPostings() {
           {query ? t("postings.searchEmpty", { q: query }) : t("postings.empty")}
         </p>
       ) : (
-        <ul
-          aria-label={t("postings.title")}
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-        >
+        <ul aria-label={t("postings.title")} className="flex flex-col gap-3">
           {postings.map((p) => (
             <PostingCard key={p.id} p={p} />
           ))}

@@ -2,7 +2,7 @@ import type { DocumentKind, PreAnalysis } from "@narnia-jobs/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useApi } from "../../app/context";
+import { useApi, useTimezone } from "../../app/context";
 import { ErrorState } from "../../components/ErrorState";
 import { NavLink } from "../../components/shell/NavLink";
 import { Alert } from "../../components/ui/alert";
@@ -13,6 +13,7 @@ import { useApplyOptions } from "../../hooks/useJobApplications";
 import { postingKeys, usePosting } from "../../hooks/usePostings";
 import { useProfiles } from "../../hooks/useProfiles";
 import { type TKey, t } from "../../i18n";
+import { formatDate } from "../../lib/format";
 import { GenerateDialog } from "../documents/GenerateDialog";
 import { PostingDocuments } from "../documents/PostingDocuments";
 import { ApplyButton } from "../job-applications/ApplyButton";
@@ -22,10 +23,7 @@ import { PostingAssets } from "./PostingAssets";
 import { PostingContactsSummary } from "./PostingContactsSummary";
 import { PostingForm } from "./PostingForm";
 import { ContactsCard, DuplicateDialog, NotesCard } from "./PostingSections";
-import { postingWho, statusTone } from "./PostingsPage";
-
-/** Quadro de vagas da Coders: o alerta dela não traz link por vaga (2026-11-12). */
-const CODERS_BOARD = "https://app.coders.com.br/vagas";
+import { CODERS_BOARD, isHttpUrl, postingWho, statusTone } from "./PostingsPage";
 
 /**
  * Página da vaga (F06 §1.3, M6): duplicata pendente (F06-9), análise do recrutador com validade (F06-10), pré-análise
@@ -37,10 +35,6 @@ const CODERS_BOARD = "https://app.coders.com.br/vagas";
  * carta travados; com uma ativa, vira "Ver candidatura". "Arquivar vaga" (sem candidatura ativa) pede o motivo do fit
  * ruim; a vaga arquivada mostra o motivo e "Desarquivar".
  */
-/** Só http(s) vira link: o campo é editável e `z.url()` aceita `javascript:`. */
-function isHttpUrl(url: string | null): boolean {
-  return /^https?:\/\//i.test(url ?? "");
-}
 
 export function PostingPage({
   postingId,
@@ -58,6 +52,7 @@ export function PostingPage({
   documentId?: string | undefined;
 }) {
   const api = useApi();
+  const tz = useTimezone();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { detail, analyses } = usePosting(postingId);
@@ -96,6 +91,15 @@ export function PostingPage({
             {posting.role ? ` - ${t(`postings.role.${posting.role}` as TKey)}` : ""}
           </h1>
           <p className="text-sm text-muted-fg">{posting.title ?? ""}</p>
+          {/* vaga do e-mail: quando o e-mail chegou e quando ela foi salva (pedido do dono 2026-11-12) */}
+          {posting.source === "email" && posting.sourceRef?.receivedAt ? (
+            <p className="text-xs text-muted-fg">
+              {t("postings.card.receivedAndSaved", {
+                received: formatDate(posting.sourceRef.receivedAt, tz),
+                saved: formatDate(posting.createdAt, tz),
+              })}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={statusTone[posting.status]}>

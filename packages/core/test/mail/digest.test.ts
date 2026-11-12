@@ -158,6 +158,8 @@ describe("F14/M4 · processamento dos e-mails", () => {
       ]),
     );
     expect(feed[0]?.sourceRef?.gmailId).toBe("alerta");
+    // a vaga guarda quando o e-mail chegou (pedido do dono 2026-11-12)
+    expect(feed[0]?.sourceRef?.receivedAt).toBe(repos.mail.byGmailId("alerta")?.receivedAt);
     expect(repos.mail.byGmailId("alerta")).toMatchObject({
       status: "done",
       class: "job_alert",

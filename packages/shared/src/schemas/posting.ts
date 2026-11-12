@@ -168,6 +168,8 @@ export const PostingSchema = PostingFieldsSchema.extend({
       gmailId: z.string().nullable().default(null),
       platform: z.string().nullable().default(null),
       mailUrl: z.string().nullable().default(null),
+      /** Quando o e-mail chegou (pedido do dono 2026-11-12). */
+      receivedAt: IsoDateTimeSchema.nullable().default(null),
       /** Remetente confiável (plataforma autenticada, lista ou histórico): só assim entra na pré-análise automática. */
       trusted: z.boolean().default(false),
     })

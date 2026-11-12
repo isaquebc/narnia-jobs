@@ -495,6 +495,7 @@ function newPostingFromMail(
     url: cls.postingUrl,
     gmailId: msg.gmailId,
     platform: null,
+    receivedAt: msg.receivedAt,
     trusted: msg.riskLevel === "trusted",
   }).posting;
   repos.postings.setFeedState(created.id, "seen");

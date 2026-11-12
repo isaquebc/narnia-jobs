@@ -20,6 +20,8 @@ export interface MailJobInput {
   url: string | null;
   gmailId: string;
   platform: string | null;
+  /** Quando o e-mail chegou (pedido do dono 2026-11-12: a vaga mostra a data e a hora do e-mail). */
+  receivedAt?: string | null;
   /** Remetente confiável (risco `trusted`): só assim a vaga entra na pré-análise automática. */
   trusted?: boolean;
 }
@@ -97,6 +99,7 @@ export function intakePostingFromMail(
       gmailId: job.gmailId,
       platform: job.platform,
       mailUrl: `https://mail.google.com/mail/u/0/#all/${job.gmailId}`,
+      receivedAt: job.receivedAt ?? null,
       trusted: job.trusted === true,
     },
     linkStatus: url ? "none" : null,

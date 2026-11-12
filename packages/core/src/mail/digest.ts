@@ -137,7 +137,13 @@ export async function digestMail(input: {
         let created = 0;
         for (const j of cls.jobs) {
           if (!j.title?.trim()) continue;
-          const job: MailJobInput = { ...j, gmailId: msg.gmailId, platform, trusted };
+          const job: MailJobInput = {
+            ...j,
+            gmailId: msg.gmailId,
+            platform,
+            trusted,
+            receivedAt: msg.receivedAt,
+          };
           const r = intakePostingFromMail(repos, job);
           postings.push(r.posting.id);
           if (r.created) created++;

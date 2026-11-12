@@ -42,9 +42,26 @@ describe("F14/M4 · feed", () => {
     const arch = mailPosting("Arquivada", null, 99);
     t.repos.postings.setArchiveAuto(arch.id, "stale");
     const feed = (await (await t.api("/api/postings?feed=1")).json()) as {
-      postings: Array<{ title: string; source: string }>;
+      postings: Array<{ title: string; source: string; id: string; analyzedAt: string | null }>;
     };
     expect(feed.postings.map((p) => p.title)).toEqual(["Alta", "Média", "Sem score"]);
+    // o card troca "Analisar" por "Ver análise" (pedido do dono 2026-11-12)
+    const alta = feed.postings.find((p) => p.title === "Alta");
+    expect(alta?.analyzedAt).toBeNull();
+    t.repos.jobAnalyses.add({
+      postingId: alta?.id as string,
+      analysis: {},
+      recommendedProfileId: null,
+      factsVersion: 1,
+      postingUpdatedAt: "2026-11-12T12:00:00.000Z",
+      models: [],
+      usage: null,
+      chatSessionId: null,
+    });
+    const again = (await (await t.api("/api/postings?feed=1")).json()) as {
+      postings: Array<{ title: string; analyzedAt: string | null }>;
+    };
+    expect(again.postings.find((p) => p.title === "Alta")?.analyzedAt).not.toBeNull();
     const all = (await (await t.api("/api/postings")).json()) as {
       postings: Array<{ title: string }>;
     };

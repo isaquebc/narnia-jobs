@@ -156,7 +156,10 @@ test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → anál
   await expect(popup.getByRole("button", { name: "Salvar vaga" })).toHaveCount(0);
   expect(context.pages().length).toBe(pagesBefore);
   await page.goto("/vagas");
-  await expect(page.getByText("Engenheira Backend Sênior")).toHaveCount(1);
+  // um card só (o card mostra o começo da descrição, que repete o cargo)
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Engenheira Backend Sênior" }),
+  ).toHaveCount(1);
 
   // candidatar-se sem duplicar (pedido do dono, 2026-10-27): na mesma aba do Chrome, a pessoa vai ao formulário e a
   // janela procura por ele; o formulário entra nesta aba da janela, ligado à vaga

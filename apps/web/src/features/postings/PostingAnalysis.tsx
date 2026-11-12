@@ -141,6 +141,25 @@ function useStartAnalysis(postingId: string) {
   return { start, busy, limit, setLimit, closeAndStart };
 }
 
+/**
+ * "Analisar" no card do feed de vagas (pedido do dono 2026-11-12): abre a conversa da análise, como na página da vaga.
+ */
+export function AnalyzePostingButton({ postingId }: { postingId: string }) {
+  const { start, busy, limit, setLimit, closeAndStart } = useStartAnalysis(postingId);
+  return (
+    <>
+      <Button type="button" size="sm" onClick={() => void start()} disabled={busy}>
+        {t("postings.card.analyze")}
+      </Button>
+      <SessionLimitDialog
+        limit={limit}
+        onCancel={() => setLimit(null)}
+        onChoose={(id) => void closeAndStart(id)}
+      />
+    </>
+  );
+}
+
 /** Análise do recrutador (M5): validade, fit por perfil, recomendado e o resto do `JobAnalysis`. */
 export function AnalysisCard({
   postingId,

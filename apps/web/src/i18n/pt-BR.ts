@@ -2058,6 +2058,11 @@ export const ptBR = {
     save: "Salvar vaga",
     saving: "Salvando…",
     createdAt: "Salva em {date}",
+    card: {
+      analyze: "Analisar",
+      seeAnalysis: "Ver análise",
+      receivedAndSaved: "E-mail recebido em {received} · salva em {saved}",
+    },
     noCompany: "Empresa não informada",
     search: "Buscar vagas",
     searchHint: "Empresa, cliente, cargo, role ou contato",

@@ -156,6 +156,8 @@ export type PostingApplicationRef = z.infer<typeof PostingApplicationRefSchema>;
 
 export const PostingListItemSchema = PostingSchema.extend({
   application: PostingApplicationRefSchema.nullable(),
+  /** Data da última análise do recrutador (o card troca "Analisar" por "Ver análise"; pedido do dono 2026-11-12). */
+  analyzedAt: z.string().nullable().default(null),
 });
 export type PostingListItem = z.infer<typeof PostingListItemSchema>;
 
