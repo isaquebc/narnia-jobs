@@ -384,3 +384,68 @@ Describe "F13 · serviço media opcional" {
     Test-Path (Join-Path $d "interviews") | Should -BeTrue
   }
 }
+
+Describe "F15-3 · vigia de avisos do Windows" {
+  BeforeAll {
+    $script:NotifyScript = Join-Path $PSScriptRoot "../notify/narnia-notify.ps1"
+    # api falsa (formato texto) num processo à parte: sem `after`, só o cursor; com `after`, um aviso urgente; token errado, 401
+    $script:ApiPort = Get-Random -Minimum 20000 -Maximum 30000
+    $script:ApiJob = Start-Job -ArgumentList $script:ApiPort -ScriptBlock {
+      param($port)
+      $l = [System.Net.HttpListener]::new(); $l.Prefixes.Add("http://127.0.0.1:$port/"); $l.Start()
+      while ($true) {
+        $c = $l.GetContext()
+        if ($c.Request.Headers["authorization"] -ne "Bearer tk") { $c.Response.StatusCode = 401; $c.Response.Close(); continue }
+        $body = if ($c.Request.QueryString["after"]) {
+          "2026-11-12T12:05:00.000Z`nTarefa vencida: Triagem`tAcme`t/tarefas?id=t1`ttrue`n"
+        } else { "2026-11-12T12:00:00.000Z`n" }
+        $b = [System.Text.Encoding]::UTF8.GetBytes($body)
+        $c.Response.ContentType = "text/plain; charset=utf-8"; $c.Response.OutputStream.Write($b, 0, $b.Length); $c.Response.Close()
+      }
+    }
+    foreach ($i in 1..50) {
+      try { Invoke-WebRequest "http://127.0.0.1:$($script:ApiPort)/" -Headers @{ authorization = "Bearer tk" } | Out-Null; break } catch { Start-Sleep -Milliseconds 100 }
+    }
+  }
+  AfterAll { Stop-Job $script:ApiJob -ErrorAction SilentlyContinue; Remove-Job $script:ApiJob -Force -ErrorAction SilentlyContinue }
+  BeforeEach {
+    $script:State = Join-Path $script:Tmp ("notify-" + [guid]::NewGuid().ToString("N"))
+    $env:NARNIA_NOTIFY_API = "http://127.0.0.1:$($script:ApiPort)"; $env:NARNIA_NOTIFY_TOKEN = "tk"
+    $env:NARNIA_NOTIFY_WEB = "http://127.0.0.1:5173"; $env:NARNIA_NOTIFY_STATE = $script:State
+    $env:NARNIA_NOTIFY_FAKE = Join-Path $script:Tmp ("shown-" + [guid]::NewGuid().ToString("N"))
+  }
+  AfterEach { Remove-Item env:NARNIA_NOTIFY* -ErrorAction SilentlyContinue }
+
+  It "primeira vez guarda o cursor sem mostrar; depois mostra o aviso com o link e avança o cursor" {
+    & pwsh -NoProfile -File $script:NotifyScript once
+    (Get-Content -Raw (Join-Path $script:State "cursor")) | Should -Be "2026-11-12T12:00:00.000Z"
+    Test-Path $env:NARNIA_NOTIFY_FAKE | Should -BeFalse
+    & pwsh -NoProfile -File $script:NotifyScript once
+    (Get-Content $env:NARNIA_NOTIFY_FAKE) | Should -Be "Tarefa vencida: Triagem|Acme|http://127.0.0.1:5173/tarefas?id=t1|True"
+    (Get-Content -Raw (Join-Path $script:State "cursor")) | Should -Be "2026-11-12T12:05:00.000Z"
+  }
+  It "só fala com a api local" {
+    $env:NARNIA_NOTIFY_API = "http://exemplo.invalid"
+    & pwsh -NoProfile -File $script:NotifyScript once 2>$null
+    $LASTEXITCODE | Should -Be 2
+  }
+  It "NARNIA_NOTIFY=0 não sobe o vigia; Stop-Notify sem vigia não falha" {
+    $env:NARNIA_NOTIFY = "0"
+    try { Start-Notify "http://127.0.0.1:1" "tk" "http://127.0.0.1:1" $script:State } finally { Remove-Item env:NARNIA_NOTIFY }
+    Test-Path (Join-Path $script:State "notify.pid") | Should -BeFalse
+    { Stop-Notify $script:State } | Should -Not -Throw
+  }
+  It "Start-Notify sobe um vigia só e Stop-Notify para" {
+    $env:NARNIA_NOTIFY = "1"
+    try {
+      Start-Notify $env:NARNIA_NOTIFY_API "tk" "http://127.0.0.1:5173" $script:State
+      $id = (Get-Content -Raw (Join-Path $script:State "notify.pid")).Trim()
+      Get-Process -Id $id | Should -Not -BeNullOrEmpty
+      Start-Notify $env:NARNIA_NOTIFY_API "tk" "http://127.0.0.1:5173" $script:State
+      (Get-Content -Raw (Join-Path $script:State "notify.pid")).Trim() | Should -Be $id
+      Stop-Notify $script:State
+      Start-Sleep -Milliseconds 300
+      Get-Process -Id $id -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+    } finally { Remove-Item env:NARNIA_NOTIFY -ErrorAction SilentlyContinue }
+  }
+}

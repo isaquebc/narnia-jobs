@@ -12,6 +12,7 @@ import {
   useScheduledTasks,
 } from "../../hooks/useScheduledTasks";
 import { type TKey, t } from "../../i18n";
+import { RereadMailButton } from "../mail/RereadMailButton";
 
 /**
  * Processos › Tarefas agendadas (F14-12, plans/plan-v0/tasks/F14-leitura-de-emails.md §2.6): o que roda sozinho, de
@@ -65,7 +66,7 @@ function RunDetail({ runId }: { runId: string }) {
         <h5 className="text-xs font-semibold uppercase text-muted-fg">{t("scheduled.items")}</h5>
         {data.items.length ? (
           <ul className="flex flex-col gap-1 text-sm">
-            {data.items.map((it) => (
+            {data.items.map((it, idx) => (
               <li key={it.id} className="flex flex-wrap items-center gap-2">
                 <Badge
                   tone={
@@ -82,6 +83,12 @@ function RunDetail({ runId }: { runId: string }) {
                   <span>{it.label}</span>
                 )}
                 {it.detail ? <span className="text-xs text-muted-fg">{it.detail}</span> : null}
+                {/* um botão por e-mail, mesmo que a execução o tenha tocado em vários passos */}
+                {it.kind === "mail" &&
+                it.refId &&
+                data.items.findIndex((x) => x.kind === "mail" && x.refId === it.refId) === idx ? (
+                  <RereadMailButton mailId={it.refId} />
+                ) : null}
               </li>
             ))}
           </ul>

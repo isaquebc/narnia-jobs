@@ -94,6 +94,22 @@ describe("F14/M6 · pelo e-mail", () => {
     expect(within(h).getByText(/pelo e-mail/)).toBeInTheDocument();
   });
 
+  it("cada e-mail da candidatura tem Ler de novo", async () => {
+    const rereadMail = vi.fn(async () => ({
+      mails: 1,
+      applicationsRemoved: 0,
+      postingsRemoved: 0,
+      kept: [],
+    }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<MailActivityCard application={app} />, {
+      api: { getMailActivity: async () => activity, rereadMail } as never,
+    });
+    const mails = await screen.findByRole("list", { name: "E-mails desta candidatura" });
+    await userEvent.click(within(mails).getByRole("button", { name: "Ler de novo" }));
+    await waitFor(() => expect(rereadMail).toHaveBeenCalledWith("m1"));
+  });
+
   it("desfazer a confirmação que criou a candidatura volta para a lista", async () => {
     navigate.mockClear();
     vi.spyOn(window, "confirm").mockReturnValue(true);

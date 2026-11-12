@@ -346,6 +346,34 @@ cmd_install_plugin() {
   install_plugin_with "$(plugin_stage_dir)" "$(mcp_server_name)" "$url" "$(plugin_marketplace_name)"
 }
 
+# --- vigia de avisos (F15-3): notificação nativa do sistema para tarefas e entrevistas ---------------------------------
+# notify_enabled -> NARNIA_NOTIFY=0 desliga (a instância do Claude desliga em .env.claude: nada na tela do dono)
+notify_enabled() { [[ "$(setting NARNIA_NOTIFY 1)" == 1 ]]; }
+
+# notify_start API TOKEN WEB STATE_DIR -> sobe scripts/notify/narnia-notify.sh em segundo plano (um por pasta de estado)
+notify_start() {
+  local api=$1 token=$2 web=$3 state=$4 pid
+  notify_enabled || return 0
+  mkdir -p "$state"
+  if [[ -f "$state/notify.pid" ]]; then
+    pid=$(cat "$state/notify.pid")
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then return 0; fi
+  fi
+  NARNIA_NOTIFY_API=$api NARNIA_NOTIFY_TOKEN=$token NARNIA_NOTIFY_WEB=$web NARNIA_NOTIFY_STATE=$state \
+    nohup bash "$INSTANCE_DIR/scripts/notify/narnia-notify.sh" run >>"$state/notify.log" 2>&1 &
+  printf '%s\n' "$!" > "$state/notify.pid"
+  info "avisos do sistema ligados (tarefas e entrevistas). Desligar: NARNIA_NOTIFY=0 no .env"
+}
+
+# notify_stop STATE_DIR -> para o vigia, se estiver rodando
+notify_stop() {
+  local state=$1 pid
+  [[ -f "$state/notify.pid" ]] || return 0
+  pid=$(cat "$state/notify.pid")
+  [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+  rm -f "$state/notify.pid"
+}
+
 # app_url PORT TOKEN -> URL de abertura da interface
 app_url() { printf 'http://127.0.0.1:%s/?token=%s\n' "$1" "$2"; }
 
@@ -450,6 +478,7 @@ cmd_up() {
   token=$(read_token)
   [[ -n "$token" ]] || die "não consegui ler o token de boot em /data/.token."
   printf '\n  narnia-jobs está no ar:\n\n    %s\n\n' "$(app_url "$port" "$token")"
+  notify_start "http://127.0.0.1:$port" "$token" "http://127.0.0.1:$port" "$NARNIA_DATA_DIR/.notify"
   if env_has_value "$ENV_FILE" CLAUDE_CODE_OAUTH_TOKEN; then
     info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $ENV_FILE."
   else
@@ -460,6 +489,7 @@ cmd_up() {
 
 cmd_down() {
   require_docker
+  notify_stop "$(prod_data_host_dir)/.notify"
   if [[ "${1:-}" == "--purge" ]]; then
     printf 'Isso remove também os volumes: o LOGIN da assinatura (claude-auth) e a fila (redis-data).\n'
     printf 'A pasta de dados (%s) NÃO é apagada. Continuar? [s/N] ' "$(prod_data_host_dir)"
@@ -543,7 +573,7 @@ e2e_launcher_port() {
     ENV_FILE="$env_file"; NARNIA_PORT_START="$base"
     PROD_COMPOSE=(docker compose -p "${E2E_PROJECT}-port" -f docker-compose.yml)   # nunca o projeto de uma instância
     export NARNIA_OAUTH_PORT=""                                                       # porta OAuth aleatória (não colide)
-    export COMPOSE_PROJECT_NAME="${E2E_PROJECT}-port" NARNIA_DATA_DIR="$data_dir" NARNIA_PROVIDER=mock
+    export COMPOSE_PROJECT_NAME="${E2E_PROJECT}-port" NARNIA_DATA_DIR="$data_dir" NARNIA_PROVIDER=mock NARNIA_NOTIFY=0
     cmd_up >/dev/null
     port=$(env_value "$env_file" NARNIA_PORT)
     [[ "$port" == "$expected" ]] || die "E2E-13: esperava a porta ${expected}, o lançador escolheu '${port}'."
@@ -809,7 +839,7 @@ main() {
     promote) cmd_promote "$@" ;;
     extension) cmd_extension ;;
     media) cmd_media "$@" ;;
-    dev-down) require_docker; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
+    dev-down) require_docker; notify_stop "$(dev_data_host_dir)/.notify"; "${DEV_COMPOSE[@]}" --profile app down --remove-orphans ;;
     logs)   require_docker; "${PROD_COMPOSE[@]}" logs -f --tail=100 "$@" ;;
     status) require_docker; "${PROD_COMPOSE[@]}" ps ;;
     dev)
@@ -824,6 +854,10 @@ main() {
       printf '\n  modo dev (hot reload):  %s\n' "$(app_url "${NARNIA_DEV_PORT:-5173}" "${NARNIA_TOKEN:-dev-token}")"
       if env_has_value "$ENV_FILE" CLAUDE_CODE_OAUTH_TOKEN; then info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $ENV_FILE."
       else info "login da assinatura (uma vez, vale para dev e produção): ./start.sh login   · mock: NARNIA_PROVIDER=mock ./start.sh dev"; fi
+      # o vigia acompanha o `up` em primeiro plano: Ctrl+C (ou o fim) para os dois
+      notify_start "http://127.0.0.1:${NARNIA_DEV_API_PORT:-3100}" "${NARNIA_TOKEN:-dev-token}" \
+        "http://127.0.0.1:${NARNIA_DEV_PORT:-5173}" "$(dev_data_host_dir)/.notify"
+      trap 'notify_stop "$(dev_data_host_dir)/.notify"' EXIT
       "${DEV_COMPOSE[@]}" --profile app up "$@" ;;
     test)
       require_docker; ensure_installed

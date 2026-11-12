@@ -65,6 +65,7 @@ import { salaryReferenceRoutes } from "./routes/salary-reference";
 import { scheduledRoutes } from "./routes/scheduled";
 import { semanticSearchRoutes } from "./routes/semantic-search";
 import { snapshotsRoutes } from "./routes/snapshots";
+import { todosRoutes } from "./routes/todos";
 import { usageRoutes } from "./routes/usage";
 import { userRoutes } from "./routes/user";
 import { workerSettingsRoutes } from "./routes/worker-settings";
@@ -368,6 +369,7 @@ export function createApp(deps: AppDeps) {
     reposRoutes({ repos: deps.repos, provider: deps.provider, queue: deps.queue, bus: deps.bus }),
   );
   app.route("/", notificationsRoutes({ repos: deps.repos, bus: deps.bus }));
+  app.route("/", todosRoutes({ repos: deps.repos, bus: deps.bus }));
   app.route(
     "/",
     postingsRoutes({ repos: deps.repos, bus: deps.bus, queue: deps.queue, dataDir: deps.dataDir }),

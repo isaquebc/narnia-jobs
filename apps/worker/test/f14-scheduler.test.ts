@@ -68,6 +68,7 @@ describe("F14/M1 · agendador no worker", () => {
       "postings.feed_archive",
       "captures.prune",
       "job_applications.archive",
+      "todos.reminders",
     ]);
     expect(h.enqueued).toEqual([
       {
@@ -100,6 +101,12 @@ describe("F14/M1 · agendador no worker", () => {
         key: "job_applications.archive",
         payload: { taskId: "job_applications.archive", trigger: "schedule" },
       },
+      {
+        queue: "scheduled",
+        type: "scheduled.run",
+        key: "todos.reminders",
+        payload: { taskId: "todos.reminders", trigger: "schedule" },
+      },
     ]);
   });
 
@@ -123,6 +130,7 @@ describe("F14/M1 · agendador no worker", () => {
       "postings.auto_analyze",
       "postings.feed_archive",
       "job_applications.archive",
+      "todos.reminders",
     ]);
   });
 

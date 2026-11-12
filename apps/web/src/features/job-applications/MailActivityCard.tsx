@@ -13,6 +13,7 @@ import { jobApplicationKeys } from "../../hooks/useJobApplications";
 import { type TKey, t } from "../../i18n";
 import type { MailActivity } from "../../lib/api";
 import { formatDate } from "../../lib/format";
+import { RereadMailButton } from "../mail/RereadMailButton";
 
 const activityKey = (id: string) => ["job-applications", id, "mail-activity"] as const;
 
@@ -145,6 +146,7 @@ export function MailActivityCard({ application: a }: { application: JobApplicati
                   {t("jobApplications.mail.undo")}
                 </Button>
               ) : null}
+              <RereadMailButton mailId={m.id} />
             </li>
           ))}
         </ul>

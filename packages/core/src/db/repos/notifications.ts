@@ -45,6 +45,8 @@ export interface NotificationsRepo {
   countUnseen(): number;
   /** Resolve as informativas abertas criadas antes de `now - INFORMATIONAL_TTL_DAYS` (FX-3); devolve as resolvidas. */
   expireInformational(now?: Date): Notification[];
+  /** F15-3 (vigia do sistema): abertas dos tipos dados criadas depois de `after`, da mais velha para a mais nova. */
+  createdAfter(after: string, kinds: readonly NotificationKind[], limit: number): Notification[];
 }
 
 /** Tipos informativos (FX-3): não contam no sino e se resolvem ao abrir o assunto ou após `INFORMATIONAL_TTL_DAYS`. */
@@ -54,6 +56,7 @@ export const INFORMATIONAL_KINDS: readonly NotificationKind[] = [
   "document.ready",
   "mail.application_closed",
   "mail.interview",
+  "todo.created",
 ];
 export const INFORMATIONAL_TTL_DAYS = 7;
 
@@ -111,6 +114,16 @@ export function notificationsRepo(db: Db): NotificationsRepo {
     `select * from notification where resolved_at is null and kind in (${informational}) and created_at < ?`,
   );
   const repo: NotificationsRepo = {
+    createdAfter(after, kinds, limit) {
+      if (!kinds.length) return [];
+      const rows = db
+        .prepare(
+          `select * from notification where created_at > ? and resolved_at is null and dismissed_at is null
+             and kind in (${kinds.map(() => "?").join(", ")}) order by created_at, rowid limit ?`,
+        )
+        .all(after, ...kinds, limit) as Row[];
+      return rows.map(map);
+    },
     upsert(i) {
       const existing = findOpen.get(i.kind, i.subjectKind, i.subjectId) as Row | undefined;
       const severity = i.severity ?? "info";

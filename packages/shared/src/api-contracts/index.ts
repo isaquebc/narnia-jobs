@@ -63,6 +63,7 @@ import {
 import { ProfileCardSchema } from "../schemas/profile-card";
 import { ProfileSuggestionSchema } from "../schemas/profile-suggestion";
 import { ScheduledRunUpdatedEventSchema } from "../schemas/scheduled";
+import { TodoUpdatedEventSchema } from "../schemas/todo";
 import { UserSchema } from "../schemas/user";
 
 /** Contratos das rotas de F01 §2.6. Fonte única para api (validação) e web (tipos). */
@@ -1060,6 +1061,7 @@ export const WsEventSchema = z.discriminatedUnion("type", [
   RecordingUpdatedEventSchema,
   ScheduledRunUpdatedEventSchema,
   GmailUpdatedEventSchema,
+  TodoUpdatedEventSchema,
 ]);
 export type WsEvent = z.infer<typeof WsEventSchema>;
 /** Mantido para o barramento da api (M3); desde M4 é o próprio `WsEventSchema`. */

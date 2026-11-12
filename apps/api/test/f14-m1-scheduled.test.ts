@@ -26,6 +26,7 @@ describe("F14/M1 · /api/scheduled-tasks", () => {
       "postings.feed_archive",
       "captures.prune",
       "job_applications.archive",
+      "todos.reminders",
     ]);
     expect(r.tasks.find((x) => x.id === "captures.prune")).toMatchObject({
       intervalMinutes: 1440,

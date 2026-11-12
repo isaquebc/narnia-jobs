@@ -19,6 +19,7 @@ Tasks fechadas ficam em [`done/`](done/) (a tabela aponta para lá); as abertas 
 | [F12-extensao-navegador](done/F12-extensao-navegador.md) | F5 | extensão do Chrome: captura de vagas e janela de ajuda nos formulários de candidatura (Haiku localiza, skill sugere, copiar/refazer/chat); o LinkedIn fica na F09 (F12-7) | F04, F05, F06; gate pairwise (F04-avaliacoes M7) |
 | [F13-entrevista-gravada](done/F13-entrevista-gravada.md) | F5 | análise pelo recrutador do vídeo de uma entrevista real: transcrição por pessoa, voz, áudio, rosto, anotações do entrevistador e feedback do discurso; serviço `media` opcional | F04, F06, F07; gate de prompts |
 | [F14-leitura-de-emails](F14-leitura-de-emails.md) | F5 | leitura do Gmail pela API REST: alertas viram vagas num feed (origem, link não abriu), confirmações/negativas/atualizações/convites viram candidatura, encerramento, histórico e agenda; etiqueta `narnia-jobs` + lido | F06, F07, F12; gate de prompts |
+| [F15-tarefas-e-avisos](F15-tarefas-e-avisos.md) | F5 | tarefas em kanban (manuais e do e-mail, com tags e filtro), aviso nativo do sistema pelo vigia no host, fases da candidatura lidas do e-mail (inclusive por OCR de imagem) | F07, F14 |
 | [F11-provider-codex](F11-provider-codex.md) | — | segundo provider (Codex) nos modos A e B; exige verificação documental antes de implementar | F04, F10 |
 
 ## Ordem sugerida (ondas)

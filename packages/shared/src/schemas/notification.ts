@@ -40,6 +40,12 @@ export const NOTIFICATION_KINDS = [
   "mail.stage_suggestion",
   /** F14/M6: convite de entrevista: etapa marcada, remarcada, cancelada ou o oficial chegou. Informativa. */
   "mail.interview",
+  /** F15: tarefa nova vinda de um e-mail (ou do recrutador). Informativa. */
+  "todo.created",
+  /** F15: o prazo da tarefa vence em até 24 h. */
+  "todo.due_soon",
+  /** F15: o prazo da tarefa passou (inclusive com o computador desligado). */
+  "todo.overdue",
 ] as const;
 export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
@@ -61,3 +67,15 @@ export const NotificationSchema = z.object({
   resolvedAt: IsoDateTimeSchema.nullable(),
 });
 export type Notification = z.infer<typeof NotificationSchema>;
+
+/**
+ * F15-3: tipos que o vigia do sistema (notificação nativa no Linux, Windows e macOS) mostra; os outros ficam só na
+ * bandeja do narnia.
+ */
+export const NATIVE_NOTIFICATION_KINDS: readonly NotificationKind[] = [
+  "todo.created",
+  "todo.due_soon",
+  "todo.overdue",
+  "mail.interview",
+  "mail.reconnect",
+];

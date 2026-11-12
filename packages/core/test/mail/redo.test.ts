@@ -20,6 +20,7 @@ import {
   openDatabase,
   type Repos,
   redoMailRuns,
+  rereadMail,
   runScheduledTask,
   startGmailConnect,
   undoMail,
@@ -156,6 +157,24 @@ describe("desfazer e refazer a leitura dos e-mails", () => {
     expect(repos.jobApplications.list()).toHaveLength(1);
     expect(alertFeed()).toHaveLength(2);
     expect(repos.mail.byGmailId("confirma")?.status).toBe("done");
+  });
+
+  it("ler de novo um e-mail só: desfaz o que ele criou, o devolve à fila, não mexe nos outros nem pausa", async () => {
+    await sync();
+    const alert = repos.mail.byGmailId("alerta");
+    const feed = () => repos.postings.feed().filter((p) => p.sourceRef?.platform === "linkedin");
+    expect(feed()).toHaveLength(2);
+    const r = rereadMail(repos, dataDir, alert?.id as string, new Date(T));
+    expect(r).toMatchObject({ mails: 1, applicationsRemoved: 0, postingsRemoved: 2, kept: [] });
+    expect(feed()).toHaveLength(0);
+    expect(repos.mail.byGmailId("alerta")).toMatchObject({ status: "pending", class: null });
+    // a confirmação fica como estava, e a leitura agendada continua ligada
+    expect(repos.mail.byGmailId("confirma")?.status).toBe("done");
+    expect(repos.jobApplications.list()).toHaveLength(1);
+    expect(repos.scheduled.task("mail.sync").paused).toBe(false);
+    await sync();
+    expect(feed()).toHaveLength(2);
+    expect(() => rereadMail(repos, dataDir, "nao-existe", new Date(T))).toThrow(MailRedoError);
   });
 
   it("vaga que já existia antes da leitura fica; sai só a candidatura que o e-mail criou nela", async () => {

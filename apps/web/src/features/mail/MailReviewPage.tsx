@@ -8,6 +8,7 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { type TKey, t } from "../../i18n";
 import type { MailReviewItem } from "../../lib/api";
+import { RereadMailButton } from "./RereadMailButton";
 
 const key = ["mail", "review"] as const;
 const when = (iso: string) =>
@@ -163,6 +164,7 @@ function Item({ m, quarantine }: { m: MailReviewItem; quarantine?: boolean }) {
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => ignore.mutate()}>
           {t("mailReview.ignore")}
         </Button>
+        <RereadMailButton mailId={m.id} />
       </div>
       {picking ? (
         <PickPosting

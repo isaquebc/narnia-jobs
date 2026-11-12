@@ -55,6 +55,7 @@ describe("F14/M1 · agendador", () => {
       "postings.feed_archive",
       "captures.prune",
       "job_applications.archive",
+      "todos.reminders",
     ]);
     const prune = tasks.find((t) => t.id === "captures.prune");
     expect(prune?.intervalMinutes).toBe(SCHEDULED_TASKS["captures.prune"].defaultIntervalMinutes);
@@ -67,6 +68,7 @@ describe("F14/M1 · agendador", () => {
       "postings.feed_archive",
       "captures.prune",
       "job_applications.archive",
+      "todos.reminders",
     ]);
   });
 
@@ -82,6 +84,7 @@ describe("F14/M1 · agendador", () => {
       "postings.auto_analyze",
       "postings.feed_archive",
       "job_applications.archive",
+      "todos.reminders",
     ]);
     expect(dueScheduledTasks(repos, plus(24 * 60))).toContain("captures.prune");
     expect(
@@ -112,6 +115,7 @@ describe("F14/M1 · agendador", () => {
       "postings.auto_analyze",
       "postings.feed_archive",
       "job_applications.archive",
+      "todos.reminders",
     ]);
     updateScheduledTask(repos, "captures.prune", { paused: false }, T0);
     expect(dueScheduledTasks(repos, T0)).toContain("captures.prune");
@@ -152,6 +156,7 @@ describe("F14/M1 · agendador", () => {
       "postings.auto_analyze",
       "postings.feed_archive",
       "job_applications.archive",
+      "todos.reminders",
     ]);
     const again = await run("captures.prune", T0, "manual");
     expect(again.skipped).toBe(true);

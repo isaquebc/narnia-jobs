@@ -23,5 +23,6 @@ export * from "./profile-suggestion";
 export * from "./recording";
 export * from "./salary-reference";
 export * from "./scheduled";
+export * from "./todo";
 export * from "./usage-event";
 export * from "./user";

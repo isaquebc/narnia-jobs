@@ -12,6 +12,7 @@ import { jobApplicationKeys, useJobApplication } from "../../hooks/useJobApplica
 import { type TKey, t } from "../../i18n";
 import { formatDate } from "../../lib/format";
 import { RecordingsCard } from "../recordings/RecordingsCard";
+import { TodosCard } from "../todos/TodosCard";
 import { AgendaCard } from "./AgendaCard";
 import { ChatAboutCard } from "./ChatAboutCard";
 import { ContactChainCard } from "./ContactChainCard";
@@ -189,6 +190,7 @@ export function JobApplicationPage({ id }: { id: string }) {
       </Card>
       <ChatAboutCard appId={a.id} />
       <StagesEditor application={a} />
+      <TodosCard applicationId={a.id} />
       <MailActivityCard application={a} />
       <AgendaCard application={a} />
       <ContactChainCard postingId={a.postingId} />

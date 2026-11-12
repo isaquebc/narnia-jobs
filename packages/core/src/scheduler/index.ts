@@ -21,6 +21,7 @@ import type { MailSource } from "../mail/source";
 import { syncMail } from "../mail/sync";
 import { applyMailUpdates } from "../mail/updates";
 import type { FetchPostingOptions } from "../postings/fetch/fetch";
+import { remindTodos, todoUrl } from "../todos/notify";
 
 /**
  * Agendador (F14-12, plans/plan-v0/tasks/F14-leitura-de-emails.md §2.6): as rotinas periódicas rodam no worker como
@@ -59,6 +60,8 @@ export const SCHEDULED_TASKS: Record<ScheduledTaskId, ScheduledTaskDefinition> =
     defaultIntervalMinutes: DAY,
     minIntervalMinutes: 60,
   },
+  // F15-4: prazos das tarefas; na primeira volta depois de ligar, avisa o que venceu com o computador desligado
+  "todos.reminders": { id: "todos.reminders", defaultIntervalMinutes: 15, minIntervalMinutes: 5 },
 };
 
 export class ScheduledTaskError extends Error {
@@ -127,6 +130,20 @@ async function jobApplicationsArchive(ctx: ScheduledContext) {
   ctx.log("info", `${ids.length} candidatura(s) arquivada(s) por inatividade`);
 }
 
+/** Lembretes das tarefas (F15/M2): vencidas e as que vencem em até 24 h, cada uma uma vez. */
+async function todosReminders(ctx: ScheduledContext) {
+  const r = await remindTodos(ctx.repos, ctx.now, ctx.publish);
+  for (const [list, action] of [
+    [r.overdue, "vencida"],
+    [r.dueSoon, "vence logo"],
+  ] as const)
+    for (const t of list)
+      ctx.item({ kind: "todo", refId: t.id, label: t.title, action, href: todoUrl(t.id) });
+  ctx.count("overdue", r.overdue.length);
+  ctx.count("due_soon", r.dueSoon.length);
+  ctx.log("info", `${r.overdue.length} vencida(s), ${r.dueSoon.length} vencendo em até 24 h`);
+}
+
 /** Handlers por tarefa; mutável só para os testes trocarem um handler. */
 /** Leitura do Gmail (F14/M2): baixa os e-mails novos de vagas; o processamento vem nos marcos seguintes. */
 async function mailSync(ctx: ScheduledContext) {
@@ -175,6 +192,7 @@ export const SCHEDULED_TASK_HANDLERS: Record<ScheduledTaskId, ScheduledHandler> 
   "postings.feed_archive": (ctx) => archiveStaleFeed(ctx),
   "captures.prune": capturesPrune,
   "job_applications.archive": jobApplicationsArchive,
+  "todos.reminders": todosReminders,
 };
 
 const intervalOf = (repos: Repos, id: ScheduledTaskId) =>

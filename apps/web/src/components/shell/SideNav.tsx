@@ -6,6 +6,7 @@ import {
   Download,
   FolderGit2,
   LayoutDashboard,
+  ListTodo,
   MessageSquare,
   Rocket,
   Settings,
@@ -100,6 +101,11 @@ export function SideNav({ className }: { className?: string }) {
               <NavLink to="/candidaturas" className={item}>
                 <ClipboardList size={16} /> {t("nav.jobApplications")}
                 <RemindersBadge />
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/tarefas" className={item}>
+                <ListTodo size={16} /> {t("nav.todos")}
               </NavLink>
             </li>
             <li>

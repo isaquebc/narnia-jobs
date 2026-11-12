@@ -369,6 +369,13 @@ const jobApplicationRoute = createRoute({
     return <JobApplicationPage key={id} id={id} />;
   },
 });
+// F15 · tarefas (kanban)
+const TodosPage = lazyRouteComponent(() => import("../features/todos/TodosPage"), "TodosPage");
+const todosRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tarefas",
+  component: TodosPage,
+});
 // F05 · processos em segundo plano (sob demanda)
 const ProcessesPage = lazyRouteComponent(
   () => import("../features/processes/ProcessesPage"),
@@ -448,6 +455,7 @@ const routeTree = rootRoute.addChildren([
   postingRoute,
   jobApplicationsRoute,
   jobApplicationRoute,
+  todosRoute,
   recordingRoute,
   chatRoute,
   chatSessionRoute,

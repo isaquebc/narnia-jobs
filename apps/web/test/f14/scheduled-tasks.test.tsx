@@ -190,6 +190,52 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
     confirm.mockRestore();
   });
 
+  it("leitura do Gmail: no detalhe da execução, cada e-mail tem Ler de novo (um botão por e-mail)", async () => {
+    const mailRun = { ...run, id: "m1", taskId: "mail.sync" as const, counts: { digested: 1 } };
+    const mailItem = (id: number, action: string) => ({
+      id,
+      at: run.startedAt,
+      kind: "mail",
+      refId: "g1",
+      label: "Recebemos sua candidatura",
+      action,
+      result: "ok" as const,
+      detail: null,
+      href: null,
+    });
+    const rereadMail = vi.fn(async () => ({
+      mails: 1,
+      applicationsRemoved: 0,
+      postingsRemoved: 0,
+      kept: [],
+    }));
+    const a = {
+      ...api(),
+      listScheduledTasks: vi.fn(async () => ({
+        tasks: [{ ...task("job_applications.archive"), id: "mail.sync", lastRun: mailRun }],
+      })),
+      listScheduledRuns: vi.fn(async () => ({ runs: [mailRun] })),
+      getScheduledRun: vi.fn(async () => ({
+        ...mailRun,
+        log: [],
+        items: [mailItem(1, "avaliado"), mailItem(2, "processado")],
+      })),
+      rereadMail,
+    };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<ProcessesPage />, { api: a as never });
+    await openTab();
+    const card = await screen.findByRole("region", { name: "Leitura do Gmail" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ver histórico" }));
+    await userEvent.click(await within(card).findByRole("button", { name: /Concluída/ }));
+    const detail = await within(card).findByRole("region", { name: "Detalhe da execução" });
+    const buttons = within(detail).getAllByRole("button", { name: "Ler de novo" });
+    expect(buttons).toHaveLength(1);
+    await userEvent.click(buttons[0] as HTMLElement);
+    expect(rereadMail).toHaveBeenCalledWith("g1");
+    confirm.mockRestore();
+  });
+
   it("leitura do Gmail: atalho no cartão desfaz todas as leituras, sem abrir o histórico", async () => {
     const empty = { ...run, id: "m2", taskId: "mail.sync" as const, counts: {} };
     const withMail = { ...run, id: "m1", taskId: "mail.sync" as const, counts: { digested: 3 } };

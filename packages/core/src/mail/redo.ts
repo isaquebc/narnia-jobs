@@ -89,45 +89,82 @@ function undoLocked(repos: Repos, dataDir: string, from: string, now: Date): Mai
     .map((g) => repos.mail.byGmailId(g))
     .filter((m): m is NonNullable<typeof m> => !!m)
     .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
-  const at = now.toISOString();
   const out: MailRedoResult = { mails: 0, applicationsRemoved: 0, postingsRemoved: 0, kept: [] };
-  for (const msg of mails) {
-    try {
-      withTransaction(repos.db, () => {
-        if (msg.status === "done" && msg.undo && !msg.undoneAt) {
-          const hadPosting = msg.undo.createdPostingId
-            ? !!repos.postings.get(msg.undo.createdPostingId)
-            : false;
-          const u = undoMail(repos, dataDir, msg.id, now, { force: true });
-          if (u.applicationRemoved) out.applicationsRemoved++;
-          if (hadPosting && !repos.postings.get(msg.undo.createdPostingId as string))
-            out.postingsRemoved++;
-        }
-        // vagas que o e-mail criou, pela origem gravada na vaga (o resultado do e-mail some num desfazer anterior que
-        // deixou vagas para trás: 2026-11-12); as que já existiam têm outra origem e ficam
-        for (const p of repos.postings.fromMail(msg.gmailId)) {
-          const pid = p.id;
-          // candidatura criada por e-mail nesta vaga sai junto; a feita pela pessoa segura a vaga
-          const apps = repos.jobApplications.list().filter((a) => a.postingId === pid);
-          if (apps.some((a) => a.source !== "email")) continue;
-          for (const a of apps) {
-            removeJobApplication(repos, dataDir, a.id);
-            out.applicationsRemoved++;
-          }
-          removeMailPosting(repos, dataDir, pid);
-          out.postingsRemoved++;
-        }
-        repos.mail.resetForRedo(msg.id, at);
-      });
-      out.mails++;
-    } catch (e) {
-      // erro num e-mail não para os outros (revisão): ele fica como estava, com o motivo
-      out.kept.push({
-        gmailId: msg.gmailId,
-        subject: msg.subject,
-        reason: `não deu para desfazer: ${e instanceof Error ? e.message : String(e)}`,
-      });
-    }
-  }
+  for (const msg of mails) undoOne(repos, dataDir, msg, now, out);
   return out;
+}
+
+type MailRecord = NonNullable<ReturnType<Repos["mail"]["get"]>>;
+
+/** Desfaz tudo o que um e-mail criou e o devolve à fila, do começo; erro fica em `kept`. */
+function undoOne(repos: Repos, dataDir: string, msg: MailRecord, now: Date, out: MailRedoResult) {
+  const at = now.toISOString();
+  try {
+    withTransaction(repos.db, () => {
+      if (msg.status === "done" && msg.undo && !msg.undoneAt) {
+        const hadPosting = msg.undo.createdPostingId
+          ? !!repos.postings.get(msg.undo.createdPostingId)
+          : false;
+        const u = undoMail(repos, dataDir, msg.id, now, { force: true });
+        if (u.applicationRemoved) out.applicationsRemoved++;
+        if (hadPosting && !repos.postings.get(msg.undo.createdPostingId as string))
+          out.postingsRemoved++;
+      }
+      // vagas que o e-mail criou, pela origem gravada na vaga (o resultado do e-mail some num desfazer anterior que
+      // deixou vagas para trás: 2026-11-12); as que já existiam têm outra origem e ficam
+      for (const p of repos.postings.fromMail(msg.gmailId)) {
+        const pid = p.id;
+        // candidatura criada por e-mail nesta vaga sai junto; a feita pela pessoa segura a vaga
+        const apps = repos.jobApplications.list().filter((a) => a.postingId === pid);
+        if (apps.some((a) => a.source !== "email")) continue;
+        for (const a of apps) {
+          removeJobApplication(repos, dataDir, a.id);
+          out.applicationsRemoved++;
+        }
+        removeMailPosting(repos, dataDir, pid);
+        out.postingsRemoved++;
+      }
+      repos.mail.resetForRedo(msg.id, at);
+    });
+    out.mails++;
+  } catch (e) {
+    // erro num e-mail não para os outros (revisão): ele fica como estava, com o motivo
+    out.kept.push({
+      gmailId: msg.gmailId,
+      subject: msg.subject,
+      reason: `não deu para desfazer: ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
+}
+
+/**
+ * "Ler de novo este e-mail" (pedido do dono 2026-11-12, para testar a leitura nova num e-mail só): desfaz tudo o que
+ * ele criou (mesmo o já usado) e o devolve à fila do começo; a leitura agendada **não** pausa, e quem chama roda a
+ * leitura logo depois.
+ */
+export function rereadMail(
+  repos: Repos,
+  dataDir: string,
+  mailId: string,
+  now = new Date(),
+): MailRedoResult {
+  const msg = repos.mail.get(mailId);
+  if (!msg) throw new MailRedoError("not_found", "E-mail não encontrado");
+  repos.db.exec("begin immediate");
+  try {
+    if (repos.scheduled.isRunning("mail.sync") || mailRedoLocked(repos, now))
+      throw new MailRedoError("running", "A leitura de e-mails está rodando; espere ela terminar");
+    repos.settings.set(MAIL_REDO_LOCK_KEY, now.toISOString());
+    repos.db.exec("commit");
+  } catch (e) {
+    repos.db.exec("rollback");
+    throw e;
+  }
+  try {
+    const out: MailRedoResult = { mails: 0, applicationsRemoved: 0, postingsRemoved: 0, kept: [] };
+    undoOne(repos, dataDir, msg, now, out);
+    return out;
+  } finally {
+    repos.settings.set(MAIL_REDO_LOCK_KEY, null);
+  }
 }

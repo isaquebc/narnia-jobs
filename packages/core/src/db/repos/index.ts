@@ -71,6 +71,7 @@ import { type SnapshotsRepo, snapshotsRepo } from "./snapshots";
 import { type SourceFilesRepo, sourceFilesRepo } from "./source-files";
 import { type StageSuggestionsRepo, stageSuggestionsRepo } from "./stage-suggestions";
 import { type SuggestionsRepo, suggestionsRepo } from "./suggestions";
+import { type TodosRepo, todosRepo } from "./todos";
 import { type UsageEventsRepo, usageEventsRepo } from "./usage-events";
 import { type UsersRepo, usersRepo } from "./users";
 
@@ -131,6 +132,8 @@ export interface Repos {
   // F13
   recordings: RecordingsRepo;
   recordingAnalysis: RecordingAnalysisRepo;
+  // F15
+  todos: TodosRepo;
 }
 
 /** Repositórios finos em SQL puro sobre uma conexão migrada (decisão F01-2). */
@@ -202,6 +205,7 @@ export function createRepos(db: Db): Repos {
     jobApplicationEvents: jobApplicationEventsRepo(db),
     recordings: recordingsRepo(db),
     recordingAnalysis: recordingAnalysisRepo(db),
+    todos: todosRepo(db),
     scheduled: scheduledRepo(db),
     mail: mailRepo(db),
     mailSenders: mailSendersRepo(db),

@@ -110,6 +110,11 @@ import type {
   ScheduledTaskPatch,
   SnapshotsListResponseSchema,
   SuggestionsListResponse,
+  TodoCreate,
+  TodoItem,
+  TodoListResponse,
+  TodoMove,
+  TodoPatch,
   TrustedDomain,
   TrustTag,
   User,
@@ -560,6 +565,35 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         `/api/ingestions/${encodeURIComponent(id)}/review`,
         json(body),
       ),
+    // F15 · tarefas (kanban)
+    listTodos: (
+      f: {
+        q?: string | undefined;
+        tag?: string | undefined;
+        source?: "manual" | "email" | undefined;
+        applicationId?: string | undefined;
+        overdue?: boolean | undefined;
+      } = {},
+    ) => {
+      const qs = new URLSearchParams();
+      if (f.q) qs.set("q", f.q);
+      if (f.tag) qs.set("tag", f.tag);
+      if (f.source) qs.set("source", f.source);
+      if (f.applicationId) qs.set("applicationId", f.applicationId);
+      if (f.overdue) qs.set("overdue", "1");
+      const s = qs.toString();
+      return request<TodoListResponse>(`/api/todos${s ? `?${s}` : ""}`);
+    },
+    createTodo: (body: TodoCreate) => request<TodoItem>("/api/todos", json(body)),
+    patchTodo: (id: string, body: TodoPatch) =>
+      request<TodoItem>(`/api/todos/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    moveTodo: (id: string, body: TodoMove) =>
+      request<TodoItem>(`/api/todos/${encodeURIComponent(id)}/move`, json(body)),
+    deleteTodo: (id: string) =>
+      request<void>(`/api/todos/${encodeURIComponent(id)}`, { method: "DELETE" }),
     listJobs: () => request<{ jobs: Job[] }>("/api/jobs"),
     listScheduledTasks: () => request<{ tasks: ScheduledTask[] }>("/api/scheduled-tasks"),
     patchScheduledTask: (id: string, patch: ScheduledTaskPatch) =>
@@ -584,6 +618,14 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         postingsRemoved: number;
         kept: Array<{ gmailId: string; subject: string | null; reason: string }>;
       }>("/api/mail/redo", json({ runId })),
+    /** "Ler de novo este e-mail": aceita o id do e-mail ou o do Gmail. */
+    rereadMail: (id: string) =>
+      request<{
+        mails: number;
+        applicationsRemoved: number;
+        postingsRemoved: number;
+        kept: Array<{ gmailId: string; subject: string | null; reason: string }>;
+      }>(`/api/mail/${encodeURIComponent(id)}/reread`, { method: "POST" }),
     getWorkerSettings: () => request<WorkerSettings>("/api/settings/workers"),
     getSemanticSearch: () => request<SemanticSearchView>("/api/settings/semantic-search"),
     putSemanticSearch: (body: { enabled: boolean }) =>

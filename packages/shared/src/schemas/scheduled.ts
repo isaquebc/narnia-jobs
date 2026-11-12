@@ -12,6 +12,7 @@ export const SCHEDULED_TASK_IDS = [
   "postings.feed_archive",
   "captures.prune",
   "job_applications.archive",
+  "todos.reminders",
 ] as const;
 export const ScheduledTaskIdSchema = z.enum(SCHEDULED_TASK_IDS);
 export type ScheduledTaskId = z.infer<typeof ScheduledTaskIdSchema>;

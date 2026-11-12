@@ -19,6 +19,7 @@ import {
   type Repos,
   readGmailToken,
   redoMailRuns,
+  rereadMail,
   resolveGoogleClient,
   resolveMailReconnect,
   resolveStageSuggestionNotification,
@@ -387,6 +388,25 @@ export function gmailRoutes(deps: {
       }
     },
   );
+  // "Ler de novo este e-mail" (pedido do dono 2026-11-12): desfaz o que ele criou e lê já, com o algoritmo atual. Aceita
+  // o id do e-mail ou o do Gmail (os itens das execuções guardam o do Gmail).
+  app.post("/api/mail/:id/reread", async (c) => {
+    const id = c.req.param("id");
+    const m = deps.repos.mail.get(id) ?? deps.repos.mail.byGmailId(id);
+    if (!m) return apiError(c, 404, "not_found", "E-mail não encontrado");
+    try {
+      const r = rereadMail(deps.repos, deps.dataDir, m.id);
+      await syncMailReviewNotification(deps.repos, async (e) => {
+        deps.bus?.emit(e);
+      });
+      if (r.mails) await runSyncNow();
+      return c.json(r);
+    } catch (e) {
+      if (e instanceof MailRedoError)
+        return apiError(c, e.code === "not_found" ? 404 : 409, e.code, e.message);
+      throw e;
+    }
+  });
   // F14-2 · aprendizado do movimento de etapa: taxa de acerto e a chave do automático
   app.get("/api/mail/stage-learning", (c) => c.json(stageLearning(deps.repos)));
   app.put("/api/mail/stage-learning", validate("json", z.object({ allowed: z.boolean() })), (c) => {

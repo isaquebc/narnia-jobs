@@ -148,6 +148,27 @@ describe("F14/M5 · e-mails para revisar", () => {
     await waitFor(() => expect(applyMail).toHaveBeenCalledWith("m2", { confirm: true }));
   });
 
+  it("ler de novo: confirma, devolve à fila e avisa que está lendo", async () => {
+    const rereadMail = vi.fn(async () => ({
+      mails: 1,
+      applicationsRemoved: 0,
+      postingsRemoved: 0,
+      kept: [],
+    }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<MailReviewPage />, {
+      api: { getMailReview: async () => view, rereadMail } as never,
+    });
+    const card = await screen.findByRole("article", { name: "Recebemos sua candidatura" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ler de novo" }));
+    expect(confirm).toHaveBeenCalled();
+    expect(rereadMail).toHaveBeenCalledWith("m1");
+    expect(await within(card).findByRole("status")).toHaveTextContent(
+      "Lendo de novo; o resultado aparece em instantes.",
+    );
+    confirm.mockRestore();
+  });
+
   it("caixa vazia", async () => {
     renderWithProviders(<MailReviewPage />, {
       api: { getMailReview: async () => ({ review: [], quarantine: [] }) } as never,

@@ -155,4 +155,17 @@ describe("F14/M5 · /api/mail/review", () => {
         .status,
     ).toBe(400);
   });
+  it("ler de novo este e-mail: volta à fila do começo e roda a leitura, pelo id ou pelo do Gmail; inexistente 404", async () => {
+    t = makeTestApp();
+    const m = inReview(t, "g-reler");
+    const r = await t.api(`/api/mail/${m.id}/reread`, req("POST"));
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ mails: 1, kept: [] });
+    expect(t.repos.mail.get(m.id)).toMatchObject({ status: "pending", class: null, result: null });
+    expect(t.queue.tasks.at(-1)).toMatchObject({ queue: "scheduled", key: "mail.sync" });
+    // a leitura agendada não pausa (só o "desfazer as leituras" pausa)
+    expect(t.repos.scheduled.task("mail.sync").paused).toBe(false);
+    expect((await t.api("/api/mail/g-reler/reread", req("POST"))).status).toBe(200);
+    expect((await t.api("/api/mail/nao-existe/reread", req("POST"))).status).toBe(404);
+  });
 });

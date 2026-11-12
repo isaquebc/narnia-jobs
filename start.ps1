@@ -87,6 +87,40 @@ function Choose-Port([string] $File, [int] $Start = $script:PortStart, [int] $En
 
 function Get-AppUrl([int] $Port, [string] $Token) { return "http://127.0.0.1:$Port/?token=$Token" }
 
+# --- vigia de avisos (F15-3): notificação do Windows para tarefas e entrevistas ----------------------------------------
+# NARNIA_NOTIFY=0 desliga (a instância do Claude desliga em .env.claude). O vigia roda no Windows PowerShell
+# (powershell.exe), que carrega as notificações do Windows; fora do Windows, o pwsh (só nos testes).
+function Test-NotifyEnabled { return (Get-Setting "NARNIA_NOTIFY" "1") -eq "1" }
+function Start-Notify([string] $Api, [string] $Token, [string] $Web, [string] $State) {
+  if (-not (Test-NotifyEnabled)) { return }
+  New-Item -ItemType Directory -Force -Path $State | Out-Null
+  $pidFile = Join-Path $State "notify.pid"
+  if (Test-Path $pidFile) {
+    $old = (Get-Content -Raw $pidFile).Trim()
+    if ($old -and (Get-Process -Id $old -ErrorAction SilentlyContinue)) { return }
+  }
+  # o token vai pelo ambiente do processo filho, nunca pela linha de comando
+  $env:NARNIA_NOTIFY_API = $Api; $env:NARNIA_NOTIFY_TOKEN = $Token; $env:NARNIA_NOTIFY_WEB = $Web; $env:NARNIA_NOTIFY_STATE = $State
+  $script = Join-Path $PSScriptRoot "scripts/notify/narnia-notify.ps1"
+  $exe = if ($IsWindows -or $PSVersionTable.PSEdition -eq "Desktop") { "powershell.exe" } else { "pwsh" }
+  $p = if ($exe -eq "powershell.exe") {
+    Start-Process -FilePath $exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $script, "run") -WindowStyle Hidden -PassThru
+  } else {
+    Start-Process -FilePath $exe -ArgumentList @("-NoProfile", "-File", $script, "run") -PassThru
+  }
+  Remove-Item Env:NARNIA_NOTIFY_TOKEN -ErrorAction SilentlyContinue
+  Set-Content -Path $pidFile -Value $p.Id -NoNewline
+  Info "avisos do Windows ligados (tarefas e entrevistas). Desligar: NARNIA_NOTIFY=0 no .env"
+}
+function Stop-Notify([string] $State) {
+  $pidFile = Join-Path $State "notify.pid"
+  if (-not (Test-Path $pidFile)) { return }
+  $id = (Get-Content -Raw $pidFile).Trim()
+  if ($id) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+  Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+}
+
+
 # --- backups e restauração (F03-fix L1, incidente de 2026-10-10) ------------------------------------------------------
 function Get-DevDataHostDir { $d = if ($env:NARNIA_DEV_DATA_DIR) { $env:NARNIA_DEV_DATA_DIR } else { "/app/data" }; return "./" + ($d -replace '^/app/', '') }
 function Get-DevBackupHostDir { $d = if ($env:NARNIA_DEV_BACKUP_DIR) { $env:NARNIA_DEV_BACKUP_DIR } else { "/app/backups" }; return "./" + ($d -replace '^/app/', '') }
@@ -472,6 +506,7 @@ function Invoke-Up {
   $token = (& docker @script:ProdCompose exec -T api cat /data/.token) -join ""
   if ([string]::IsNullOrWhiteSpace($token)) { Fail "não consegui ler o token de boot em /data/.token." }
   Write-Host ""; Write-Host "  narnia-jobs está no ar:"; Write-Host ""; Write-Host "    $(Get-AppUrl $port $token.Trim())"; Write-Host ""
+  Start-Notify "http://127.0.0.1:$port" $token.Trim() "http://127.0.0.1:$port" (Join-Path $dataDir ".notify")
   if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $($script:EnvFile)." }
   else { Info "login da assinatura (uma vez): .\start.ps1 login   · diagnóstico: .\start.ps1 doctor" }
   Info "dados em $dataDir · parar: .\start.ps1 down"
@@ -479,6 +514,7 @@ function Invoke-Up {
 
 function Invoke-Down {
   Assert-Docker
+  Stop-Notify (Join-Path (Get-ProdDataHostDir) ".notify")
   if ($Rest -contains "--purge") {
     Write-Host "Isso remove também os volumes: o LOGIN da assinatura (claude-auth) e a fila (redis-data)."
     $answer = Read-Host "A pasta de dados NÃO é apagada. Continuar? [s/N]"
@@ -580,7 +616,7 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
     "promote"   { Invoke-Promote @Rest }
     "extension" { Invoke-Extension }
     "media"     { Invoke-Media $Rest }
-    "dev-down"  { Assert-Docker; $a = Get-DevDownArgs; & docker @a }
+    "dev-down"  { Assert-Docker; Stop-Notify (Join-Path (Get-DevDataHostDir) ".notify"); $a = Get-DevDownArgs; & docker @a }
     "logs"      { Assert-Docker; Invoke-Prod (@("logs", "-f", "--tail=100") + $Rest) }
     "status"    { Assert-Docker; Invoke-Prod @("ps") }
     "dev"       {
@@ -595,7 +631,11 @@ if (-not $env:NARNIA_PS_NO_MAIN) {
       Write-Host ""; Write-Host "  modo dev (hot reload):  $(Get-AppUrl $devPort $devToken)"
       if (Test-EnvHasValue $script:EnvFile "CLAUDE_CODE_OAUTH_TOKEN") { Info "login: usando CLAUDE_CODE_OAUTH_TOKEN do $($script:EnvFile)." }
       else { Info "login da assinatura (uma vez, vale para dev e produção): .\start.ps1 login   · mock: `$env:NARNIA_PROVIDER='mock'" }
-      & docker @script:DevCompose --profile app up @Rest
+      $devApiPort = if ($env:NARNIA_DEV_API_PORT) { $env:NARNIA_DEV_API_PORT } else { "3100" }
+      $notifyState = Join-Path (Get-DevDataHostDir) ".notify"
+      Start-Notify "http://127.0.0.1:$devApiPort" $devToken "http://127.0.0.1:$devPort" $notifyState
+      # o vigia acompanha o `up` em primeiro plano: Ctrl+C (ou o fim) para os dois
+      try { & docker @script:DevCompose --profile app up @Rest } finally { Stop-Notify $notifyState }
     }
     "test"      { Assert-Docker; Ensure-Installed; Invoke-Dev (@("pnpm", "test") + $Rest) }
     "lint"      { Assert-Docker; Ensure-Installed; Invoke-Dev (@("pnpm", "lint") + $Rest) }
