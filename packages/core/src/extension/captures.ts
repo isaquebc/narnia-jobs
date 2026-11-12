@@ -66,5 +66,26 @@ export function findLikelyPosting(
   );
 }
 
+/**
+ * A mesma vaga, com certeza (pedido do dono 2026-11-12: a página de uma vaga já salva abre a salva, sem "Salvar vaga"):
+ * mesmo link, mesmo id da vaga no link ou mesma empresa e mesmo cargo. O resto de `findLikelyPosting` só avisa.
+ */
+export function findSamePosting(
+  postings: Posting[],
+  page: { url: string; title?: string | null; company?: string | null },
+): Posting | null {
+  const byUrl = postings.find((p) => p.postingUrl && samePostingUrl(p.postingUrl, page.url));
+  if (byUrl) return byUrl;
+  const ids = new Set(jobIds(page.url));
+  if (ids.size) {
+    const byId = postings.find((p) => p.postingUrl && jobIds(p.postingUrl).some((x) => ids.has(x)));
+    if (byId) return byId;
+  }
+  const title = key(page.title);
+  const company = key(page.company);
+  if (!title || !company) return null;
+  return postings.find((p) => key(p.title) === title && key(p.company) === company) ?? null;
+}
+
 /** Sem caixa, acento, pontuação nem espaço: "Acme S.A." = "ACME SA". */
 const key = (v: string | null | undefined) => normalizeIdentityPart(v).replace(/ /g, "");

@@ -101,7 +101,12 @@ export function CaptureFollowUp({
         role="status"
         className="flex flex-col gap-2 rounded-md border border-ok/40 bg-ok/10 p-3 text-sm"
       >
-        <span>{t("capture.saved")}</span>
+        {/* a página de uma vaga já salva abre a salva (pedido do dono 2026-11-12) */}
+        <span>
+          {posting && posting.createdAt < capture.createdAt
+            ? t("capture.alreadySaved")
+            : t("capture.saved")}
+        </span>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <a
             href={`/vagas/${postingId}`}

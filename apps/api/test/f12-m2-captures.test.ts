@@ -138,7 +138,7 @@ describe("F12/M2 · captura de vaga pela extensão", () => {
     expect(t.repos.postings.list()).toHaveLength(1);
   });
 
-  it("parece uma vaga já salva: mesmo link (sem o rastreio) ou mesma empresa e cargo", async () => {
+  it('a mesma vaga já salva (mesmo link sem o rastreio, ou mesma empresa e cargo) abre a salva, sem "Salvar vaga"; a descrição que faltava vem da página', async () => {
     t = makeTestApp();
     const saved = t.repos.postings.create({
       title: "Outra coisa",
@@ -147,17 +147,32 @@ describe("F12/M2 · captura de vaga pela extensão", () => {
     });
     const token = await device(t);
     const a = await capture(t, token, withJsonLd, "https://vagas.example/123?utm_source=linkedin");
-    expect((await get(t, a.body.id)).capture.duplicate).toEqual({
-      id: saved.id,
-      title: "Outra coisa",
-      company: "Outra",
+    expect((await get(t, a.body.id)).capture).toMatchObject({
+      postingId: saved.id,
+      duplicate: null,
     });
+    // vaga sem descrição (do e-mail, link que não abriu): a página completa
+    expect(t.repos.postings.get(saved.id)?.jdText).toContain("Kafka e PostgreSQL");
     const same = t.repos.postings.create({
       title: "Engenheira Backend Senior",
       company: "ACME Pagamentos",
     });
     const b = await capture(t, token, withJsonLd, "https://outro.example/x");
-    expect((await get(t, b.body.id)).capture.duplicate).toMatchObject({ id: same.id });
+    expect((await get(t, b.body.id)).capture.postingId).toBe(same.id);
+  });
+
+  it('parece a vaga salva, sem certeza (cargo encurtado): só avisa, e "Salvar vaga" continua', async () => {
+    t = makeTestApp();
+    const near = t.repos.postings.create({
+      title: "Engenheira Backend",
+      company: "Acme Pagamentos",
+    });
+    const token = await device(t);
+    const a = await capture(t, token, withJsonLd, "https://outro.example/y");
+    expect((await get(t, a.body.id)).capture).toMatchObject({
+      postingId: null,
+      duplicate: { id: near.id },
+    });
   });
 
   it("valida a entrada: sem HTML, link que não é http(s), sem autenticação", async () => {

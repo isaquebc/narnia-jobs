@@ -68,7 +68,7 @@ async function pair(page: Page, extensionId: string) {
   await options.close();
 }
 
-test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → análise → CV e carta → aviso de já salva", async () => {
+test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → análise → CV e carta → a mesma vaga abre a salva", async () => {
   test.setTimeout(240_000);
   await freshStart("engineer");
   const ext = join(dir, "dist");
@@ -144,25 +144,17 @@ test("F12/E2E-02 extensão: página de vaga → janela → Salvar vaga → anál
   await page.goto("/vagas");
   await expect(page.getByText("Engenheira Backend Sênior").first()).toBeVisible();
 
-  // de novo na mesma vaga: a mesma janela, com o aviso de vaga já salva (mesmo link, sem o rastreio)
+  // de novo na mesma vaga: a mesma janela abre a salva direto (mesmo link, sem o rastreio), com a análise que ela já
+  // tem, sem "Salvar vaga" nem outra vaga (pedido do dono 2026-11-12)
   const pagesBefore = context.pages().length;
   const firstUrl = popup.url();
   expect(await click()).toBe("window");
   await expect.poll(() => popup.url()).not.toBe(firstUrl);
   await popup.waitForURL(/\/candidatura\?captura=/);
-  await expect(
-    popup.getByText(/Parece a vaga "Engenheira Backend Sênior · Acme Pagamentos"/),
-  ).toBeVisible();
-  expect(context.pages().length).toBe(pagesBefore);
-
-  // salvar assim mesmo: a extração acha a salva pelo link e a janela pede a decisão antes de analisar; descartar
-  // volta para a salva, com a análise que ela já tem
-  await popup.getByRole("button", { name: "Salvar vaga" }).click();
-  const dialog = popup.getByRole("dialog", { name: "Vaga repetida?" });
-  await expect(dialog).toBeVisible({ timeout: 60_000 });
-  await expect(popup.getByText(/A análise começa depois que você decidir/)).toBeVisible();
-  await dialog.getByRole("button", { name: "Descartar esta vaga" }).click();
+  await expect(popup.getByText("Esta vaga já estava salva no narnia.")).toBeVisible();
   await expect(popup.getByRole("region", { name: "Análise da vaga" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Salvar vaga" })).toHaveCount(0);
+  expect(context.pages().length).toBe(pagesBefore);
   await page.goto("/vagas");
   await expect(page.getByText("Engenheira Backend Sênior")).toHaveCount(1);
 

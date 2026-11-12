@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { shellApi } from "../f03/shell-api";
@@ -13,7 +13,8 @@ const capture = (over: Record<string, unknown> = {}) => ({
   id: "c1",
   url: "https://vagas.example/123",
   title: "Vagas",
-  createdAt: "2026-10-23T12:00:00.000Z",
+  // antes da vaga (2026-10-14): salvar por esta captura cria a vaga depois dela
+  createdAt: "2026-10-14T11:00:00.000Z",
   postingId: null,
   duplicate: null,
   applicationId: null,
@@ -81,12 +82,28 @@ describe("F12/M2 · janela da extensão: vaga", () => {
     await userEvent.click(screen.getByRole("button", { name: "Salvar vaga" }));
     expect(saveCapturePosting).toHaveBeenCalledWith("c1");
     const status = await screen.findByRole("status");
-    expect(status).toHaveTextContent(/Vaga salva/);
+    expect(status).toHaveTextContent("Vaga salva no narnia.");
     // salvar também analisa: a janela acompanha a extração (pedido do dono, 2026-10-23)
     expect(await screen.findByText(/Lendo os detalhes da vaga/)).toBeInTheDocument();
     const open = within(status).getByRole("link", { name: "Abrir a vaga no narnia" });
     expect(open).toHaveAttribute("href", "/vagas/p1");
     expect(open).toHaveAttribute("target", "_blank");
+  });
+
+  it('a mesma vaga já salva: a janela abre a salva direto, sem "Salvar vaga" (pedido do dono 2026-11-12)', async () => {
+    renderApp({
+      api: {
+        ...shellApi,
+        getExtensionCapture: async () => ({
+          capture: capture({ postingId: "p1", createdAt: "2026-11-12T12:00:00.000Z" }),
+        }),
+        ...followUpApi,
+      },
+      initialUrl: "/candidatura?captura=c1",
+    });
+    const status = await screen.findByRole("status");
+    await waitFor(() => expect(status).toHaveTextContent("Esta vaga já estava salva no narnia."));
+    expect(screen.queryByRole("button", { name: "Salvar vaga" })).toBeNull();
   });
 
   it("parece uma vaga já salva: avisa e oferece abrir a salva, sem impedir salvar", async () => {

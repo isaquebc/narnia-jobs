@@ -5,6 +5,7 @@ import {
   canonicalUrl,
   type ExtensionCaptureRecord,
   findLikelyPosting,
+  findSamePosting,
   isDeviceToken,
   isVersionActive,
   MIN_APPLICATION_FIELDS,
@@ -59,6 +60,50 @@ export function extensionRoutes(deps: {
     return isDeviceToken(bearer) ? deps.repos.extension.findByToken(bearer) : null;
   };
   let failures: number[] = [];
+
+  /**
+   * Liga a captura a uma vaga já salva: a descrição que faltava nela vem da página (vaga do e-mail cujo link não abriu)
+   * e a extração roda de novo; sem análise ainda, ela é pedida, como no "Salvar vaga".
+   */
+  const attach = async (captureId: string, posting: Posting, text: string, html: string | null) => {
+    let job = null;
+    if (!posting.jdText && text) {
+      deps.repos.postings.update(posting.id, { jdText: text }, { source: "user" });
+      if (posting.linkStatus !== "ok") deps.repos.postings.setLinkStatus(posting.id, "ok");
+      if (html) {
+        const rel = join("snapshots", "postings", `${posting.id}.html`);
+        mkdirSync(join(deps.dataDir, "snapshots", "postings"), { recursive: true });
+        writeFileSync(join(deps.dataDir, rel), html);
+        deps.repos.postings.setRawPath(posting.id, rel);
+      }
+      if (deps.queue)
+        job = await enqueueExtraction(
+          { repos: deps.repos, queue: deps.queue, dataDir: deps.dataDir, bus: deps.bus },
+          deps.repos.postings.get(posting.id) as Posting,
+        );
+    }
+    deps.repos.postings.touchInteraction(posting.id);
+    deps.repos.extension.linkCapturePosting(captureId, posting.id);
+    if (!deps.repos.jobAnalyses.list(posting.id).length) {
+      deps.repos.extension.requestCaptureAnalysis(captureId);
+      // a análise já começou por outra captura desta vaga: a janela acompanha a mesma conversa, sem abrir outra
+      const running = deps.repos.db
+        .prepare(
+          "select analysis_session_id as id from extension_capture where posting_id = ? and analysis_session_id is not null order by created_at desc limit 1",
+        )
+        .get(posting.id) as { id: string } | undefined;
+      const fresh = deps.repos.postings.get(posting.id);
+      if (running) deps.repos.extension.setCaptureAnalysis(captureId, { sessionId: running.id });
+      else if (
+        fresh &&
+        fresh.status !== "extracting" &&
+        !(fresh.duplicate && fresh.duplicate.decision === null)
+      )
+        startAnalysis(captureId, posting.id);
+    }
+    deps.bus?.emit({ type: "posting.updated", postingId: posting.id });
+    return job;
+  };
 
   app.post("/api/extension/pairing", (c) => c.json(deps.repos.extension.createPairing()));
 
@@ -137,6 +182,15 @@ export function extensionRoutes(deps: {
           fields: b.form.fields,
         });
         if (deps.queue) await enqueueLocate(deps.queue, form.id);
+      } else if (read.ok) {
+        // a página de uma vaga já salva abre a salva (pedido do dono 2026-11-12), sem "Salvar vaga"; a descrição que
+        // faltava nela (vaga do e-mail, link que não abriu) vem desta página
+        const same = findSamePosting(deps.repos.postings.list(), {
+          url: b.url,
+          title: read.title,
+          company: read.company,
+        });
+        if (same) await attach(capture.id, same, read.text, b.html);
       }
       return c.json({ id: capture.id }, 201);
     },
@@ -207,25 +261,10 @@ export function extensionRoutes(deps: {
     const fromMail = canonical
       ? deps.repos.postings
           .findByCanonicalUrl(canonical)
-          .find((x) => x.source === "email" && x.linkStatus === "failed")
+          .find((x) => x.source === "email" && !x.jdText)
       : undefined;
     if (fromMail && p.text) {
-      deps.repos.postings.update(fromMail.id, { jdText: p.text }, { source: "user" });
-      deps.repos.postings.setLinkStatus(fromMail.id, "ok");
-      deps.repos.postings.touchInteraction(fromMail.id);
-      if (html) {
-        const rel = join("snapshots", "postings", `${fromMail.id}.html`);
-        mkdirSync(join(deps.dataDir, "snapshots", "postings"), { recursive: true });
-        writeFileSync(join(deps.dataDir, rel), html);
-        deps.repos.postings.setRawPath(fromMail.id, rel);
-      }
-      const job = await enqueueExtraction(
-        { repos: deps.repos, queue: deps.queue, dataDir: deps.dataDir, bus: deps.bus },
-        deps.repos.postings.get(fromMail.id) as Posting,
-      );
-      deps.repos.extension.linkCapturePosting(capture.id, fromMail.id);
-      deps.repos.extension.requestCaptureAnalysis(capture.id);
-      deps.bus?.emit({ type: "posting.updated", postingId: fromMail.id });
+      const job = await attach(capture.id, fromMail, p.text, html);
       return c.json({ posting: deps.repos.postings.get(fromMail.id), job, completed: true }, 200);
     }
     const r = await intakePosting(

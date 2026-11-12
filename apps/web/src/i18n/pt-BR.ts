@@ -1839,6 +1839,7 @@ export const ptBR = {
     save: "Salvar vaga",
     saving: "Salvando…",
     saved: "Vaga salva no narnia.",
+    alreadySaved: "Esta vaga já estava salva no narnia.",
     description: "Descrição lida da página",
     open: "Abrir a vaga no narnia",
     duplicate: 'Parece a vaga "{name}" já salva.',
