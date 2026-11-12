@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { browserUserAgent, COOKIE_ACCEPT, requestDecision } from "../src/postings/browser";
+import {
+  browserUserAgent,
+  COOKIE_ACCEPT,
+  requestDecision,
+  SHOW_MORE,
+} from "../src/postings/browser";
 import {
   extractPosting,
   fetchPostingPage,
@@ -269,6 +274,19 @@ ${mod("Your qualifications and skills", "<ul><li>7+ years of experience in softw
     });
     const cf = `<html><head><title>Just a moment...</title></head><body><main><article><p>${"Verifying you are human. This may take a few seconds. ".repeat(6)}</p></article></main></body></html>`;
     expect(extractPosting(cf, "https://x.com/")).toMatchObject({ ok: false, code: "blocked_page" });
+    // Glassdoor ao navegador headless (2026-11-12): passava como vaga
+    const gd = `<html><head><title>Um momento…</title></head><body><main><h1>Somente humanos</h1><p>${"O Glassdoor é baseado em contribuições de funcionários e candidatos reais. Usamos sistemas avançados para manter nosso site seguro. ".repeat(3)}</p></main></body></html>`;
+    expect(extractPosting(gd, "https://x.com/", "browser")).toMatchObject({
+      ok: false,
+      code: "blocked_page",
+    });
+  });
+
+  it('botões de "ver mais" da descrição em pt e en; candidatar e links ficam de fora', () => {
+    for (const t of ["Ver mais", "Mostrar mais", "Show more", "See more", "Leia mais"])
+      expect(SHOW_MORE.test(t), t).toBe(true);
+    for (const t of ["Candidatar-se", "Ver mais vagas", "Mais"])
+      expect(SHOW_MORE.test(t), t).toBe(false);
   });
 
   it("robots.txt e rede interna nunca chegam ao navegador", async () => {

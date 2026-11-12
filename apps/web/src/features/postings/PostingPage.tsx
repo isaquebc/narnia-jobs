@@ -24,6 +24,9 @@ import { PostingForm } from "./PostingForm";
 import { ContactsCard, DuplicateDialog, NotesCard } from "./PostingSections";
 import { postingWho, statusTone } from "./PostingsPage";
 
+/** Quadro de vagas da Coders: o alerta dela não traz link por vaga (2026-11-12). */
+const CODERS_BOARD = "https://app.coders.com.br/vagas";
+
 /**
  * Página da vaga (F06 §1.3, M6): duplicata pendente (F06-9), análise do recrutador com validade (F06-10), pré-análise
  * sem tokens, todos os campos editáveis com a origem de cada um, contatos e notas. Link para a vaga oficial (`postingUrl`)
@@ -106,6 +109,30 @@ export function PostingPage({
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
               {t("postings.openOriginal")}
+            </a>
+          ) : null}
+          {/* vaga do e-mail (pedido do dono 2026-11-12): o e-mail no Gmail; a Coders não manda link por vaga, só o
+              quadro de vagas dela */}
+          {posting.source === "email" && isHttpUrl(posting.sourceRef?.mailUrl ?? null) ? (
+            <a
+              href={posting.sourceRef?.mailUrl ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.openMail")}
+            </a>
+          ) : null}
+          {posting.source === "email" &&
+          posting.sourceRef?.platform === "coders" &&
+          !isHttpUrl(posting.postingUrl) ? (
+            <a
+              href={CODERS_BOARD}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass({ variant: "outline", size: "sm" })}
+            >
+              {t("postings.openCodersBoard")}
             </a>
           ) : null}
           {posting.jdText ? (

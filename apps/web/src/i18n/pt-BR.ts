@@ -2145,6 +2145,8 @@ export const ptBR = {
       saved: "Vaga salva.",
     },
     openOriginal: "Ver vaga oficial",
+    openMail: "Ver o e-mail",
+    openCodersBoard: "Procurar na Coders",
     reextract: "Extrair de novo com o modelo",
     remove: "Apagar vaga",
     removeConfirm: "Apagar esta vaga, os contatos, as notas e as análises?",

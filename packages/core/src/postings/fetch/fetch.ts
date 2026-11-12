@@ -64,7 +64,9 @@ export type PageRender = (
 
 const MAX_REDIRECTS = 3;
 const BLOCKED_PAGE =
-  /\b(blocked|bloquead[oa]|captcha|access denied|acesso negado|just a moment|verify(ing)? you are (a )?human|are you a robot|unusual traffic|tráfego incomum)\b/i;
+  /\b(blocked|bloquead[oa]|captcha|access denied|acesso negado|just a moment|verify(ing)? you are (a )?human|are you a robot|unusual traffic|tráfego incomum|somente humanos|only humans|help us protect)\b/i;
+/** Título da checagem anti-robô em pt (Glassdoor ao navegador headless, 2026-11-12: "Um momento…" + "Somente humanos"). */
+const BLOCKED_TITLE = /^\s*(um momento|just a moment)\b/i;
 const MIN_TEXT = 200;
 export const POSTING_USER_AGENT = "narnia-jobs/0.1 (+https://github.com/isaquebc/narnia-jobs)";
 
@@ -296,7 +298,10 @@ export function extractPosting(
     text = main;
   // página de bloqueio, captcha ou checagem anti-robô (curta e com o aviso no título ou no texto) não é a vaga
   const pageTitle = document.querySelector("title")?.textContent ?? "";
-  if (text.length < 2000 && BLOCKED_PAGE.test(`${pageTitle}\n${text.slice(0, 600)}`))
+  if (
+    text.length < 2000 &&
+    (BLOCKED_TITLE.test(pageTitle) || BLOCKED_PAGE.test(`${pageTitle}\n${text.slice(0, 600)}`))
+  )
     return fail(
       "blocked_page",
       "O site bloqueou a leitura automática desta página. Cole o texto da vaga.",

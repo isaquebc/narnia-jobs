@@ -35,6 +35,13 @@ export const COOKIE_ACCEPT =
   /^\s*(aceitar( todos)?( os cookies)?|aceito|accept( all)?( cookies)?|concordo|i agree|agree|allow all|permitir todos|ok|entendi|got it)\s*[.!]?\s*$/i;
 
 /**
+ * Botão que abre a descrição cortada ("Ver mais" no Glassdoor, pedido do dono 2026-11-12). Só botão, nunca link: não
+ * navega para outra página.
+ */
+export const SHOW_MORE =
+  /^\s*(ver mais|mostrar mais|exibir mais|leia mais|ler mais|show more|see more|read more|view more)\s*$/i;
+
+/**
  * User-agent de um Chrome comum da mesma versão, sem "HeadlessChrome": CDNs anti-robô (Akamai, na Prisma Consultoria) derrubam
  * a conexão do headless (`ERR_HTTP2_PROTOCOL_ERROR`). A busca continua sendo uma página pedida pelo usuário, com o
  * robots.txt respeitado antes (2026-10-15).
@@ -80,6 +87,15 @@ export async function renderInBrowser(
       await accept.click({ timeout: 2_000 }).catch(() => undefined);
       await page.waitForLoadState("networkidle", { timeout: 4_000 }).catch(() => undefined);
     }
+    // descrição cortada: abre cada "Ver mais" (no máximo 3) antes de ler a página
+    const more = page.getByRole("button", { name: SHOW_MORE });
+    const n = Math.min(await more.count().catch(() => 0), 3);
+    for (let i = 0; i < n; i++) {
+      const b = more.nth(i);
+      if (await b.isVisible().catch(() => false))
+        await b.click({ timeout: 2_000 }).catch(() => undefined);
+    }
+    if (n) await page.waitForLoadState("networkidle", { timeout: 4_000 }).catch(() => undefined);
     const finalUrl = page.url();
     if ((await requestDecision(finalUrl, "document", opts.guard)) === "abort")
       return { ok: false, message: "A página redirecionou para um endereço interno." };

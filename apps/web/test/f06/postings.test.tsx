@@ -132,6 +132,35 @@ describe("F06/M6 · Vagas", () => {
     );
   });
 
+  it("vaga do e-mail: link para o e-mail; da Coders (sem link por vaga), também o quadro de vagas dela", async () => {
+    renderApp({
+      api: api({
+        getPosting: vi.fn(async (id: string) => ({
+          posting: posting(id, {
+            source: "email",
+            postingUrl: null,
+            sourceRef: {
+              gmailId: "g1",
+              platform: "coders",
+              mailUrl: "https://mail.google.com/mail/u/0/#all/g1",
+            },
+          } as never),
+          contacts: [],
+          notes: [],
+          duplicates: [],
+        })),
+      }) as never,
+      initialUrl: "/vagas/v1",
+    });
+    const mail = await screen.findByRole("link", { name: "Ver o e-mail" });
+    expect(mail).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#all/g1");
+    expect(screen.getByRole("link", { name: "Procurar na Coders" })).toHaveAttribute(
+      "href",
+      "https://app.coders.com.br/vagas",
+    );
+    expect(screen.queryByRole("link", { name: "Ver vaga oficial" })).toBeNull();
+  });
+
   it.each([null, "javascript:alert(1)"])(
     "vaga com link %s: sem botão da vaga oficial",
     async (postingUrl) => {
