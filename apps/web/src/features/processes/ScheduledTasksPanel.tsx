@@ -93,27 +93,32 @@ function RunDetail({ runId }: { runId: string }) {
   );
 }
 
-/** Leitura do Gmail: desfaz esta execução e as seguintes e lê os e-mails de novo (pedido do dono 2026-11-11). */
-function RedoMail({
-  run,
-  running,
-  label = t("scheduled.redo"),
+/**
+ * Leitura do Gmail: desfaz esta execução e as seguintes (sem `runId`, todas) e devolve os e-mails à fila; a leitura
+ * agendada fica pausada e a pessoa clica em "Rodar agora" quando quiser (pedido do dono 2026-11-11 e 2026-11-12).
+ */
+function UndoMail({
+  runId,
+  disabled,
+  label,
+  confirm,
 }: {
-  run: ScheduledRun;
-  running: boolean;
-  label?: string;
+  runId: string | null;
+  disabled: boolean;
+  label: string;
+  confirm: string;
 }) {
-  const redo = useRedoMailRuns();
-  const r = redo.data;
+  const undo = useRedoMailRuns();
+  const r = undo.data;
   return (
     <div className="flex flex-col gap-1">
       <Button
         size="sm"
         variant="outline"
         className="self-start"
-        disabled={running || run.status === "running" || redo.isPending}
+        disabled={disabled || undo.isPending}
         onClick={() => {
-          if (window.confirm(t("scheduled.redoConfirm"))) redo.mutate(run.id);
+          if (window.confirm(confirm)) undo.mutate(runId);
         }}
       >
         {label}
@@ -143,25 +148,25 @@ function RedoMail({
           ) : null}
         </div>
       ) : null}
-      {redo.error ? <p className="text-xs text-danger">{(redo.error as Error).message}</p> : null}
+      {undo.error ? <p className="text-xs text-danger">{(undo.error as Error).message}</p> : null}
     </div>
   );
 }
 
-/** Leitura que mexeu em e-mails (baixou, avaliou ou processou): o alvo do atalho no cartão. */
+/** Leitura que mexeu em e-mails (baixou, avaliou ou processou): só nela o botão tem o que desfazer. */
 const touchedMail = (r: ScheduledRun) =>
   ["fetched", "assessed", "digested"].some((k) => (r.counts[k] ?? 0) > 0);
 
-/** Atalho no cartão da Leitura do Gmail: desfaz e refaz a última leitura com e-mails, sem abrir o histórico. */
-function RedoLastMail({ taskId, running }: { taskId: string; running: boolean }) {
+/** Atalho no cartão da Leitura do Gmail: desfaz todas as leituras, sem abrir o histórico. */
+function UndoAllMail({ taskId, running }: { taskId: string; running: boolean }) {
   const { data: runs = [] } = useScheduledRuns(taskId, true);
-  const last = runs.find((r) => r.status !== "running" && touchedMail(r));
-  if (!last) return null;
+  if (!runs.some(touchedMail)) return null;
   return (
-    <RedoMail
-      run={last}
-      running={running}
-      label={t("scheduled.redoLast", { when: when(last.startedAt) })}
+    <UndoMail
+      runId={null}
+      disabled={running}
+      label={t("scheduled.undoAll")}
+      confirm={t("scheduled.undoAllConfirm")}
     />
   );
 }
@@ -191,7 +196,14 @@ function RunHistory({ taskId, running }: { taskId: string; running: boolean }) {
           </button>
           {/* visível sem abrir a execução: escondido no detalhe, o dono não achou (2026-11-12) */}
           {/* só nas leituras que mexeram em e-mails: nas vazias o botão não desfazia nada (2026-11-12) */}
-          {taskId === "mail.sync" && touchedMail(r) ? <RedoMail run={r} running={running} /> : null}
+          {taskId === "mail.sync" && touchedMail(r) ? (
+            <UndoMail
+              runId={r.id}
+              disabled={running || r.status === "running"}
+              label={t("scheduled.redo")}
+              confirm={t("scheduled.redoConfirm")}
+            />
+          ) : null}
           {open === r.id ? <RunDetail runId={r.id} /> : null}
         </li>
       ))}
@@ -291,7 +303,7 @@ function TaskCard({ task }: { task: ScheduledTask }) {
           {t("scheduled.minimum", { n: task.minIntervalMinutes })}
         </p>
       ) : null}
-      {task.id === "mail.sync" ? <RedoLastMail taskId={task.id} running={task.running} /> : null}
+      {task.id === "mail.sync" ? <UndoAllMail taskId={task.id} running={task.running} /> : null}
       <div>
         <Button
           size="sm"

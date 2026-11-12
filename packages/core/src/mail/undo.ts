@@ -1,6 +1,19 @@
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import type { Repos } from "../db";
 import { withTransaction } from "../db/open";
 import { removeJobApplication } from "../job-applications/entries";
+
+/** Apaga uma vaga criada por e-mail com os arquivos dos documentos dela (as linhas caem em cascata). */
+export function removeMailPosting(repos: Repos, dataDir: string, id: string): void {
+  for (const n of repos.postingNotes.list(id))
+    repos.notifications.resolveSubject("posting_note", n.id, ["posting.note_pending"]);
+  for (const d of repos.documents.list({ postingId: id })) {
+    repos.notifications.resolveSubject("document", d.id);
+    rmSync(join(dataDir, "documents", d.id), { recursive: true, force: true });
+  }
+  repos.postings.remove(id);
+}
 
 export class MailUndoError extends Error {
   constructor(
@@ -41,6 +54,11 @@ export function undoMail(
   dataDir: string,
   mailId: string,
   now = new Date(),
+  /**
+   * Desfazer as leituras (pedido do dono 2026-11-12, "tudo deve ser limpo"): apaga a candidatura e a vaga criadas pelo
+   * e-mail mesmo com o que a pessoa acrescentou depois. Vaga que já existia antes do e-mail nunca sai.
+   */
+  opts: { force?: boolean } = {},
 ): MailUndoResult {
   const msg = repos.mail.get(mailId);
   if (!msg) throw new MailUndoError("not_found", "E-mail não encontrado");
@@ -54,7 +72,7 @@ export function undoMail(
   const touched = new Set<string>();
 
   // candidatura criada pelo e-mail: só apaga se ela tem apenas o que o e-mail criou (revisão do M6, #5)
-  if (u.createdApplicationId && repos.jobApplications.get(u.createdApplicationId)) {
+  if (!opts.force && u.createdApplicationId && repos.jobApplications.get(u.createdApplicationId)) {
     const id = u.createdApplicationId;
     const own = new Set(u.entryIds ?? []);
     const details: string[] = [];
@@ -149,15 +167,12 @@ export function undoMail(
       applicationRemoved = true;
     }
     const pid = u.createdPostingId;
-    if (
-      pid &&
-      repos.postings.get(pid) &&
-      !repos.jobApplications.latestForPosting(pid) &&
-      !repos.documents.list({ postingId: pid }).length &&
-      !repos.jobAnalyses.latest(pid)
-    )
-      repos.postings.remove(pid);
-    else if (pid && repos.postings.get(pid)) skipped.push("vaga (tem documentos ou análise)");
+    if (pid && repos.postings.get(pid) && !repos.jobApplications.latestForPosting(pid)) {
+      if (opts.force) removeMailPosting(repos, dataDir, pid);
+      else if (!repos.documents.list({ postingId: pid }).length && !repos.jobAnalyses.latest(pid))
+        repos.postings.remove(pid);
+      else skipped.push("vaga (tem documentos ou análise)");
+    } else if (pid && repos.postings.get(pid)) skipped.push("vaga (tem outra candidatura)");
     repos.mail.markUndone(mailId, at);
     return {
       applicationId: applicationRemoved ? null : (result?.applicationId ?? null),

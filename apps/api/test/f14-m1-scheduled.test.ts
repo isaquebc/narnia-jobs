@@ -110,18 +110,19 @@ describe("F14/M1 · /api/scheduled-tasks", () => {
     expect((await t.api("/api/scheduled-runs/nope")).status).toBe(404);
   });
 
-  it("desfazer e refazer a leitura de e-mails: devolve o resumo e já pede uma leitura nova; outra tarefa ou execução inexistente recusa", async () => {
+  it("desfazer a leitura de e-mails: devolve o resumo e pausa a leitura agendada (sem ler de novo); outra tarefa ou execução inexistente recusa", async () => {
     t = makeTestApp();
     const at = "2026-11-11T12:00:00.000Z";
     const mailRun = t.repos.scheduled.startRun({ taskId: "mail.sync", trigger: "manual", at });
     t.repos.scheduled.finishRun(mailRun, { status: "done", counts: {}, error: null, at });
     const r = await t.api("/api/mail/redo", json("POST", { runId: mailRun }));
     expect(r.status).toBe(200);
-    expect(await r.json()).toMatchObject({ mails: 0, kept: [], enqueued: true });
-    expect(t.queue.tasks.at(-1)).toMatchObject({
-      key: "mail.sync",
-      payload: { trigger: "manual" },
-    });
+    expect(await r.json()).toMatchObject({ mails: 0, kept: [] });
+    // nada lê de novo sozinho (pedido do dono 2026-11-12): a leitura agendada fica pausada
+    expect(t.queue.tasks.some((q) => q.key === "mail.sync")).toBe(false);
+    expect(t.repos.scheduled.task("mail.sync").paused).toBe(true);
+    // sem leitura: todas
+    expect((await t.api("/api/mail/redo", json("POST", { runId: null }))).status).toBe(200);
     const other = t.repos.scheduled.startRun({ taskId: "captures.prune", trigger: "manual", at });
     t.repos.scheduled.finishRun(other, { status: "done", counts: {}, error: null, at });
     expect((await t.api("/api/mail/redo", json("POST", { runId: other }))).status).toBe(422);

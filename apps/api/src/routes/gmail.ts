@@ -363,19 +363,18 @@ export function gmailRoutes(deps: {
       throw e;
     }
   });
-  // Desfazer e refazer a leitura (pedido do dono 2026-11-11): a execução escolhida e as seguintes voltam, os e-mails
-  // voltam para a fila e uma leitura nova começa na hora
+  // Desfazer a leitura (pedido do dono 2026-11-11 e 2026-11-12): a execução escolhida e as seguintes (sem `runId`,
+  // todas) voltam, os e-mails voltam para a fila e a leitura agendada fica pausada; a pessoa lê de novo quando quiser
   app.post(
     "/api/mail/redo",
-    validate("json", z.object({ runId: z.string().min(1) })),
+    validate("json", z.object({ runId: z.string().min(1).nullable() })),
     async (c) => {
       try {
         const r = redoMailRuns(deps.repos, deps.dataDir, c.req.valid("json").runId);
         await syncMailReviewNotification(deps.repos, async (e) => {
           deps.bus?.emit(e);
         });
-        const queued = await runSyncNow();
-        return c.json({ ...r, enqueued: queued?.enqueued ?? false });
+        return c.json(r);
       } catch (e) {
         if (e instanceof MailRedoError)
           return apiError(

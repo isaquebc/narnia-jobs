@@ -28,9 +28,9 @@ import { seedFixture } from "../../src/testing/profile-fixtures";
 import { rawMail } from "./fixtures";
 
 /**
- * Pedido do dono 2026-11-11 · "desfazer a última leitura de e-mails e refazer", para testar o mecanismo novo: tudo que
- * as leituras escolhidas fizeram volta (candidaturas, notas, vagas do feed sem interação) e os e-mails voltam para a
- * fila; a próxima leitura processa de novo. O que a pessoa já usou fica, e o e-mail dele também.
+ * Pedido do dono 2026-11-11 e 2026-11-12 · desfazer as leituras de e-mails para testar o mecanismo novo: tudo que as
+ * leituras escolhidas criaram sai (mesmo o que a pessoa usou), menos as vagas que já existiam antes; os e-mails voltam
+ * para a fila e a leitura agendada fica pausada até a pessoa clicar em "Rodar agora".
  */
 const client: GoogleClient = { clientId: "id-123456789", clientSecret: "s", source: "env" };
 const T = Date.parse("2026-11-11T12:00:00Z");
@@ -121,22 +121,26 @@ describe("desfazer e refazer a leitura dos e-mails", () => {
       services: { classifyMail: classify },
     });
 
-  it("desfaz candidatura e vagas sem interação, devolve os e-mails à fila; a próxima leitura refaz igual", async () => {
+  it("apaga tudo o que a leitura criou, mesmo o que a pessoa usou; e-mails voltam à fila e a leitura fica pausada", async () => {
     const run = await sync();
     expect(repos.jobApplications.list()).toHaveLength(1);
-    // o feed tem as duas do alerta (a vaga da candidatura também vem do e-mail, já vista)
     const alertFeed = () =>
       repos.postings.feed().filter((p) => p.sourceRef?.platform === "linkedin");
-    const feed = alertFeed();
-    expect(feed).toHaveLength(2);
-    // a pessoa abriu uma das vagas do feed: ela fica
-    const used = feed.find((p) => p.company === "Globex")?.id as string;
-    repos.postings.touchInteraction(used);
+    expect(alertFeed()).toHaveLength(2);
+    // a pessoa abriu uma vaga e anotou na candidatura: sai também (pedido do dono 2026-11-12, "tudo deve ser limpo")
+    repos.postings.touchInteraction(alertFeed()[0]?.id as string);
+    const app = repos.jobApplications.list()[0] as { id: string };
+    addJobApplicationEntry(repos, dataDir, app.id, {
+      occurredOn: "2026-11-10",
+      body: "liguei para o RH",
+      files: [],
+    });
 
     const r = redoMailRuns(repos, dataDir, run.id, new Date(T));
-    expect(r).toMatchObject({ mails: 2, applicationsRemoved: 1, postingsRemoved: 1, kept: [] });
+    expect(r).toMatchObject({ mails: 2, applicationsRemoved: 1, kept: [] });
+    expect(r.postingsRemoved).toBe(3);
     expect(repos.jobApplications.list()).toHaveLength(0);
-    expect(repos.postings.feed().map((p) => p.id)).toEqual([used]);
+    expect(repos.postings.list().filter((p) => p.source === "email")).toHaveLength(0);
     for (const id of ["alerta", "confirma"])
       expect(repos.mail.byGmailId(id)).toMatchObject({
         status: "pending",
@@ -145,42 +149,38 @@ describe("desfazer e refazer a leitura dos e-mails", () => {
         undo: null,
         undoneAt: null,
       });
+    // nada lê de novo sozinho: a leitura agendada fica pausada e "Rodar agora" lê
+    expect(repos.scheduled.task("mail.sync").paused).toBe(true);
 
     await sync();
     expect(repos.jobApplications.list()).toHaveLength(1);
     expect(alertFeed()).toHaveLength(2);
-    expect(alertFeed().some((p) => p.id === used)).toBe(true);
     expect(repos.mail.byGmailId("confirma")?.status).toBe("done");
   });
 
-  it("candidatura em que a pessoa já acrescentou algo: o e-mail dela fica como está (e é avisado)", async () => {
-    const run = await sync();
-    const app = repos.jobApplications.list()[0] as { id: string };
-    addJobApplicationEntry(repos, dataDir, app.id, {
-      occurredOn: "2026-11-10",
-      body: "liguei para o RH",
-      files: [],
+  it("vaga que já existia antes da leitura fica; sai só a candidatura que o e-mail criou nela", async () => {
+    const before = repos.postings.create({ company: "Acme", title: "Dev Backend" } as never, {
+      source: "user",
     });
+    repos.postings.setOrigin(before.id, { source: "extension" });
+    const run = await sync();
+    const app = repos.jobApplications.list()[0];
+    expect(app?.postingId).toBe(before.id);
+
     const r = redoMailRuns(repos, dataDir, run.id, new Date(T));
-    expect(r.kept).toEqual([
-      expect.objectContaining({
-        subject: "Recebemos sua candidatura",
-        reason: expect.stringMatching(/nota/),
-      }),
-    ]);
-    expect(repos.jobApplications.get(app.id)).not.toBeNull();
-    expect(repos.mail.byGmailId("confirma")?.status).toBe("done");
-    expect(repos.mail.byGmailId("alerta")?.status).toBe("pending");
+    expect(r.applicationsRemoved).toBe(1);
+    expect(repos.jobApplications.list()).toHaveLength(0);
+    expect(repos.postings.get(before.id)).not.toBeNull();
   });
 
-  it("desde uma leitura antiga: pega as seguintes também; leitura de outra tarefa ou inexistente: erro", async () => {
+  it("desde uma leitura antiga: pega as seguintes também; sem leitura, todas; outra tarefa ou inexistente: erro", async () => {
     const first = await sync();
     fakeGmailAdd(state, {
       id: "novo",
       internalDate: T - 3_600_000,
       raw: rawMail({ from: "RH Acme <rh@acme.example>", subject: "Novidades" }).toString(),
     });
-    await runScheduledTask({
+    const second = await runScheduledTask({
       repos,
       dataDir,
       taskId: "mail.sync",
@@ -195,7 +195,9 @@ describe("desfazer e refazer a leitura dos e-mails", () => {
         }),
       services: { classifyMail: classify },
     });
+    expect(redoMailRuns(repos, dataDir, second.id, new Date(T)).mails).toBe(1);
     expect(redoMailRuns(repos, dataDir, first.id, new Date(T)).mails).toBe(3);
+    expect(redoMailRuns(repos, dataDir, null, new Date(T)).mails).toBe(3);
     expect(() => redoMailRuns(repos, dataDir, "nao-existe")).toThrow(MailRedoError);
     const other = await runScheduledTask({
       repos,
@@ -207,15 +209,13 @@ describe("desfazer e refazer a leitura dos e-mails", () => {
     expect(() => redoMailRuns(repos, dataDir, other.id)).toThrow(/leitura de e-mails/);
   });
 
-  it("revisão: e-mail que a pessoa desfez ou decidiu na revisão fica; com a trava, a leitura agendada espera", async () => {
+  it("e-mail que a pessoa já desfez também volta à fila; com a trava, a leitura espera", async () => {
     const run = await sync();
     const conf = repos.mail.byGmailId("confirma");
     undoMail(repos, dataDir, conf?.id as string, new Date(T));
     const r = redoMailRuns(repos, dataDir, run.id, new Date(T));
-    expect(r.kept).toEqual([
-      expect.objectContaining({ gmailId: "confirma", reason: expect.stringMatching(/desfeito/) }),
-    ]);
-    expect(repos.mail.byGmailId("confirma")?.undoneAt).not.toBeNull();
+    expect(r).toMatchObject({ mails: 2, kept: [] });
+    expect(repos.mail.byGmailId("confirma")).toMatchObject({ status: "pending", undoneAt: null });
     expect(repos.jobApplications.list()).toHaveLength(0);
 
     repos.settings.set(MAIL_REDO_LOCK_KEY, new Date().toISOString());

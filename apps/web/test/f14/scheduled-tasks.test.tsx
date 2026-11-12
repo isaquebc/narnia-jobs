@@ -149,7 +149,7 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
     ).toBeInTheDocument();
   });
 
-  it("leitura do Gmail: desfazer e refazer daqui em diante, com confirmação e o resumo (o que ficou é avisado)", async () => {
+  it("leitura do Gmail: desfazer daqui em diante, com confirmação e o resumo (erro num e-mail é avisado; leitura pausada)", async () => {
     const mailRun = { ...run, id: "m1", taskId: "mail.sync" as const, counts: { digested: 3 } };
     const a = {
       ...api(),
@@ -166,10 +166,9 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
           {
             gmailId: "g9",
             subject: "Recebemos sua candidatura",
-            reason: "a candidatura já tem 1 nota(s)",
+            reason: "não deu para desfazer: falhou",
           },
         ],
-        enqueued: true,
       })),
     };
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -179,19 +178,19 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Ver histórico" }));
     // o botão aparece na linha da execução, sem abrir o detalhe (o dono não achou escondido)
     await userEvent.click(
-      await within(card).findByRole("button", { name: "Desfazer e refazer daqui em diante" }),
+      await within(card).findByRole("button", { name: "Desfazer daqui em diante" }),
     );
     expect(confirm).toHaveBeenCalled();
     expect(a.redoMailRuns).toHaveBeenCalledWith("m1");
     const status = await within(card).findByRole("status");
     expect(status).toHaveTextContent(
-      "3 e-mail(s) voltaram para a fila (1 candidatura(s) e 2 vaga(s) desfeitas)",
+      "3 e-mail(s) voltaram para a fila; 1 candidatura(s) e 2 vaga(s) apagadas. A leitura automática está pausada",
     );
-    expect(status).toHaveTextContent("Recebemos sua candidatura: a candidatura já tem 1 nota(s)");
+    expect(status).toHaveTextContent("Recebemos sua candidatura: não deu para desfazer: falhou");
     confirm.mockRestore();
   });
 
-  it("leitura do Gmail: atalho no cartão desfaz e refaz a última leitura com e-mails, sem abrir o histórico", async () => {
+  it("leitura do Gmail: atalho no cartão desfaz todas as leituras, sem abrir o histórico", async () => {
     const empty = { ...run, id: "m2", taskId: "mail.sync" as const, counts: {} };
     const withMail = { ...run, id: "m1", taskId: "mail.sync" as const, counts: { digested: 3 } };
     const a = {
@@ -205,7 +204,6 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
         applicationsRemoved: 0,
         postingsRemoved: 0,
         kept: [],
-        enqueued: true,
       })),
     };
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -214,18 +212,17 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
     const card = await screen.findByRole("region", { name: "Leitura do Gmail" });
     await userEvent.click(
       await within(card).findByRole("button", {
-        name: /Desfazer e refazer a última leitura com e-mails/,
+        name: "Desfazer todas as leituras",
       }),
     );
-    // a leitura vazia mais recente é pulada: o alvo é a última que mexeu em e-mails
-    expect(a.redoMailRuns).toHaveBeenCalledWith("m1");
+    expect(a.redoMailRuns).toHaveBeenCalledWith(null);
     expect(within(card).queryByRole("button", { name: "Esconder histórico" })).toBeNull();
     // no histórico, a leitura vazia não tem o botão (ele não desfaria nada)
     await userEvent.click(within(card).getByRole("button", { name: "Ver histórico" }));
     await within(card).findAllByRole("button", { name: /Concluída/ });
-    expect(
-      within(card).getAllByRole("button", { name: "Desfazer e refazer daqui em diante" }),
-    ).toHaveLength(1);
+    expect(within(card).getAllByRole("button", { name: "Desfazer daqui em diante" })).toHaveLength(
+      1,
+    );
     confirm.mockRestore();
   });
 });
