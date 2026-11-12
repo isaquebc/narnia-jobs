@@ -190,4 +190,42 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
     expect(status).toHaveTextContent("Recebemos sua candidatura: a candidatura já tem 1 nota(s)");
     confirm.mockRestore();
   });
+
+  it("leitura do Gmail: atalho no cartão desfaz e refaz a última leitura com e-mails, sem abrir o histórico", async () => {
+    const empty = { ...run, id: "m2", taskId: "mail.sync" as const, counts: {} };
+    const withMail = { ...run, id: "m1", taskId: "mail.sync" as const, counts: { digested: 3 } };
+    const a = {
+      ...api(),
+      listScheduledTasks: vi.fn(async () => ({
+        tasks: [{ ...task("job_applications.archive"), id: "mail.sync", lastRun: empty }],
+      })),
+      listScheduledRuns: vi.fn(async () => ({ runs: [empty, withMail] })),
+      redoMailRuns: vi.fn(async () => ({
+        mails: 3,
+        applicationsRemoved: 0,
+        postingsRemoved: 0,
+        kept: [],
+        enqueued: true,
+      })),
+    };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<ProcessesPage />, { api: a as never });
+    await openTab();
+    const card = await screen.findByRole("region", { name: "Leitura do Gmail" });
+    await userEvent.click(
+      await within(card).findByRole("button", {
+        name: /Desfazer e refazer a última leitura com e-mails/,
+      }),
+    );
+    // a leitura vazia mais recente é pulada: o alvo é a última que mexeu em e-mails
+    expect(a.redoMailRuns).toHaveBeenCalledWith("m1");
+    expect(within(card).queryByRole("button", { name: "Esconder histórico" })).toBeNull();
+    // no histórico, a leitura vazia não tem o botão (ele não desfaria nada)
+    await userEvent.click(within(card).getByRole("button", { name: "Ver histórico" }));
+    await within(card).findAllByRole("button", { name: /Concluída/ });
+    expect(
+      within(card).getAllByRole("button", { name: "Desfazer e refazer daqui em diante" }),
+    ).toHaveLength(1);
+    confirm.mockRestore();
+  });
 });

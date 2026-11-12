@@ -94,7 +94,15 @@ function RunDetail({ runId }: { runId: string }) {
 }
 
 /** Leitura do Gmail: desfaz esta execução e as seguintes e lê os e-mails de novo (pedido do dono 2026-11-11). */
-function RedoMail({ run, running }: { run: ScheduledRun; running: boolean }) {
+function RedoMail({
+  run,
+  running,
+  label = t("scheduled.redo"),
+}: {
+  run: ScheduledRun;
+  running: boolean;
+  label?: string;
+}) {
   const redo = useRedoMailRuns();
   const r = redo.data;
   return (
@@ -108,16 +116,18 @@ function RedoMail({ run, running }: { run: ScheduledRun; running: boolean }) {
           if (window.confirm(t("scheduled.redoConfirm"))) redo.mutate(run.id);
         }}
       >
-        {t("scheduled.redo")}
+        {label}
       </Button>
       {r ? (
         <div role="status" className="text-xs text-muted-fg">
           <p>
-            {t("scheduled.redoDone", {
-              mails: r.mails,
-              apps: r.applicationsRemoved,
-              postings: r.postingsRemoved,
-            })}
+            {r.mails || r.kept.length
+              ? t("scheduled.redoDone", {
+                  mails: r.mails,
+                  apps: r.applicationsRemoved,
+                  postings: r.postingsRemoved,
+                })
+              : t("scheduled.redoNothing")}
           </p>
           {r.kept.length ? (
             <>
@@ -135,6 +145,24 @@ function RedoMail({ run, running }: { run: ScheduledRun; running: boolean }) {
       ) : null}
       {redo.error ? <p className="text-xs text-danger">{(redo.error as Error).message}</p> : null}
     </div>
+  );
+}
+
+/** Leitura que mexeu em e-mails (baixou, avaliou ou processou): o alvo do atalho no cartão. */
+const touchedMail = (r: ScheduledRun) =>
+  ["fetched", "assessed", "digested"].some((k) => (r.counts[k] ?? 0) > 0);
+
+/** Atalho no cartão da Leitura do Gmail: desfaz e refaz a última leitura com e-mails, sem abrir o histórico. */
+function RedoLastMail({ taskId, running }: { taskId: string; running: boolean }) {
+  const { data: runs = [] } = useScheduledRuns(taskId, true);
+  const last = runs.find((r) => r.status !== "running" && touchedMail(r));
+  if (!last) return null;
+  return (
+    <RedoMail
+      run={last}
+      running={running}
+      label={t("scheduled.redoLast", { when: when(last.startedAt) })}
+    />
   );
 }
 
@@ -162,7 +190,8 @@ function RunHistory({ taskId, running }: { taskId: string; running: boolean }) {
             </span>
           </button>
           {/* visível sem abrir a execução: escondido no detalhe, o dono não achou (2026-11-12) */}
-          {taskId === "mail.sync" ? <RedoMail run={r} running={running} /> : null}
+          {/* só nas leituras que mexeram em e-mails: nas vazias o botão não desfazia nada (2026-11-12) */}
+          {taskId === "mail.sync" && touchedMail(r) ? <RedoMail run={r} running={running} /> : null}
           {open === r.id ? <RunDetail runId={r.id} /> : null}
         </li>
       ))}
@@ -262,6 +291,7 @@ function TaskCard({ task }: { task: ScheduledTask }) {
           {t("scheduled.minimum", { n: task.minIntervalMinutes })}
         </p>
       ) : null}
+      {task.id === "mail.sync" ? <RedoLastMail taskId={task.id} running={task.running} /> : null}
       <div>
         <Button
           size="sm"

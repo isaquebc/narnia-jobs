@@ -559,10 +559,13 @@ export const ptBR = {
       provisional_scores: "score(s) provisório(s)",
     },
     redo: "Desfazer e refazer daqui em diante",
+    redoLast: "Desfazer e refazer a última leitura com e-mails ({when})",
     redoConfirm:
       "Desfazer o que esta leitura e as seguintes fizeram (candidaturas, notas e vagas do feed que você não usou) e ler esses e-mails de novo? O que você já usou fica como está.",
     redoDone:
       "{mails} e-mail(s) voltaram para a fila ({apps} candidatura(s) e {postings} vaga(s) desfeitas); a leitura nova já começou.",
+    redoNothing:
+      "Esta leitura e as seguintes não mexeram em nenhum e-mail: nada foi desfeito. Use o botão de uma leitura com e-mails processados.",
     redoKept: "Ficaram como estavam (você já mexeu na candidatura):",
     last: "Última execução",
     next: "Próxima",
