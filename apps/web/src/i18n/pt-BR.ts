@@ -576,6 +576,8 @@ export const ptBR = {
     runNow: "Rodar agora",
     alreadyQueued: "Já há uma execução desta tarefa na fila ou rodando.",
     showHistory: "Ver histórico",
+    showDetail: "ver log e itens",
+    hideDetail: "esconder log e itens",
     hideHistory: "Esconder histórico",
     noRuns: "Nenhuma execução ainda.",
     detail: "Detalhe da execução",

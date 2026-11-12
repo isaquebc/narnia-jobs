@@ -177,7 +177,7 @@ describe("F14/M1 · Processos › Tarefas agendadas", () => {
     await openTab();
     const card = await screen.findByRole("region", { name: "Leitura do Gmail" });
     await userEvent.click(within(card).getByRole("button", { name: "Ver histórico" }));
-    await userEvent.click(await within(card).findByRole("button", { name: /Concluída/ }));
+    // o botão aparece na linha da execução, sem abrir o detalhe (o dono não achou escondido)
     await userEvent.click(
       await within(card).findByRole("button", { name: "Desfazer e refazer daqui em diante" }),
     );

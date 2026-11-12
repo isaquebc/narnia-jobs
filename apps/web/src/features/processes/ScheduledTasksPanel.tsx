@@ -146,7 +146,7 @@ function RunHistory({ taskId, running }: { taskId: string; running: boolean }) {
   return (
     <ul className="flex flex-col gap-2">
       {runs.map((r) => (
-        <li key={r.id} className="flex flex-col gap-2">
+        <li key={r.id} className="flex flex-col gap-2 border-b border-border pb-2 last:border-0">
           <button
             type="button"
             className="flex flex-wrap items-center gap-2 text-left text-sm hover:underline"
@@ -157,13 +157,13 @@ function RunHistory({ taskId, running }: { taskId: string; running: boolean }) {
             <span>{when(r.startedAt)}</span>
             <span className="text-muted-fg">{t(`scheduled.trigger.${r.trigger}` as TKey)}</span>
             {countsText(r) ? <span className="text-muted-fg">{countsText(r)}</span> : null}
+            <span className="text-xs text-muted-fg">
+              {open === r.id ? t("scheduled.hideDetail") : t("scheduled.showDetail")}
+            </span>
           </button>
-          {open === r.id ? (
-            <>
-              {taskId === "mail.sync" ? <RedoMail run={r} running={running} /> : null}
-              <RunDetail runId={r.id} />
-            </>
-          ) : null}
+          {/* visível sem abrir a execução: escondido no detalhe, o dono não achou (2026-11-12) */}
+          {taskId === "mail.sync" ? <RedoMail run={r} running={running} /> : null}
+          {open === r.id ? <RunDetail runId={r.id} /> : null}
         </li>
       ))}
     </ul>
