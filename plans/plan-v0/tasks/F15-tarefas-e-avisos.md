@@ -2,7 +2,7 @@
 
 Entregável 15 do plan-v0, pedido pelo dono em 2026-11-12 depois de um e-mail real: uma empresa convidou para uma etapa automática (triagem com perguntas técnicas por WhatsApp, num parceiro de recrutamento) e listou as fases do processo **numa imagem** no começo do corpo. O narnia classificou como contato de recrutador, gravou só uma nota e não viu as fases (a imagem é remota e o narnia nunca baixa nada de um e-mail).
 
-Status: **decisões F15-1 a F15-6 fechadas com o dono em 2026-11-12; plano aprovado pelo dono em 2026-11-12; em execução**. Depende de F07 (candidaturas, etapas, `StagesEditor`) e F14 (leitura do Gmail, risco do remetente, desfazer, agendador, gate de prompts).
+Status: **decisões F15-1 a F15-6 fechadas com o dono em 2026-11-12; plano aprovado pelo dono em 2026-11-12; M1–M5 implementados em 2026-11-13 (falta o teste do dono no Windows e com o e-mail real)**. Depende de F07 (candidaturas, etapas, `StagesEditor`) e F14 (leitura do Gmail, risco do remetente, desfazer, agendador, gate de prompts).
 
 ---
 
@@ -119,3 +119,15 @@ Pedido do dono para testar a leitura nova num e-mail só: `rereadMail` (core, `m
 - Fases (F15-6): etapas padrão (os 6 nomes na ordem) → trocadas pelas fases; a atual vira a dica da etapa (sugestão ou automático pela regra da F14). Etapas editadas → `processSuggestion` no resultado do e-mail e **Usar estas fases** no cartão "Pelo e-mail" (`POST /api/mail/:id/apply-process`). Desfazer devolve as etapas (se ainda estão como o e-mail deixou) e apaga as tarefas ainda em "A fazer" (no desfazer das leituras, todas).
 - Tools MCP `todos.*` e skill: **fora desta entrega** — mexem nas dependências do gate do chat (pairwise de horas na assinatura) sem pedido do dono; ficam como sugestão (§8).
 - Testes antes: sim (core `test/todos/from-mail`, api `f15-m3-process`, web `mail-activity`, e2e `F15/E2E-02`).
+
+### M4 · execução (2026-11-13)
+- `packages/core/src/mail/images.ts`: as imagens do HTML que valem ler (`http(s)`, sem repetir, sem as declaradas pequenas, até 3), download protegido (`safeImageFetch`: só endereço público conferido a cada redirecionamento, sem credenciais, 15 s, até 5 MB), tamanho pelo cabeçalho (PNG, GIF, JPEG; menores que 200 px ficam de fora) e OCR local com o Tesseract que o worker já usa nos PDFs (`createTesseractRecognizer`; nada novo na imagem Docker).
+- `digestMail`: depois da primeira classificação, se a classe é atualização, convite ou contato e o corpo tem imagens, confere a permissão (`mayReadMailImages`: risco não alto, e-mail ligado a uma candidatura já feita pela mesma regra do M6 — `mailApplicationOf` —, e remetente confiável ou do domínio da vaga/empresa com autenticação alinhada) e classifica de novo com `<texto_das_imagens>`. O resultado guarda `images` (link, motivo de pular, quantos caracteres); o texto lido fica em `<e-mail>.images.json`, e "Ler de novo" não baixa de novo.
+- Worker: `readMailImages` nos serviços da rotina (`ScheduledServices.readMailImages`).
+- e2e: sem caso novo — o download protegido recusa os endereços da rede do e2e de propósito; a regra fica coberta pelos testes do core (`test/mail/images`, `test/mail/images-digest`).
+- Testes antes: sim.
+
+### M5 · execução (2026-11-13)
+- Docs: `docs/tarefas.md` (ação ou fases numa imagem), `docs/gmail.md` (o texto lido fica guardado).
+- Gate: lint, typecheck, testes por pacote, e2e completo, bats e Pester.
+- Para o dono: `./start.sh promote` e `make dev-down && make dev` (migração 0049 e o vigia de avisos no lançador); conferir o aviso no Windows; "Ler de novo" no e-mail real que motivou a F15.

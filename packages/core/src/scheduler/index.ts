@@ -11,7 +11,12 @@ import {
 import type { Repos } from "../db";
 import { jobApplicationUrl } from "../job-applications/tools";
 import { applyMailApplications, syncMailReviewNotification } from "../mail/applications";
-import { digestMail, type MailClassifier, syncDigestLabels } from "../mail/digest";
+import {
+  digestMail,
+  type MailClassifier,
+  type MailImageReader,
+  syncDigestLabels,
+} from "../mail/digest";
 import { archiveStaleFeed, markAutoAnalyses } from "../mail/feed";
 import { openMailPostingLinks } from "../mail/postings";
 import { assessPendingMail } from "../mail/process";
@@ -93,6 +98,8 @@ export interface ScheduledContext {
 
 export interface ScheduledServices {
   classifyMail?: MailClassifier | null;
+  /** F15/M4: leitor das imagens do corpo (OCR); ausente, as imagens não são abertas. */
+  readMailImages?: MailImageReader | null;
   enqueuePostingExtract?: (postingId: string) => Promise<void>;
   fetchOptions?: FetchPostingOptions;
 }
@@ -161,6 +168,7 @@ async function mailSync(ctx: ScheduledContext) {
     dataDir: ctx.dataDir,
     ctx,
     classify: ctx.services.classifyMail ?? null,
+    readImages: ctx.services.readMailImages ?? null,
   });
   // M5: confirmações e negativas viram candidaturas (ou encerram), com a data e a hora do e-mail
   // candidaturas (M5) e atualizações (M6) em ordem cronológica entre si: cada passada só aplica o que é anterior ao

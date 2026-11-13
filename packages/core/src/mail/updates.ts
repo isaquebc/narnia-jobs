@@ -234,7 +234,7 @@ const mailNote = (repos: Repos, msg: MailMessageRecord, cls: MailClassifyOutput)
  * Candidatura do e-mail: vaga escolhida na revisão → mesma conversa (thread) de um e-mail já ligado → vaga do e-mail →
  * a última candidatura dela.
  */
-function applicationOf(
+export function mailApplicationOf(
   repos: Repos,
   msg: MailMessageRecord,
   cls: MailClassifyOutput,
@@ -360,7 +360,7 @@ export async function applyMailUpdates(
     };
     try {
       const done = withTransaction(repos.db, () => {
-        const found = applicationOf(repos, msg, cls);
+        const found = mailApplicationOf(repos, msg, cls);
         if (!found || "review" in found) {
           if (cls.class === "recruiter_contact" && !found) {
             // contato sem candidatura: fica registrado no e-mail (o feed de contatos é sugestão futura)
@@ -581,7 +581,7 @@ export async function applyMailUpdates(
       for (const e of events) await ctx.publish(e).catch(() => {});
     } catch (e) {
       if (e instanceof NeedsConfirm) {
-        const app = applicationOf(repos, msg, cls);
+        const app = mailApplicationOf(repos, msg, cls);
         toReview(e.message, {
           needsConfirm: true,
           ...(app && !("review" in app) ? { suggestedPostingId: app.postingId } : {}),

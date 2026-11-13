@@ -80,6 +80,7 @@ export * from "./mail/digest";
 export * from "./mail/domains";
 export * from "./mail/feed";
 export * from "./mail/google-oauth";
+export * from "./mail/images";
 export * from "./mail/postings";
 export * from "./mail/prefilter";
 export * from "./mail/process";

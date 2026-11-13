@@ -1,13 +1,18 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MailClassifyOutput } from "@narnia-jobs/shared";
 import type { Repos } from "../db";
+import type { MailMessageRecord } from "../db/repos/mail";
 import type { ScheduledContext } from "../scheduler";
+import { senderMatchesPosting } from "../todos/from-mail";
 import { parseJobAlert } from "./alerts";
 import { MAIL_LABEL, MAIL_SUSPECT_LABEL } from "./connection";
+import { domainOfAddress } from "./domains";
+import { imagesText, type MailImageRead, mailImageUrls } from "./images";
 import { intakePostingFromMail, type MailJobInput, safeHttpUrl } from "./postings";
-import { parseMail } from "./risk";
+import { authVerdict, type ParsedMail, parseMail } from "./risk";
 import type { MailSource } from "./source";
+import { mailApplicationOf } from "./updates";
 
 /**
  * Processamento dos e-mails avaliados (F14/M4): o leitor por código lê os alertas das plataformas conhecidas; o resto
@@ -21,7 +26,37 @@ export type MailClassifier = (input: {
   date: string;
   text: string;
   links: string[];
+  /** F15/M4: texto lido das imagens do corpo (OCR), quando o e-mail pode abri-las. */
+  images?: string;
 }) => Promise<MailClassifyOutput>;
+
+/** F15/M4: baixa e lê as imagens do HTML (no worker: `readMailImages` com o download protegido e o Tesseract). */
+export type MailImageReader = (html: string) => Promise<MailImageRead[]>;
+
+/** Classes em que o e-mail pode trazer as fases ou a ação numa imagem. */
+const IMAGE_CLASSES = new Set(["update", "interview_invite", "recruiter_contact"]);
+
+/**
+ * Pode abrir as imagens deste e-mail? (F15-5, regra do dono): só de e-mail ligado a uma candidatura já feita, nunca de
+ * risco alto, e só de remetente confiável ou do domínio da vaga ou da empresa com a autenticação conferindo.
+ */
+export function mayReadMailImages(
+  repos: Repos,
+  msg: MailMessageRecord,
+  parsed: ParsedMail,
+  cls: MailClassifyOutput,
+): boolean {
+  if (!IMAGE_CLASSES.has(cls.class) || msg.riskLevel === "high" || !msg.riskLevel) return false;
+  const app = mailApplicationOf(repos, msg, cls);
+  if (!app || "review" in app) return false;
+  if (msg.riskLevel === "trusted") return true;
+  if (!authVerdict(parsed.authResults, domainOfAddress(msg.fromAddr)).aligned) return false;
+  return senderMatchesPosting(msg.fromAddr, repos.postings.get(app.postingId));
+}
+
+/** O que foi lido fica ao lado do e-mail: "Ler de novo" não baixa de novo. */
+const imagesCache = (dataDir: string, msg: MailMessageRecord) =>
+  join(dataDir, `${msg.rawPath}.images.json`);
 
 export const MAIL_DIGEST_PER_RUN = 100;
 /** Modelo da classificação em Configurações › Modelos (padrão: Haiku). */
@@ -61,6 +96,8 @@ export async function digestMail(input: {
   dataDir: string;
   ctx: Pick<ScheduledContext, "log" | "item" | "count">;
   classify: MailClassifier | null;
+  /** F15/M4: leitor das imagens; ausente, as imagens não são abertas. */
+  readImages?: MailImageReader | null;
   limit?: number;
 }): Promise<MailDigestResult> {
   const { repos, ctx } = input;
@@ -79,6 +116,7 @@ export async function digestMail(input: {
       const alert = parseJobAlert(parsed);
       let cls: MailClassifyOutput;
       let by: "code" | "model";
+      let imageInfo: Array<{ url: string; skipped: string | null; chars: number }> | null = null;
       if (alert) {
         by = "code";
         cls = {
@@ -102,18 +140,44 @@ export async function digestMail(input: {
       } else {
         if (!input.classify) continue; // sem modelo nesta execução: fica para a próxima
         by = "model";
-        cls = await modelCall(
-          () =>
-            input.classify?.({
-              from: parsed.fromName
-                ? `${parsed.fromName} <${parsed.fromAddr ?? ""}>`
-                : (parsed.fromAddr ?? ""),
-              subject: parsed.subject,
-              date: msg.receivedAt,
-              text: parsed.text.slice(0, TEXT_MAX),
-              links: parsed.links.slice(0, LINKS_MAX),
-            }) as Promise<MailClassifyOutput>,
-        );
+        const ask = (images?: string) =>
+          modelCall(
+            () =>
+              input.classify?.({
+                from: parsed.fromName
+                  ? `${parsed.fromName} <${parsed.fromAddr ?? ""}>`
+                  : (parsed.fromAddr ?? ""),
+                subject: parsed.subject,
+                date: msg.receivedAt,
+                text: parsed.text.slice(0, TEXT_MAX),
+                links: parsed.links.slice(0, LINKS_MAX),
+                ...(images ? { images } : {}),
+              }) as Promise<MailClassifyOutput>,
+          );
+        cls = await ask();
+        // F15/M4: imagens do corpo (as fases numa imagem): só com permissão, lidas por OCR e classificado de novo
+        if (
+          input.readImages &&
+          parsed.html &&
+          mailImageUrls(parsed.html).length &&
+          mayReadMailImages(repos, msg, parsed, cls)
+        ) {
+          const cache = imagesCache(input.dataDir, msg);
+          let reads: MailImageRead[];
+          if (existsSync(cache)) reads = JSON.parse(readFileSync(cache, "utf8")) as MailImageRead[];
+          else {
+            reads = await input.readImages(parsed.html);
+            writeFileSync(cache, JSON.stringify(reads));
+          }
+          const text = imagesText(reads);
+          imageInfo = reads.map((r) => ({
+            url: r.url,
+            skipped: r.skipped,
+            chars: r.text?.length ?? 0,
+          }));
+          ctx.count("images", reads.filter((r) => r.text).length);
+          if (text) cls = await ask(text);
+        }
       }
       const platform = alert?.platform ?? null;
       // revisão do M4: link vindo do modelo só vale se estiver nos links do próprio e-mail (nada de URL inventada)
@@ -203,7 +267,7 @@ export async function digestMail(input: {
             status: "pending",
             class: cls.class,
             confidence: cls.confidence,
-            result: { by, ...cls },
+            result: { by, ...cls, ...(imageInfo ? { images: imageInfo } : {}) },
           },
           at(),
         );

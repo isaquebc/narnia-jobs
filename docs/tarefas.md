@@ -42,5 +42,6 @@ Com a [leitura do Gmail](gmail.md) ligada, um e-mail de candidatura que pede uma
 - **o que conta como ação:** triagem automática (por chat, WhatsApp ou vídeo), teste ou desafio, formulário, mandar documentos, entrevista para comparecer ou escolher um horário. E-mail que só informa ("estamos analisando") não vira tarefa;
 - **o que a tarefa traz:** o título com a empresa, o prazo quando o e-mail diz, o link da ação, a candidatura, **Ver o e-mail** e as tags (a empresa, `e-mail` e o tipo, como `triagem` ou `teste`). Ela nasce com o aviso do sistema;
 - **link só de quem é de confiança:** o link da ação entra quando o remetente é confiável, ou é do domínio da vaga ou da empresa com a autenticação conferida. De outro remetente, a tarefa nasce sem o link e com a tag `confira`: abra o e-mail e confira antes de clicar;
+- **ação ou fases numa imagem:** quando o e-mail traz a etapa ou as fases do processo numa imagem (um banner no começo do corpo), o narnia lê o texto da imagem no seu computador e usa na leitura, com as mesmas regras de confiança (detalhes em [Gmail](gmail.md));
 - **sem repetir:** se já existe uma tarefa aberta do mesmo tipo para a mesma candidatura, o e-mail novo não cria outra;
 - **Desfazer:** o **Desfazer** do e-mail apaga as tarefas que ele criou. A tarefa que você já moveu de coluna fica.

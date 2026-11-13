@@ -1,12 +1,15 @@
 import {
+  createTesseractRecognizer,
   dueScheduledTasks,
   isScheduledTaskId,
   MAIL_MODEL_KEY,
   POSTING_TASKS,
+  readMailImages,
   recordUsage,
   resolveModel,
   runScheduledTask,
   SCHEDULED_RUN_TASK,
+  safeImageFetch,
   type TaskJobData,
   TERMINAL_JOB_STATUSES,
   taskJobId,
@@ -44,6 +47,13 @@ export async function scheduledRun(
         );
         return r.output;
       },
+      // F15/M4: imagens do corpo com download protegido e OCR local (Tesseract), sem modelo
+      readMailImages: (html) =>
+        readMailImages({
+          html,
+          fetchImage: safeImageFetch(),
+          recognizer: () => createTesseractRecognizer(),
+        }),
       enqueuePostingExtract: async (postingId) => {
         await deps.enqueueTask({
           queue: "extract",
