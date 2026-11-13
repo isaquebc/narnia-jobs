@@ -96,6 +96,8 @@ export async function digestMail(input: {
           stageHint: null,
           interview: null,
           summary: `Alerta com ${alert.items.length} vaga(s).`,
+          actions: [],
+          process: null,
         };
       } else {
         if (!input.classify) continue; // sem modelo nesta execução: fica para a próxima
@@ -129,6 +131,9 @@ export async function digestMail(input: {
           jobs: cls.jobs.map((j) => ({ ...j, url: keep(j.url) })),
           // F14/M6: o link da chamada do convite também precisa estar no e-mail
           interview: cls.interview ? { ...cls.interview, link: keep(cls.interview.link) } : null,
+          // F15-2: o link da ação pedida também
+          actions: (cls.actions ?? []).map((a) => ({ ...a, url: keep(a.url) })),
+          process: cls.process ?? null,
         };
       }
       const trusted = msg.riskLevel === "trusted";

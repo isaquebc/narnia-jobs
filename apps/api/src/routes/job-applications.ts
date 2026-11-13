@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import {
   addJobApplicationEntry,
   addJobApplicationEvent,
+  applyMailProcess,
   applyOptions,
   applyToPosting,
   approveStageSuggestion,
@@ -11,6 +12,7 @@ import {
   jobApplicationFunnel,
   listJobApplications,
   listSavedPostings,
+  MailProcessError,
   type Repos,
   rejectJobApplication,
   rejectStageSuggestion,
@@ -420,6 +422,14 @@ export function jobApplicationsRoutes(deps: {
         undoneAt: m.undoneAt,
         canUndo: m.status === "done" && !m.undoneAt && !!m.undo,
         mailUrl: `https://mail.google.com/mail/u/0/#all/${m.gmailId}`,
+        // F15-6: fases que o e-mail lista, para a pessoa aplicar (a candidatura tem etapas editadas)
+        processSuggestion: m.undoneAt
+          ? null
+          : ((
+              m.result as {
+                processSuggestion?: { stages: string[]; current: string | null };
+              } | null
+            )?.processSuggestion ?? null),
       })),
       suggestions: repos.stageSuggestions.open(id).map((s) => ({
         id: s.id,
@@ -464,6 +474,18 @@ export function jobApplicationsRoutes(deps: {
       }
     },
   );
+  // F15-6 · aplicar as fases que um e-mail sugeriu
+  app.post("/api/mail/:mid/apply-process", (c) => {
+    try {
+      const ja = applyMailProcess(repos, c.req.param("mid"));
+      touched(ja.id);
+      return c.json({ application: ja });
+    } catch (e) {
+      if (e instanceof MailProcessError)
+        return apiError(c, e.code === "not_found" ? 404 : 409, e.code, e.message);
+      return fail(c, e);
+    }
+  });
   app.post("/api/stage-suggestions/:sid/reject", (c) => {
     const s = repos.stageSuggestions.get(c.req.param("sid"));
     try {

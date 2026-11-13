@@ -153,6 +153,8 @@ export interface MailClassifyInput {
   date: string;
   text: string;
   links: string[];
+  /** F15/M4: texto lido (OCR) das imagens do corpo, quando o e-mail pode ter as imagens abertas; senão vazio. */
+  images?: string;
   model: string;
 }
 

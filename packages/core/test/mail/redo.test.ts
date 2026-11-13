@@ -45,6 +45,8 @@ const out = (o: Partial<MailClassifyOutput>): MailClassifyOutput => ({
   postingUrl: null,
   jobs: [],
   stageHint: null,
+  actions: [],
+  process: null,
   interview: null,
   summary: "x",
   ...o,

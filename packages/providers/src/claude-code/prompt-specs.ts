@@ -169,7 +169,7 @@ export const STRUCTURED_PROMPTS: Record<StructuredOperation, StructuredPromptSpe
       "F14: tipo do e-mail de vagas (alerta, candidatura, negativa, atualização, convite) e os dados dele.",
     file: FILE("mail-classify"),
     userTemplate:
-      "<email>\nDe: {{from}}\nAssunto: {{subject}}\nData: {{date}}\n\n{{text}}\n</email>\n\n<links>\n{{links}}\n</links>",
+      "<email>\nDe: {{from}}\nAssunto: {{subject}}\nData: {{date}}\n\n{{text}}\n</email>\n\n<links>\n{{links}}\n</links>\n\n<texto_das_imagens>\n{{images}}\n</texto_das_imagens>",
     defaultModel: "haiku",
     jsonSchema: MAIL_OUTPUT_JSON_SCHEMAS.mailClassify,
     tools: [],
@@ -343,6 +343,7 @@ export const structuredPromptVars = {
     date: i.date,
     text: i.text,
     links: i.links.join("\n"),
+    images: i.images?.trim() || "(nenhuma)",
   }),
   postingMerge: (i: PostingMergeInput) => ({
     text: i.text,

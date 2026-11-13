@@ -30,6 +30,15 @@ export interface MailUndo {
   stage?: { applicationId: string; fromStageId: string | null; toStageId: string | null };
   suggestionIds?: string[];
   eventIds?: string[];
+  /** F15: tarefas criadas pelas ações pedidas no e-mail. */
+  todoIds?: string[];
+  /** F15-6: as etapas trocadas pelas fases do e-mail (os nomes de antes e de depois). */
+  stages?: {
+    applicationId: string;
+    before: string[];
+    beforeCurrent: string | null;
+    after: string[];
+  };
   /** Eventos que já existiam e mudaram (remarcação, cancelamento, oficial no lugar da provisória). */
   eventPrev?: Array<{
     id: string;

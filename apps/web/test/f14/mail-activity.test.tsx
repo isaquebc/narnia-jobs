@@ -94,6 +94,26 @@ describe("F14/M6 · pelo e-mail", () => {
     expect(within(h).getByText(/pelo e-mail/)).toBeInTheDocument();
   });
 
+  it("F15-6: fases sugeridas pelo e-mail, com a atual marcada; Usar estas fases aplica", async () => {
+    const applyMailProcess = vi.fn(async () => ({ application: {} }));
+    const withProcess = {
+      ...activity,
+      mails: [
+        {
+          ...activity.mails[0],
+          processSuggestion: { stages: ["Inscrição", "Pré-seleção"], current: "Pré-seleção" },
+        },
+      ],
+    };
+    renderWithProviders(<MailActivityCard application={app} />, {
+      api: { getMailActivity: async () => withProcess, applyMailProcess } as never,
+    });
+    const box = await screen.findByRole("region", { name: "Fases do processo pelo e-mail" });
+    expect(within(box).getByText(/Pré-seleção \(você está aqui\)/)).toBeInTheDocument();
+    await userEvent.click(within(box).getByRole("button", { name: "Usar estas fases" }));
+    await waitFor(() => expect(applyMailProcess).toHaveBeenCalledWith("m1"));
+  });
+
   it("cada e-mail da candidatura tem Ler de novo", async () => {
     const rereadMail = vi.fn(async () => ({
       mails: 1,

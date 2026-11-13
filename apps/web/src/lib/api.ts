@@ -226,6 +226,7 @@ export interface MailActivity {
     undoneAt: string | null;
     canUndo: boolean;
     mailUrl: string;
+    processSuggestion: { stages: string[]; current: string | null } | null;
   }>;
   suggestions: Array<{
     id: string;
@@ -997,6 +998,11 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     /** F14/M6: o que os e-mails fizeram na candidatura. */
     getMailActivity: (appId: string) =>
       request<MailActivity>(`/api/job-applications/${encodeURIComponent(appId)}/mail-activity`),
+    applyMailProcess: (mailId: string) =>
+      request<{ application: JobApplicationSummary }>(
+        `/api/mail/${encodeURIComponent(mailId)}/apply-process`,
+        { method: "POST" },
+      ),
     approveStageSuggestion: (id: string, stageId?: string) =>
       request<{ application: unknown }>(
         `/api/stage-suggestions/${encodeURIComponent(id)}/approve`,

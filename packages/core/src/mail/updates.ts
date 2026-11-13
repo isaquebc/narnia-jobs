@@ -8,13 +8,20 @@ import { addJobApplicationEntry } from "../job-applications/entries";
 import { normalizeIdentityPart } from "../postings/identity";
 import type { ScheduledContext } from "../scheduler";
 import {
+  cleanProcess,
+  createMailTodos,
+  hasDefaultStages,
+  senderMatchesPosting,
+} from "../todos/from-mail";
+import {
   closedAt,
   MAIL_APPLICATION_CLASSES,
   oldestPendingOf,
   oldestUnclassified,
   resolveMailPosting,
 } from "./applications";
-import { parseMail } from "./risk";
+import { domainOfAddress } from "./domains";
+import { authVerdict, parseMail } from "./risk";
 
 /**
  * Atualizações, convites e contatos vindos de e-mail (F14/M6, plano §2.3, §2.4, F14-2, F14-3). O e-mail vira nota
@@ -199,6 +206,8 @@ export interface MailUpdatesResult {
   suggested: number;
   events: number;
   review: number;
+  /** F15: tarefas criadas pelas ações pedidas nos e-mails. */
+  todos: number;
 }
 
 const userTz = (repos: Repos) => repos.users.get()?.timezone || "America/Sao_Paulo";
@@ -284,6 +293,16 @@ interface Ctx {
 
 type Pub = Parameters<ScheduledContext["publish"]>[0];
 
+/** A autenticação do Gmail (DMARC, DKIM ou SPF) confere com o domínio do remetente (F15-5). */
+export async function mailAuthAligned(dataDir: string, msg: MailMessageRecord): Promise<boolean> {
+  try {
+    const parsed = await parseMail(readFileSync(join(dataDir, msg.rawPath)));
+    return authVerdict(parsed.authResults, domainOfAddress(msg.fromAddr)).aligned;
+  } catch {
+    return false;
+  }
+}
+
 /** Convites `.ics` anexados ao e-mail (o `.eml` guardado). */
 async function calendarsOf(dataDir: string, msg: MailMessageRecord) {
   try {
@@ -307,6 +326,7 @@ export async function applyMailUpdates(
     suggested: 0,
     events: 0,
     review: 0,
+    todos: 0,
   };
   // ordem com o M5 (revisão do M6, #13): nada mais novo que o e-mail de candidatura ou negativa ainda pendente
   const barrier = minIso(
@@ -324,6 +344,7 @@ export async function applyMailUpdates(
       cls.class === "recruiter_contact" ? [] : await calendarsOf(input.dataDir, msg);
     const events: Pub[] = [];
     const ctl = cls as MailClassifyOutput & { confirmed?: boolean; forcedPostingId?: string };
+    const aligned = (cls.actions ?? []).length ? await mailAuthAligned(input.dataDir, msg) : false;
     const toReview = (reason: string, extra: Record<string, unknown> = {}) => {
       repos.mail.setResult(
         msg.id,
@@ -358,7 +379,7 @@ export async function applyMailUpdates(
           toReview(reason);
           return { app: null, action: `para revisão: ${reason}` };
         }
-        const app = found;
+        let app = found;
         const undo: MailUndo = {};
         const trusted =
           msg.riskLevel === "trusted" || ctl.confirmed === true || !!ctl.forcedPostingId;
@@ -376,16 +397,35 @@ export async function applyMailUpdates(
           files: [],
         });
         undo.entryIds = [entry.id];
-        const counts = { contacts: 0, noted: 1, moved: 0, suggested: 0, events: 0 };
+        const counts = { contacts: 0, noted: 1, moved: 0, suggested: 0, events: 0, todos: 0 };
         const actions: string[] = ["nota"];
         const closedAtIso = app.column === "closed" ? closedAt(repos, app.id) : null;
-        const target = cls.stageHint
-          ? matchStage(repos, app, cls.stageHint, { company, platform })
-          : null;
+        // F15-6: as fases do e-mail trocam as etapas padrão (sem edição da pessoa); senão ficam como sugestão
+        const proc = app.column !== "closed" ? cleanProcess(cls.process) : null;
+        let processSuggestion: { stages: string[]; current: string | null } | null = null;
+        if (proc && hasDefaultStages(app)) {
+          undo.stages = {
+            applicationId: app.id,
+            before: app.stages.map((s) => s.name),
+            beforeCurrent: app.stages.find((s) => s.id === app.currentStageId)?.name ?? null,
+            after: proc.stages,
+          };
+          app = repos.jobApplications.setStages(
+            app.id,
+            proc.stages.map((name) => ({ name })),
+          );
+          // a atual fica na mesma posição (a primeira, numa candidatura nova); a do e-mail vem pela sugestão abaixo
+          actions.push(`etapas trocadas pelas ${proc.stages.length} fases do e-mail`);
+        } else if (proc && proc.stages.join("\n") !== app.stages.map((s) => s.name).join("\n")) {
+          processSuggestion = proc;
+          actions.push("fases do processo sugeridas");
+        }
+        const stageHint = cls.stageHint ?? proc?.current ?? null;
+        const target = stageHint ? matchStage(repos, app, stageHint, { company, platform }) : null;
         if (app.column !== "closed") {
           // etapa (F14-2): só para a frente, e só se a dica casa com uma etapa da candidatura
           const pos = (id: string | null) => app.stages.findIndex((s) => s.id === id);
-          if (cls.stageHint && (!target || pos(target.stage.id) > pos(app.currentStageId))) {
+          if (stageHint && (!target || pos(target.stage.id) > pos(app.currentStageId))) {
             const confidence =
               target?.via === "aprendido" ? Math.max(cls.confidence, 95) : cls.confidence;
             const auto =
@@ -396,8 +436,8 @@ export async function applyMailUpdates(
                 applicationId: app.id,
                 fromStageId: app.currentStageId,
                 toStageId: target?.stage.id ?? null,
-                toStageName: target?.stage.name ?? cls.stageHint,
-                hint: cls.stageHint,
+                toStageName: target?.stage.name ?? stageHint,
+                hint: stageHint,
                 company: company ? normalizeIdentityPart(company) : null,
                 platform,
                 confidence,
@@ -472,6 +512,28 @@ export async function applyMailUpdates(
             });
           }
         }
+        // F15-2: as ações pedidas viram tarefas; o link só de remetente confiável ou do domínio da vaga/empresa
+        if (app.column !== "closed" && (cls.actions ?? []).length) {
+          const made = createMailTodos(repos, {
+            msg,
+            actions: cls.actions ?? [],
+            app,
+            company,
+            linkAllowed: trusted || (aligned && senderMatchesPosting(msg.fromAddr, posting)),
+            at,
+          });
+          if (made.todos.length) {
+            undo.todoIds = made.todos.map((t) => t.id);
+            counts.todos += made.todos.length;
+            actions.push(`${made.todos.length} tarefa(s)`);
+            for (const n of made.notifications)
+              events.push({
+                type: n.created ? "notification.created" : "notification.updated",
+                notification: n.notification,
+              });
+            events.push({ type: "todo.updated", todoId: null });
+          }
+        }
         repos.mail.addUndo(msg.id, undo);
         repos.mail.setResult(
           msg.id,
@@ -479,7 +541,12 @@ export async function applyMailUpdates(
             status: "done",
             class: cls.class,
             confidence: msg.confidence,
-            result: { ...cleanControl(cls), postingId: app.postingId, applicationId: app.id },
+            result: {
+              ...cleanControl(cls),
+              postingId: app.postingId,
+              applicationId: app.id,
+              ...(processSuggestion ? { processSuggestion } : {}),
+            },
           },
           at,
         );
@@ -491,6 +558,7 @@ export async function applyMailUpdates(
         out.moved += done.counts.moved;
         out.suggested += done.counts.suggested;
         out.events += done.counts.events;
+        out.todos += (done.counts as { todos?: number }).todos ?? 0;
       }
       ctx.item(
         done.app
@@ -536,6 +604,7 @@ export async function applyMailUpdates(
   if (out.moved) ctx.count("stages_moved", out.moved);
   if (out.suggested) ctx.count("stages_suggested", out.suggested);
   if (out.events) ctx.count("events", out.events);
+  if (out.todos) ctx.count("todos", out.todos);
   return out;
 }
 

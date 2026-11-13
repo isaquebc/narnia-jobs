@@ -858,6 +858,37 @@ export class MockProvider implements Provider {
             }
           : null,
       summary: `E-mail classificado como ${cls}.`,
+      // F15: linhas "AÇÃO: tipo | título | link | prazo" e "FASES: a > b > c" (a atual com *) no texto ou nas imagens
+      actions: [...`${input.text}\n${input.images ?? ""}`.matchAll(/^A[ÇC][ÃA]O:\s*(.+)$/gim)].map(
+        (m) => {
+          const [kind = "other", title = "", url = "", dueAt = ""] = (m[1] ?? "")
+            .split("|")
+            .map((x) => x.trim());
+          return {
+            kind: (["screening", "test", "form", "documents", "interview", "schedule"].includes(
+              kind,
+            )
+              ? kind
+              : "other") as MailClassifyOutput["actions"][number]["kind"],
+            title,
+            url: url || null,
+            dueAt: dueAt || null,
+          };
+        },
+      ),
+      process: (() => {
+        const line = /^FASES:\s*(.+)$/im.exec(`${input.text}\n${input.images ?? ""}`)?.[1];
+        if (!line) return null;
+        const parts = line
+          .split(">")
+          .map((x) => x.trim())
+          .filter(Boolean);
+        const cur = parts.find((x) => x.endsWith("*"));
+        return {
+          stages: parts.map((x) => x.replace(/\*$/, "").trim()),
+          current: cur ? cur.replace(/\*$/, "").trim() : null,
+        };
+      })(),
     };
     return this.result(output, input.text, input.model);
   }

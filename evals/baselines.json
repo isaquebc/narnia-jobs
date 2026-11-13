@@ -277,9 +277,9 @@
       "json_schema": 1,
       "padrao_de_entrega": 1
     },
-    "versionId": "4501167944a59aac7775c3e07a37cdcb458f1d0719d190c51d32e4364af5df3e",
-    "commit": "8aff859",
-    "updatedAt": "2026-11-11T18:25:59.627Z"
+    "versionId": "27d6d227524dbe709eead880c95499f119bb8da041018531fec276d144718dab",
+    "commit": "4944bf5",
+    "updatedAt": "2026-11-12T23:43:07.013Z"
   },
   "narnia-posting-duplicate": {
     "scores": {

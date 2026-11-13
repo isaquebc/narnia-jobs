@@ -91,5 +91,22 @@ export const MailClassifyOutputSchema = z.object({
     .nullable(),
   /** Uma frase em português sobre o que o e-mail diz. */
   summary: z.string(),
+  /**
+   * F15-2: o que o e-mail pede para a pessoa fazer (triagem, teste, formulário, documentos, entrevista, escolher
+   * horário), cada uma com o link (só se estiver no e-mail) e o prazo (ISO 8601) quando escritos. Vazia se não pede nada.
+   */
+  actions: z.array(
+    z.object({
+      kind: z.enum(["screening", "test", "form", "documents", "interview", "schedule", "other"]),
+      title: z.string(),
+      url: z.string().nullable(),
+      dueAt: z.string().nullable(),
+    }),
+  ),
+  /**
+   * F15-6: as fases do processo seletivo quando o e-mail (ou o texto das imagens dele) as lista, na ordem, e a fase em
+   * que a pessoa está agora; `null` se não lista.
+   */
+  process: z.object({ stages: z.array(z.string()), current: z.string().nullable() }).nullable(),
 });
 export type MailClassifyOutput = z.infer<typeof MailClassifyOutputSchema>;

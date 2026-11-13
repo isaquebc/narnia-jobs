@@ -1907,6 +1907,66 @@ export const PROMPT_DATASETS: { [Op in StructuredOperation]: DatasetExample<Op>[
         forbidden: ['"class":"rejection"'],
       },
     },
+    // F15 (2026-11-12): ações pedidas e fases do processo, inclusive lidas das imagens do corpo
+    {
+      id: "triagem-automatica-fases-na-imagem",
+      description:
+        "Convite para triagem automática por WhatsApp de uma candidatura feita; as fases estão no texto da imagem: update com a ação de triagem, o link e as fases com a atual.",
+      input: {
+        from: "Vértice Tech <noreplyhiring@vertice.example>",
+        subject: "[Vaga 4410] Engenheira de IA (Sênior): seu próximo desafio",
+        date: "2026-11-12T15:40:00.000Z",
+        text: "Olá, Ana! Que bom ter você no processo da Vértice Tech. Queremos conhecer você melhor: convidamos você a responder algumas perguntas pelo WhatsApp com a Lia, nossa parceira. O que fazer? Acesse este link para começar a triagem pelo WhatsApp. Responda 4 perguntas técnicas, com até 5 minutos por resposta e até 3 tentativas. Esta etapa não garante a participação nas próximas.",
+        links: ["https://triagem.example/start?c=4410", "https://vertice.example/carreiras"],
+        images:
+          "YOU ARE AT THIS STAGE!\nApplication AI-assisted Resume Analysis AI-assisted Pre-selection Technical and Behavioral Interview. Offer\n*THE STAGES MAY CHANGE DEPENDING ON THE JOB CONTEXT.",
+      },
+      reference: {
+        expected: [
+          '"class":"update"',
+          '"kind":"screening"',
+          "https://triagem.example/start?c=4410",
+          '"stages":[',
+          "Vértice",
+        ],
+        forbidden: ['"process":null', '"actions":[]'],
+      },
+    },
+    {
+      id: "teste-online-com-prazo",
+      description:
+        "Teste online com prazo escrito: update com a ação de teste, o link e o prazo em ISO; sem fases.",
+      input: {
+        from: "Globex Talentos <talentos@globex.example>",
+        subject: "Desafio técnico - Engenheira de Software Pleno",
+        date: "2026-11-06T13:00:00.000Z",
+        text: "Oi, Ana! Você avançou para o desafio técnico da vaga de Engenheira de Software Pleno. Faça o teste online pelo link abaixo até 10/11/2026 às 23h59 (horário de Brasília). Boa sorte!",
+        links: ["https://globex.example/desafio/abc"],
+      },
+      reference: {
+        expected: [
+          '"class":"update"',
+          '"kind":"test"',
+          "https://globex.example/desafio/abc",
+          '"dueAt":"2026-11-10',
+        ],
+      },
+    },
+    {
+      id: "atualizacao-sem-acao",
+      description:
+        "Processo em análise, sem nada para a pessoa fazer: update sem ações e sem fases.",
+      input: {
+        from: "Initech RH <rh@initech.example>",
+        subject: "Sua candidatura está em análise",
+        date: "2026-11-05T12:00:00.000Z",
+        text: "Olá, Ana. Sua candidatura para Analista de Dados está em análise pelo time. Assim que tivermos novidades entraremos em contato. Obrigado pela paciência!",
+        links: [],
+      },
+      reference: {
+        expected: ['"class":"update"', '"actions":[]', '"process":null'],
+      },
+    },
   ],
   postingDuplicate: [
     {

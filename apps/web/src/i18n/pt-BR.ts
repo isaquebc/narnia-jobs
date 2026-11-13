@@ -119,6 +119,11 @@ export const ptBR = {
       attachHint: "Enviou um arquivo feito fora do narnia? Anexe-o numa nota da candidatura.",
     },
     mail: {
+      processTitle: "Fases do processo pelo e-mail",
+      processHint:
+        "Um e-mail lista as fases deste processo. Como você já editou as etapas, o narnia não trocou sozinho:",
+      processCurrent: "você está aqui",
+      processApply: "Usar estas fases",
       heading: "Pelo e-mail",
       suggestions: "Etapas sugeridas pelo e-mail",
       suggestion: "Um e-mail diz que a candidatura passou para {stage}.",
@@ -601,6 +606,7 @@ export const ptBR = {
       deleted: "apagada(s)",
       archived: "arquivada(s)",
       overdue: "tarefa(s) vencida(s)",
+      todos: "tarefa(s) criada(s)",
       due_soon: "tarefa(s) vencendo",
       fetched: "e-mail(s) baixado(s)",
       errors: "erro(s)",

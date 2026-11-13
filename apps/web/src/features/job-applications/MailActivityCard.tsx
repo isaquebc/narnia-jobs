@@ -77,6 +77,46 @@ function Suggestion({
   );
 }
 
+/** F15-6: o e-mail lista as fases do processo e a candidatura tem etapas editadas: a pessoa decide se aplica. */
+function ProcessSuggestion({
+  mailId,
+  p,
+  refresh,
+}: {
+  mailId: string;
+  p: MailActivity["mails"][number]["processSuggestion"];
+  refresh: () => void;
+}) {
+  const api = useApi();
+  const apply = useMutation({ mutationFn: () => api.applyMailProcess(mailId), onSettled: refresh });
+  if (!p) return null;
+  return (
+    <section
+      aria-label={t("jobApplications.mail.processTitle")}
+      className="flex flex-col gap-2 rounded-md border border-primary/40 p-2 text-sm"
+    >
+      <span>{t("jobApplications.mail.processHint")}</span>
+      <ol className="list-decimal pl-5">
+        {p.stages.map((s) => (
+          <li key={s} className={s === p.current ? "font-medium" : undefined}>
+            {s}
+            {s === p.current ? ` (${t("jobApplications.mail.processCurrent")})` : ""}
+          </li>
+        ))}
+      </ol>
+      <Button
+        size="sm"
+        className="self-start"
+        disabled={apply.isPending}
+        onClick={() => apply.mutate()}
+      >
+        {t("jobApplications.mail.processApply")}
+      </Button>
+      {apply.error ? <Alert tone="danger">{describeError(apply.error).title}</Alert> : null}
+    </section>
+  );
+}
+
 /**
  * Pelo e-mail (F14/M6): sugestões de etapa para aprovar, os e-mails que mexeram na candidatura (cada um com
  * "desfazer") e o histórico das etapas com a origem de cada mudança.
@@ -151,6 +191,16 @@ export function MailActivityCard({ application: a }: { application: JobApplicati
           ))}
         </ul>
       ) : null}
+      {d.mails
+        .filter((m) => m.processSuggestion)
+        .map((m) => (
+          <ProcessSuggestion
+            key={`p-${m.id}`}
+            mailId={m.id}
+            p={m.processSuggestion}
+            refresh={refresh}
+          />
+        ))}
       {undo.error ? <Alert tone="danger">{describeError(undo.error).title}</Alert> : null}
       {undo.data?.skipped?.length ? (
         <Alert tone="warn">

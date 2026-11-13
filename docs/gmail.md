@@ -5,7 +5,9 @@ O narnia-jobs pode ler a sua caixa do Gmail e transformar os e-mails de vagas em
 - **Alertas de vagas** (LinkedIn, Glassdoor, Coders e outros) viram vagas num **feed**, ordenado pelo match com os seus perfis. O narnia tenta abrir o link de cada vaga; se não abrir (o LinkedIn costuma pedir login), a vaga ganha a marca **link não abriu** e você completa pela extensão do navegador.
 - **Confirmações de candidatura** criam a candidatura com a **data e a hora do e-mail**.
 - **Negativas** encerram a candidatura com a data e a hora do e-mail e uma nota com o link para ele.
-- **Atualizações** viram nota na candidatura e sugerem a próxima etapa.
+- **Atualizações** viram nota na candidatura e sugerem a próxima etapa. Quando o e-mail pede uma ação (triagem, teste, formulário, documentos, horário), ela vira uma [tarefa](tarefas.md) com o prazo e o link.
+- **Fases do processo:** quando o e-mail lista as fases do processo seletivo, elas viram as etapas da candidatura, se ela ainda tem as etapas padrão; a fase em que você está vira a etapa sugerida (ou movida, quando o automático está ligado). Se você já editou as etapas, a candidatura mostra **Usar estas fases** para você decidir. O **Desfazer** do e-mail devolve as etapas de antes.
+- **Imagens do e-mail:** algumas empresas mandam as fases numa imagem. O narnia só abre as imagens de um e-mail ligado a uma candidatura que você já fez, e só se o remetente for confiável ou do domínio da vaga ou da empresa. Ele baixa no máximo 3 imagens (sem as pequenas, como pixels de rastreio, e nunca de endereços da sua rede) e lê o texto delas no seu computador (OCR); a imagem não vai a nenhum modelo, só o texto lido, junto com o e-mail, para a classificação.
 - **Convites de entrevista** viram etapas na agenda: o convite `.ics` da empresa é o evento oficial; um horário combinado só no texto vira uma etapa **provisória**.
 - Todo e-mail processado ganha a etiqueta **`narnia-jobs`** e é marcado como lido. E-mails fora do assunto não são tocados. E-mails suspeitos ganham a etiqueta **`narnia-jobs/suspeito`** e continuam não lidos.
 

@@ -137,6 +137,34 @@ export function undoMail(
         });
       else if (cur) skipped.push("etapa (mudou depois)");
     }
+    // F15-6: as etapas voltam às de antes, se ainda estão como o e-mail deixou
+    if (u.stages) {
+      const cur = repos.jobApplications.get(u.stages.applicationId);
+      if (cur && cur.stages.map((s) => s.name).join("\n") === u.stages.after.join("\n")) {
+        const back = repos.jobApplications.setStages(
+          cur.id,
+          u.stages.before.map((name) => ({ name })),
+          now,
+        );
+        const stage = back.stages.find((s) => s.name === u.stages?.beforeCurrent);
+        if (stage && back.currentStageId !== stage.id)
+          repos.jobApplications.setCurrentStage(cur.id, stage.id, now, {
+            source: "undo",
+            mailMessageId: mailId,
+          });
+      } else if (cur) skipped.push("etapas (mudaram depois)");
+    }
+    // F15: tarefas do e-mail; a que a pessoa já moveu fica (no desfazer das leituras, sai também)
+    for (const id of u.todoIds ?? []) {
+      const t = repos.todos.get(id);
+      if (!t) continue;
+      if (!opts.force && t.status !== "todo") {
+        skipped.push(`tarefa "${t.title}" (você já mexeu nela)`);
+        continue;
+      }
+      repos.todos.remove(id);
+      repos.notifications.resolveSubject("todo", id);
+    }
     if (u.closed) {
       const cur = repos.jobApplications.get(u.closed.applicationId);
       const mine = new Set(u.entryIds ?? []);

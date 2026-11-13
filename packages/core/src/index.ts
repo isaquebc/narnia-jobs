@@ -139,5 +139,6 @@ export * from "./testing/fake-gh";
 export * from "./testing/fake-gmail";
 export * from "./testing/profile-fixtures";
 export * from "./todos";
+export * from "./todos/from-mail";
 export * from "./todos/notify";
 export * from "./usage";

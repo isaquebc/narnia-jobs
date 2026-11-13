@@ -35,6 +35,12 @@ Quem mostra é um pequeno **vigia** que o `./start.sh` (Linux e macOS) e o `.\st
 
 Para desligar os avisos do sistema, ponha `NARNIA_NOTIFY=0` no `.env` e rode o narnia de novo. Os avisos continuam na bandeja do narnia. O registro do vigia fica em `<dados>/.notify/notify.log`.
 
-## Ainda por vir (F15)
+## Tarefas pelo e-mail
 
-- Tarefas criadas pelos e-mails que pedem uma ação (triagem, teste, formulário, documentos, horário), com o link e o prazo do e-mail.
+Com a [leitura do Gmail](gmail.md) ligada, um e-mail de candidatura que pede uma ação sua vira tarefa em **A fazer**, sozinho:
+
+- **o que conta como ação:** triagem automática (por chat, WhatsApp ou vídeo), teste ou desafio, formulário, mandar documentos, entrevista para comparecer ou escolher um horário. E-mail que só informa ("estamos analisando") não vira tarefa;
+- **o que a tarefa traz:** o título com a empresa, o prazo quando o e-mail diz, o link da ação, a candidatura, **Ver o e-mail** e as tags (a empresa, `e-mail` e o tipo, como `triagem` ou `teste`). Ela nasce com o aviso do sistema;
+- **link só de quem é de confiança:** o link da ação entra quando o remetente é confiável, ou é do domínio da vaga ou da empresa com a autenticação conferida. De outro remetente, a tarefa nasce sem o link e com a tag `confira`: abra o e-mail e confira antes de clicar;
+- **sem repetir:** se já existe uma tarefa aberta do mesmo tipo para a mesma candidatura, o e-mail novo não cria outra;
+- **Desfazer:** o **Desfazer** do e-mail apaga as tarefas que ele criou. A tarefa que você já moveu de coluna fica.

@@ -42,6 +42,7 @@ const VARIABLES: Record<StructuredOperation, Record<string, string>> = {
   },
   postingDuplicate: { salva: "input.saved_json", nova: "input.incoming_json", resposta: OUTPUT },
   mailClassify: {
+    data: "input.date",
     email: "input.text",
     assunto: "input.subject",
     remetente: "input.from",
