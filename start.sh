@@ -167,8 +167,8 @@ media_dirs() { mkdir -p "$1/interviews"; }
 
 # ligado: os composes de dev e produção incluem o perfil (sobe, para e derruba junto com o resto)
 read -r -a MEDIA_ARGS <<<"$(media_profile_args)" || true
-DEV_COMPOSE+=("${MEDIA_ARGS[@]}")
-PROD_COMPOSE+=("${MEDIA_ARGS[@]}")
+DEV_COMPOSE+=(${MEDIA_ARGS[@]+"${MEDIA_ARGS[@]}"})  # bash 3.2 (macOS): array vazio com set -u
+PROD_COMPOSE+=(${MEDIA_ARGS[@]+"${MEDIA_ARGS[@]}"})
 
 # oauth_port -> porta do callback do OAuth do Google no host (a mesma dentro do container: o endereço de retorno é um só)
 oauth_port() { setting NARNIA_OAUTH_PORT 8089; }
@@ -611,7 +611,7 @@ cmd_e2e() {
   "${E2E_COMPOSE[@]}" build
   e2e_up
   # cenários de interface (tudo que não depende de reiniciar serviços)
-  e2e_play --grep-invert '@ops' "${args[@]}" || rc=$?
+  e2e_play --grep-invert '@ops' ${args[@]+"${args[@]}"} || rc=$?
   if (( rc == 0 && ui_only == 0 )); then
     # E2E-06: concluir o onboarding → down → up → dashboard e upload preservados
     e2e_play --grep 'E2E-06.*parte 1' || rc=$?

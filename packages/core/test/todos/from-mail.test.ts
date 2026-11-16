@@ -7,7 +7,10 @@ import {
   applyMailApplications,
   applyMailProcess,
   applyMailUpdates,
+  cleanProcess,
+  companyTag,
   createRepos,
+  MailProcessError,
   migrate,
   openDatabase,
   type Repos,
@@ -231,5 +234,45 @@ describe("F15/M3 · tarefas e fases pelo e-mail", () => {
     ).toBe(false);
     expect(senderMatchesPosting("vagas@gmail.com", p({ company: "Gmail" }))).toBe(false);
     expect(senderMatchesPosting("rh@golpe.example", p({}))).toBe(false);
+  });
+
+  it("ação de tipo desconhecido vira 'outro'; sem título não cria; prazo inválido fica sem prazo", async () => {
+    await applied();
+    mail(
+      out({
+        actions: [
+          { kind: "dançar" as never, title: "  Responder   o RH ", url: null, dueAt: "amanhã" },
+          { kind: "test", title: "   ", url: null, dueAt: null },
+        ],
+      }),
+      "2026-11-12T15:40:00.000Z",
+    );
+    await run();
+    const todos = repos.todos.list({}, "2026-11-13T00:00:00.000Z");
+    expect(todos).toHaveLength(1);
+    expect(todos[0]).toMatchObject({ title: "Responder o RH", kind: "other", dueAt: null });
+    expect(todos[0]?.tags).not.toContain("confira");
+  });
+
+  it("peças: tag da empresa, fases válidas e aplicar sem sugestão", () => {
+    expect(companyTag("Ação & Cia.")).toBe("acao-cia");
+    expect(companyTag(null)).toBeNull();
+    expect(companyTag("!!!")).toBeNull();
+    expect(cleanProcess(null)).toBeNull();
+    expect(
+      cleanProcess({ stages: Array.from({ length: 13 }, (_, i) => `F${i}`), current: null }),
+    ).toBeNull();
+    expect(cleanProcess({ stages: ["A", "B"], current: "  " })).toEqual({
+      stages: ["A", "B"],
+      current: null,
+    });
+    expect(() => applyMailProcess(repos, "nada")).toThrow(MailProcessError);
+    const id = mail(out({}), "2026-11-12T15:40:00.000Z");
+    repos.mail.setResult(
+      id,
+      { status: "done", class: "update", confidence: 90, result: { applicationId: "x" } },
+      "2026-11-12T15:40:00.000Z",
+    );
+    expect(() => applyMailProcess(repos, id)).toThrow(/não sugere fases/);
   });
 });

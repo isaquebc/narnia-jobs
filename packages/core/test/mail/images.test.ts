@@ -98,4 +98,62 @@ describe("F15/M4 · imagens do e-mail", () => {
     expect(terminate).toHaveBeenCalled();
     expect(imagesText(reads)).toBe("Application > Offer");
   });
+
+  it("download: segue o redirecionamento conferido, devolve tipo e corpo; erro, sem destino, grande demais e saltos demais", async () => {
+    const f = safeImageFetch(async () => ["8.8.8.8"]);
+    const real = globalThis.fetch;
+    const responses: Record<string, () => Response> = {
+      "https://a.example/ok.png": () =>
+        new Response(png(600, 400), { headers: { "content-type": "image/png" } }),
+      "https://a.example/vai.png": () =>
+        new Response(null, { status: 301, headers: { location: "/ok.png" } }),
+      "https://a.example/sem-destino.png": () => new Response(null, { status: 302 }),
+      "https://a.example/404.png": () => new Response("x", { status: 404 }),
+      "https://a.example/grande.png": () =>
+        new Response("x", { headers: { "content-length": String(6 * 1024 * 1024) } }),
+      "https://a.example/corpo-grande.png": () => new Response(Buffer.alloc(5 * 1024 * 1024 + 1)),
+      "https://a.example/laco.png": () =>
+        new Response(null, { status: 302, headers: { location: "/laco.png" } }),
+    };
+    globalThis.fetch = vi.fn(async (u: string | URL) =>
+      (responses[String(u)] ?? (() => new Response("", { status: 500 })))(),
+    ) as never;
+    try {
+      const ok = await f("https://a.example/vai.png");
+      expect(ok?.type).toBe("image/png");
+      expect(ok && imageSize(ok.body)).toEqual({ width: 600, height: 400 });
+      expect(await f("https://a.example/sem-destino.png")).toBeNull();
+      expect(await f("https://a.example/404.png")).toBeNull();
+      expect(await f("https://a.example/laco.png")).toBeNull();
+      await expect(f("https://a.example/grande.png")).rejects.toThrow("grande demais");
+      await expect(f("https://a.example/corpo-grande.png")).rejects.toThrow("grande demais");
+      expect(await f("ftp://a.example/x.png")).toBeNull();
+      await expect(f("https://[::1]/x.png")).rejects.toThrow("endereço interno");
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  it("leitura: HTML sem imagem não chama o OCR; download nulo, sem texto e não-imagem ficam marcados", async () => {
+    const recognizer = vi.fn(async () => ({
+      recognize: async () => ({ text: "  ", confidence: 0 }),
+      terminate: async () => {},
+    }));
+    expect(
+      await readMailImages({ html: "<p>oi</p>", fetchImage: async () => null, recognizer }),
+    ).toEqual([]);
+    const reads = await readMailImages({
+      html: `<img src='https://a.example/1.png'><img src=https://a.example/2.png><img src="https://a.example/3.bin">`,
+      fetchImage: async (url) =>
+        url.endsWith("1.png")
+          ? null
+          : url.endsWith("2.png")
+            ? { type: "image/png", body: png(600, 400) }
+            : { type: "application/octet-stream", body: Buffer.from("nada") },
+      recognizer,
+    });
+    expect(reads.map((r) => r.skipped)).toEqual(["não abriu", "sem texto", "não é imagem"]);
+    expect(recognizer).toHaveBeenCalledTimes(1);
+    expect(imagesText(reads)).toBe("");
+  });
 });

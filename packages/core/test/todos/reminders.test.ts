@@ -107,4 +107,32 @@ describe("F15/M2 · avisos das tarefas", () => {
     const last = all.at(-1)?.createdAt as string;
     expect(repos.notifications.createdAfter(last, NATIVE_NOTIFICATION_KINDS, 50)).toEqual([]);
   });
+
+  it("tarefa de uma candidatura leva empresa e cargo no aviso; sem quem publique, avisa do mesmo jeito", async () => {
+    const posting = repos.postings.create({ company: "Acme", title: "Dev Backend" } as never, {
+      source: "user",
+    });
+    const app = repos.jobApplications.create({
+      postingId: posting.id,
+      profileId: null,
+      cvVersionId: null,
+      coverLetterVersionId: null,
+      appliedOn: "2026-11-01",
+      stages: ["Inscrição", "Entrevista"],
+    });
+    const semPrazo = createTodo(repos, { title: "Mandar documentos", applicationId: app.id }, NOW);
+    const n = await notifyTodoCreated(repos, repos.todos.get(semPrazo.id) as never);
+    expect(n.body).toBe("Acme · Dev Backend");
+    const sem = createTodo(repos, { title: "Sem candidatura" }, NOW);
+    expect((await notifyTodoCreated(repos, repos.todos.get(sem.id) as never)).body).toBeNull();
+
+    createTodo(repos, { title: "Teste online", applicationId: app.id, dueAt: h(-2) }, NOW);
+    createTodo(repos, { title: "Formulário", applicationId: app.id, dueAt: h(3) }, NOW);
+    const r = await remindTodos(repos, NOW);
+    expect(r.overdue.map((t) => t.title)).toEqual(["Teste online"]);
+    expect(r.dueSoon.map((t) => t.title)).toEqual(["Formulário"]);
+    const kinds = repos.notifications.list().filter((x) => x.kind !== "todo.created");
+    expect(kinds.every((x) => x.body?.startsWith("Acme · Dev Backend · "))).toBe(true);
+    await resolveTodoNotifications(repos, semPrazo.id);
+  });
 });
